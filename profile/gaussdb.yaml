@@ -1,0 +1,12 @@
+features:
+  savepoint: true
+  callable_statement: true
+  array_type: true
+  ref_type: false
+  struct_type: false
+  sqlxml: false
+  rowset: true
+  blobs: true
+  clobs: true
+  nclobs: false
+  parameter_metadata: true

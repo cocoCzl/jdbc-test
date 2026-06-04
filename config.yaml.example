@@ -1,0 +1,37 @@
+db:
+  type: postgresql
+  url: jdbc:postgresql://localhost:5432/postgres
+  username: postgres
+  password: ${DB_PASSWORD}
+
+ddl:
+  base_path: ddl
+
+dml:
+  base_path: dml
+
+pool:
+  profile_dir: pool
+
+profile:
+  profile_dir: profile
+
+concurrency:
+  enabled: false
+  threads: 4
+  timeout: 300000
+
+execution:
+  mode: local
+
+report:
+  output_dir: report
+  format:
+    - json
+    - html
+    - markdown
+
+test_filter:
+  include_tests: []
+  exclude_tests: []
+  timeout: 60000

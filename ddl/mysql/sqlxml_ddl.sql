@@ -1,0 +1,1 @@
+-- MySQL 不支持 XML 类型，跳过 SQLXML 测试（通过 @RequiresFeature("sqlxml") 标记）

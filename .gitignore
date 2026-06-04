@@ -1,0 +1,36 @@
+# Maven
+target/
+*.jar
+!lib/*.jar
+
+# IDE
+.idea/
+.vscode/
+.classpath
+.project
+.settings/
+*.iml
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Reports
+report/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Config (含密码信息)
+configs/
+config*.yaml
+
+# Logs
+*.log
