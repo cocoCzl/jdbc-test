@@ -20,15 +20,19 @@ import java.util.regex.Pattern;
 public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, AfterEachCallback,
         ParameterResolver, ExecutionCondition {
 
+    private static final ExtensionContext.Namespace ROOT_NAMESPACE =
+            ExtensionContext.Namespace.create(JdbcTestExtension.class);
     private static final Pattern CREATE_TABLE_PATTERN =
             Pattern.compile("CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?(\\S+)",
                     Pattern.CASE_INSENSITIVE);
     private static final int SQL_ERROR_TRUNCATE_LENGTH = 200;
     private static volatile boolean initialized = false;
+    private static volatile String initializedConfigKey;
 
     @Override
     public void beforeAll(ExtensionContext context) throws Exception {
         Config config = ensureInitialized();
+        registerShutdownHook(context);
 
         Class<?> testClass = context.getRequiredTestClass();
         UseSqlScripts annotation = testClass.getAnnotation(UseSqlScripts.class);
@@ -133,10 +137,12 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
     }
 
     private Config ensureInitialized() {
-        if (!initialized) {
+        Config config = ConfigLoader.load();
+        String configKey = configKey(config);
+
+        if (!initialized || !configKey.equals(initializedConfigKey) || JdbcContext.getDataSource() == null) {
             synchronized (JdbcTestExtension.class) {
-                if (!initialized) {
-                    Config config = ConfigLoader.load();
+                if (!initialized || !configKey.equals(initializedConfigKey) || JdbcContext.getDataSource() == null) {
                     JdbcContext.init(
                             config.db.getJdbcUrl(),
                             config.db.getDriverClass(),
@@ -147,11 +153,28 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
                     );
                     FeatureProfile.load(config.db.type, config.profile.profileDir);
                     initialized = true;
+                    initializedConfigKey = configKey;
                     return config;
                 }
             }
         }
-        return ConfigLoader.load();
+        return config;
+    }
+
+    private String configKey(Config config) {
+        return String.join("\u0000",
+                config.db.type.name(),
+                config.db.getJdbcUrl(),
+                config.db.getDriverClass(),
+                config.db.username,
+                config.pool.profileDir,
+                config.profile.profileDir);
+    }
+
+    private void registerShutdownHook(ExtensionContext context) {
+        context.getRoot().getStore(ROOT_NAMESPACE)
+                .getOrComputeIfAbsent("jdbcContext", key -> new JdbcContextResource(),
+                        JdbcContextResource.class);
     }
 
     @Override
@@ -164,6 +187,7 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
     public Object resolveParameter(ParameterContext parameterContext, ExtensionContext extensionContext)
             throws ParameterResolutionException {
         try {
+            registerShutdownHook(extensionContext);
             Connection conn = JdbcContext.getConnection();
             extensionContext.getStore(ExtensionContext.Namespace.create(extensionContext.getRequiredTestClass()))
                     .put(extensionContext.getRequiredTestMethod().getName() + "_conn", conn);
@@ -319,5 +343,14 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
             }
         }
         return raw;
+    }
+
+    private static class JdbcContextResource implements ExtensionContext.Store.CloseableResource {
+        @Override
+        public void close() {
+            JdbcContext.shutdown();
+            initialized = false;
+            initializedConfigKey = null;
+        }
     }
 }

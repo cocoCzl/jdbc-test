@@ -6,6 +6,7 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -15,12 +16,34 @@ public class ConfigLoader {
 
     private static final Pattern ENV_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
 
-    private static volatile Config cached;
+    private static final Map<Path, Config> CACHE = new HashMap<>();
 
     public static Config load() {
-        if (cached != null) {
-            return cached;
+        Path path = resolveConfigPath();
+        synchronized (CACHE) {
+            Config cached = CACHE.get(path);
+            if (cached != null) {
+                return cached;
+            }
         }
+
+        try (InputStream in = new FileInputStream(path.toFile())) {
+            Yaml yaml = new Yaml();
+            Map<String, Object> raw = yaml.load(in);
+            if (raw == null) {
+                throw new IllegalStateException("配置文件为空");
+            }
+            Config config = parse(raw);
+            synchronized (CACHE) {
+                CACHE.put(path, config);
+            }
+            return config;
+        } catch (Exception e) {
+            throw new RuntimeException("加载配置文件失败: " + path, e);
+        }
+    }
+
+    private static Path resolveConfigPath() {
         String configPath = System.getProperty("config.yaml");
         if (configPath == null || configPath.isBlank()) {
             configPath = System.getenv("CONFIG_PATH");
@@ -29,21 +52,15 @@ public class ConfigLoader {
             Path localConfig = Path.of(System.getProperty("user.dir", "."), "configs", "config.yaml");
             configPath = Files.exists(localConfig) ? localConfig.toString() : "config.yaml";
         }
-        Path path = Path.of(System.getProperty("user.dir", "."), configPath);
+
+        Path path = Path.of(configPath);
+        if (!path.isAbsolute()) {
+            path = Path.of(System.getProperty("user.dir", "."), configPath);
+        }
         if (!Files.exists(path)) {
             path = Path.of(configPath);
         }
-        try (InputStream in = new FileInputStream(path.toFile())) {
-            Yaml yaml = new Yaml();
-            Map<String, Object> raw = yaml.load(in);
-            if (raw == null) {
-                throw new IllegalStateException("配置文件为空");
-            }
-            cached = parse(raw);
-            return cached;
-        } catch (Exception e) {
-            throw new RuntimeException("加载配置文件失败: " + path, e);
-        }
+        return path.toAbsolutePath().normalize();
     }
 
     @SuppressWarnings("unchecked")
@@ -114,7 +131,9 @@ public class ConfigLoader {
     }
 
     static void resetForTesting() {
-        cached = null;
+        synchronized (CACHE) {
+            CACHE.clear();
+        }
     }
 
     private static Number numVal(Object v, int defaultVal) {

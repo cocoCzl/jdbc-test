@@ -274,4 +274,60 @@ class StatementTest {
             }
         }
     }
+
+    @Test
+    @Order(20)
+    @DisplayName("Statement poolable hint")
+    void testPoolable(Connection conn) throws SQLException {
+        try (Statement stmt = conn.createStatement()) {
+            stmt.setPoolable(true);
+            assertDoesNotThrow(stmt::isPoolable, "isPoolable 不应抛异常");
+
+            stmt.setPoolable(false);
+            assertDoesNotThrow(stmt::isPoolable, "关闭 poolable hint 后 isPoolable 不应抛异常");
+        }
+    }
+
+    @Test
+    @Order(21)
+    @DisplayName("closeOnCompletion 自动关闭 Statement")
+    void testCloseOnCompletion(Connection conn) throws SQLException {
+        Statement stmt = conn.createStatement();
+        stmt.closeOnCompletion();
+        assertTrue(stmt.isCloseOnCompletion(), "closeOnCompletion 后状态应为 true");
+
+        ResultSet rs = stmt.executeQuery(isOracle() ? "SELECT 1 FROM DUAL" : "SELECT 1");
+        assertFalse(stmt.isClosed(), "ResultSet 关闭前 Statement 不应关闭");
+        rs.close();
+        assertTrue(stmt.isClosed(), "ResultSet 关闭后 Statement 应自动关闭");
+    }
+
+    @Test
+    @Order(22)
+    @DisplayName("executeLargeUpdate 返回长整型影响行数")
+    void testExecuteLargeUpdate(Connection conn) throws SQLException {
+        try (Statement stmt = conn.createStatement()) {
+            long count = stmt.executeLargeUpdate(
+                    "UPDATE statement_test SET value = value WHERE name = '批量1'");
+            assertEquals(1L, count, "executeLargeUpdate 应返回影响行数");
+            assertEquals(1L, stmt.getLargeUpdateCount(), "getLargeUpdateCount 应返回最近影响行数");
+        }
+    }
+
+    @Test
+    @Order(23)
+    @DisplayName("executeLargeBatch 批处理")
+    void testExecuteLargeBatch(Connection conn) throws SQLException {
+        try (Statement stmt = conn.createStatement()) {
+            String t = isOracle() ? "1" : "true";
+            stmt.addBatch("INSERT INTO statement_test (name, value, active) VALUES ('大批处理A', 11, " + t + ")");
+            stmt.addBatch("INSERT INTO statement_test (name, value, active) VALUES ('大批处理B', 12, " + t + ")");
+
+            long[] results = stmt.executeLargeBatch();
+            assertEquals(2, results.length, "应执行 2 条批处理语句");
+            for (long result : results) {
+                assertEquals(1L, result, "每条 INSERT 应影响 1 行");
+            }
+        }
+    }
 }

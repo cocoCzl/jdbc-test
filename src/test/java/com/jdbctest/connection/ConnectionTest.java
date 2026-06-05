@@ -8,6 +8,8 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.sql.*;
+import java.util.Properties;
+import java.util.concurrent.Executor;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -169,5 +171,69 @@ class ConnectionTest {
         assertFalse(conn.isClosed(), "活跃连接 isClosed 应返回 false");
         conn.close();
         assertTrue(conn.isClosed(), "关闭后 isClosed 应返回 true");
+    }
+
+    @Test
+    @Order(13)
+    @DisplayName("nativeSQL 转换 SQL")
+    void testNativeSql(Connection conn) throws SQLException {
+        String sql = isOracle() ? "SELECT 1 FROM DUAL" : "SELECT 1";
+        String nativeSql = conn.nativeSQL(sql);
+        assertNotNull(nativeSql, "nativeSQL 不应返回 null");
+        assertFalse(nativeSql.isBlank(), "nativeSQL 不应返回空字符串");
+    }
+
+    @Test
+    @Order(14)
+    @DisplayName("获取 catalog 和 schema")
+    void testCatalogAndSchema(Connection conn) throws SQLException {
+        assertDoesNotThrow(conn::getCatalog, "getCatalog 不应抛异常");
+        assertDoesNotThrow(conn::getSchema, "getSchema 不应抛异常");
+
+        String catalog = conn.getCatalog();
+        if (catalog != null && !catalog.isBlank()) {
+            assertDoesNotThrow(() -> conn.setCatalog(catalog), "setCatalog 为当前 catalog 不应失败");
+        }
+
+        String schema = conn.getSchema();
+        if (schema != null && !schema.isBlank()) {
+            assertDoesNotThrow(() -> conn.setSchema(schema), "setSchema 为当前 schema 不应失败");
+        }
+    }
+
+    @Test
+    @Order(15)
+    @DisplayName("获取和设置 ResultSet holdability")
+    void testHoldability(Connection conn) throws SQLException {
+        int holdability = conn.getHoldability();
+        assertTrue(holdability == ResultSet.HOLD_CURSORS_OVER_COMMIT
+                        || holdability == ResultSet.CLOSE_CURSORS_AT_COMMIT,
+                "getHoldability 应返回 JDBC 定义值");
+
+        DatabaseMetaData meta = conn.getMetaData();
+        if (meta.supportsResultSetHoldability(holdability)) {
+            conn.setHoldability(holdability);
+            assertEquals(holdability, conn.getHoldability(), "设置当前 holdability 后应保持一致");
+        }
+    }
+
+    @Test
+    @Order(16)
+    @DisplayName("ClientInfo 读取")
+    void testClientInfo(Connection conn) throws SQLException {
+        assertDoesNotThrow(() -> conn.getClientInfo(), "getClientInfo 不应抛异常");
+        Properties clientInfo = conn.getClientInfo();
+        assertNotNull(clientInfo, "getClientInfo 不应返回 null");
+    }
+
+    @Test
+    @Order(17)
+    @DisplayName("NetworkTimeout 获取和设置")
+    void testNetworkTimeout(Connection conn) throws SQLException {
+        int original = conn.getNetworkTimeout();
+        Executor directExecutor = Runnable::run;
+
+        conn.setNetworkTimeout(directExecutor, original);
+        assertEquals(original, conn.getNetworkTimeout(), "设置为当前 network timeout 后应保持一致");
     }
 }

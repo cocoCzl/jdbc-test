@@ -93,4 +93,33 @@ class ConfigLoaderTest {
 
         assertTrue(ex.getMessage().contains("加载配置文件失败"));
     }
+
+    @Test
+    void cachesConfigByResolvedPath() throws Exception {
+        Path mysqlConfig = tempDir.resolve("mysql.yaml");
+        Files.writeString(mysqlConfig, """
+                db:
+                  type: mysql
+                  url: jdbc:mysql://127.0.0.1:3306/sample
+                  username: root
+                  password: secret
+                """);
+        Path postgresConfig = tempDir.resolve("postgres.yaml");
+        Files.writeString(postgresConfig, """
+                db:
+                  type: postgresql
+                  url: jdbc:postgresql://localhost:5432/postgres
+                  username: develop
+                  password: secret
+                """);
+
+        System.setProperty("config.yaml", mysqlConfig.toString());
+        Config mysql = ConfigLoader.load();
+
+        System.setProperty("config.yaml", postgresConfig.toString());
+        Config postgres = ConfigLoader.load();
+
+        assertEquals(Config.DbType.MYSQL, mysql.db.type);
+        assertEquals(Config.DbType.POSTGRESQL, postgres.db.type);
+    }
 }
