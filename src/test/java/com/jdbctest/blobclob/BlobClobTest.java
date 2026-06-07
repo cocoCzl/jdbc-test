@@ -119,9 +119,8 @@ class BlobClobTest {
                 "SELECT text_data FROM blobclob_test WHERE name = '字符流'");
              ResultSet rs = ps.executeQuery()) {
             assertTrue(rs.next());
-            try (Reader reader = rs.getCharacterStream("text_data")) {
-                assertNotNull(reader);
-                BufferedReader br = new BufferedReader(reader);
+            try (Reader reader = rs.getCharacterStream("text_data");
+                 BufferedReader br = new BufferedReader(reader)) {
                 assertNotNull(br.readLine());
             }
         }

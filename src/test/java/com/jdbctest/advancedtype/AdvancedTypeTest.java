@@ -115,7 +115,7 @@ class AdvancedTypeTest {
                 int count = 0;
                 while (arrRs.next()) {
                     count++;
-                    assertNotNull(arrRs.getInt(2), "数组元素值不应为空"); // 列1=索引, 列2=值
+                    arrRs.getInt(2);// 列1=索引, 列2=值
                 }
                 assertEquals(5, count, "应有 5 个元素");
             }

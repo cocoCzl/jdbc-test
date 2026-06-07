@@ -46,11 +46,8 @@ class DataSourceTest {
     @DisplayName("getConnection(user, password) 带认证获取连接")
     void testGetConnectionWithAuth() {
         DataSource ds = getDataSource();
-        assertThrows(SQLException.class, () -> {
-            try (Connection c = ds.getConnection("postgres", "postgres123")) {
-                fail("HikariCP 不支持带认证参数的 getConnection，应抛出异常");
-            }
-        }, "HikariCP 应拒绝带参数的 getConnection(user, password)");
+        assertThrows(SQLException.class, () -> ds.getConnection("postgres", "postgres123"),
+                "HikariCP 应拒绝带参数的 getConnection(user, password)");
     }
 
     @Test
@@ -68,13 +65,12 @@ class DataSourceTest {
     @DisplayName("getLogWriter 和 setLogWriter")
     void testLogWriter() throws SQLException {
         DataSource ds = getDataSource();
-        PrintWriter pw = new PrintWriter(System.out);
-        try {
+        try (PrintWriter pw = new PrintWriter(System.out)) {
             ds.setLogWriter(pw);
             PrintWriter retrieved = ds.getLogWriter();
             assertNotNull(retrieved);
         } catch (SQLFeatureNotSupportedException e) {
-            // HikariCP 可能不支持
+            // HikariCP 不支持
         }
     }
 
@@ -86,8 +82,8 @@ class DataSourceTest {
         try {
             Logger logger = ds.getParentLogger();
             assertNotNull(logger, "getParentLogger 应返回有效 Logger");
-        } catch (SQLFeatureNotSupportedException e) {
-            // HikariCP 不支持，跳过
+        } catch (SQLFeatureNotSupportedException ignore) {
+            // HikariCP 不支持
         }
     }
 

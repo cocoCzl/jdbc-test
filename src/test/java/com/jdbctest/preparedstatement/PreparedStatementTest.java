@@ -292,9 +292,10 @@ class PreparedStatementTest {
     @Order(19)
     @DisplayName("isClosed 和 close 状态")
     void testIsClosed(Connection conn) throws SQLException {
-        PreparedStatement ps = conn.prepareStatement("SELECT 1");
-        assertFalse(ps.isClosed());
-        ps.close();
-        assertTrue(ps.isClosed());
+        try (PreparedStatement ps = conn.prepareStatement("SELECT 1")) {
+            assertFalse(ps.isClosed());
+            ps.close();
+            assertTrue(ps.isClosed());
+        }
     }
 }

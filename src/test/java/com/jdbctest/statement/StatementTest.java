@@ -225,10 +225,11 @@ class StatementTest {
     @Order(16)
     @DisplayName("isClosed 和 close 状态检查")
     void testIsClosed(Connection conn) throws SQLException {
-        Statement stmt = conn.createStatement();
-        assertFalse(stmt.isClosed(), "新 Statement 不应关闭");
-        stmt.close();
-        assertTrue(stmt.isClosed(), "关闭后 isClosed 应返回 true");
+        try (Statement stmt = conn.createStatement()) {
+            assertFalse(stmt.isClosed(), "新 Statement 不应关闭");
+            stmt.close();
+            assertTrue(stmt.isClosed(), "关闭后 isClosed 应返回 true");
+        }
     }
 
     @Test
@@ -264,7 +265,9 @@ class StatementTest {
                 } else {
                     stmt.execute("DROP TABLE IF EXISTS temp_test_ddl");
                 }
-            } catch (SQLException ignored) {}
+            } catch (SQLException ignored) {
+                // table may not exist
+            }
             int count = stmt.executeUpdate("CREATE TABLE temp_test_ddl (id INT)");
             assertEquals(0, count, "DDL 语句应返回 0");
             if (isOracle()) {
@@ -292,14 +295,15 @@ class StatementTest {
     @Order(21)
     @DisplayName("closeOnCompletion 自动关闭 Statement")
     void testCloseOnCompletion(Connection conn) throws SQLException {
-        Statement stmt = conn.createStatement();
-        stmt.closeOnCompletion();
-        assertTrue(stmt.isCloseOnCompletion(), "closeOnCompletion 后状态应为 true");
+        try (Statement stmt = conn.createStatement()) {
+            stmt.closeOnCompletion();
+            assertTrue(stmt.isCloseOnCompletion(), "closeOnCompletion 后状态应为 true");
 
-        ResultSet rs = stmt.executeQuery(isOracle() ? "SELECT 1 FROM DUAL" : "SELECT 1");
-        assertFalse(stmt.isClosed(), "ResultSet 关闭前 Statement 不应关闭");
-        rs.close();
-        assertTrue(stmt.isClosed(), "ResultSet 关闭后 Statement 应自动关闭");
+            ResultSet rs = stmt.executeQuery(isOracle() ? "SELECT 1 FROM DUAL" : "SELECT 1");
+            assertFalse(stmt.isClosed(), "ResultSet 关闭前 Statement 不应关闭");
+            rs.close();
+            assertTrue(stmt.isClosed(), "ResultSet 关闭后 Statement 应自动关闭");
+        }
     }
 
     @Test

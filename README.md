@@ -14,9 +14,9 @@ JDBC Test 是一个基于 Maven 和 JUnit 5 的 JDBC 接口兼容性测试项目
 
 ## 环境要求
 
-- JDK 21
+- JDK 21+
 - Maven 3.8+
-- Python 3.8+，使用 `scripts/runner.py` 生成归档报告时需要
+- Python 3.8+（仅生成归档报告时需要）
 - 可访问的目标数据库实例
 
 Python 依赖：
@@ -37,7 +37,7 @@ pip install -r scripts/requirements.txt
 ├── profile/                 # 数据库能力开关配置
 ├── report/                  # runner 生成的测试报告归档
 ├── scripts/runner.py        # 测试执行和报告生成脚本
-├── src/main/java/           # 构建期辅助代码
+├── src/main/java/           # 构建期辅助代码（配置加载、属性生成）
 ├── src/test/java/           # JUnit 测试代码
 ├── config.yaml.example      # 配置模板
 ├── Dockerfile               # Docker 执行环境
@@ -46,119 +46,75 @@ pip install -r scripts/requirements.txt
 
 ## 快速开始
 
-复制配置模板：
+项目已在 `configs/` 下预置了三种数据库配置：
+
+| 数据库     | 配置文件                        |
+|-----------|-------------------------------|
+| PostgreSQL | `configs/config-postgresql.yaml` |
+| MySQL      | `configs/config-mysql.yaml`      |
+| Oracle     | `configs/config-oracle.yaml`     |
+
+### 1. 配置数据库连接
+
+复制对应数据库的配置，或直接使用已有配置：
 
 ```bash
-cp config.yaml.example configs/config.yaml
+# 以 PostgreSQL 为例
+cp configs/config-postgresql.yaml configs/config.yaml
 ```
 
-修改 `configs/config.yaml` 中的数据库连接信息：
+然后修改 `configs/config.yaml` 中的数据库连接信息：
 
 ```yaml
 db:
   type: postgresql
   url: jdbc:postgresql://localhost:5432/postgres
-  username: postgres
-  password: ${DB_PASSWORD}
+  username: your_user
+  password: your_password
 ```
 
-设置密码环境变量：
+> 密码也支持环境变量替换：`password: ${DB_PASSWORD}`，此时需先 `export DB_PASSWORD='your-password'`。
+
+### 2. 执行测试
+
+**方式一：Python runner（推荐，会生成格式化报告）**
 
 ```bash
-export DB_PASSWORD='your-password'
+python3 scripts/runner.py configs/config.yaml
 ```
 
-执行测试并生成报告：
+也可以直接指定其他配置运行不同数据库：
 
 ```bash
-python scripts/runner.py configs/config.yaml
+python3 scripts/runner.py configs/config-mysql.yaml
+python3 scripts/runner.py configs/config-oracle.yaml
 ```
 
-报告会输出到：
+报告输出到 `report/{db_type}_{timestamp}/`，包含 `report.json`、`report.html` 和 `report.md`。
 
-```text
-report/{db_type}_{timestamp}/
-```
-
-根据配置，目录中会生成 `report.json`、`report.html` 和 `report.md`。
-
-## 直接使用 Maven 执行
-
-也可以不经过 Python runner，直接运行 JUnit 测试：
+**方式二：Maven 直接执行（仅生成 Surefire 原始报告）**
 
 ```bash
 mvn test -Dconfig.yaml=configs/config.yaml
 ```
 
-这种方式会生成 Maven Surefire 原始报告：
+Surefire 报告位于 `target/surefire-reports/`。
 
-```text
-target/surefire-reports/
-```
+**方式三：IDEA 中运行**
 
-## 配置说明
+1. **File → Project Structure → Modules**，确认 `src/test/java` 被标记为 Test Sources Root（绿色文件夹图标）
+2. **Run → Edit Configurations → + → JUnit**
+   - Test kind: `All in package`
+   - Package: `com.jdbctest`
+   - Module: `jdbc-test`
+   - VM options: `-Dconfig.yaml=configs/config.yaml`
+3. 点击绿色 ▶ 运行
 
-完整配置示例见 `config.yaml.example`。
-
-```yaml
-db:
-  type: postgresql
-  url: jdbc:postgresql://localhost:5432/postgres
-  username: postgres
-  password: ${DB_PASSWORD}
-
-ddl:
-  base_path: ddl
-
-dml:
-  base_path: dml
-
-pool:
-  profile_dir: pool
-
-profile:
-  profile_dir: profile
-
-concurrency:
-  enabled: false
-  threads: 4
-  timeout: 300000
-
-execution:
-  mode: local
-
-report:
-  output_dir: report
-  format:
-    - json
-    - html
-    - markdown
-
-test_filter:
-  include_tests: []
-  exclude_tests: []
-  timeout: 60000
-```
-
-主要字段：
-
-- `db.type`：数据库类型，支持 `postgresql`、`gaussdb`、`mysql`、`oracle`、`sqlserver`
-- `db.url`：完整 JDBC URL
-- `db.username` / `db.password`：数据库账号密码，密码支持 `${ENV_NAME}` 环境变量替换
-- `ddl.base_path`：DDL 脚本根目录
-- `dml.base_path`：DML 脚本根目录
-- `pool.profile_dir`：连接池配置目录
-- `profile.profile_dir`：数据库能力配置目录
-- `concurrency.enabled`：是否按测试类并行执行
-- `concurrency.threads`：并行线程数
-- `execution.mode`：执行模式，支持 `local` 和 `docker`
-- `report.format`：归档报告格式，支持 `json`、`html`、`markdown`
-- `test_filter.include_tests`：只运行指定测试类或方法
-- `test_filter.exclude_tests`：排除指定测试类或方法
+> IDEA 中运行仅显示 IDEA 内置测试面板，不生成项目的格式化报告。如需 HTML 报告，请使用 Python runner。
 
 ## 运行指定测试
 
-通过配置文件过滤测试：
+通过配置文件过滤：
 
 ```yaml
 test_filter:
@@ -174,6 +130,26 @@ test_filter:
 ```bash
 mvn test -Dconfig.yaml=configs/config.yaml -Dtest=ConnectionTest
 ```
+
+## 测试覆盖范围
+
+| 模块                    | 测试类                         | 主要验证内容                          |
+|------------------------|-------------------------------|-------------------------------------|
+| Connection             | ConnectionTest                | 连接、自动提交、事务、Schema、类型映射     |
+| Statement              | StatementTest                 | execute/executeQuery/executeUpdate、批处理、超时 |
+| PreparedStatement      | PreparedStatementTest          | 参数绑定、批处理、获取生成主键             |
+| CallableStatement      | CallableStatementTest          | 函数调用、输出参数、wasNull              |
+| ResultSet              | ResultSetTest                 | 游标移动、类型读取、wasNull、滚动结果集     |
+| DatabaseMetaData       | DatabaseMetaDataTest          | 表/列/主键/索引等元数据查询              |
+| ResultSetMetaData      | ResultSetMetaDataTest         | 列类型、精度、可空性、自增等属性           |
+| ParameterMetaData      | ParameterMetaDataTest         | 参数数量、类型、模式等                  |
+| Savepoint              | SavepointTest                 | 创建/释放/回滚保存点                    |
+| RowSet                 | RowSetTest                    | JdbcRowSet 导航、更新、插入、删除         |
+| Blob/Clob              | BlobClobTest                  | 二进制和文本大数据读写、流操作             |
+| SQLXML                 | SQLXMLTest                    | XML 数据读写、Source/Result 操作        |
+| DataSource             | DataSourceTest                | 连接池获取、超时、日志等                 |
+| Wrapper                | WrapperTest                   | isWrapperFor/unwrap 契约             |
+| AdvancedType           | AdvancedTypeTest              | 数组、结构等高级类型                     |
 
 ## 数据库脚本
 
@@ -284,7 +260,17 @@ report/{db_type}_{timestamp}/
 
 ## 常见问题
 
-### 配置文件不存在
+### MySQL 需要预先创建数据库
+
+MySQL 的 JDBC URL 中必须指定数据库名（如 `jdbc:mysql://host:port/jdbctest`），因此需要提前在 MySQL 中创建数据库：
+
+```sql
+CREATE DATABASE jdbctest;
+```
+
+PostgreSQL 默认存在 `postgres` 库可直接使用，Oracle 使用用户默认 tablespace 无需额外操作。
+
+### 配置文件找不到
 
 默认加载顺序：
 
@@ -332,3 +318,10 @@ profile/{db_type}.yaml
 ```
 
 如果数据库实际支持该能力，可以将对应 feature 改为 `true`。
+
+### IDEA 中运行按钮灰色
+
+1. 确认 `src/test/java` 目录被标记为 Test Sources Root（绿色文件夹图标）
+2. 右键该目录 → **Mark Directory as** → **Test Sources Root**
+3. 刷新 Maven：右键 `pom.xml` → **Maven** → **Reload Project**
+4. 如仍不行：**File** → **Invalidate Caches** → 勾选全部 → **Invalidate and Restart**

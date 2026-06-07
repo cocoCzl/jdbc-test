@@ -29,7 +29,7 @@ class ConnectionTest {
     @Order(1)
     @DisplayName("获取自动提交模式")
     void testGetAutoCommit(Connection conn) throws SQLException {
-        assertDoesNotThrow(() -> conn.getAutoCommit(), "getAutoCommit 不应抛异常");
+        assertDoesNotThrow(conn::getAutoCommit, "getAutoCommit 不应抛异常");
         boolean autoCommit = conn.getAutoCommit();
         assertFalse(conn.isClosed(), "未关闭的连接 getAutoCommit 不应失败");
     }
@@ -152,7 +152,7 @@ class ConnectionTest {
         assertNotNull(meta, "getMetaData 不应返回 null");
         assertNotNull(meta.getDatabaseProductName(), "数据库产品名不为空");
         assertNotNull(meta.getDriverName(), "驱动名不为空");
-        assertTrue(meta.getDriverVersion().length() > 0, "驱动版本不为空");
+        assertFalse(meta.getDriverVersion().isEmpty(), "驱动版本不为空");
     }
 
     @Test

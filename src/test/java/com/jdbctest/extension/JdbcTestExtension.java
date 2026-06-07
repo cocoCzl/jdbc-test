@@ -70,9 +70,9 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
             }
         }
 
+        @SuppressWarnings("unchecked")
         List<String> tables = (List<String>) context.getStore(
-                ExtensionContext.Namespace.create(testClass)
-        ).get("createdTables");
+            ExtensionContext.Namespace.create(testClass)).get("createdTables");
 
         if (tables == null || tables.isEmpty()) {
             return;
@@ -328,7 +328,7 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
             public int skipAfterMatch() { return 0; }
         });
         for (int i = 0; i < raw.length; i++) {
-            String trimmed = raw[i].trim().toUpperCase(java.util.Locale.ENGLISH);
+            String trimmed = raw[i].trim().toUpperCase(Locale.ENGLISH);
             // Preserve trailing ; for PL/SQL blocks and function/procedure/package/trigger definitions
             if (!trimmed.startsWith("BEGIN") && !trimmed.startsWith("DECLARE")
                     && !trimmed.startsWith("CREATE OR REPLACE FUNCTION")

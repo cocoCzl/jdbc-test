@@ -22,10 +22,8 @@ public class Config {
 
         public String getIdentifierQuote() {
             return switch (this) {
-                case POSTGRESQL, GAUSSDB -> "\"";
                 case MYSQL -> "`";
-                case ORACLE -> "\"";
-                case SQLSERVER -> "\"";
+                case POSTGRESQL, GAUSSDB, ORACLE, SQLSERVER -> "\"";
                 default -> "\"";
             };
         }

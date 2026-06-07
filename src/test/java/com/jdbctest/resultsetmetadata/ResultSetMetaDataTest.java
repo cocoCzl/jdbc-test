@@ -23,12 +23,6 @@ class ResultSetMetaDataTest {
         return ConfigLoader.load().db.type == Config.DbType.ORACLE;
     }
 
-    private ResultSetMetaData getMeta(Connection conn) throws SQLException {
-        Statement stmt = conn.createStatement();
-        ResultSet rs = stmt.executeQuery("SELECT id, name, value, amount, active, created_at, rating, big_num FROM resultset_test");
-        return rs.getMetaData();
-    }
-
     @Test
     @Order(1)
     @DisplayName("getColumnCount 获取列数")
@@ -158,9 +152,7 @@ class ResultSetMetaDataTest {
              ResultSet rs = stmt.executeQuery("SELECT id, name FROM resultset_test")) {
             ResultSetMetaData meta = rs.getMetaData();
             if (isOracle()) {
-                // Oracle GENERATED AS IDENTITY may not report isAutoIncrement
-                assertTrue(meta.isAutoIncrement(1) || !meta.isAutoIncrement(1),
-                        "isAutoIncrement 调用应正常完成");
+                assertDoesNotThrow(() -> meta.isAutoIncrement(1), "isAutoIncrement 调用应正常完成");
             } else {
                 assertTrue(meta.isAutoIncrement(1), "id 应为自增列");
             }
@@ -180,9 +172,7 @@ class ResultSetMetaDataTest {
                 assertFalse(meta.isCurrency(2), "INT 不应为货币类型");
             }
             assertTrue(meta.isSigned(2), "INT 应为有符号");
-            if (meta.isReadOnly(1)) {
-                // 有些驱动可能返回 true
-            }
+            assertNotNull(meta.isReadOnly(1), "isReadOnly 应返回有效值");
         }
     }
 

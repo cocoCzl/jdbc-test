@@ -307,7 +307,6 @@ class DatabaseMetaDataTest {
     void testSupportsMultipleResultSets(Connection conn) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
         assertNotNull(meta);
-        assertDoesNotThrow(() -> meta.supportsMultipleResultSets(),
-                "supportsMultipleResultSets 应可正常调用");
+        assertDoesNotThrow(meta::supportsMultipleResultSets, "supportsMultipleResultSets 应可正常调用");
     }
 }

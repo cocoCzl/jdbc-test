@@ -326,7 +326,7 @@ class ResultSetTest {
              ResultSet rs = stmt.executeQuery("SELECT * FROM resultset_test")) {
             rs.clearWarnings();
             SQLWarning warning = rs.getWarnings();
-            assertTrue(warning == null || warning instanceof SQLWarning);
+            assertNull(warning, "clearWarnings 后 getWarnings 应返回 null");
         }
     }
 
@@ -334,10 +334,12 @@ class ResultSetTest {
     @Order(24)
     @DisplayName("close 和 isClosed")
     void testClose(Connection conn) throws SQLException {
-        ResultSet rs = conn.createStatement().executeQuery("SELECT * FROM resultset_test");
-        assertFalse(rs.isClosed());
-        rs.close();
-        assertTrue(rs.isClosed());
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT * FROM resultset_test")) {
+            assertFalse(rs.isClosed());
+            rs.close();
+            assertTrue(rs.isClosed());
+        }
     }
 
     @Test

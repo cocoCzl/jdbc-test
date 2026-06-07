@@ -23,7 +23,6 @@ public class FeatureProfile {
 
         try (InputStream in = new FileInputStream(path.toFile())) {
             Yaml yaml = new Yaml();
-            @SuppressWarnings("unchecked")
             Map<String, Object> raw = yaml.load(in);
             @SuppressWarnings("unchecked")
             Map<String, Object> featureMap = (Map<String, Object>) raw.get("features");

@@ -99,7 +99,7 @@ class SQLXMLTest {
             assertTrue(rs.next());
             SQLXML xml = rs.getSQLXML("xml_data");
             // Oracle requires a specific Source class, null not supported
-            Source source = isOracle() ? xml.getSource(javax.xml.transform.stream.StreamSource.class) : xml.getSource(null);
+            Source source = isOracle() ? xml.getSource(StreamSource.class) : xml.getSource(null);
             assertNotNull(source, "getSource 应返回非空");
         }
     }
