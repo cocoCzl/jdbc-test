@@ -23,6 +23,8 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
 
+from compatibility_v1 import build_v1_report, generate_matrix, vendor_extension_report
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -259,6 +261,8 @@ def parse_surefire_reports():
                 "failures": int(root.get("failures", 0)),
                 "errors": int(root.get("errors", 0)),
                 "skipped": int(root.get("skipped", 0)),
+                "system_err": root.findtext("system-err", default=""),
+                "system_out": root.findtext("system-out", default=""),
                 "testcases": [],
             }
 
@@ -448,6 +452,7 @@ def generate_html_report(report):
     summary = report["测试汇总"]
     env = report["环境信息"]
     exec_info = report["执行概要"]
+    v1 = report.get("v1_compatibility_report", {})
 
     status_style = {
         "passed": "color:#2e7d32;font-weight:bold",
@@ -525,6 +530,7 @@ tr:hover {{ background: #f5f5f5; }}
 <div class="container">
 <h1>JDBC 接口测试报告</h1>
 <p>生成时间: {report['生成时间']} | 执行耗时: {exec_info['总耗时秒']}s</p>
+{_v1_html_summary(v1)}
 
 <div class="summary">
 <div class="card green"><div class="num">{summary['通过']}</div><div>通过</div></div>
@@ -555,12 +561,40 @@ def generate_markdown_report(report):
     summary = report["测试汇总"]
     env = report["环境信息"]
     exec_info = report["执行概要"]
+    v1 = report.get("v1_compatibility_report", {})
 
     lines = [
         f"# JDBC 接口测试报告",
         "",
         f"**数据库类型**: {env.get('数据库类型', '')} | **生成时间**: {report['生成时间']} | **总耗时**: {exec_info['总耗时秒']}s",
         "",
+    ]
+    if v1:
+        lines += [
+            "## v1 兼容性评估",
+            "",
+            "| 项目 | 值 |",
+            "|------|------|",
+            f"| Target Outcome | {v1.get('target_outcome', '')} |",
+            f"| Run Kind | {v1.get('run_kind', '')} |",
+            f"| Compatibility Baseline Version | {v1.get('compatibility_baseline_version', '')} |",
+            f"| Report Schema Version | {v1.get('report_schema_version', '')} |",
+            f"| Capability Profile | {(v1.get('capability_profile') or {}).get('completeness', 'N/A')} |",
+            "",
+            "### v1 场景结果",
+            "",
+            "| Scenario ID | Category | Compatibility Status | Source |",
+            "|-------------|----------|----------------------|--------|",
+        ]
+        for scenario_id, result in v1.get("scenario_results", {}).items():
+            source = result.get("source_class", "").split(".")[-1] + "." + result.get("source_method", "")
+            lines.append(
+                f"| {_md_escape(scenario_id)} | {result.get('category', '')} | "
+                f"{result.get('compatibility_status', '')} | {_md_escape(source)} |"
+            )
+        lines.append("")
+
+    lines += [
         "## 测试汇总",
         "",
         "| 指标 | 数值 |",
@@ -618,6 +652,44 @@ def _md_escape(text):
     return str(text).replace("|", "\\|").replace("\n", " ")
 
 
+def _v1_html_summary(v1):
+    if not v1:
+        return ""
+    profile = v1.get("capability_profile") or {}
+    rows = [
+        ("Target Outcome", v1.get("target_outcome", "")),
+        ("Run Kind", v1.get("run_kind", "")),
+        ("Compatibility Baseline Version", v1.get("compatibility_baseline_version", "")),
+        ("Report Schema Version", v1.get("report_schema_version", "")),
+        ("Capability Profile", profile.get("completeness", "N/A")),
+    ]
+    summary_rows = "".join(
+        f"<tr><td><b>{_html_escape(k)}</b></td><td>{_html_escape(v)}</td></tr>"
+        for k, v in rows
+    )
+    scenario_rows = "".join(
+        "<tr>"
+        f"<td>{_html_escape(scenario_id)}</td>"
+        f"<td>{_html_escape(result.get('category', ''))}</td>"
+        f"<td>{_html_escape(result.get('compatibility_status', ''))}</td>"
+        f"<td>{_html_escape(result.get('source_class', '').split('.')[-1] + '.' + result.get('source_method', ''))}</td>"
+        "</tr>"
+        for scenario_id, result in v1.get("scenario_results", {}).items()
+    )
+    return f"""
+<h2>v1 兼容性评估</h2>
+<table>
+<tr><th style="width:260px">项目</th><th>值</th></tr>
+{summary_rows}
+</table>
+<h2>v1 场景结果</h2>
+<table>
+<tr><th>Scenario ID</th><th>Category</th><th>Compatibility Status</th><th>Source</th></tr>
+{scenario_rows}
+</table>
+"""
+
+
 def archive_report(config, report):
     """归档报告到 report/{db_type}_{timestamp}/"""
     db_type = config.get("db", {}).get("type", "unknown")
@@ -636,6 +708,23 @@ def archive_report(config, report):
         with open(json_path, "w", encoding="utf-8") as f:
             json.dump(report, f, ensure_ascii=False, indent=2)
         print(f"[归档] JSON -> {json_path}")
+
+        v1_report = report.get("v1_compatibility_report")
+        if v1_report:
+            v1_path = report_dir / "compatibility-report-v1.json"
+            with open(v1_path, "w", encoding="utf-8") as f:
+                json.dump(v1_report, f, ensure_ascii=False, indent=2)
+            print(f"[归档] v1 JSON -> {v1_path}")
+
+            matrix_path = report_dir / "compatibility-matrix.json"
+            with open(matrix_path, "w", encoding="utf-8") as f:
+                json.dump(generate_matrix([v1_report]), f, ensure_ascii=False, indent=2)
+            print(f"[归档] Matrix -> {matrix_path}")
+
+            vendor_path = report_dir / "vendor-extension-report.json"
+            with open(vendor_path, "w", encoding="utf-8") as f:
+                json.dump(vendor_extension_report([v1_report]), f, ensure_ascii=False, indent=2)
+            print(f"[归档] Vendor Extensions -> {vendor_path}")
 
     if "html" in formats:
         html_path = report_dir / "report.html"
@@ -685,6 +774,7 @@ def main():
     # 5. 生成报告并归档
     print("[5/5] 生成报告...")
     report = generate_json_report(config, execution, test_suites, env_info)
+    report["v1_compatibility_report"] = build_v1_report(config, execution, test_suites, env_info, PROJECT_ROOT)
     archive_path = archive_report(config, report)
 
     print("=" * 60)
@@ -693,6 +783,7 @@ def main():
     print(f"  测试用例: {summary['测试方法总数']}")
     print(f"  通过: {summary['通过']} | 失败: {summary['失败']} | 错误: {summary['错误']} | 跳过: {summary['跳过']}")
     print(f"  通过率: {summary['通过率']}")
+    print(f"  Target Outcome: {report['v1_compatibility_report']['target_outcome']}")
     print(f"  总耗时: {summary.get('总耗时秒', execution['elapsed_seconds'])}s")
     print(f"  报告目录: {archive_path}")
     print("=" * 60)

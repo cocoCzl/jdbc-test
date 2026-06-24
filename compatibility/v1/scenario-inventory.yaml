@@ -1,0 +1,1183 @@
+compatibility_baseline_version: 1.0.0
+deprecated_scenario_ids: []
+scenarios:
+- scenario_id: advanced_type.array_get_array
+  category: extended
+  contract: advanced type array get array follows the JDBC-facing API contract when
+    capabilities array_type are declared.
+  source_class: com.jdbctest.advancedtype.AdvancedTypeTest
+  source_method: testArrayGetArray
+  required_capabilities:
+  - array_type
+- scenario_id: advanced_type.array_get_result_set
+  category: extended
+  contract: advanced type array get result set follows the JDBC-facing API contract
+    when capabilities array_type are declared.
+  source_class: com.jdbctest.advancedtype.AdvancedTypeTest
+  source_method: testArrayGetResultSet
+  required_capabilities:
+  - array_type
+- scenario_id: advanced_type.empty_array
+  category: extended
+  contract: advanced type empty array follows the JDBC-facing API contract when capabilities
+    array_type are declared.
+  source_class: com.jdbctest.advancedtype.AdvancedTypeTest
+  source_method: testEmptyArray
+  required_capabilities:
+  - array_type
+- scenario_id: advanced_type.get_array
+  category: extended
+  contract: advanced type get array follows the JDBC-facing API contract when capabilities
+    array_type are declared.
+  source_class: com.jdbctest.advancedtype.AdvancedTypeTest
+  source_method: testGetArray
+  required_capabilities:
+  - array_type
+- scenario_id: advanced_type.get_base_type
+  category: extended
+  contract: advanced type get base type follows the JDBC-facing API contract when
+    capabilities array_type are declared.
+  source_class: com.jdbctest.advancedtype.AdvancedTypeTest
+  source_method: testGetBaseType
+  required_capabilities:
+  - array_type
+- scenario_id: advanced_type.get_base_type_name
+  category: extended
+  contract: advanced type get base type name follows the JDBC-facing API contract
+    when capabilities array_type are declared.
+  source_class: com.jdbctest.advancedtype.AdvancedTypeTest
+  source_method: testGetBaseTypeName
+  required_capabilities:
+  - array_type
+- scenario_id: advanced_type.set_array
+  category: extended
+  contract: advanced type set array follows the JDBC-facing API contract when capabilities
+    array_type are declared.
+  source_class: com.jdbctest.advancedtype.AdvancedTypeTest
+  source_method: testSetArray
+  required_capabilities:
+  - array_type
+- scenario_id: advanced_type.string_array
+  category: extended
+  contract: advanced type string array follows the JDBC-facing API contract when capabilities
+    array_type are declared.
+  source_class: com.jdbctest.advancedtype.AdvancedTypeTest
+  source_method: testStringArray
+  required_capabilities:
+  - array_type
+- scenario_id: blob_clob.binary_stream
+  category: core
+  contract: blob clob binary stream follows the JDBC-facing API contract.
+  source_class: com.jdbctest.blobclob.BlobClobTest
+  source_method: testBinaryStream
+  required_capabilities: []
+- scenario_id: blob_clob.bytea_length
+  category: core
+  contract: blob clob bytea length follows the JDBC-facing API contract.
+  source_class: com.jdbctest.blobclob.BlobClobTest
+  source_method: testByteaLength
+  required_capabilities: []
+- scenario_id: blob_clob.character_stream
+  category: core
+  contract: blob clob character stream follows the JDBC-facing API contract.
+  source_class: com.jdbctest.blobclob.BlobClobTest
+  source_method: testCharacterStream
+  required_capabilities: []
+- scenario_id: blob_clob.get_bytes
+  category: core
+  contract: blob clob get bytes follows the JDBC-facing API contract.
+  source_class: com.jdbctest.blobclob.BlobClobTest
+  source_method: testGetBytes
+  required_capabilities: []
+- scenario_id: blob_clob.get_string
+  category: core
+  contract: blob clob get string follows the JDBC-facing API contract.
+  source_class: com.jdbctest.blobclob.BlobClobTest
+  source_method: testGetString
+  required_capabilities: []
+- scenario_id: blob_clob.large_text
+  category: core
+  contract: blob clob large text follows the JDBC-facing API contract.
+  source_class: com.jdbctest.blobclob.BlobClobTest
+  source_method: testLargeText
+  required_capabilities: []
+- scenario_id: blob_clob.null_binary
+  category: core
+  contract: blob clob null binary follows the JDBC-facing API contract.
+  source_class: com.jdbctest.blobclob.BlobClobTest
+  source_method: testNullBinary
+  required_capabilities: []
+- scenario_id: blob_clob.set_bytes
+  category: core
+  contract: blob clob set bytes follows the JDBC-facing API contract.
+  source_class: com.jdbctest.blobclob.BlobClobTest
+  source_method: testSetBytes
+  required_capabilities: []
+- scenario_id: blob_clob.set_null_binary
+  category: core
+  contract: blob clob set null binary follows the JDBC-facing API contract.
+  source_class: com.jdbctest.blobclob.BlobClobTest
+  source_method: testSetNullBinary
+  required_capabilities: []
+- scenario_id: blob_clob.set_string
+  category: core
+  contract: blob clob set string follows the JDBC-facing API contract.
+  source_class: com.jdbctest.blobclob.BlobClobTest
+  source_method: testSetString
+  required_capabilities: []
+- scenario_id: blob_clob.text_length
+  category: core
+  contract: blob clob text length follows the JDBC-facing API contract.
+  source_class: com.jdbctest.blobclob.BlobClobTest
+  source_method: testTextLength
+  required_capabilities: []
+- scenario_id: callable_statement.call_function_get_count
+  category: core
+  contract: callable statement call function get count follows the JDBC-facing API
+    contract.
+  source_class: com.jdbctest.callablestatement.CallableStatementTest
+  source_method: testCallFunctionGetCount
+  required_capabilities: []
+- scenario_id: callable_statement.call_function_get_name
+  category: core
+  contract: callable statement call function get name follows the JDBC-facing API
+    contract.
+  source_class: com.jdbctest.callablestatement.CallableStatementTest
+  source_method: testCallFunctionGetName
+  required_capabilities: []
+- scenario_id: callable_statement.call_function_get_name_id2
+  category: core
+  contract: callable statement call function get name id2 follows the JDBC-facing
+    API contract.
+  source_class: com.jdbctest.callablestatement.CallableStatementTest
+  source_method: testCallFunctionGetNameId2
+  required_capabilities: []
+- scenario_id: callable_statement.call_function_with_return
+  category: core
+  contract: callable statement call function with return follows the JDBC-facing API
+    contract.
+  source_class: com.jdbctest.callablestatement.CallableStatementTest
+  source_method: testCallFunctionWithReturn
+  required_capabilities: []
+- scenario_id: callable_statement.execute
+  category: core
+  contract: callable statement execute follows the JDBC-facing API contract.
+  source_class: com.jdbctest.callablestatement.CallableStatementTest
+  source_method: testExecute
+  required_capabilities: []
+- scenario_id: callable_statement.multiple_params
+  category: core
+  contract: callable statement multiple params follows the JDBC-facing API contract.
+  source_class: com.jdbctest.callablestatement.CallableStatementTest
+  source_method: testMultipleParams
+  required_capabilities: []
+- scenario_id: callable_statement.was_null
+  category: core
+  contract: callable statement was null follows the JDBC-facing API contract.
+  source_class: com.jdbctest.callablestatement.CallableStatementTest
+  source_method: testWasNull
+  required_capabilities: []
+- scenario_id: connection.catalog_and_schema
+  category: core
+  contract: connection catalog and schema follows the JDBC-facing API contract.
+  source_class: com.jdbctest.connection.ConnectionTest
+  source_method: testCatalogAndSchema
+  required_capabilities: []
+- scenario_id: connection.client_info
+  category: core
+  contract: connection client info follows the JDBC-facing API contract.
+  source_class: com.jdbctest.connection.ConnectionTest
+  source_method: testClientInfo
+  required_capabilities: []
+- scenario_id: connection.close
+  category: core
+  contract: connection close follows the JDBC-facing API contract.
+  source_class: com.jdbctest.connection.ConnectionTest
+  source_method: testClose
+  required_capabilities: []
+- scenario_id: connection.commit
+  category: core
+  contract: connection commit follows the JDBC-facing API contract.
+  source_class: com.jdbctest.connection.ConnectionTest
+  source_method: testCommit
+  required_capabilities: []
+- scenario_id: connection.create_statement
+  category: core
+  contract: connection create statement follows the JDBC-facing API contract.
+  source_class: com.jdbctest.connection.ConnectionTest
+  source_method: testCreateStatement
+  required_capabilities: []
+- scenario_id: connection.get_auto_commit
+  category: core
+  contract: connection get auto commit follows the JDBC-facing API contract.
+  source_class: com.jdbctest.connection.ConnectionTest
+  source_method: testGetAutoCommit
+  required_capabilities: []
+- scenario_id: connection.get_meta_data
+  category: core
+  contract: connection get meta data follows the JDBC-facing API contract.
+  source_class: com.jdbctest.connection.ConnectionTest
+  source_method: testGetMetaData
+  required_capabilities: []
+- scenario_id: connection.holdability
+  category: core
+  contract: connection holdability follows the JDBC-facing API contract.
+  source_class: com.jdbctest.connection.ConnectionTest
+  source_method: testHoldability
+  required_capabilities: []
+- scenario_id: connection.is_valid
+  category: core
+  contract: connection is valid follows the JDBC-facing API contract.
+  source_class: com.jdbctest.connection.ConnectionTest
+  source_method: testIsValid
+  required_capabilities: []
+- scenario_id: connection.native_sql
+  category: core
+  contract: connection native sql follows the JDBC-facing API contract.
+  source_class: com.jdbctest.connection.ConnectionTest
+  source_method: testNativeSql
+  required_capabilities: []
+- scenario_id: connection.network_timeout
+  category: core
+  contract: connection network timeout follows the JDBC-facing API contract.
+  source_class: com.jdbctest.connection.ConnectionTest
+  source_method: testNetworkTimeout
+  required_capabilities: []
+- scenario_id: connection.prepare_statement
+  category: core
+  contract: connection prepare statement follows the JDBC-facing API contract.
+  source_class: com.jdbctest.connection.ConnectionTest
+  source_method: testPrepareStatement
+  required_capabilities: []
+- scenario_id: connection.read_only
+  category: core
+  contract: connection read only follows the JDBC-facing API contract.
+  source_class: com.jdbctest.connection.ConnectionTest
+  source_method: testReadOnly
+  required_capabilities: []
+- scenario_id: connection.rollback
+  category: core
+  contract: connection rollback follows the JDBC-facing API contract.
+  source_class: com.jdbctest.connection.ConnectionTest
+  source_method: testRollback
+  required_capabilities: []
+- scenario_id: connection.set_auto_commit
+  category: core
+  contract: connection set auto commit follows the JDBC-facing API contract.
+  source_class: com.jdbctest.connection.ConnectionTest
+  source_method: testSetAutoCommit
+  required_capabilities: []
+- scenario_id: connection.transaction_isolation
+  category: core
+  contract: connection transaction isolation follows the JDBC-facing API contract.
+  source_class: com.jdbctest.connection.ConnectionTest
+  source_method: testTransactionIsolation
+  required_capabilities: []
+- scenario_id: connection.warnings
+  category: core
+  contract: connection warnings follows the JDBC-facing API contract.
+  source_class: com.jdbctest.connection.ConnectionTest
+  source_method: testWarnings
+  required_capabilities: []
+- scenario_id: database_metadata.database_version
+  category: core
+  contract: database metadata database version follows the JDBC-facing API contract.
+  source_class: com.jdbctest.databasemetadata.DatabaseMetaDataTest
+  source_method: testDatabaseVersion
+  required_capabilities: []
+- scenario_id: database_metadata.get_catalogs
+  category: core
+  contract: database metadata get catalogs follows the JDBC-facing API contract.
+  source_class: com.jdbctest.databasemetadata.DatabaseMetaDataTest
+  source_method: testGetCatalogs
+  required_capabilities: []
+- scenario_id: database_metadata.get_columns
+  category: core
+  contract: database metadata get columns follows the JDBC-facing API contract.
+  source_class: com.jdbctest.databasemetadata.DatabaseMetaDataTest
+  source_method: testGetColumns
+  required_capabilities: []
+- scenario_id: database_metadata.get_database_product_name
+  category: core
+  contract: database metadata get database product name follows the JDBC-facing API
+    contract.
+  source_class: com.jdbctest.databasemetadata.DatabaseMetaDataTest
+  source_method: testGetDatabaseProductName
+  required_capabilities: []
+- scenario_id: database_metadata.get_database_product_version
+  category: core
+  contract: database metadata get database product version follows the JDBC-facing
+    API contract.
+  source_class: com.jdbctest.databasemetadata.DatabaseMetaDataTest
+  source_method: testGetDatabaseProductVersion
+  required_capabilities: []
+- scenario_id: database_metadata.get_driver_name
+  category: core
+  contract: database metadata get driver name follows the JDBC-facing API contract.
+  source_class: com.jdbctest.databasemetadata.DatabaseMetaDataTest
+  source_method: testGetDriverName
+  required_capabilities: []
+- scenario_id: database_metadata.get_driver_version
+  category: core
+  contract: database metadata get driver version follows the JDBC-facing API contract.
+  source_class: com.jdbctest.databasemetadata.DatabaseMetaDataTest
+  source_method: testGetDriverVersion
+  required_capabilities: []
+- scenario_id: database_metadata.get_identifier_quote_string
+  category: core
+  contract: database metadata get identifier quote string follows the JDBC-facing
+    API contract.
+  source_class: com.jdbctest.databasemetadata.DatabaseMetaDataTest
+  source_method: testGetIdentifierQuoteString
+  required_capabilities: []
+- scenario_id: database_metadata.get_max_connections
+  category: core
+  contract: database metadata get max connections follows the JDBC-facing API contract.
+  source_class: com.jdbctest.databasemetadata.DatabaseMetaDataTest
+  source_method: testGetMaxConnections
+  required_capabilities: []
+- scenario_id: database_metadata.get_primary_keys
+  category: core
+  contract: database metadata get primary keys follows the JDBC-facing API contract.
+  source_class: com.jdbctest.databasemetadata.DatabaseMetaDataTest
+  source_method: testGetPrimaryKeys
+  required_capabilities: []
+- scenario_id: database_metadata.get_procedures
+  category: core
+  contract: database metadata get procedures follows the JDBC-facing API contract.
+  source_class: com.jdbctest.databasemetadata.DatabaseMetaDataTest
+  source_method: testGetProcedures
+  required_capabilities: []
+- scenario_id: database_metadata.get_schemas
+  category: core
+  contract: database metadata get schemas follows the JDBC-facing API contract.
+  source_class: com.jdbctest.databasemetadata.DatabaseMetaDataTest
+  source_method: testGetSchemas
+  required_capabilities: []
+- scenario_id: database_metadata.get_search_string_escape
+  category: core
+  contract: database metadata get search string escape follows the JDBC-facing API
+    contract.
+  source_class: com.jdbctest.databasemetadata.DatabaseMetaDataTest
+  source_method: testGetSearchStringEscape
+  required_capabilities: []
+- scenario_id: database_metadata.get_sql_keywords
+  category: core
+  contract: database metadata get sql keywords follows the JDBC-facing API contract.
+  source_class: com.jdbctest.databasemetadata.DatabaseMetaDataTest
+  source_method: testGetSQLKeywords
+  required_capabilities: []
+- scenario_id: database_metadata.get_tables
+  category: core
+  contract: database metadata get tables follows the JDBC-facing API contract.
+  source_class: com.jdbctest.databasemetadata.DatabaseMetaDataTest
+  source_method: testGetTables
+  required_capabilities: []
+- scenario_id: database_metadata.get_type_info
+  category: core
+  contract: database metadata get type info follows the JDBC-facing API contract.
+  source_class: com.jdbctest.databasemetadata.DatabaseMetaDataTest
+  source_method: testGetTypeInfo
+  required_capabilities: []
+- scenario_id: database_metadata.get_url
+  category: core
+  contract: database metadata get url follows the JDBC-facing API contract.
+  source_class: com.jdbctest.databasemetadata.DatabaseMetaDataTest
+  source_method: testGetURL
+  required_capabilities: []
+- scenario_id: database_metadata.get_user_name
+  category: core
+  contract: database metadata get user name follows the JDBC-facing API contract.
+  source_class: com.jdbctest.databasemetadata.DatabaseMetaDataTest
+  source_method: testGetUserName
+  required_capabilities: []
+- scenario_id: database_metadata.jdbc_version
+  category: core
+  contract: database metadata jdbc version follows the JDBC-facing API contract.
+  source_class: com.jdbctest.databasemetadata.DatabaseMetaDataTest
+  source_method: testJDBCVersion
+  required_capabilities: []
+- scenario_id: database_metadata.supports_batch_updates
+  category: core
+  contract: database metadata supports batch updates follows the JDBC-facing API contract.
+  source_class: com.jdbctest.databasemetadata.DatabaseMetaDataTest
+  source_method: testSupportsBatchUpdates
+  required_capabilities: []
+- scenario_id: database_metadata.supports_multiple_result_sets
+  category: core
+  contract: database metadata supports multiple result sets follows the JDBC-facing
+    API contract.
+  source_class: com.jdbctest.databasemetadata.DatabaseMetaDataTest
+  source_method: testSupportsMultipleResultSets
+  required_capabilities: []
+- scenario_id: database_metadata.supports_savepoints
+  category: core
+  contract: database metadata supports savepoints follows the JDBC-facing API contract.
+  source_class: com.jdbctest.databasemetadata.DatabaseMetaDataTest
+  source_method: testSupportsSavepoints
+  required_capabilities: []
+- scenario_id: database_metadata.supports_transactions
+  category: core
+  contract: database metadata supports transactions follows the JDBC-facing API contract.
+  source_class: com.jdbctest.databasemetadata.DatabaseMetaDataTest
+  source_method: testSupportsTransactions
+  required_capabilities: []
+- scenario_id: datasource.data_source_not_null
+  category: core
+  contract: datasource data source not null follows the JDBC-facing API contract.
+  source_class: com.jdbctest.datasource.DataSourceTest
+  source_method: testDataSourceNotNull
+  required_capabilities: []
+- scenario_id: datasource.get_connection
+  category: core
+  contract: datasource get connection follows the JDBC-facing API contract.
+  source_class: com.jdbctest.datasource.DataSourceTest
+  source_method: testGetConnection
+  required_capabilities: []
+- scenario_id: datasource.get_connection_with_auth
+  category: core
+  contract: datasource get connection with auth follows the JDBC-facing API contract.
+  source_class: com.jdbctest.datasource.DataSourceTest
+  source_method: testGetConnectionWithAuth
+  required_capabilities: []
+- scenario_id: datasource.get_parent_logger
+  category: core
+  contract: datasource get parent logger follows the JDBC-facing API contract.
+  source_class: com.jdbctest.datasource.DataSourceTest
+  source_method: testGetParentLogger
+  required_capabilities: []
+- scenario_id: datasource.log_writer
+  category: core
+  contract: datasource log writer follows the JDBC-facing API contract.
+  source_class: com.jdbctest.datasource.DataSourceTest
+  source_method: testLogWriter
+  required_capabilities: []
+- scenario_id: datasource.login_timeout
+  category: core
+  contract: datasource login timeout follows the JDBC-facing API contract.
+  source_class: com.jdbctest.datasource.DataSourceTest
+  source_method: testLoginTimeout
+  required_capabilities: []
+- scenario_id: datasource.multiple_connections
+  category: core
+  contract: datasource multiple connections follows the JDBC-facing API contract.
+  source_class: com.jdbctest.datasource.DataSourceTest
+  source_method: testMultipleConnections
+  required_capabilities: []
+- scenario_id: parameter_metadata.get_parameter_class_name
+  category: extended
+  contract: parameter metadata get parameter class name follows the JDBC-facing API
+    contract when capabilities parameter_metadata are declared.
+  source_class: com.jdbctest.parametermetadata.ParameterMetaDataTest
+  source_method: testGetParameterClassName
+  required_capabilities:
+  - parameter_metadata
+- scenario_id: parameter_metadata.get_parameter_count
+  category: extended
+  contract: parameter metadata get parameter count follows the JDBC-facing API contract
+    when capabilities parameter_metadata are declared.
+  source_class: com.jdbctest.parametermetadata.ParameterMetaDataTest
+  source_method: testGetParameterCount
+  required_capabilities:
+  - parameter_metadata
+- scenario_id: parameter_metadata.get_parameter_mode
+  category: extended
+  contract: parameter metadata get parameter mode follows the JDBC-facing API contract
+    when capabilities parameter_metadata are declared.
+  source_class: com.jdbctest.parametermetadata.ParameterMetaDataTest
+  source_method: testGetParameterMode
+  required_capabilities:
+  - parameter_metadata
+- scenario_id: parameter_metadata.get_parameter_type
+  category: extended
+  contract: parameter metadata get parameter type follows the JDBC-facing API contract
+    when capabilities parameter_metadata are declared.
+  source_class: com.jdbctest.parametermetadata.ParameterMetaDataTest
+  source_method: testGetParameterType
+  required_capabilities:
+  - parameter_metadata
+- scenario_id: parameter_metadata.get_parameter_type_name
+  category: extended
+  contract: parameter metadata get parameter type name follows the JDBC-facing API
+    contract when capabilities parameter_metadata are declared.
+  source_class: com.jdbctest.parametermetadata.ParameterMetaDataTest
+  source_method: testGetParameterTypeName
+  required_capabilities:
+  - parameter_metadata
+- scenario_id: parameter_metadata.is_nullable
+  category: extended
+  contract: parameter metadata is nullable follows the JDBC-facing API contract when
+    capabilities parameter_metadata are declared.
+  source_class: com.jdbctest.parametermetadata.ParameterMetaDataTest
+  source_method: testIsNullable
+  required_capabilities:
+  - parameter_metadata
+- scenario_id: parameter_metadata.is_signed
+  category: extended
+  contract: parameter metadata is signed follows the JDBC-facing API contract when
+    capabilities parameter_metadata are declared.
+  source_class: com.jdbctest.parametermetadata.ParameterMetaDataTest
+  source_method: testIsSigned
+  required_capabilities:
+  - parameter_metadata
+- scenario_id: parameter_metadata.precision_and_scale
+  category: extended
+  contract: parameter metadata precision and scale follows the JDBC-facing API contract
+    when capabilities parameter_metadata are declared.
+  source_class: com.jdbctest.parametermetadata.ParameterMetaDataTest
+  source_method: testPrecisionAndScale
+  required_capabilities:
+  - parameter_metadata
+- scenario_id: prepared_statement.batch
+  category: core
+  contract: prepared statement batch follows the JDBC-facing API contract.
+  source_class: com.jdbctest.preparedstatement.PreparedStatementTest
+  source_method: testBatch
+  required_capabilities: []
+- scenario_id: prepared_statement.clear_parameters
+  category: core
+  contract: prepared statement clear parameters follows the JDBC-facing API contract.
+  source_class: com.jdbctest.preparedstatement.PreparedStatementTest
+  source_method: testClearParameters
+  required_capabilities: []
+- scenario_id: prepared_statement.execute
+  category: core
+  contract: prepared statement execute follows the JDBC-facing API contract.
+  source_class: com.jdbctest.preparedstatement.PreparedStatementTest
+  source_method: testExecute
+  required_capabilities: []
+- scenario_id: prepared_statement.execute_query
+  category: core
+  contract: prepared statement execute query follows the JDBC-facing API contract.
+  source_class: com.jdbctest.preparedstatement.PreparedStatementTest
+  source_method: testExecuteQuery
+  required_capabilities: []
+- scenario_id: prepared_statement.execute_update
+  category: core
+  contract: prepared statement execute update follows the JDBC-facing API contract.
+  source_class: com.jdbctest.preparedstatement.PreparedStatementTest
+  source_method: testExecuteUpdate
+  required_capabilities: []
+- scenario_id: prepared_statement.get_generated_keys
+  category: core
+  contract: prepared statement get generated keys follows the JDBC-facing API contract.
+  source_class: com.jdbctest.preparedstatement.PreparedStatementTest
+  source_method: testGetGeneratedKeys
+  required_capabilities: []
+- scenario_id: prepared_statement.get_meta_data
+  category: core
+  contract: prepared statement get meta data follows the JDBC-facing API contract.
+  source_class: com.jdbctest.preparedstatement.PreparedStatementTest
+  source_method: testGetMetaData
+  required_capabilities: []
+- scenario_id: prepared_statement.get_parameter_meta_data
+  category: core
+  contract: prepared statement get parameter meta data follows the JDBC-facing API
+    contract.
+  source_class: com.jdbctest.preparedstatement.PreparedStatementTest
+  source_method: testGetParameterMetaData
+  required_capabilities: []
+- scenario_id: prepared_statement.is_closed
+  category: core
+  contract: prepared statement is closed follows the JDBC-facing API contract.
+  source_class: com.jdbctest.preparedstatement.PreparedStatementTest
+  source_method: testIsClosed
+  required_capabilities: []
+- scenario_id: prepared_statement.set_big_decimal
+  category: core
+  contract: prepared statement set big decimal follows the JDBC-facing API contract.
+  source_class: com.jdbctest.preparedstatement.PreparedStatementTest
+  source_method: testSetBigDecimal
+  required_capabilities: []
+- scenario_id: prepared_statement.set_boolean
+  category: core
+  contract: prepared statement set boolean follows the JDBC-facing API contract.
+  source_class: com.jdbctest.preparedstatement.PreparedStatementTest
+  source_method: testSetBoolean
+  required_capabilities: []
+- scenario_id: prepared_statement.set_date
+  category: core
+  contract: prepared statement set date follows the JDBC-facing API contract.
+  source_class: com.jdbctest.preparedstatement.PreparedStatementTest
+  source_method: testSetDate
+  required_capabilities: []
+- scenario_id: prepared_statement.set_double
+  category: core
+  contract: prepared statement set double follows the JDBC-facing API contract.
+  source_class: com.jdbctest.preparedstatement.PreparedStatementTest
+  source_method: testSetDouble
+  required_capabilities: []
+- scenario_id: prepared_statement.set_int
+  category: core
+  contract: prepared statement set int follows the JDBC-facing API contract.
+  source_class: com.jdbctest.preparedstatement.PreparedStatementTest
+  source_method: testSetInt
+  required_capabilities: []
+- scenario_id: prepared_statement.set_long
+  category: core
+  contract: prepared statement set long follows the JDBC-facing API contract.
+  source_class: com.jdbctest.preparedstatement.PreparedStatementTest
+  source_method: testSetLong
+  required_capabilities: []
+- scenario_id: prepared_statement.set_null
+  category: core
+  contract: prepared statement set null follows the JDBC-facing API contract.
+  source_class: com.jdbctest.preparedstatement.PreparedStatementTest
+  source_method: testSetNull
+  required_capabilities: []
+- scenario_id: prepared_statement.set_object
+  category: core
+  contract: prepared statement set object follows the JDBC-facing API contract.
+  source_class: com.jdbctest.preparedstatement.PreparedStatementTest
+  source_method: testSetObject
+  required_capabilities: []
+- scenario_id: prepared_statement.set_string
+  category: core
+  contract: prepared statement set string follows the JDBC-facing API contract.
+  source_class: com.jdbctest.preparedstatement.PreparedStatementTest
+  source_method: testSetString
+  required_capabilities: []
+- scenario_id: prepared_statement.set_timestamp
+  category: core
+  contract: prepared statement set timestamp follows the JDBC-facing API contract.
+  source_class: com.jdbctest.preparedstatement.PreparedStatementTest
+  source_method: testSetTimestamp
+  required_capabilities: []
+- scenario_id: result_set.absolute
+  category: core
+  contract: result set absolute follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultset.ResultSetTest
+  source_method: testAbsolute
+  required_capabilities: []
+- scenario_id: result_set.before_first_after_last
+  category: core
+  contract: result set before first after last follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultset.ResultSetTest
+  source_method: testBeforeFirstAfterLast
+  required_capabilities: []
+- scenario_id: result_set.close
+  category: core
+  contract: result set close follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultset.ResultSetTest
+  source_method: testClose
+  required_capabilities: []
+- scenario_id: result_set.fetch_size
+  category: core
+  contract: result set fetch size follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultset.ResultSetTest
+  source_method: testFetchSize
+  required_capabilities: []
+- scenario_id: result_set.find_column
+  category: core
+  contract: result set find column follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultset.ResultSetTest
+  source_method: testFindColumn
+  required_capabilities: []
+- scenario_id: result_set.first
+  category: core
+  contract: result set first follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultset.ResultSetTest
+  source_method: testFirst
+  required_capabilities: []
+- scenario_id: result_set.get_big_decimal
+  category: core
+  contract: result set get big decimal follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultset.ResultSetTest
+  source_method: testGetBigDecimal
+  required_capabilities: []
+- scenario_id: result_set.get_boolean
+  category: core
+  contract: result set get boolean follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultset.ResultSetTest
+  source_method: testGetBoolean
+  required_capabilities: []
+- scenario_id: result_set.get_date
+  category: core
+  contract: result set get date follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultset.ResultSetTest
+  source_method: testGetDate
+  required_capabilities: []
+- scenario_id: result_set.get_double
+  category: core
+  contract: result set get double follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultset.ResultSetTest
+  source_method: testGetDouble
+  required_capabilities: []
+- scenario_id: result_set.get_int
+  category: core
+  contract: result set get int follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultset.ResultSetTest
+  source_method: testGetInt
+  required_capabilities: []
+- scenario_id: result_set.get_meta_data
+  category: core
+  contract: result set get meta data follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultset.ResultSetTest
+  source_method: testGetMetaData
+  required_capabilities: []
+- scenario_id: result_set.get_numeric_types
+  category: core
+  contract: result set get numeric types follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultset.ResultSetTest
+  source_method: testGetNumericTypes
+  required_capabilities: []
+- scenario_id: result_set.get_row
+  category: core
+  contract: result set get row follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultset.ResultSetTest
+  source_method: testGetRow
+  required_capabilities: []
+- scenario_id: result_set.get_statement
+  category: core
+  contract: result set get statement follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultset.ResultSetTest
+  source_method: testGetStatement
+  required_capabilities: []
+- scenario_id: result_set.get_string
+  category: core
+  contract: result set get string follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultset.ResultSetTest
+  source_method: testGetString
+  required_capabilities: []
+- scenario_id: result_set.get_timestamp
+  category: core
+  contract: result set get timestamp follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultset.ResultSetTest
+  source_method: testGetTimestamp
+  required_capabilities: []
+- scenario_id: result_set.is_first_is_last
+  category: core
+  contract: result set is first is last follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultset.ResultSetTest
+  source_method: testIsFirstIsLast
+  required_capabilities: []
+- scenario_id: result_set.last
+  category: core
+  contract: result set last follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultset.ResultSetTest
+  source_method: testLast
+  required_capabilities: []
+- scenario_id: result_set.next
+  category: core
+  contract: result set next follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultset.ResultSetTest
+  source_method: testNext
+  required_capabilities: []
+- scenario_id: result_set.previous
+  category: core
+  contract: result set previous follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultset.ResultSetTest
+  source_method: testPrevious
+  required_capabilities: []
+- scenario_id: result_set.relative
+  category: core
+  contract: result set relative follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultset.ResultSetTest
+  source_method: testRelative
+  required_capabilities: []
+- scenario_id: result_set.type_and_concurrency
+  category: core
+  contract: result set type and concurrency follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultset.ResultSetTest
+  source_method: testTypeAndConcurrency
+  required_capabilities: []
+- scenario_id: result_set.warnings
+  category: core
+  contract: result set warnings follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultset.ResultSetTest
+  source_method: testWarnings
+  required_capabilities: []
+- scenario_id: result_set.was_null
+  category: core
+  contract: result set was null follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultset.ResultSetTest
+  source_method: testWasNull
+  required_capabilities: []
+- scenario_id: result_set_metadata.column_properties
+  category: core
+  contract: result set metadata column properties follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultsetmetadata.ResultSetMetaDataTest
+  source_method: testColumnProperties
+  required_capabilities: []
+- scenario_id: result_set_metadata.get_column_class_name
+  category: core
+  contract: result set metadata get column class name follows the JDBC-facing API
+    contract.
+  source_class: com.jdbctest.resultsetmetadata.ResultSetMetaDataTest
+  source_method: testGetColumnClassName
+  required_capabilities: []
+- scenario_id: result_set_metadata.get_column_count
+  category: core
+  contract: result set metadata get column count follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultsetmetadata.ResultSetMetaDataTest
+  source_method: testGetColumnCount
+  required_capabilities: []
+- scenario_id: result_set_metadata.get_column_display_size
+  category: core
+  contract: result set metadata get column display size follows the JDBC-facing API
+    contract.
+  source_class: com.jdbctest.resultsetmetadata.ResultSetMetaDataTest
+  source_method: testGetColumnDisplaySize
+  required_capabilities: []
+- scenario_id: result_set_metadata.get_column_label
+  category: core
+  contract: result set metadata get column label follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultsetmetadata.ResultSetMetaDataTest
+  source_method: testGetColumnLabel
+  required_capabilities: []
+- scenario_id: result_set_metadata.get_column_name
+  category: core
+  contract: result set metadata get column name follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultsetmetadata.ResultSetMetaDataTest
+  source_method: testGetColumnName
+  required_capabilities: []
+- scenario_id: result_set_metadata.get_column_type
+  category: core
+  contract: result set metadata get column type follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultsetmetadata.ResultSetMetaDataTest
+  source_method: testGetColumnType
+  required_capabilities: []
+- scenario_id: result_set_metadata.get_column_type_name
+  category: core
+  contract: result set metadata get column type name follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultsetmetadata.ResultSetMetaDataTest
+  source_method: testGetColumnTypeName
+  required_capabilities: []
+- scenario_id: result_set_metadata.is_auto_increment
+  category: core
+  contract: result set metadata is auto increment follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultsetmetadata.ResultSetMetaDataTest
+  source_method: testIsAutoIncrement
+  required_capabilities: []
+- scenario_id: result_set_metadata.is_nullable
+  category: core
+  contract: result set metadata is nullable follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultsetmetadata.ResultSetMetaDataTest
+  source_method: testIsNullable
+  required_capabilities: []
+- scenario_id: result_set_metadata.precision_and_scale
+  category: core
+  contract: result set metadata precision and scale follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultsetmetadata.ResultSetMetaDataTest
+  source_method: testPrecisionAndScale
+  required_capabilities: []
+- scenario_id: result_set_metadata.schema_table_catalog
+  category: core
+  contract: result set metadata schema table catalog follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultsetmetadata.ResultSetMetaDataTest
+  source_method: testSchemaTableCatalog
+  required_capabilities: []
+- scenario_id: result_set_metadata.writable_searchable
+  category: core
+  contract: result set metadata writable searchable follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultsetmetadata.ResultSetMetaDataTest
+  source_method: testWritableSearchable
+  required_capabilities: []
+- scenario_id: rowset.absolute
+  category: core
+  contract: rowset absolute follows the JDBC-facing API contract.
+  source_class: com.jdbctest.rowset.RowSetTest
+  source_method: testAbsolute
+  required_capabilities: []
+- scenario_id: rowset.close
+  category: core
+  contract: rowset close follows the JDBC-facing API contract.
+  source_class: com.jdbctest.rowset.RowSetTest
+  source_method: testClose
+  required_capabilities: []
+- scenario_id: rowset.create_jdbc_row_set
+  category: core
+  contract: rowset create jdbc row set follows the JDBC-facing API contract.
+  source_class: com.jdbctest.rowset.RowSetTest
+  source_method: testCreateJdbcRowSet
+  required_capabilities: []
+- scenario_id: rowset.delete_row
+  category: core
+  contract: rowset delete row follows the JDBC-facing API contract.
+  source_class: com.jdbctest.rowset.RowSetTest
+  source_method: testDeleteRow
+  required_capabilities: []
+- scenario_id: rowset.execute_and_navigate
+  category: core
+  contract: rowset execute and navigate follows the JDBC-facing API contract.
+  source_class: com.jdbctest.rowset.RowSetTest
+  source_method: testExecuteAndNavigate
+  required_capabilities: []
+- scenario_id: rowset.first_last
+  category: core
+  contract: rowset first last follows the JDBC-facing API contract.
+  source_class: com.jdbctest.rowset.RowSetTest
+  source_method: testFirstLast
+  required_capabilities: []
+- scenario_id: rowset.insert_row
+  category: core
+  contract: rowset insert row follows the JDBC-facing API contract.
+  source_class: com.jdbctest.rowset.RowSetTest
+  source_method: testInsertRow
+  required_capabilities: []
+- scenario_id: rowset.set_properties
+  category: core
+  contract: rowset set properties follows the JDBC-facing API contract.
+  source_class: com.jdbctest.rowset.RowSetTest
+  source_method: testSetProperties
+  required_capabilities: []
+- scenario_id: rowset.update_row
+  category: core
+  contract: rowset update row follows the JDBC-facing API contract.
+  source_class: com.jdbctest.rowset.RowSetTest
+  source_method: testUpdateRow
+  required_capabilities: []
+- scenario_id: savepoint.multiple_savepoints
+  category: core
+  contract: savepoint multiple savepoints follows the JDBC-facing API contract.
+  source_class: com.jdbctest.savepoint.SavepointTest
+  source_method: testMultipleSavepoints
+  required_capabilities: []
+- scenario_id: savepoint.release_savepoint
+  category: core
+  contract: savepoint release savepoint follows the JDBC-facing API contract.
+  source_class: com.jdbctest.savepoint.SavepointTest
+  source_method: testReleaseSavepoint
+  required_capabilities: []
+- scenario_id: savepoint.rollback_to_savepoint
+  category: core
+  contract: savepoint rollback to savepoint follows the JDBC-facing API contract.
+  source_class: com.jdbctest.savepoint.SavepointTest
+  source_method: testRollbackToSavepoint
+  required_capabilities: []
+- scenario_id: savepoint.savepoint_after_commit
+  category: core
+  contract: savepoint savepoint after commit follows the JDBC-facing API contract.
+  source_class: com.jdbctest.savepoint.SavepointTest
+  source_method: testSavepointAfterCommit
+  required_capabilities: []
+- scenario_id: savepoint.set_savepoint
+  category: core
+  contract: savepoint set savepoint follows the JDBC-facing API contract.
+  source_class: com.jdbctest.savepoint.SavepointTest
+  source_method: testSetSavepoint
+  required_capabilities: []
+- scenario_id: savepoint.set_savepoint_with_name
+  category: core
+  contract: savepoint set savepoint with name follows the JDBC-facing API contract.
+  source_class: com.jdbctest.savepoint.SavepointTest
+  source_method: testSetSavepointWithName
+  required_capabilities: []
+- scenario_id: sqlxml.get_source
+  category: extended
+  contract: sqlxml get source follows the JDBC-facing API contract when capabilities
+    sqlxml are declared.
+  source_class: com.jdbctest.sqlxml.SQLXMLTest
+  source_method: testGetSource
+  required_capabilities:
+  - sqlxml
+- scenario_id: sqlxml.get_sqlxml
+  category: extended
+  contract: sqlxml get sqlxml follows the JDBC-facing API contract when capabilities
+    sqlxml are declared.
+  source_class: com.jdbctest.sqlxml.SQLXMLTest
+  source_method: testGetSQLXML
+  required_capabilities:
+  - sqlxml
+- scenario_id: sqlxml.get_string
+  category: extended
+  contract: sqlxml get string follows the JDBC-facing API contract when capabilities
+    sqlxml are declared.
+  source_class: com.jdbctest.sqlxml.SQLXMLTest
+  source_method: testGetString
+  required_capabilities:
+  - sqlxml
+- scenario_id: sqlxml.set_result
+  category: extended
+  contract: sqlxml set result follows the JDBC-facing API contract when capabilities
+    sqlxml are declared.
+  source_class: com.jdbctest.sqlxml.SQLXMLTest
+  source_method: testSetResult
+  required_capabilities:
+  - sqlxml
+- scenario_id: sqlxml.set_sqlxml
+  category: extended
+  contract: sqlxml set sqlxml follows the JDBC-facing API contract when capabilities
+    sqlxml are declared.
+  source_class: com.jdbctest.sqlxml.SQLXMLTest
+  source_method: testSetSQLXML
+  required_capabilities:
+  - sqlxml
+- scenario_id: sqlxml.set_string
+  category: extended
+  contract: sqlxml set string follows the JDBC-facing API contract when capabilities
+    sqlxml are declared.
+  source_class: com.jdbctest.sqlxml.SQLXMLTest
+  source_method: testSetString
+  required_capabilities:
+  - sqlxml
+- scenario_id: sqlxml.snapshot_scrap
+  category: extended
+  contract: sqlxml snapshot scrap follows the JDBC-facing API contract when capabilities
+    sqlxml are declared.
+  source_class: com.jdbctest.sqlxml.SQLXMLTest
+  source_method: testSnapshotScrap
+  required_capabilities:
+  - sqlxml
+- scenario_id: statement.clear_batch
+  category: core
+  contract: statement clear batch follows the JDBC-facing API contract.
+  source_class: com.jdbctest.statement.StatementTest
+  source_method: testClearBatch
+  required_capabilities: []
+- scenario_id: statement.close_on_completion
+  category: core
+  contract: statement close on completion follows the JDBC-facing API contract.
+  source_class: com.jdbctest.statement.StatementTest
+  source_method: testCloseOnCompletion
+  required_capabilities: []
+- scenario_id: statement.execute_batch
+  category: core
+  contract: statement execute batch follows the JDBC-facing API contract.
+  source_class: com.jdbctest.statement.StatementTest
+  source_method: testExecuteBatch
+  required_capabilities: []
+- scenario_id: statement.execute_delete
+  category: core
+  contract: statement execute delete follows the JDBC-facing API contract.
+  source_class: com.jdbctest.statement.StatementTest
+  source_method: testExecuteDelete
+  required_capabilities: []
+- scenario_id: statement.execute_insert
+  category: core
+  contract: statement execute insert follows the JDBC-facing API contract.
+  source_class: com.jdbctest.statement.StatementTest
+  source_method: testExecuteInsert
+  required_capabilities: []
+- scenario_id: statement.execute_large_batch
+  category: core
+  contract: statement execute large batch follows the JDBC-facing API contract.
+  source_class: com.jdbctest.statement.StatementTest
+  source_method: testExecuteLargeBatch
+  required_capabilities: []
+- scenario_id: statement.execute_large_update
+  category: core
+  contract: statement execute large update follows the JDBC-facing API contract.
+  source_class: com.jdbctest.statement.StatementTest
+  source_method: testExecuteLargeUpdate
+  required_capabilities: []
+- scenario_id: statement.execute_query
+  category: core
+  contract: statement execute query follows the JDBC-facing API contract.
+  source_class: com.jdbctest.statement.StatementTest
+  source_method: testExecuteQuery
+  required_capabilities: []
+- scenario_id: statement.execute_select
+  category: core
+  contract: statement execute select follows the JDBC-facing API contract.
+  source_class: com.jdbctest.statement.StatementTest
+  source_method: testExecuteSelect
+  required_capabilities: []
+- scenario_id: statement.execute_update
+  category: core
+  contract: statement execute update follows the JDBC-facing API contract.
+  source_class: com.jdbctest.statement.StatementTest
+  source_method: testExecuteUpdate
+  required_capabilities: []
+- scenario_id: statement.execute_update_ddl
+  category: core
+  contract: statement execute update ddl follows the JDBC-facing API contract.
+  source_class: com.jdbctest.statement.StatementTest
+  source_method: testExecuteUpdateDDL
+  required_capabilities: []
+- scenario_id: statement.execute_update_row_count
+  category: core
+  contract: statement execute update row count follows the JDBC-facing API contract.
+  source_class: com.jdbctest.statement.StatementTest
+  source_method: testExecuteUpdateRowCount
+  required_capabilities: []
+- scenario_id: statement.fetch_size
+  category: core
+  contract: statement fetch size follows the JDBC-facing API contract.
+  source_class: com.jdbctest.statement.StatementTest
+  source_method: testFetchSize
+  required_capabilities: []
+- scenario_id: statement.get_connection
+  category: core
+  contract: statement get connection follows the JDBC-facing API contract.
+  source_class: com.jdbctest.statement.StatementTest
+  source_method: testGetConnection
+  required_capabilities: []
+- scenario_id: statement.get_generated_keys
+  category: core
+  contract: statement get generated keys follows the JDBC-facing API contract.
+  source_class: com.jdbctest.statement.StatementTest
+  source_method: testGetGeneratedKeys
+  required_capabilities: []
+- scenario_id: statement.get_more_results
+  category: core
+  contract: statement get more results follows the JDBC-facing API contract.
+  source_class: com.jdbctest.statement.StatementTest
+  source_method: testGetMoreResults
+  required_capabilities: []
+- scenario_id: statement.get_result_set
+  category: core
+  contract: statement get result set follows the JDBC-facing API contract.
+  source_class: com.jdbctest.statement.StatementTest
+  source_method: testGetResultSet
+  required_capabilities: []
+- scenario_id: statement.get_update_count
+  category: core
+  contract: statement get update count follows the JDBC-facing API contract.
+  source_class: com.jdbctest.statement.StatementTest
+  source_method: testGetUpdateCount
+  required_capabilities: []
+- scenario_id: statement.get_warnings
+  category: core
+  contract: statement get warnings follows the JDBC-facing API contract.
+  source_class: com.jdbctest.statement.StatementTest
+  source_method: testGetWarnings
+  required_capabilities: []
+- scenario_id: statement.is_closed
+  category: core
+  contract: statement is closed follows the JDBC-facing API contract.
+  source_class: com.jdbctest.statement.StatementTest
+  source_method: testIsClosed
+  required_capabilities: []
+- scenario_id: statement.max_rows
+  category: core
+  contract: statement max rows follows the JDBC-facing API contract.
+  source_class: com.jdbctest.statement.StatementTest
+  source_method: testMaxRows
+  required_capabilities: []
+- scenario_id: statement.poolable
+  category: core
+  contract: statement poolable follows the JDBC-facing API contract.
+  source_class: com.jdbctest.statement.StatementTest
+  source_method: testPoolable
+  required_capabilities: []
+- scenario_id: statement.query_timeout
+  category: core
+  contract: statement query timeout follows the JDBC-facing API contract.
+  source_class: com.jdbctest.statement.StatementTest
+  source_method: testQueryTimeout
+  required_capabilities: []
+- scenario_id: wrapper.connection_wrapper
+  category: core
+  contract: wrapper connection wrapper follows the JDBC-facing API contract.
+  source_class: com.jdbctest.wrapper.WrapperTest
+  source_method: testConnectionWrapper
+  required_capabilities: []
+- scenario_id: wrapper.data_source_wrapper
+  category: core
+  contract: wrapper data source wrapper follows the JDBC-facing API contract.
+  source_class: com.jdbctest.wrapper.WrapperTest
+  source_method: testDataSourceWrapper
+  required_capabilities: []
+- scenario_id: wrapper.meta_data_wrapper
+  category: core
+  contract: wrapper meta data wrapper follows the JDBC-facing API contract.
+  source_class: com.jdbctest.wrapper.WrapperTest
+  source_method: testMetaDataWrapper
+  required_capabilities: []
+- scenario_id: wrapper.statement_and_result_set_wrapper
+  category: core
+  contract: wrapper statement and result set wrapper follows the JDBC-facing API contract.
+  source_class: com.jdbctest.wrapper.WrapperTest
+  source_method: testStatementAndResultSetWrapper
+  required_capabilities: []

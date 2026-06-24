@@ -94,9 +94,32 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
                     }
                 } catch (SQLException e) {
                     System.err.println("[WARN] 清理表 " + table + " 失败: " + e.getMessage());
+                    System.err.println("[JDBC_CLEANUP_ISSUE] " + cleanupIssueJson(testClass.getName(), table, e));
                 }
             }
         }
+    }
+
+    private String cleanupIssueJson(String className, String table, SQLException e) {
+        return "{"
+                + "\"source_class\":\"" + jsonEscape(className) + "\","
+                + "\"asset_type\":\"table\","
+                + "\"asset_name\":\"" + jsonEscape(table) + "\","
+                + "\"message\":\"" + jsonEscape(e.getMessage()) + "\","
+                + "\"sql_state\":\"" + jsonEscape(e.getSQLState()) + "\","
+                + "\"error_code\":" + e.getErrorCode()
+                + "}";
+    }
+
+    private String jsonEscape(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r");
     }
 
     @Override
