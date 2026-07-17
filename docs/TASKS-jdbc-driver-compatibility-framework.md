@@ -2,12 +2,25 @@
 
 来源：[PRD：通用 JDBC 驱动兼容性与回归测试框架](./PRD-jdbc-driver-compatibility-framework.md)
 
-## 实施状态（2026-07-17）
+## 最终验收状态（2026-07-17）
 
-- 已完成：TASK-01 至 TASK-12、TASK-14。
-- 已实现候选适配包、等待真实数据库证据：TASK-13（GaussDB）、TASK-15（SQL Server）。
-- TASK-16 的代码、发布包、三平台 CI、许可证和双语文档已完成；“五个官方适配包均有真实验证证据”仍被 TASK-13、TASK-15 阻塞。
-- 真实验证完成：PostgreSQL 15.2 / driver 42.7.2、MySQL 8.0.30 / driver 8.3.0、Oracle 19.3 / driver 21.13。
+| 范围 | 状态 | 验收结论 |
+| --- | --- | --- |
+| TASK-01 至 TASK-12 | 已完成 | 报告契约、稳定 ID、声明式适配包、安全命名空间、Python 主流程、基线比较、JDBC 覆盖和已知差异治理均已实现并通过自动化/真实数据库验证。 |
+| TASK-13：GaussDB | Candidate | 已交付独立候选适配包和自身身份/能力声明；用户确认 v1.2.0 暂不要求真实 GaussDB 组合与脱敏验证证据。 |
+| TASK-14：Oracle | 已完成 | Oracle 19.3 / driver 21.13：181 通过、12 声明不支持，`target_compatible`、`formal_eligible=true`，权限与清理问题为 0。 |
+| TASK-15：SQL Server | Candidate | 已交付独立候选适配包和能力声明；用户确认 v1.2.0 暂不要求真实 SQL Server 组合与脱敏验证证据。 |
+| TASK-16 | 已完成（含发布例外） | 许可证、双语文档、Docker、CI、无驱动 ZIP/SHA-256 和 Release 工作流已完成；GaussDB、SQL Server 的真实证据按用户确认延期。 |
+
+真实数据库验收补充：
+
+- PostgreSQL 15.2 / driver 42.7.2：190 通过、3 声明不支持。
+- MySQL 8.0.30 / driver 8.3.0：165 通过、28 声明不支持。
+- Oracle 19.3 / driver 21.13：181 通过、12 声明不支持。
+- 三个目标均为 `target_compatible`、`formal_eligible=true`，权限与清理问题为 0。
+- 24 项 Python 契约测试、Maven 配置加载/SQL 拆分测试和敏感信息扫描通过。
+- GitHub Actions CI Run 9 已在 Ubuntu、macOS、Windows 上通过 Python、Java 和无驱动发布包构建。
+- 发布版本确认为 `v1.2.0`；标签工作流负责发布 ZIP 与 SHA-256。
 
 ## 使用者故事
 
@@ -17,7 +30,9 @@
 - **US-04**：作为开源使用者，我能在主流操作系统上低门槛安装、运行并安全共享结果。
 - **US-05**：作为项目维护者，我能审核、发布和维护可信的官方适配包。
 
-## 任务清单（依赖顺序）
+## 原始任务清单（依赖顺序）
+
+以下验收标准保留为原始需求定义；当前完成状态以“最终验收状态”表为准。
 
 ### TASK-01：定义版本化评估报告契约
 
@@ -225,6 +240,8 @@
 
 ### TASK-13：将 GaussDB 迁移为官方适配包
 
+**最终状态**：Candidate；真实数据库组合和脱敏证据延期。
+
 **类型**：AFK  
 **阻塞于**：TASK-11  
 **覆盖**：US-01、US-05
@@ -259,6 +276,8 @@
 
 ### TASK-15：将 SQL Server 迁移为官方适配包
 
+**最终状态**：Candidate；真实数据库组合和脱敏证据延期。
+
 **类型**：AFK  
 **阻塞于**：TASK-11  
 **覆盖**：US-01、US-05
@@ -291,6 +310,7 @@
 - [ ] Linux、macOS、Windows 的自动化或人工验证覆盖 `init → run → compare`；不依赖 Unix shell。
 - [ ] 提供 CI 示例和可选 Docker 说明，Docker 仅封装框架运行时且连接用户提供的目标数据库。
 - [ ] 五个 Initial Official Adapter 都有至少一个已验证的数据库 × 驱动组合及脱敏验证证据。
+  - v1.2.0 发布例外：PostgreSQL、MySQL、Oracle 已满足；GaussDB、SQL Server 经用户确认以 Candidate 状态延期验证。
 
 ## 建议执行方式
 
