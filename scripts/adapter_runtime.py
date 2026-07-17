@@ -175,7 +175,6 @@ def build_runtime_config(
     assets = manifest["assets"]
     ddl_root = _asset_root(project_root, adapter.root, assets["ddl"])
     dml_root = _asset_root(project_root, adapter.root, assets["dml"])
-    profile_root = _asset_root(project_root, adapter.root, assets.get("profile", "profile"))
     pool_root = _asset_root(project_root, adapter.root, assets.get("pool", "pool"))
 
     runtime = {
@@ -214,7 +213,6 @@ def build_runtime_config(
         },
         "ddl": {"base_path": str(ddl_root)},
         "dml": {"base_path": str(dml_root)},
-        "profile": {"profile_dir": str(profile_root)},
         "pool": {"profile_dir": str(pool_root)},
         "concurrency": {"enabled": False, "threads": 1, "timeout": 300000},
         "execution": {"mode": (user_config.get("execution") or {}).get("mode", "local")},

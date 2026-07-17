@@ -103,11 +103,6 @@ public class ConfigLoader {
         Map<String, Object> pool = (Map<String, Object>) raw.get("pool");
         if (pool != null && pool.get("profile_dir") != null) config.pool.profileDir = str(pool.get("profile_dir"));
 
-        config.profile = new Config.ProfileConfig();
-        config.profile.profileDir = "profile";
-        Map<String, Object> profile = (Map<String, Object>) raw.get("profile");
-        if (profile != null && profile.get("profile_dir") != null) config.profile.profileDir = str(profile.get("profile_dir"));
-
         config.namespace = new Config.NamespaceConfig();
         Map<String, Object> namespace = (Map<String, Object>) raw.get("namespace");
         if (namespace != null) {

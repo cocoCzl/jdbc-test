@@ -25,7 +25,7 @@
     "nclobs": false, "parameter_metadata": true
   },
   "assets": {
-    "ddl": "ddl", "dml": "dml", "profile": "profile", "pool": "pool",
+    "ddl": "ddl", "dml": "dml", "pool": "pool",
     "directory": "postgresql",
     "areas": ["connection", "statement", "preparedstatement", "callablestatement", "resultset", "metadatatest", "savepoint", "rowset", "blobclob", "sqlxml", "advancedtype"]
   },

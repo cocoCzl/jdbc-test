@@ -189,7 +189,6 @@ class CompatibilityV1Test(unittest.TestCase):
     def test_builds_v1_report_shape(self):
         config = {
             "db": {"type": "postgresql", "url": "jdbc:postgresql://example/test", "username": "develop"},
-            "profile": {"profile_dir": "profile"},
             "execution": {"mode": "local"},
             "test_filter": {},
         }
@@ -242,7 +241,6 @@ class CompatibilityV1Test(unittest.TestCase):
                 "username": "develop",
                 "expected_database_product": "Oracle",
             },
-            "profile": {"profile_dir": "profile"},
             "execution": {"mode": "local"},
             "test_filter": {"include_tests": ["ConnectionTest"]},
         }
@@ -281,7 +279,6 @@ class CompatibilityV1Test(unittest.TestCase):
                 "url": "jdbc:postgresql://example/test",
                 "username": "develop",
             },
-            "profile": {"profile_dir": "profile"},
             "execution": {"mode": "local"},
             "test_filter": {},
             "known_deviations": [
@@ -363,7 +360,6 @@ class CompatibilityV1Test(unittest.TestCase):
         ]
         config = {
             "db": {"type": "postgresql", "url": "jdbc:postgresql://example/test", "username": "develop"},
-            "profile": {"profile_dir": "profile"},
             "execution": {"mode": "local"},
             "test_filter": {},
         }
@@ -434,7 +430,6 @@ class CompatibilityV1Test(unittest.TestCase):
     def test_class_setup_error_marks_class_scenarios_execution_error(self):
         config = {
             "db": {"type": "mysql", "url": "jdbc:mysql://example/", "username": "root"},
-            "profile": {"profile_dir": "profile"},
             "execution": {"mode": "local"},
             "test_filter": {},
         }
@@ -477,7 +472,6 @@ class CompatibilityV1Test(unittest.TestCase):
     def test_end_to_end_fixture_report_human_views_and_matrix_cli(self):
         config = {
             "db": {"type": "postgresql", "url": "jdbc:postgresql://example/test", "username": "develop"},
-            "profile": {"profile_dir": "profile"},
             "execution": {"mode": "local"},
             "test_filter": {},
             "report": {"format": ["json", "html", "markdown"]},

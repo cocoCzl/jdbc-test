@@ -54,7 +54,6 @@ class ConfigLoaderTest {
         assertEquals("ddl", loaded.ddl.basePath);
         assertEquals("dml", loaded.dml.basePath);
         assertEquals("pool", loaded.pool.profileDir);
-        assertEquals("profile", loaded.profile.profileDir);
     }
 
     @Test

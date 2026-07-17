@@ -475,20 +475,7 @@ def load_capability_declarations(config: dict[str, Any], project_root: Path) -> 
     adapter_capabilities = (config.get("adapter", {}) or {}).get("capabilities")
     if isinstance(adapter_capabilities, dict):
         return adapter_capabilities
-    db_type = (config.get("db", {}) or {}).get("type", "")
-    profile_dir = (config.get("profile", {}) or {}).get("profile_dir", "profile")
-    path = Path(profile_dir)
-    if not path.is_absolute():
-        path = project_root / path
-    profile_path = path / f"{db_type}.yaml"
-    if not profile_path.exists() or yaml is None:
-        return {}
-    with profile_path.open("r", encoding="utf-8") as f:
-        raw = yaml.safe_load(f) or {}
-    features = raw.get("features", raw)
-    if not isinstance(features, dict):
-        return {}
-    return features
+    return {}
 
 
 def applicable_known_deviations(

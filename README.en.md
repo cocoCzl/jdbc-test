@@ -49,6 +49,14 @@ A local adapter contains `adapter.json` plus database-specific SQL assets and ca
 
 Adapters must declare product and driver identity/ranges, capabilities, test assets, namespace lifecycle, least privileges, validated combinations, and known differences. Local adapter results remain local/experimental and cannot directly become formal baselines.
 
+To use a local JDBC driver JAR, replace `db.driver` in the generated config with:
+
+```json
+{"kind": "local", "path": "/absolute/path/to/driver.jar"}
+```
+
+Do not copy or commit driver JARs into this repository.
+
 ## Safety
 
 - Passwords are read from environment variables and local configs are ignored by Git.

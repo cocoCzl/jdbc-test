@@ -49,6 +49,14 @@ python3 scripts/runner.py compare \
 
 适配包必须声明产品/驱动身份与版本范围、能力、测试资产、命名空间生命周期、最小权限、已验证组合和已知差异。本地适配包生成的结果始终标记为本地/试验性，不能直接作为正式基线。
 
+如需使用本地 JDBC 驱动 JAR，请将生成配置中的 `db.driver` 改为：
+
+```json
+{"kind": "local", "path": "/absolute/path/to/driver.jar"}
+```
+
+驱动 JAR 不应复制或提交到本项目仓库。
+
 ## 安全边界
 
 - 密码只从环境变量读取，本地配置默认被 Git 忽略。

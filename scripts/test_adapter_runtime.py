@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from adapter_runtime import AdapterPackage, build_runtime_config, discover_adapters, load_adapter, validate_adapter
+from build_release import project_version, release_files
 from compatibility_v1 import RunKind, aggregate_target_outcome, build_v1_report, collect_preflight_issues
 from runner import _assessment_exit_code, compare_reports
 
@@ -15,6 +16,22 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 class AdapterRuntimeTest(unittest.TestCase):
+
+    def test_release_files_are_allowlisted_and_patch_versioned(self):
+        self.assertEqual("1.2.1", project_version())
+        included = {path.relative_to(PROJECT_ROOT).as_posix() for path in release_files()}
+        self.assertIn("README.md", included)
+        self.assertIn("scripts/runner.py", included)
+        forbidden = {
+            "CONTEXT.md",
+            "config.yaml.example",
+            "lib/README.md",
+            ".DS_Store",
+            ".classpath",
+            ".project",
+        }
+        self.assertTrue(forbidden.isdisjoint(included))
+        self.assertFalse(any(path.startswith(("docs/", "report/", "configs/", "target/", "profile/")) for path in included))
 
     def test_bundled_adapters_are_discoverable_and_valid(self):
         adapters = discover_adapters(PROJECT_ROOT)

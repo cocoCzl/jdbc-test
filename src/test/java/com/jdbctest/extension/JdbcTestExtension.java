@@ -183,8 +183,7 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
                 config.db.getJdbcUrl(),
                 config.db.getDriverClass(),
                 config.db.username,
-                config.pool.profileDir,
-                config.profile.profileDir);
+                config.pool.profileDir);
     }
 
     private void registerShutdownHook(ExtensionContext context) {

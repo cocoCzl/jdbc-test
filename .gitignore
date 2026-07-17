@@ -1,7 +1,7 @@
 # Maven
 target/
+dist/
 *.jar
-!lib/*.jar
 
 # IDE
 .idea/
@@ -20,9 +20,17 @@ __pycache__/
 *.pyo
 .venv/
 venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
 # Reports
 report/
+baseline/
+compatibility-matrix.json
+vendor-extension-report.json
 
 # OS
 .DS_Store
@@ -31,6 +39,7 @@ Thumbs.db
 # Config (含密码信息)
 configs/
 config*.yaml
+*.local.json
 
 # Logs
 *.log

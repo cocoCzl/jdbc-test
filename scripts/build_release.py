@@ -10,6 +10,22 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 EXCLUDED_PARTS = {".git", ".idea", ".vscode", "target", "report", "configs", "__pycache__", ".venv"}
+INCLUDED_PATHS = (
+    ".gitignore",
+    "Dockerfile",
+    "LICENSE",
+    "README.en.md",
+    "README.md",
+    "adapters",
+    "compatibility",
+    "ddl",
+    "dml",
+    "examples",
+    "pom.xml",
+    "pool",
+    "scripts",
+    "src",
+)
 
 
 def project_version() -> str:
@@ -27,19 +43,30 @@ def build(output: Path) -> tuple[Path, Path]:
     archive = output / f"jdbc-test-{version}.zip"
     prefix = f"jdbc-test-{version}"
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
-        for path in sorted(PROJECT_ROOT.rglob("*")):
+        for path in release_files():
             relative = path.relative_to(PROJECT_ROOT)
-            if path == output or output in path.parents:
-                continue
-            if path.is_dir() or EXCLUDED_PARTS.intersection(relative.parts):
-                continue
-            if path.suffix == ".jar" or path.name.endswith(".local.json"):
-                continue
             bundle.write(path, f"{prefix}/{relative.as_posix()}")
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     checksum = archive.with_suffix(archive.suffix + ".sha256")
     checksum.write_text(f"{digest}  {archive.name}\n", encoding="utf-8")
     return archive, checksum
+
+
+def release_files() -> list[Path]:
+    files: list[Path] = []
+    for relative in INCLUDED_PATHS:
+        root = PROJECT_ROOT / relative
+        if root.is_file():
+            files.append(root)
+        elif root.is_dir():
+            files.extend(path for path in root.rglob("*") if path.is_file())
+    return sorted(
+        path for path in files
+        if not EXCLUDED_PARTS.intersection(path.relative_to(PROJECT_ROOT).parts)
+        and path.name not in {".DS_Store", "Thumbs.db"}
+        and path.suffix != ".jar"
+        and not path.name.endswith(".local.json")
+    )
 
 
 def main() -> int:

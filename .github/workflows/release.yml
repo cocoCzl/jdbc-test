@@ -21,8 +21,11 @@ jobs:
       - name: Verify checksum and archive contents
         working-directory: dist
         run: |
-          shasum -a 256 -c jdbc-test-*.zip.sha256
-          if unzip -l jdbc-test-*.zip | grep -E '\.jar$|configs/|report/'; then
+          version="${GITHUB_REF_NAME#v}"
+          test -f "jdbc-test-${version}.zip"
+          test -f "jdbc-test-${version}.zip.sha256"
+          shasum -a 256 -c "jdbc-test-${version}.zip.sha256"
+          if unzip -l "jdbc-test-${version}.zip" | grep -E '\.jar$|configs/|report/|docs/|CONTEXT\.md|config\.yaml\.example|lib/|\.DS_Store|\.idea/|\.classpath|\.project|\.settings/|target/'; then
             echo "Release archive contains forbidden runtime artifacts"
             exit 1
           fi
