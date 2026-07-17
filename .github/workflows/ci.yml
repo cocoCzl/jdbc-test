@@ -28,6 +28,6 @@ jobs:
           PYTHONPATH: scripts
         run: python scripts/run_contract_tests.py
       - name: Validate Java configuration and SQL splitting
-        run: mvn -q -Dtest=ConfigLoaderTest,SqlSplitterTest test
+        run: mvn -q '-Dtest=ConfigLoaderTest,SqlSplitterTest' test
       - name: Build driver-free release archive
         run: python scripts/build_release.py --output dist
