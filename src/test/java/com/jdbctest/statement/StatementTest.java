@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class StatementTest {
 
     private static boolean isOracle() {
-        return ConfigLoader.load().db.type == Config.DbType.ORACLE;
+        return ConfigLoader.load().db.isDialect("oracle");
     }
 
     @Test

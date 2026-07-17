@@ -1,0 +1,47 @@
+{
+  "id": "oracle",
+  "name": "Oracle Database",
+  "version": "1.0.0",
+  "revision": "1.0.0",
+  "trust": "official",
+  "dialect": "oracle",
+  "identifier_quote": "\"",
+  "driver": {
+    "class": "oracle.jdbc.OracleDriver",
+    "source": {"kind": "maven", "coordinate": "com.oracle.database.jdbc:ojdbc11:21.13.0.0"}
+  },
+  "identity": {
+    "database_product_regex": "Oracle",
+    "driver_name_regex": "Oracle JDBC"
+  },
+  "supported_versions": {
+    "database": {"min": "11", "max": "99"},
+    "driver": {"min": "21", "max": "22"}
+  },
+  "validated_combinations": [
+    {"database_version": "19.3.0.0.0", "driver_version": "21.13.0.0.0", "evidence": "evidence/oracle-19.3-driver-21.13.json"}
+  ],
+  "capabilities": {
+    "savepoint": true, "callable_statement": true, "array_type": false,
+    "ref_type": false, "struct_type": false, "rowid_type": false, "sqlxml": true,
+    "rowset": true, "blobs": true, "clobs": true, "nclobs": true,
+    "parameter_metadata": true
+  },
+  "assets": {
+    "ddl": "ddl", "dml": "dml", "profile": "profile", "pool": "pool",
+    "areas": ["connection", "statement", "preparedstatement", "callablestatement", "resultset", "metadatatest", "savepoint", "rowset", "blobclob", "sqlxml", "advancedtype"]
+  },
+  "namespace": {
+    "mode": "existing", "selection": "schema", "name_from": "username",
+    "drop_on_exit": false
+  },
+  "minimum_privileges": ["CREATE SESSION", "CREATE TABLE", "CREATE PROCEDURE", "CREATE SEQUENCE", "CREATE TYPE"],
+  "privilege_checks": [
+    {"privilege": "CREATE SESSION", "sql": "SELECT 1 FROM DUAL", "cleanup_sql": ""},
+    {"privilege": "CREATE TABLE", "sql": "CREATE TABLE {probe}_t (id NUMBER)", "cleanup_sql": "DROP TABLE {probe}_t PURGE"},
+    {"privilege": "CREATE SEQUENCE", "sql": "CREATE SEQUENCE {probe}_seq", "cleanup_sql": "DROP SEQUENCE {probe}_seq"},
+    {"privilege": "CREATE TYPE", "sql": "CREATE TYPE {probe}_type AS OBJECT (value NUMBER)", "cleanup_sql": "DROP TYPE {probe}_type FORCE"},
+    {"privilege": "CREATE PROCEDURE", "sql": "CREATE OR REPLACE PROCEDURE {probe}_proc AS BEGIN NULL; END;", "cleanup_sql": "DROP PROCEDURE {probe}_proc"}
+  ],
+  "known_differences": []
+}

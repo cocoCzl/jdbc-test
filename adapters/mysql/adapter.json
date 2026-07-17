@@ -1,0 +1,46 @@
+{
+  "id": "mysql",
+  "name": "MySQL",
+  "version": "1.0.0",
+  "revision": "1.0.0",
+  "trust": "official",
+  "dialect": "mysql",
+  "identifier_quote": "`",
+  "driver": {
+    "class": "com.mysql.cj.jdbc.Driver",
+    "source": {"kind": "maven", "coordinate": "com.mysql:mysql-connector-j:8.3.0"}
+  },
+  "identity": {
+    "database_product_regex": "MySQL",
+    "driver_name_regex": "MySQL Connector/J"
+  },
+  "supported_versions": {
+    "database": {"min": "5.7", "max": "99"},
+    "driver": {"min": "8.0", "max": "9"}
+  },
+  "validated_combinations": [
+    {"database_version": "8.0.30", "driver_version": "8.3.0", "evidence": "evidence/mysql-8.0.30-driver-8.3.0.json"}
+  ],
+  "capabilities": {
+    "savepoint": true, "callable_statement": true, "array_type": false,
+    "ref_type": false, "struct_type": false, "rowid_type": false, "sqlxml": false,
+    "rowset": true, "blobs": true, "clobs": true, "nclobs": false,
+    "parameter_metadata": false
+  },
+  "assets": {
+    "ddl": "ddl", "dml": "dml", "profile": "profile", "pool": "pool",
+    "areas": ["connection", "statement", "preparedstatement", "callablestatement", "resultset", "metadatatest", "savepoint", "rowset", "blobclob", "sqlxml", "advancedtype"]
+  },
+  "namespace": {
+    "mode": "auto", "selection": "catalog",
+    "create_privilege": "CREATE/DROP DATABASE",
+    "create_sql": "CREATE DATABASE `{namespace}`",
+    "drop_sql": "DROP DATABASE `{namespace}`",
+    "drop_on_exit": true
+  },
+  "minimum_privileges": ["CONNECT", "CREATE/DROP DATABASE"],
+  "privilege_checks": [
+    {"privilege": "CONNECT", "sql": "SELECT 1", "cleanup_sql": ""}
+  ],
+  "known_differences": []
+}

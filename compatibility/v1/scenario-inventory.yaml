@@ -1,6 +1,47 @@
 compatibility_baseline_version: 1.0.0
 deprecated_scenario_ids: []
 scenarios:
+- scenario_id: jdbc_type.common_type_metadata
+  category: core
+  contract: common JDBC scalar types are exposed through DatabaseMetaData type information.
+  source_class: com.jdbctest.jdbctype.JdbcTypeCoverageTest
+  source_method: testCommonTypeMetadata
+  required_capabilities: []
+- scenario_id: jdbc_type.array_type_metadata
+  category: extended
+  contract: ARRAY type metadata is exposed when array_type is declared.
+  source_class: com.jdbctest.jdbctype.JdbcTypeCoverageTest
+  source_method: testArrayTypeMetadata
+  required_capabilities:
+  - array_type
+- scenario_id: jdbc_type.sqlxml_api
+  category: extended
+  contract: SQLXML can be created when sqlxml is declared.
+  source_class: com.jdbctest.jdbctype.JdbcTypeCoverageTest
+  source_method: testSqlXmlApi
+  required_capabilities:
+  - sqlxml
+- scenario_id: jdbc_type.row_id_type_metadata
+  category: extended
+  contract: ROWID type metadata is exposed when rowid_type is declared.
+  source_class: com.jdbctest.jdbctype.JdbcTypeCoverageTest
+  source_method: testRowIdTypeMetadata
+  required_capabilities:
+  - rowid_type
+- scenario_id: jdbc_type.ref_type_metadata
+  category: extended
+  contract: REF type metadata is exposed when ref_type is declared.
+  source_class: com.jdbctest.jdbctype.JdbcTypeCoverageTest
+  source_method: testRefTypeMetadata
+  required_capabilities:
+  - ref_type
+- scenario_id: jdbc_type.struct_type_metadata
+  category: extended
+  contract: STRUCT type metadata is exposed when struct_type is declared.
+  source_class: com.jdbctest.jdbctype.JdbcTypeCoverageTest
+  source_method: testStructTypeMetadata
+  required_capabilities:
+  - struct_type
 - scenario_id: advanced_type.array_get_array
   category: extended
   contract: advanced type array get array follows the JDBC-facing API contract when

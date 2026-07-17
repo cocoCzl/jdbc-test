@@ -3,6 +3,7 @@ package com.jdbctest.callablestatement;
 import com.jdbctest.config.Config;
 import com.jdbctest.config.ConfigLoader;
 import com.jdbctest.extension.JdbcTestExtension;
+import com.jdbctest.extension.RequiresFeature;
 import com.jdbctest.extension.UseSqlScripts;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,15 +13,17 @@ import java.sql.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 @ExtendWith(JdbcTestExtension.class)
+@RequiresFeature("callable_statement")
 @UseSqlScripts(
     ddl = {"callablestatement_ddl.sql"},
-    dml = {"callablestatement_dml.sql"}
+    dml = {"callablestatement_dml.sql"},
+    cleanup = {"callablestatement_cleanup.sql"}
 )
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class CallableStatementTest {
 
     private static boolean isOracle() {
-        return ConfigLoader.load().db.type == Config.DbType.ORACLE;
+        return ConfigLoader.load().db.isDialect("oracle");
     }
 
     private static String fn(String name) {

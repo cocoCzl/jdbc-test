@@ -1,0 +1,44 @@
+{
+  "id": "gaussdb",
+  "name": "GaussDB",
+  "version": "1.0.0",
+  "revision": "1.0.0",
+  "trust": "candidate",
+  "dialect": "postgresql",
+  "identifier_quote": "\"",
+  "driver": {
+    "class": "org.postgresql.Driver",
+    "source": {"kind": "maven", "coordinate": "org.postgresql:postgresql:42.7.2"}
+  },
+  "identity": {
+    "database_product_regex": "GaussDB|openGauss|PostgreSQL",
+    "driver_name_regex": "PostgreSQL JDBC Driver"
+  },
+  "supported_versions": {
+    "database": {"min": "1", "max": "99"},
+    "driver": {"min": "42.0", "max": "43"}
+  },
+  "validated_combinations": [],
+  "capabilities": {
+    "savepoint": true, "callable_statement": true, "array_type": true,
+    "ref_type": false, "struct_type": false, "rowid_type": false, "sqlxml": false,
+    "rowset": true, "blobs": true, "clobs": true, "nclobs": false,
+    "parameter_metadata": true
+  },
+  "assets": {
+    "ddl": "ddl", "dml": "dml", "profile": "profile", "pool": "pool",
+    "areas": ["connection", "statement", "preparedstatement", "callablestatement", "resultset", "metadatatest", "savepoint", "rowset", "blobclob", "sqlxml", "advancedtype"]
+  },
+  "namespace": {
+    "mode": "auto", "selection": "schema",
+    "create_privilege": "CREATE ON DATABASE",
+    "create_sql": "CREATE SCHEMA \"{namespace}\"",
+    "drop_sql": "DROP SCHEMA \"{namespace}\" CASCADE",
+    "drop_on_exit": true
+  },
+  "minimum_privileges": ["CONNECT", "CREATE ON DATABASE"],
+  "privilege_checks": [
+    {"privilege": "CONNECT", "sql": "SELECT 1", "cleanup_sql": ""}
+  ],
+  "known_differences": []
+}

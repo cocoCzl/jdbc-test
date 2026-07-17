@@ -40,18 +40,18 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
             return;
         }
 
-        Config.DbType dbType = config.db.type;
+        String adapterId = config.db.assetId;
         List<String> createdTables = new ArrayList<>();
 
         for (String ddlFile : annotation.ddl()) {
-            Path path = resolvePath(config.ddl.basePath, dbType.name().toLowerCase(), ddlFile);
-            List<String> tables = executeSqlFile(context, path, dbType);
+            Path path = resolvePath(config.ddl.basePath, adapterId, ddlFile);
+            List<String> tables = executeSqlFile(context, path);
             createdTables.addAll(tables);
         }
 
         for (String dmlFile : annotation.dml()) {
-            Path path = resolvePath(config.dml.basePath, dbType.name().toLowerCase(), dmlFile);
-            executeSqlFile(context, path, dbType);
+            Path path = resolvePath(config.dml.basePath, adapterId, dmlFile);
+            executeSqlFile(context, path);
         }
 
         context.getStore(ExtensionContext.Namespace.create(testClass))
@@ -65,8 +65,8 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
         UseSqlScripts annotation = testClass.getAnnotation(UseSqlScripts.class);
         if (annotation != null) {
             for (String cleanupFile : annotation.cleanup()) {
-                Path path = resolvePath(config.ddl.basePath, config.db.type.name().toLowerCase(), cleanupFile);
-                executeSqlFile(context, path, config.db.type);
+                Path path = resolvePath(config.ddl.basePath, config.db.assetId, cleanupFile);
+                executeSqlFile(context, path);
             }
         }
 
@@ -78,7 +78,7 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
             return;
         }
 
-        String quote = config.db.type.getIdentifierQuote();
+        String quote = config.db.getIdentifierQuote();
 
         try (Connection conn = JdbcContext.getConnection();
              Statement stmt = conn.createStatement()) {
@@ -86,7 +86,7 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
                 String table = tables.get(i);
                 String quoted = quote + table.replace(quote, quote + quote) + quote;
                 try {
-                    if (config.db.type == Config.DbType.ORACLE) {
+                    if (config.db.isDialect("oracle")) {
                         stmt.execute("DROP TABLE " + table.toUpperCase(Locale.ENGLISH)
                                 + " CASCADE CONSTRAINTS PURGE");
                     } else {
@@ -166,15 +166,8 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
         if (!initialized || !configKey.equals(initializedConfigKey) || JdbcContext.getDataSource() == null) {
             synchronized (JdbcTestExtension.class) {
                 if (!initialized || !configKey.equals(initializedConfigKey) || JdbcContext.getDataSource() == null) {
-                    JdbcContext.init(
-                            config.db.getJdbcUrl(),
-                            config.db.getDriverClass(),
-                            config.db.username,
-                            config.db.password,
-                            config.db.type,
-                            config.pool.profileDir
-                    );
-                    FeatureProfile.load(config.db.type, config.profile.profileDir);
+                    JdbcContext.init(config);
+                    FeatureProfile.load(config.adapter == null ? null : config.adapter.capabilities);
                     initialized = true;
                     initializedConfigKey = configKey;
                     return config;
@@ -186,7 +179,7 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
 
     private String configKey(Config config) {
         return String.join("\u0000",
-                config.db.type.name(),
+                config.db.adapterId,
                 config.db.getJdbcUrl(),
                 config.db.getDriverClass(),
                 config.db.username,
@@ -234,10 +227,14 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
         if (p.isAbsolute() || fileName.contains("/") || fileName.contains("\\")) {
             return Paths.get(fileName);
         }
-        return Paths.get(System.getProperty("user.dir", "."), basePath, dbType, fileName);
+        Path base = Paths.get(basePath);
+        if (!base.isAbsolute()) {
+            base = Paths.get(System.getProperty("user.dir", "."), basePath);
+        }
+        return base.resolve(dbType).resolve(fileName);
     }
 
-    private List<String> executeSqlFile(ExtensionContext context, Path path, Config.DbType dbType) throws IOException {
+    private List<String> executeSqlFile(ExtensionContext context, Path path) throws IOException {
         if (!Files.exists(path)) {
             throw new RuntimeException("SQL 文件不存在: " + path.toAbsolutePath());
         }
@@ -305,7 +302,9 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
         if (isDrop) {
             return code == 942   // Oracle: ORA-00942 表或视图不存在
                 || code == 1051  // MySQL: Table doesn't exist
-                || code == 1418; // Oracle: ORA-01418 指定的索引不存在
+                || code == 1418  // Oracle: ORA-01418 指定的索引不存在
+                || code == 4043  // Oracle: ORA-04043 object does not exist
+                || code == 1305; // MySQL: FUNCTION does not exist
         }
         if (isCreateOrReplace) {
             return code == 955;  // Oracle: ORA-00955 名称已由现有对象使用（同名不同类对象冲突）

@@ -1,0 +1,11 @@
+{
+  "database_product": "PostgreSQL",
+  "database_version": "15.2 (Debian 15.2-1.pgdg110+1)",
+  "driver_version": "42.7.2",
+  "test_suite_version": "1.0.0",
+  "target_outcome": "target_compatible",
+  "passed": 190,
+  "known_unsupported": 3,
+  "cleanup_failures": 0,
+  "report_sha256": "4e71642b923612d700fba7f324d0b17b694ab4ebbda3cca6e778f11cc8c094f1"
+}

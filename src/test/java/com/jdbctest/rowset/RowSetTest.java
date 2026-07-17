@@ -3,6 +3,7 @@ package com.jdbctest.rowset;
 import com.jdbctest.config.Config;
 import com.jdbctest.config.ConfigLoader;
 import com.jdbctest.extension.JdbcTestExtension;
+import com.jdbctest.extension.RequiresFeature;
 import com.jdbctest.extension.UseSqlScripts;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -13,6 +14,7 @@ import java.sql.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 @ExtendWith(JdbcTestExtension.class)
+@RequiresFeature("rowset")
 @UseSqlScripts(
     ddl = {"rowset_ddl.sql"},
     dml = {"rowset_dml.sql"}
@@ -21,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class RowSetTest {
 
     private static boolean isOracle() {
-        return ConfigLoader.load().db.type == Config.DbType.ORACLE;
+        return ConfigLoader.load().db.isDialect("oracle");
     }
 
     private String getJdbcUrl() {
@@ -41,7 +43,22 @@ class RowSetTest {
         rowSet.setUrl(getJdbcUrl());
         rowSet.setUsername(getUsername());
         rowSet.setPassword(getPassword());
-        rowSet.setCommand(sql);
+        rowSet.setCommand(qualifyRowSetTable(sql));
+    }
+
+    private String qualifyRowSetTable(String sql) {
+        Config config = ConfigLoader.load();
+        String namespace = config.namespace == null ? "" : config.namespace.name;
+        if (namespace == null || namespace.isBlank()) return sql;
+        String table = "rowset_test";
+        if (config.db.isDialect("oracle")) {
+            namespace = namespace.toUpperCase();
+            table = table.toUpperCase();
+        }
+        String quote = config.db.getIdentifierQuote();
+        String qualified = quote + namespace.replace(quote, quote + quote) + quote
+                + "." + quote + table + quote;
+        return sql.replace("rowset_test", qualified);
     }
 
     @Test
@@ -61,7 +78,7 @@ class RowSetTest {
             setupRowSet(rowSet, "SELECT * FROM rowset_test");
 
             assertEquals(getJdbcUrl(), rowSet.getUrl());
-            assertEquals("SELECT * FROM rowset_test", rowSet.getCommand());
+            assertEquals(qualifyRowSetTable("SELECT * FROM rowset_test"), rowSet.getCommand());
         }
     }
 

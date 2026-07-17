@@ -54,6 +54,9 @@ class CompatibilityV1Test(unittest.TestCase):
                 "execution_error",
                 "capability_declaration_mismatch",
                 "observed",
+                "known_difference",
+                "adapter_incomplete",
+                "cleanup_failure",
             },
             {item.value for item in CompatibilityStatus},
         )

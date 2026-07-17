@@ -138,6 +138,9 @@
                     <includes>
                         <include>**/*Test.java</include>
                     </includes>
+                    <additionalClasspathElements>
+                        <additionalClasspathElement>${surefire.additionalClasspath}</additionalClasspathElement>
+                    </additionalClasspathElements>
                 </configuration>
             </plugin>
         </plugins>

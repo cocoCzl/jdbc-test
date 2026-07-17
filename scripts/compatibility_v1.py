@@ -6,12 +6,15 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any
 
-import yaml
+try:
+    import yaml
+except ImportError:  # Zero-dependency launcher fallback.
+    yaml = None
 
 
 COMPATIBILITY_BASELINE_VERSION = "1.0.0"
@@ -40,6 +43,9 @@ class CompatibilityStatus(StableValueEnum):
     EXECUTION_ERROR = "execution_error"
     CAPABILITY_DECLARATION_MISMATCH = "capability_declaration_mismatch"
     OBSERVED = "observed"
+    KNOWN_DIFFERENCE = "known_difference"
+    ADAPTER_INCOMPLETE = "adapter_incomplete"
+    CLEANUP_FAILURE = "cleanup_failure"
 
 
 class ScenarioCategory(StableValueEnum):
@@ -85,11 +91,23 @@ class Scenario:
 
 def build_scenario_inventory(project_root: Path) -> dict[tuple[str, str], Scenario]:
     inventory_path = project_root / SCENARIO_INVENTORY_PATH
-    if inventory_path.exists():
+    if inventory_path.exists() and yaml is not None:
         source_inventory = discover_source_scenarios(project_root)
-        inventory = load_scenario_inventory(inventory_path)
-        validate_inventory_covers_source(source_inventory, inventory)
-        return inventory
+        stable_inventory = load_scenario_inventory(inventory_path)
+        validate_inventory_covers_source(source_inventory, stable_inventory)
+        return {
+            key: Scenario(
+                scenario_id=stable_inventory[key].scenario_id,
+                category=source.category,
+                contract=stable_inventory[key].contract,
+                class_name=source.class_name,
+                method_name=source.method_name,
+                required_capabilities=source.required_capabilities,
+                deprecated=stable_inventory[key].deprecated,
+                replacement_scenario_id=stable_inventory[key].replacement_scenario_id,
+            )
+            for key, source in source_inventory.items()
+        }
     return discover_source_scenarios(project_root)
 
 
@@ -132,6 +150,8 @@ def discover_source_scenarios(project_root: Path) -> dict[tuple[str, str], Scena
 
 
 def load_scenario_inventory(path: Path) -> dict[tuple[str, str], Scenario]:
+    if yaml is None:
+        raise RuntimeError("PyYAML is required only to validate the checked-in scenario inventory")
     with path.open("r", encoding="utf-8") as f:
         raw = yaml.safe_load(f) or {}
     scenarios = raw.get("scenarios", [])
@@ -254,6 +274,10 @@ def build_v1_report(
     scenario_results: dict[str, dict[str, Any]] = {}
     for case in enriched_cases:
         compatibility_status = normalize_status(case, capability_declarations)
+        deviations = applicable_known_deviations(config, target, case["scenario_id"])
+        if compatibility_status == CompatibilityStatus.COMPATIBILITY_FAILURE.value and any(
+                d.get("trust") == "official" for d in deviations):
+            compatibility_status = CompatibilityStatus.KNOWN_DIFFERENCE.value
         scenario_results[case["scenario_id"]] = {
             "scenario_id": case["scenario_id"],
             "category": case["category"],
@@ -264,12 +288,12 @@ def build_v1_report(
             "timing": {"duration_seconds": case.get("time_seconds", 0.0)},
             "diagnostic": {
                 "raw_status": case.get("status", ""),
-                "message": case.get("error_message") or case.get("skip_reason") or "",
+                "message": _sanitize_message(case.get("error_message") or case.get("skip_reason") or ""),
                 "error_type": case.get("error_type", ""),
-                "details": case.get("error_text", ""),
+                "details": "local diagnostic log",
             },
             "required_capabilities": case.get("required_capabilities", []),
-            "known_deviations": applicable_known_deviations(config, target, case["scenario_id"]),
+            "known_deviations": deviations,
         }
 
     for scenario in inventory.values():
@@ -288,9 +312,9 @@ def build_v1_report(
             "timing": {"duration_seconds": 0.0},
             "diagnostic": {
                 "raw_status": raw_status,
-                "message": setup_error.get("error_message", "") if setup_error else "",
+                "message": _sanitize_message(setup_error.get("error_message", "")) if setup_error else "",
                 "error_type": setup_error.get("error_type", "") if setup_error else "",
-                "details": setup_error.get("error_text", "") if setup_error else "",
+                "details": "local diagnostic log" if setup_error else "",
             },
             "required_capabilities": list(scenario.required_capabilities),
             "known_deviations": applicable_known_deviations(config, target, scenario.scenario_id),
@@ -310,12 +334,16 @@ def build_v1_report(
         "scenario_results": dict(sorted(scenario_results.items())),
         "capability_profile": capability_profile,
         "known_deviations": collect_report_known_deviations(scenario_results),
+        "expired_known_deviations": collect_expired_known_deviations(config),
         "environment_cleanup_issues": collect_cleanup_issues(execution, test_suites),
+        "environment_preflight_issues": collect_preflight_issues(execution, test_suites),
+        "formal_eligible": _formal_eligible(config, run_kind, identity_mismatch),
+        "adapter": config.get("adapter", {}),
+        "driver_artifact": config.get("driver_artifact", {}),
         "diagnostics": {
             "unmapped_test_cases": unmapped,
             "maven_exit_code": execution.get("exit_code"),
-            "stdout": execution.get("stdout", ""),
-            "stderr": execution.get("stderr", ""),
+            "local_log": "diagnostics.log",
         },
     }
 
@@ -351,7 +379,8 @@ def aggregate_target_outcome(
                  CompatibilityStatus.SKIPPED.value, CompatibilityStatus.UNKNOWN_CAPABILITY.value)
            for s in core_statuses):
         return TargetOutcome.EVALUATION_INCONCLUSIVE
-    if all(s == CompatibilityStatus.PASSED.value for s in core_statuses):
+    if all(s in (CompatibilityStatus.PASSED.value, CompatibilityStatus.KNOWN_DIFFERENCE.value)
+           for s in core_statuses):
         return TargetOutcome.TARGET_COMPATIBLE
     return TargetOutcome.EVALUATION_INCONCLUSIVE
 
@@ -361,13 +390,11 @@ def build_compatibility_target(config: dict[str, Any], env_info: dict[str, str])
     configured_type = db_config.get("type", "")
     return {
         "configured_database_type": configured_type,
-        "configured_jdbc_url": db_config.get("url", ""),
-        "configured_username": db_config.get("username", ""),
         "database_product": _explicit(env_info.get("jdbc.test.databaseProductName"), db_config.get("expected_database_product")),
         "database_version": _explicit(env_info.get("jdbc.test.databaseProductVersion"), db_config.get("expected_database_version")),
         "jdbc_driver_name": _explicit(env_info.get("jdbc.test.driverName"), _configured_driver_name(configured_type)),
         "jdbc_driver_version": _explicit(env_info.get("jdbc.test.driverVersion"), db_config.get("expected_driver_version")),
-        "jdbc_url": _explicit(env_info.get("jdbc.test.jdbcUrl"), db_config.get("url")),
+        "jdbc_url": {"value": "redacted", "source": "redacted"},
     }
 
 
@@ -445,13 +472,16 @@ def build_capability_profile(
 
 
 def load_capability_declarations(config: dict[str, Any], project_root: Path) -> dict[str, Any]:
+    adapter_capabilities = (config.get("adapter", {}) or {}).get("capabilities")
+    if isinstance(adapter_capabilities, dict):
+        return adapter_capabilities
     db_type = (config.get("db", {}) or {}).get("type", "")
     profile_dir = (config.get("profile", {}) or {}).get("profile_dir", "profile")
     path = Path(profile_dir)
     if not path.is_absolute():
         path = project_root / path
     profile_path = path / f"{db_type}.yaml"
-    if not profile_path.exists():
+    if not profile_path.exists() or yaml is None:
         return {}
     with profile_path.open("r", encoding="utf-8") as f:
         raw = yaml.safe_load(f) or {}
@@ -476,6 +506,8 @@ def applicable_known_deviations(
     for deviation in deviations:
         if deviation.get("scenario_id") != scenario_id:
             continue
+        if _known_deviation_expired(deviation):
+            continue
         product = deviation.get("database_product")
         if product and product.lower() not in target_product.lower():
             continue
@@ -485,6 +517,38 @@ def applicable_known_deviations(
             continue
         applicable.append(deviation)
     return applicable
+
+
+def collect_expired_known_deviations(config: dict[str, Any]) -> list[dict[str, Any]]:
+    deviations = config.get("known_deviations") or []
+    return [dict(item) for item in deviations if isinstance(item, dict) and _known_deviation_expired(item)]
+
+
+def _known_deviation_expired(deviation: dict[str, Any]) -> bool:
+    value = deviation.get("review_after")
+    if not value:
+        return False
+    try:
+        return date.fromisoformat(str(value)) < date.today()
+    except ValueError:
+        return True
+
+
+def _formal_eligible(config: dict[str, Any], run_kind: RunKind, identity_mismatch: dict[str, Any]) -> bool:
+    adapter = config.get("adapter", {}) or {}
+    return (
+        run_kind == RunKind.FORMAL_COMPATIBILITY_EVALUATION
+        and not identity_mismatch.get("mismatch")
+        and adapter.get("trust") == "official"
+        and not adapter.get("experimental_override", False)
+    )
+
+
+def _sanitize_message(value: str) -> str:
+    text = (value or "").replace("\r", " ").replace("\n", " ")
+    text = re.sub(r"jdbc:[^\s]+", "jdbc:[redacted]", text, flags=re.IGNORECASE)
+    text = re.sub(r"(?i)(password|pwd|token)\s*[=:]\s*[^\s,;]+", r"\1=[redacted]", text)
+    return text[:240]
 
 
 def collect_report_known_deviations(scenario_results: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
@@ -514,6 +578,26 @@ def collect_cleanup_issues(
             continue
         if "清理" in line and ("失败" in line or "[WARN]" in line):
             issues.append({"message": line})
+    return issues
+
+
+def collect_preflight_issues(
+    execution: dict[str, Any],
+    test_suites: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    issues = []
+    streams = [execution.get("stderr", "") or ""]
+    for suite in test_suites or []:
+        streams.append(suite.get("system_err", "") or "")
+        streams.append(suite.get("system_out", "") or "")
+    for line in "\n".join(streams).splitlines():
+        if not line.startswith("[JDBC_PREFLIGHT_ISSUE]"):
+            continue
+        payload = line.removeprefix("[JDBC_PREFLIGHT_ISSUE]").strip()
+        try:
+            issues.append(json.loads(payload))
+        except json.JSONDecodeError:
+            issues.append({"message": payload})
     return issues
 
 

@@ -1,0 +1,43 @@
+{
+  "id": "sqlserver",
+  "name": "Microsoft SQL Server",
+  "version": "1.0.0",
+  "revision": "1.0.0",
+  "trust": "candidate",
+  "dialect": "sqlserver",
+  "identifier_quote": "\"",
+  "driver": {
+    "class": "com.microsoft.sqlserver.jdbc.SQLServerDriver",
+    "source": {"kind": "maven", "coordinate": "com.microsoft.sqlserver:mssql-jdbc:12.6.0.jre11"}
+  },
+  "identity": {
+    "database_product_regex": "Microsoft SQL Server",
+    "driver_name_regex": "Microsoft JDBC Driver"
+  },
+  "supported_versions": {
+    "database": {"min": "2016", "max": "9999"},
+    "driver": {"min": "12", "max": "13"}
+  },
+  "validated_combinations": [],
+  "capabilities": {
+    "savepoint": true, "callable_statement": true, "array_type": false,
+    "ref_type": false, "struct_type": false, "rowid_type": false, "sqlxml": true,
+    "rowset": true, "blobs": true, "clobs": true, "nclobs": true,
+    "parameter_metadata": true
+  },
+  "assets": {
+    "ddl": "ddl", "dml": "dml", "profile": "profile", "pool": "pool",
+    "areas": ["connection", "statement", "preparedstatement", "callablestatement", "resultset", "metadatatest", "savepoint", "rowset", "blobclob", "sqlxml", "advancedtype"]
+  },
+  "namespace": {
+    "mode": "existing", "selection": "schema", "name": "dbo",
+    "drop_on_exit": false
+  },
+  "minimum_privileges": ["CONNECT", "CREATE TABLE", "CREATE PROCEDURE"],
+  "privilege_checks": [
+    {"privilege": "CONNECT", "sql": "SELECT 1", "cleanup_sql": ""},
+    {"privilege": "CREATE TABLE", "sql": "CREATE TABLE {probe}_t (id INT)", "cleanup_sql": "DROP TABLE {probe}_t"},
+    {"privilege": "CREATE PROCEDURE", "sql": "CREATE PROCEDURE {probe}_proc AS SELECT 1", "cleanup_sql": "DROP PROCEDURE {probe}_proc"}
+  ],
+  "known_differences": []
+}

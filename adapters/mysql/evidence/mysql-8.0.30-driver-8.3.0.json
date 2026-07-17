@@ -1,0 +1,11 @@
+{
+  "database_product": "MySQL",
+  "database_version": "8.0.30",
+  "driver_version": "8.3.0",
+  "test_suite_version": "1.0.0",
+  "target_outcome": "target_compatible",
+  "passed": 165,
+  "known_unsupported": 28,
+  "cleanup_failures": 0,
+  "report_sha256": "4effffa63c4e65917366f425b87d55a280b55fcc7ba08a036af856d805ad9d68"
+}

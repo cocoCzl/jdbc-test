@@ -1,795 +1,482 @@
 #!/usr/bin/env python3
-"""
-JDBC Test Runner
-用法: python scripts/runner.py [config.yaml]
+from __future__ import annotations
 
-功能:
-  1. 读取配置文件
-  2. 生成 junit-platform.properties
-  3. 执行 mvn test
-  4. 解析 Surefire XML 报告
-  5. 生成 JSON 报告
-  6. 归档到 report/{db_type}_{timestamp}/
-"""
-
-import yaml
-import subprocess
-import os
-import sys
+import argparse
+import html
 import json
-import re
+import os
 import platform
+import re
+import subprocess
+import sys
+import tempfile
 import xml.etree.ElementTree as ET
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
-from compatibility_v1 import build_v1_report, generate_matrix, vendor_extension_report
+from adapter_runtime import (
+    build_runtime_config,
+    discover_adapters,
+    load_adapter,
+    resolve_driver,
+    runtime_dependencies,
+)
+from compatibility_v1 import (
+    CompatibilityStatus,
+    build_v1_report,
+    load_v1_report,
+)
+
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+REPORT_SCHEMA_VERSION = "1.0.0"
 
 
-def resolve_config_path(config_path=None):
-    if config_path is None:
-        config_path = os.environ.get("CONFIG_PATH")
-        if config_path is None:
-            local_config = PROJECT_ROOT / "configs" / "config.yaml"
-            config_path = str(local_config if local_config.exists() else PROJECT_ROOT / "config.yaml")
-
-    path = Path(config_path)
-    if not path.is_absolute():
-        path = PROJECT_ROOT / path
-
-    if not path.exists():
-        print(f"[错误] 配置文件不存在: {path}")
-        sys.exit(1)
-
-    return path
-
-
-def load_config(config_path=None):
-    path = resolve_config_path(config_path)
-
-    with open(path, "r", encoding="utf-8") as f:
-        config = yaml.safe_load(f)
-
-    # 环境变量替换 ${VAR}
-    def resolve_env(obj):
-        if isinstance(obj, str):
-            return re.sub(r'\$\{([^}]+)}', lambda m: os.environ.get(m.group(1), ""), obj)
-        if isinstance(obj, dict):
-            return {k: resolve_env(v) for k, v in obj.items()}
-        if isinstance(obj, list):
-            return [resolve_env(v) for v in obj]
-        return obj
-
-    config = resolve_env(config)
-    config["_config_path"] = str(path)
-    return config
+def main(argv: list[str] | None = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] not in {"init", "run", "compare", "adapters", "--help", "-h"}:
+        argv.insert(0, "run")
+    parser = _parser()
+    args = parser.parse_args(argv)
+    if args.command == "init":
+        return command_init(args)
+    if args.command == "run":
+        return command_run(args)
+    if args.command == "compare":
+        return command_compare(args)
+    if args.command == "adapters":
+        return command_adapters()
+    parser.print_help()
+    return 0
 
 
-def generate_junit_properties(config):
-    concurrency = config.get("concurrency", {})
-    parallel = concurrency.get("enabled", False)
-    threads = concurrency.get("threads", 1)
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="JDBC 4.3 driver compatibility assessment")
+    sub = parser.add_subparsers(dest="command")
+    init = sub.add_parser("init", help="Generate secure local configuration")
+    init.add_argument("--adapter")
+    init.add_argument("--url")
+    init.add_argument("--username")
+    init.add_argument("--password-env", default="DB_PASSWORD")
+    init.add_argument("--namespace")
+    init.add_argument("--consent", action="store_true")
+    init.add_argument("--output", default="configs/config.local.json")
 
-    output_dir = PROJECT_ROOT / "target" / "test-classes"
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output_file = output_dir / "junit-platform.properties"
+    run = sub.add_parser("run", help="Run compatibility assessment")
+    run.add_argument("config")
+    run.add_argument("--experimental-override", action="store_true")
 
-    lines = [
-        f"junit.jupiter.execution.parallel.enabled = {'true' if parallel else 'false'}",
-        "junit.jupiter.execution.parallel.mode.default = same_thread",
-        f"junit.jupiter.execution.parallel.mode.classes.default = {'concurrent' if parallel else 'same_thread'}",
-    ]
-    if parallel and threads > 1:
-        lines.append("junit.jupiter.execution.parallel.config.strategy = fixed")
-        lines.append(f"junit.jupiter.execution.parallel.config.fixed.parallelism = {threads}")
-
-    test_timeout = config.get("test_filter", {}).get("timeout")
-    if test_timeout:
-        lines.append(f"junit.jupiter.execution.timeout.test.method.default = {int(test_timeout)} ms")
-
-    with open(output_file, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines) + "\n")
-
-    print(f"[生成] {output_file} (并行: {parallel}, 线程: {threads})")
-    return output_file
+    compare = sub.add_parser("compare", help="Compare an assessment with an approved baseline")
+    compare.add_argument("--baseline", required=True)
+    compare.add_argument("--current", required=True)
+    compare.add_argument("--output")
+    sub.add_parser("adapters", help="List bundled adapters")
+    return parser
 
 
-def run_maven_test(config):
-    print("[执行] mvn test ...")
-    env = os.environ.copy()
-    config_path = config.get("_config_path", str(PROJECT_ROOT / "config.yaml"))
-    env["CONFIG_PATH"] = config_path
+def command_adapters() -> int:
+    for adapter_id, path in discover_adapters(PROJECT_ROOT).items():
+        manifest = json.loads((path / "adapter.json").read_text(encoding="utf-8"))
+        print(f"{adapter_id:12} {manifest.get('trust', ''):10} {manifest.get('name', '')}")
+    return 0
 
-    _install_custom_driver(config, env)
 
-    cmd = ["mvn", "test", "-q", f"-Dconfig.yaml={config_path}"]
-    include_tests = config.get("test_filter", {}).get("include_tests") or []
-    exclude_tests = config.get("test_filter", {}).get("exclude_tests") or []
-    test_patterns = list(include_tests) if include_tests else []
-    if exclude_tests:
-        if not test_patterns:
-            test_patterns.append("*Test")
-        test_patterns.extend(f"!{pattern}" for pattern in exclude_tests)
-    if test_patterns:
-        cmd.append(f"-Dtest={','.join(test_patterns)}")
+def command_init(args: argparse.Namespace) -> int:
+    discovered = discover_adapters(PROJECT_ROOT)
+    if not discovered:
+        print("[错误] 没有可用数据库适配包", file=sys.stderr)
+        return 2
+    adapter_ref = args.adapter or _prompt("Adapter", ", ".join(discovered), next(iter(discovered)))
+    try:
+        adapter = load_adapter(PROJECT_ROOT, adapter_ref)
+    except ValueError as exc:
+        print(f"[错误] {exc}", file=sys.stderr)
+        return 2
+    url = args.url or _prompt("JDBC URL")
+    username = args.username or _prompt("Username")
+    namespace = args.namespace
+    consent = bool(args.consent)
+    if not args.consent and sys.stdin.isatty():
+        consent = _prompt("Allow creation/deletion of the dedicated test namespace?", "yes/no", "no").lower() == "yes"
+    config = {
+        "schema_version": "1.0.0",
+        "adapter": adapter_ref,
+        "db": {
+            "url": url,
+            "username": username,
+            "password_env": args.password_env,
+            "driver": adapter.manifest["driver"]["source"],
+        },
+        "namespace": {
+            "mode": adapter.manifest["namespace"]["mode"],
+            "name": namespace,
+            "destructive_consent": consent,
+        },
+        "execution": {"mode": "local"},
+        "report": {"output_dir": "report", "format": ["json", "html", "markdown"]},
+        "test_filter": {"include_tests": [], "exclude_tests": [], "timeout": 60000},
+    }
+    output = Path(args.output)
+    if not output.is_absolute():
+        output = PROJECT_ROOT / output
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    try:
+        output.chmod(0o600)
+    except OSError:
+        pass
+    print(f"[生成] {output}")
+    print(f"[提示] 运行前设置环境变量 {args.password_env}")
+    if not consent:
+        print("[安全] destructive_consent=false；run 将拒绝执行数据库变更")
+    return 0
 
-    start_time = datetime.now()
-    result = subprocess.run(
-        cmd,
-        cwd=PROJECT_ROOT,
-        env=env,
-        capture_output=True,
-        text=True,
-    )
-    end_time = datetime.now()
 
-    elapsed = (end_time - start_time).total_seconds()
-    print(f"[完成] 耗时 {elapsed:.1f}s, 退出码 {result.returncode}")
+def command_run(args: argparse.Namespace) -> int:
+    config_path = Path(args.config)
+    if not config_path.is_absolute():
+        config_path = PROJECT_ROOT / config_path
+    try:
+        user_config = _load_user_config(config_path)
+        if args.experimental_override:
+            user_config["experimental_override"] = True
+        dependencies = _preflight_dependencies()
+        adapter = load_adapter(PROJECT_ROOT, str(user_config.get("adapter", "")))
+        driver = resolve_driver(PROJECT_ROOT, user_config, adapter)
+        runtime = build_runtime_config(PROJECT_ROOT, user_config, adapter, driver)
+    except (OSError, ValueError) as exc:
+        print(f"[预检失败] {exc}", file=sys.stderr)
+        return 2
 
+    runtime["evaluation_dependencies"] = dependencies
+    execution: dict[str, Any]
+    runtime_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", prefix="jdbc-test-", delete=False, encoding="utf-8") as handle:
+            json.dump(runtime, handle, ensure_ascii=False)
+            runtime_path = Path(handle.name)
+        try:
+            runtime_path.chmod(0o600)
+        except OSError:
+            pass
+        execution = _run_maven(runtime, runtime_path, Path(driver["path"]))
+        suites, env_info = _parse_surefire_reports()
+        report = build_v1_report(runtime, execution, suites, env_info, PROJECT_ROOT)
+        report["report_schema_version"] = REPORT_SCHEMA_VERSION
+        report["formal_eligible"] = _validated_formal_eligibility(report, adapter.manifest)
+        report_dir = _archive_report(runtime, report, execution, suites)
+        print(f"[报告] {report_dir}")
+        print(f"[结果] {report.get('target_outcome')} | formal_eligible={report.get('formal_eligible')}")
+        return _assessment_exit_code(report)
+    finally:
+        if runtime_path is not None:
+            runtime_path.unlink(missing_ok=True)
+
+
+def command_compare(args: argparse.Namespace) -> int:
+    baseline = load_v1_report(Path(args.baseline))
+    current = load_v1_report(Path(args.current))
+    comparison = compare_reports(baseline, current)
+    payload = json.dumps(comparison, ensure_ascii=False, indent=2) + "\n"
+    if args.output:
+        Path(args.output).write_text(payload, encoding="utf-8")
+        print(f"[生成] {args.output}")
+    else:
+        print(payload, end="")
+    return 1 if comparison["blocking_changes"] else 0
+
+
+def compare_reports(baseline: dict[str, Any], current: dict[str, Any]) -> dict[str, Any]:
+    errors: list[str] = []
+    if baseline.get("compatibility_baseline_version") != current.get("compatibility_baseline_version"):
+        errors.append("测试套件版本不兼容；请在当前套件上重新建立基线")
+    if not baseline.get("formal_eligible"):
+        errors.append("基线报告不是正式可比较报告")
+    if not current.get("formal_eligible"):
+        errors.append("当前报告不是正式可比较报告")
+    if errors:
+        return {"comparable": False, "errors": errors, "changes": [], "blocking_changes": True}
+    previous = baseline.get("scenario_results", {})
+    now = current.get("scenario_results", {})
+    changes = []
+    blocking_statuses = {
+        CompatibilityStatus.COMPATIBILITY_FAILURE.value,
+        CompatibilityStatus.EXECUTION_ERROR.value,
+        CompatibilityStatus.UNKNOWN_CAPABILITY.value,
+        CompatibilityStatus.CAPABILITY_DECLARATION_MISMATCH.value,
+        CompatibilityStatus.NOT_RUN.value,
+    }
+    for scenario_id in sorted(set(previous) | set(now)):
+        before = (previous.get(scenario_id) or {}).get("compatibility_status", "not_run")
+        after = (now.get(scenario_id) or {}).get("compatibility_status", "not_run")
+        if before != after:
+            changes.append({
+                "scenario_id": scenario_id,
+                "before": before,
+                "after": after,
+                "blocking": after in blocking_statuses and before != after,
+            })
+    cleanup = current.get("environment_cleanup_issues") or []
     return {
-        "start_time": start_time.isoformat(),
-        "end_time": end_time.isoformat(),
-        "elapsed_seconds": round(elapsed, 3),
+        "comparable": True,
+        "baseline": _report_identity(baseline),
+        "current": _report_identity(current),
+        "changes": changes,
+        "cleanup_failures": cleanup,
+        "blocking_changes": any(change["blocking"] for change in changes) or bool(cleanup),
+    }
+
+
+def _preflight_dependencies() -> dict[str, str]:
+    found = runtime_dependencies()
+    missing = [name for name, path in found.items() if not path]
+    if missing:
+        guidance = {
+            "python": "Install Python 3.9+ / 安装 Python 3.9+",
+            "java": "Install JDK 21 / 安装 JDK 21",
+            "maven": "Install Maven 3.8+ / 安装 Maven 3.8+",
+        }
+        raise ValueError("; ".join(guidance[name] for name in missing))
+    java = subprocess.run([str(found["java"]), "-version"], capture_output=True, text=True)
+    version_text = java.stderr + java.stdout
+    match = re.search(r'version "(\d+)', version_text)
+    if not match or int(match.group(1)) != 21:
+        raise ValueError(f"正式评估要求 JDK 21，当前: {version_text.splitlines()[0] if version_text else 'unknown'}")
+    return {name: str(path) for name, path in found.items() if path}
+
+
+def _run_maven(runtime: dict[str, Any], runtime_path: Path, driver_path: Path) -> dict[str, Any]:
+    surefire = PROJECT_ROOT / "target" / "surefire-reports"
+    if surefire.exists():
+        for path in surefire.glob("TEST-*.xml"):
+            path.unlink(missing_ok=True)
+    command = [
+        "mvn", "-q", "test",
+        f"-Dconfig.yaml={runtime_path}",
+        f"-Dsurefire.additionalClasspath={driver_path}",
+    ]
+    filters = runtime.get("test_filter") or {}
+    includes = filters.get("include_tests") or []
+    excludes = filters.get("exclude_tests") or []
+    patterns = list(includes)
+    if excludes:
+        if not patterns:
+            patterns.append("*Test")
+        patterns.extend(f"!{value}" for value in excludes)
+    if patterns:
+        command.append(f"-Dtest={','.join(patterns)}")
+    started = datetime.now(timezone.utc)
+    result = subprocess.run(command, cwd=PROJECT_ROOT, capture_output=True, text=True)
+    ended = datetime.now(timezone.utc)
+    return {
+        "start_time": started.isoformat(),
+        "end_time": ended.isoformat(),
+        "elapsed_seconds": round((ended - started).total_seconds(), 3),
         "exit_code": result.returncode,
         "stdout": result.stdout,
         "stderr": result.stderr,
     }
 
 
-def _install_custom_driver(config, env):
-    """安装自定义 JDBC 驱动到本地 Maven 仓库"""
-    custom = config.get("db", {}).get("custom_driver")
-    if not custom:
-        return
-
-    load_method = custom.get("load_method", "")
-    jar_path = custom.get("jar_path", "")
-
-    if not jar_path:
-        print("[警告] custom_driver.jar_path 未配置")
-        return
-
-    jar_file = Path(jar_path)
-    if not jar_file.is_absolute():
-        jar_file = PROJECT_ROOT / jar_path
-
-    if not jar_file.exists():
-        print(f"[错误] 自定义驱动 JAR 不存在: {jar_file}")
-        sys.exit(1)
-
-    if load_method == "local_repo":
-        gid = custom.get("group_id", "com.custom")
-        aid = custom.get("artifact_id", "custom-driver")
-        ver = custom.get("version", "1.0")
-        print(f"[安装] {jar_file.name} -> 本地仓库 ({gid}:{aid}:{ver})")
-        result = subprocess.run(
-            ["mvn", "install:install-file", "-q",
-             f"-Dfile={jar_file}",
-             f"-DgroupId={gid}",
-             f"-DartifactId={aid}",
-             f"-Dversion={ver}",
-             "-Dpackaging=jar"],
-            cwd=PROJECT_ROOT,
-            capture_output=True, text=True,
-        )
-        if result.returncode != 0:
-            print(f"[错误] install:install-file 失败:\n{result.stderr}")
-            sys.exit(1)
-    elif load_method == "classpath":
-        cp = env.get("SUREFIRE_ADDITIONAL_CLASSPATH", "")
-        sep = ";" if platform.system() == "Windows" else ":"
-        env["SUREFIRE_ADDITIONAL_CLASSPATH"] = f"{cp}{sep}{jar_file}" if cp else str(jar_file)
-
-
-def run_docker_test(config):
-    """在 Docker 容器中执行测试"""
-    db = config.get("db", {})
-    image_name = "jdbc-test-runner"
-    container_name = f"jdbc-test-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-    m2_volume = "m2_repo"
-
-    # 构建镜像
-    print(f"[Docker] 构建镜像 {image_name}...")
-    build_result = subprocess.run(
-        ["docker", "build", "-t", image_name, "-q", "."],
-        cwd=PROJECT_ROOT,
-        capture_output=True,
-        text=True,
-    )
-    if build_result.returncode != 0:
-        print(f"[错误] Docker 镜像构建失败:\n{build_result.stderr}")
-        sys.exit(1)
-    print(f"[Docker] 镜像构建成功")
-
-    # 准备环境变量
-    docker_env = []
-    if db.get("password"):
-        docker_env.extend(["-e", f"DB_PASSWORD={db['password']}"])
-
-    # 确保 m2 volume 存在
-    subprocess.run(["docker", "volume", "create", m2_volume], capture_output=True)
-
-    # 运行容器
-    print(f"[Docker] 启动容器 {container_name}...")
-    start_time = datetime.now()
-
-    run_result = subprocess.run([
-        "docker", "run", "--rm",
-        "--name", container_name,
-        "-v", f"{PROJECT_ROOT}:/project",
-        "-v", f"{m2_volume}:/root/.m2",
-        "--network", "host",
-        *docker_env,
-        image_name,
-        "test", "-q",
-    ], capture_output=True, text=True, timeout=config.get("concurrency", {}).get("timeout", 300000) // 1000)
-
-    end_time = datetime.now()
-    elapsed = (end_time - start_time).total_seconds()
-    print(f"[Docker] 完成 耗时 {elapsed:.1f}s, 退出码 {run_result.returncode}")
-
-    return {
-        "start_time": start_time.isoformat(),
-        "end_time": end_time.isoformat(),
-        "elapsed_seconds": round(elapsed, 3),
-        "exit_code": run_result.returncode,
-        "stdout": run_result.stdout,
-        "stderr": run_result.stderr,
-    }
-
-
-def parse_surefire_reports():
-    surefire_dir = PROJECT_ROOT / "target" / "surefire-reports"
-    if not surefire_dir.exists():
-        print("[警告] surefire-reports 目录不存在")
-        return [], {}
-
-    env_info = {}
-    test_suites = []
-
-    for xml_file in sorted(surefire_dir.glob("TEST-*.xml")):
-        try:
-            tree = ET.parse(xml_file)
-            root = tree.getroot()
-
-            suite = {
-                "name": root.get("name", ""),
-                "time_seconds": float(root.get("time", 0)),
-                "total": int(root.get("tests", 0)),
-                "failures": int(root.get("failures", 0)),
-                "errors": int(root.get("errors", 0)),
-                "skipped": int(root.get("skipped", 0)),
-                "system_err": root.findtext("system-err", default=""),
-                "system_out": root.findtext("system-out", default=""),
-                "testcases": [],
-            }
-
-            # 收集系统属性（只从第一个文件收集）
-            if not env_info:
-                props_elem = root.find("properties")
-                if props_elem is not None:
-                    for prop in props_elem.findall("property"):
-                        env_info[prop.get("name", "")] = prop.get("value", "")
-
-            # 解析测试用例
-            for tc in root.findall("testcase"):
-                case = {
-                    "name": tc.get("name", ""),
-                    "classname": tc.get("classname", ""),
-                    "time_seconds": float(tc.get("time", 0)),
-                }
-
-                error_elem = tc.find("error")
-                if error_elem is not None:
-                    case["status"] = "error"
-                    case["error_message"] = error_elem.get("message", "")
-                    case["error_type"] = error_elem.get("type", "")
-                    case["error_text"] = error_elem.text or ""
-                elif tc.find("failure") is not None:
-                    case["status"] = "failure"
-                    f_elem = tc.find("failure")
-                    case["error_message"] = f_elem.get("message", "")
-                    case["error_text"] = f_elem.text or ""
-                elif tc.find("skipped") is not None:
-                    case["status"] = "skipped"
-                    s_elem = tc.find("skipped")
-                    case["skip_reason"] = s_elem.get("message", "") or s_elem.text or ""
-                else:
-                    case["status"] = "passed"
-
-                suite["testcases"].append(case)
-
-            test_suites.append(suite)
-
-        except Exception as e:
-            print(f"[警告] 解析 {xml_file.name} 失败: {e}")
-
-    return test_suites, env_info
-
-
-def extract_driver_info(env_info):
-    """从 classpath 中提取驱动版本信息"""
-    classpath = env_info.get("surefire.test.class.path", "")
-    drivers = {}
-
-    patterns = [
-        (r"postgresql-([\d.]+)\.jar", "postgresql"),
-        (r"mysql-connector-j-([\d.]+)\.jar", "mysql"),
-        (r"ojdbc11-([\d.]+)\.jar", "oracle"),
-        (r"mssql-jdbc-([\d.]+)\.jre\d+\.jar", "sqlserver"),
-    ]
-
-    for pattern, name in patterns:
-        m = re.search(pattern, classpath)
-        if m:
-            drivers[name] = {
-                "jar": f"{name}-{m.group(1)}",
-                "version": m.group(1),
-            }
-
-    return drivers
-
-
-def collect_environment_info(config, env_info):
-    """收集环境信息"""
-    db_config = config.get("db", {})
-    drivers = extract_driver_info(env_info)
-
-    current_driver = drivers.get(db_config.get("type", ""), {})
-    runtime_driver_name = env_info.get("jdbc.test.driverName", "")
-    runtime_driver_version = env_info.get("jdbc.test.driverVersion", "")
-
-    return {
-        "数据库类型": db_config.get("type", ""),
-        "数据库产品名": env_info.get("jdbc.test.databaseProductName", ""),
-        "数据库产品版本": env_info.get("jdbc.test.databaseProductVersion", ""),
-        "配置JDBC URL": db_config.get("url", ""),
-        "数据库用户名": db_config.get("username", ""),
-        "JDBC连接URL": env_info.get("jdbc.test.jdbcUrl", ""),
-        "JDBC驱动": runtime_driver_name or current_driver.get("jar", "未知"),
-        "JDBC驱动版本": runtime_driver_version or current_driver.get("version", "未知"),
-        "JDBC驱动类名": _get_driver_class(db_config.get("type", "")),
-        "DDL脚本路径": config.get("ddl", {}).get("base_path", ""),
-        "DML脚本路径": config.get("dml", {}).get("base_path", ""),
-        "Java版本": env_info.get("java.version", ""),
-        "Java规范版本": env_info.get("java.specification.version", ""),
-        "Java供应商": env_info.get("java.vm.vendor", ""),
-        "JVM名称": env_info.get("java.vm.name", ""),
-        "操作系统": env_info.get("os.name", ""),
-        "操作系统架构": env_info.get("os.arch", ""),
-        "操作系统版本": env_info.get("os.version", ""),
-        "用户名": env_info.get("user.name", ""),
-        "用户语言": env_info.get("user.language", ""),
-        "用户国家": env_info.get("user.country", ""),
-        "文件编码": env_info.get("file.encoding", ""),
-        "本地时区": env_info.get("user.timezone", ""),
-        "主机名": platform.node(),
-        "Python版本": sys.version,
-        "执行时间": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-    }
-
-
-def _get_driver_class(db_type):
-    mapping = {
-        "postgresql": "org.postgresql.Driver",
-        "mysql": "com.mysql.cj.jdbc.Driver",
-        "oracle": "oracle.jdbc.OracleDriver",
-        "sqlserver": "com.microsoft.sqlserver.jdbc.SQLServerDriver",
-    }
-    return mapping.get(db_type, "")
-
-
-def generate_json_report(config, execution, test_suites, env_info):
-    """生成 JSON 报告"""
-    total_tests = sum(s["total"] for s in test_suites)
-    total_failures = sum(s["failures"] for s in test_suites)
-    total_errors = sum(s["errors"] for s in test_suites)
-    total_skipped = sum(s["skipped"] for s in test_suites)
-    total_passed = total_tests - total_failures - total_errors - total_skipped
-
-    environment = collect_environment_info(config, env_info)
-
-    report = {
-        "报告标题": "JDBC 接口测试报告",
-        "生成时间": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "执行概要": {
-            "开始时间": execution["start_time"],
-            "结束时间": execution["end_time"],
-            "总耗时秒": execution["elapsed_seconds"],
-            "退出码": execution["exit_code"],
-        },
-        "测试汇总": {
-            "测试类数量": len(test_suites),
-            "测试方法总数": total_tests,
-            "通过": total_passed,
-            "失败": total_failures,
-            "错误": total_errors,
-            "跳过": total_skipped,
-            "通过率": f"{(total_passed / total_tests * 100):.1f}%" if total_tests > 0 else "N/A",
-        },
-        "环境信息": environment,
-        "测试类明细": [],
-    }
-
-    for suite in test_suites:
-        suite_passed = suite["total"] - suite["failures"] - suite["errors"] - suite["skipped"]
-        detail = {
-            "类名": suite["name"],
-            "耗时秒": suite["time_seconds"],
-            "用例统计": {
-                "总数": suite["total"],
-                "通过": suite_passed,
-                "失败": suite["failures"],
-                "错误": suite["errors"],
-                "跳过": suite["skipped"],
-            },
-            "用例明细": [],
+def _parse_surefire_reports() -> tuple[list[dict[str, Any]], dict[str, str]]:
+    directory = PROJECT_ROOT / "target" / "surefire-reports"
+    suites: list[dict[str, Any]] = []
+    env: dict[str, str] = {}
+    for xml_file in sorted(directory.glob("TEST-*.xml")) if directory.exists() else []:
+        root = ET.parse(xml_file).getroot()
+        if not env:
+            properties = root.find("properties")
+            if properties is not None:
+                env = {item.get("name", ""): item.get("value", "") for item in properties.findall("property")}
+        suite = {
+            "name": root.get("name", ""),
+            "time_seconds": float(root.get("time", 0)),
+            "total": int(root.get("tests", 0)),
+            "failures": int(root.get("failures", 0)),
+            "errors": int(root.get("errors", 0)),
+            "skipped": int(root.get("skipped", 0)),
+            "system_err": root.findtext("system-err", default=""),
+            "system_out": root.findtext("system-out", default=""),
+            "testcases": [],
         }
-
-        for case in suite["testcases"]:
-            case_detail = {
-                "方法名": case["name"],
-                "耗时秒": case["time_seconds"],
-                "状态": case["status"],
+        for node in root.findall("testcase"):
+            case = {
+                "name": node.get("name", ""),
+                "classname": node.get("classname", ""),
+                "time_seconds": float(node.get("time", 0)),
             }
-            if case["status"] == "error" or case["status"] == "failure":
-                case_detail["错误信息"] = case.get("error_message", "")
-                case_detail["错误类型"] = case.get("error_type", "")
-                case_detail["堆栈"] = case.get("error_text", "")
-            if case["status"] == "skipped":
-                case_detail["跳过原因"] = case.get("skip_reason", "")
-            detail["用例明细"].append(case_detail)
+            failure = node.find("failure")
+            error = node.find("error")
+            skipped = node.find("skipped")
+            if error is not None:
+                case.update(status="error", error_message=error.get("message", ""), error_type=error.get("type", ""), error_text=error.text or "")
+            elif failure is not None:
+                case.update(status="failure", error_message=failure.get("message", ""), error_type=failure.get("type", ""), error_text=failure.text or "")
+            elif skipped is not None:
+                case.update(status="skipped", skip_reason=skipped.get("message", "") or skipped.text or "")
+            else:
+                case["status"] = "passed"
+            suite["testcases"].append(case)
+        suites.append(suite)
+    return suites, env
 
-        report["测试类明细"].append(detail)
 
-    return report
-
-
-def generate_html_report(report):
-    """生成 HTML 报告"""
-    summary = report["测试汇总"]
-    env = report["环境信息"]
-    exec_info = report["执行概要"]
-    v1 = report.get("v1_compatibility_report", {})
-
-    status_style = {
-        "passed": "color:#2e7d32;font-weight:bold",
-        "failure": "color:#c62828;font-weight:bold",
-        "error": "color:#e65100;font-weight:bold",
-        "skipped": "color:#6a1b9a;font-weight:bold",
+def _archive_report(runtime: dict[str, Any], report: dict[str, Any], execution: dict[str, Any], suites: list[dict[str, Any]]) -> Path:
+    root = Path((runtime.get("report") or {}).get("output_dir", "report"))
+    if not root.is_absolute():
+        root = PROJECT_ROOT / root
+    stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    directory = root / f"{runtime['db']['adapter_id']}_{stamp}"
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (directory / "report.md").write_text(_markdown(report), encoding="utf-8")
+    (directory / "report.html").write_text(_html(report), encoding="utf-8")
+    diagnostic = {
+        "execution": execution,
+        "test_suites": suites,
+        "notice": "Local diagnostic log. Review before sharing.",
     }
-
-    suite_rows = []
-    for s in report["测试类明细"]:
-        passed = s["用例统计"]["通过"]
-        failed = s["用例统计"]["失败"]
-        errors = s["用例统计"]["错误"]
-        if passed == s["用例统计"]["总数"]:
-            badge = '<span style="color:#2e7d32">&#10003;</span>'
-        elif failed > 0 or errors > 0:
-            badge = '<span style="color:#c62828">&#10007;</span>'
-        else:
-            badge = '<span style="color:#6a1b9a">&#9888;</span>'
-
-        # 用例明细行
-        case_rows = []
-        for c in s["用例明细"]:
-            st = c["状态"]
-            emoji = {"passed": "&#10003;", "failure": "&#10007;", "error": "&#9888;", "skipped": "&#10140;"}.get(st, "")
-            detail = ""
-            if st in ("error", "failure"):
-                detail = f'<br><small style="color:#c62828">{_html_escape(c.get("错误信息", ""))}</small>'
-            elif st == "skipped":
-                detail = f'<br><small style="color:#6a1b9a">原因: {_html_escape(c.get("跳过原因", ""))}</small>'
-            case_rows.append(
-                f'<tr><td style="padding-left:32px">{emoji} {_html_escape(c["方法名"])}</td>'
-                f'<td style="{status_style.get(st, "")}">{st}</td>'
-                f'<td>{c["耗时秒"]:.3f}s</td></tr>'
-                + (f'<tr><td colspan="3" style="padding-left:48px;font-family:monospace;font-size:12px;white-space:pre-wrap;color:#c62828">{detail}</td></tr>' if detail else "")
-            )
-
-        suite_rows.append(
-            f'<tr style="background:#f5f5f5"><td><b>{badge} {_html_escape(s["类名"])}</b></td>'
-            f'<td>{s["用例统计"]["总数"]}</td>'
-            f'<td style="color:#2e7d32">{passed}</td>'
-            f'<td style="color:#c62828">{failed + errors}</td>'
-            f'<td style="color:#6a1b9a">{s["用例统计"]["跳过"]}</td>'
-            f'<td>{s["耗时秒"]:.3f}s</td></tr>'
-            + "".join(case_rows)
-        )
-
-    env_rows = "".join(f"<tr><td><b>{k}</b></td><td>{_html_escape(str(v))}</td></tr>" for k, v in env.items())
-
-    html = f"""<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>JDBC 测试报告 - {env.get('数据库类型', '')}</title>
-<style>
-body {{ font-family: -apple-system, 'Microsoft YaHei', sans-serif; margin: 20px; background: #fafafa; color: #333; }}
-.container {{ max-width: 1200px; margin: 0 auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 24px; }}
-h1 {{ color: #1a237e; border-bottom: 3px solid #3f51b5; padding-bottom: 8px; }}
-h2 {{ color: #283593; margin-top: 32px; }}
-table {{ width: 100%; border-collapse: collapse; margin: 12px 0; }}
-th, td {{ padding: 8px 12px; text-align: left; border-bottom: 1px solid #e0e0e0; }}
-th {{ background: #3f51b5; color: #fff; font-weight: 600; }}
-tr:hover {{ background: #f5f5f5; }}
-.summary {{ display: flex; gap: 16px; margin: 16px 0; flex-wrap: wrap; }}
-.card {{ border: 2px solid #e0e0e0; border-radius: 8px; padding: 16px; min-width: 140px; text-align: center; }}
-.card .num {{ font-size: 36px; font-weight: bold; }}
-.card.green {{ border-color: #4caf50; }} .card.green .num {{ color: #2e7d32; }}
-.card.red {{ border-color: #f44336; }} .card.red .num {{ color: #c62828; }}
-.card.orange {{ border-color: #ff9800; }} .card.orange .num {{ color: #e65100; }}
-.card.purple {{ border-color: #9c27b0; }} .card.purple .num {{ color: #6a1b9a; }}
-</style>
-</head>
-<body>
-<div class="container">
-<h1>JDBC 接口测试报告</h1>
-<p>生成时间: {report['生成时间']} | 执行耗时: {exec_info['总耗时秒']}s</p>
-{_v1_html_summary(v1)}
-
-<div class="summary">
-<div class="card green"><div class="num">{summary['通过']}</div><div>通过</div></div>
-<div class="card red"><div class="num">{summary['失败'] + summary['错误']}</div><div>失败/错误</div></div>
-<div class="card purple"><div class="num">{summary['跳过']}</div><div>跳过</div></div>
-<div class="card"><div class="num">{summary['通过率']}</div><div>通过率</div></div>
-</div>
-
-<h2>测试明细</h2>
-<table>
-<tr><th>测试类</th><th>总数</th><th>通过</th><th>失败</th><th>跳过</th><th>耗时</th></tr>
-{"".join(suite_rows)}
-</table>
-
-<h2>环境信息</h2>
-<table>
-<tr><th style="width:200px">项目</th><th>值</th></tr>
-{env_rows}
-</table>
-</div>
-</body>
-</html>"""
-    return html
+    (directory / "diagnostics.log").write_text(json.dumps(diagnostic, ensure_ascii=False, indent=2), encoding="utf-8")
+    return directory
 
 
-def generate_markdown_report(report):
-    """生成 Markdown 报告"""
-    summary = report["测试汇总"]
-    env = report["环境信息"]
-    exec_info = report["执行概要"]
-    v1 = report.get("v1_compatibility_report", {})
-
+def _markdown(report: dict[str, Any]) -> str:
+    target = report.get("compatibility_target", {})
     lines = [
-        f"# JDBC 接口测试报告",
-        "",
-        f"**数据库类型**: {env.get('数据库类型', '')} | **生成时间**: {report['生成时间']} | **总耗时**: {exec_info['总耗时秒']}s",
-        "",
+        "# JDBC 4.3 Compatibility Assessment", "",
+        f"- Target outcome: `{report.get('target_outcome', '')}`",
+        f"- Formal eligible: `{report.get('formal_eligible', False)}`",
+        f"- Database: `{(target.get('database_product') or {}).get('value', '')}`",
+        f"- Database version: `{(target.get('database_version') or {}).get('value', '')}`",
+        f"- Driver version: `{(target.get('jdbc_driver_version') or {}).get('value', '')}`",
+        "", "## Outcome matrix", "",
+        "| Scenario ID | Category | Outcome |", "|---|---|---|",
     ]
-    if v1:
-        lines += [
-            "## v1 兼容性评估",
-            "",
-            "| 项目 | 值 |",
-            "|------|------|",
-            f"| Target Outcome | {v1.get('target_outcome', '')} |",
-            f"| Run Kind | {v1.get('run_kind', '')} |",
-            f"| Compatibility Baseline Version | {v1.get('compatibility_baseline_version', '')} |",
-            f"| Report Schema Version | {v1.get('report_schema_version', '')} |",
-            f"| Capability Profile | {(v1.get('capability_profile') or {}).get('completeness', 'N/A')} |",
-            "",
-            "### v1 场景结果",
-            "",
-            "| Scenario ID | Category | Compatibility Status | Source |",
-            "|-------------|----------|----------------------|--------|",
-        ]
-        for scenario_id, result in v1.get("scenario_results", {}).items():
-            source = result.get("source_class", "").split(".")[-1] + "." + result.get("source_method", "")
-            lines.append(
-                f"| {_md_escape(scenario_id)} | {result.get('category', '')} | "
-                f"{result.get('compatibility_status', '')} | {_md_escape(source)} |"
-            )
-        lines.append("")
-
-    lines += [
-        "## 测试汇总",
-        "",
-        "| 指标 | 数值 |",
-        "|------|------|",
-        f"| 测试类 | {summary['测试类数量']} |",
-        f"| 测试用例 | {summary['测试方法总数']} |",
-        f"| 通过 | {summary['通过']} |",
-        f"| 失败 | {summary['失败']} |",
-        f"| 错误 | {summary['错误']} |",
-        f"| 跳过 | {summary['跳过']} |",
-        f"| 通过率 | {summary['通过率']} |",
-        "",
-        "## 测试类明细",
-        "",
-        "| 测试类 | 总数 | 通过 | 失败 | 跳过 | 耗时(s) |",
-        "|--------|------|------|------|------|---------|",
-    ]
-
-    for s in report["测试类明细"]:
-        failed = s["用例统计"]["失败"] + s["用例统计"]["错误"]
-        status = "✅" if s["用例统计"]["通过"] == s["用例统计"]["总数"] else ("❌" if failed > 0 else "⚠️")
-        lines.append(
-            f"| {status} {_md_escape(s['类名'])} | {s['用例统计']['总数']} | "
-            f"{s['用例统计']['通过']} | {failed} | {s['用例统计']['跳过']} | {s['耗时秒']:.3f} |"
-        )
-
-        for c in s["用例明细"]:
-            st_emoji = {"passed": "✅", "failure": "❌", "error": "⚠️", "skipped": "➡️"}.get(c["状态"], "")
-            lines.append(f"| &nbsp;&nbsp;&nbsp;&nbsp;{st_emoji} {_md_escape(c['方法名'])} | | | | | {c['耗时秒']:.3f}s |")
-            if c["状态"] in ("error", "failure"):
-                msg = c.get("错误信息", "")[:200]
-                lines.append(f"| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;> {_md_escape(msg)} | | | | | |")
-            if c["状态"] == "skipped":
-                reason = c.get("跳过原因", "")
-                lines.append(f"| &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;> 原因: {_md_escape(reason)} | | | | | |")
-
-    lines += [
-        "",
-        "## 环境信息",
-        "",
-        "| 项目 | 值 |",
-        "|------|-----|",
-    ]
-    for k, v in env.items():
-        lines.append(f"| {k} | {_md_escape(str(v))} |")
-
+    for scenario_id, result in report.get("scenario_results", {}).items():
+        lines.append(f"| {scenario_id} | {result.get('category', '')} | {result.get('compatibility_status', '')} |")
     return "\n".join(lines) + "\n"
 
 
-def _html_escape(text):
-    return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
-
-
-def _md_escape(text):
-    return str(text).replace("|", "\\|").replace("\n", " ")
-
-
-def _v1_html_summary(v1):
-    if not v1:
-        return ""
-    profile = v1.get("capability_profile") or {}
-    rows = [
-        ("Target Outcome", v1.get("target_outcome", "")),
-        ("Run Kind", v1.get("run_kind", "")),
-        ("Compatibility Baseline Version", v1.get("compatibility_baseline_version", "")),
-        ("Report Schema Version", v1.get("report_schema_version", "")),
-        ("Capability Profile", profile.get("completeness", "N/A")),
-    ]
-    summary_rows = "".join(
-        f"<tr><td><b>{_html_escape(k)}</b></td><td>{_html_escape(v)}</td></tr>"
-        for k, v in rows
+def _html(report: dict[str, Any]) -> str:
+    rows = "".join(
+        f"<tr><td>{html.escape(sid)}</td><td>{html.escape(str(result.get('category', '')))}</td>"
+        f"<td>{html.escape(str(result.get('compatibility_status', '')))}</td></tr>"
+        for sid, result in report.get("scenario_results", {}).items()
     )
-    scenario_rows = "".join(
-        "<tr>"
-        f"<td>{_html_escape(scenario_id)}</td>"
-        f"<td>{_html_escape(result.get('category', ''))}</td>"
-        f"<td>{_html_escape(result.get('compatibility_status', ''))}</td>"
-        f"<td>{_html_escape(result.get('source_class', '').split('.')[-1] + '.' + result.get('source_method', ''))}</td>"
-        "</tr>"
-        for scenario_id, result in v1.get("scenario_results", {}).items()
+    return (
+        "<!doctype html><html><head><meta charset='utf-8'><title>JDBC Compatibility Assessment</title>"
+        "<style>body{font-family:system-ui;margin:2rem}table{border-collapse:collapse;width:100%}"
+        "td,th{border:1px solid #ddd;padding:.45rem;text-align:left}th{background:#f3f4f6}</style></head><body>"
+        f"<h1>JDBC 4.3 Compatibility Assessment</h1><p>Target Outcome: <b>{html.escape(str(report.get('target_outcome', '')))}</b></p>"
+        f"<p>Formal eligible: {str(report.get('formal_eligible', False)).lower()}</p>"
+        f"<table><thead><tr><th>Scenario ID</th><th>Category</th><th>Outcome</th></tr></thead><tbody>{rows}</tbody></table>"
+        "</body></html>"
     )
-    return f"""
-<h2>v1 兼容性评估</h2>
-<table>
-<tr><th style="width:260px">项目</th><th>值</th></tr>
-{summary_rows}
-</table>
-<h2>v1 场景结果</h2>
-<table>
-<tr><th>Scenario ID</th><th>Category</th><th>Compatibility Status</th><th>Source</th></tr>
-{scenario_rows}
-</table>
-"""
 
 
-def archive_report(config, report):
-    """归档报告到 report/{db_type}_{timestamp}/"""
-    db_type = config.get("db", {}).get("type", "unknown")
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    output_dir = config.get("report", {}).get("output_dir", "report")
-    report_dir = Path(output_dir)
-    if not report_dir.is_absolute():
-        report_dir = PROJECT_ROOT / report_dir
-    report_dir = report_dir / f"{db_type}_{timestamp}"
-    report_dir.mkdir(parents=True, exist_ok=True)
-
-    formats = config.get("report", {}).get("format", ["json"])
-
-    if "json" in formats:
-        json_path = report_dir / "report.json"
-        with open(json_path, "w", encoding="utf-8") as f:
-            json.dump(report, f, ensure_ascii=False, indent=2)
-        print(f"[归档] JSON -> {json_path}")
-
-        v1_report = report.get("v1_compatibility_report")
-        if v1_report:
-            v1_path = report_dir / "compatibility-report-v1.json"
-            with open(v1_path, "w", encoding="utf-8") as f:
-                json.dump(v1_report, f, ensure_ascii=False, indent=2)
-            print(f"[归档] v1 JSON -> {v1_path}")
-
-            matrix_path = report_dir / "compatibility-matrix.json"
-            with open(matrix_path, "w", encoding="utf-8") as f:
-                json.dump(generate_matrix([v1_report]), f, ensure_ascii=False, indent=2)
-            print(f"[归档] Matrix -> {matrix_path}")
-
-            vendor_path = report_dir / "vendor-extension-report.json"
-            with open(vendor_path, "w", encoding="utf-8") as f:
-                json.dump(vendor_extension_report([v1_report]), f, ensure_ascii=False, indent=2)
-            print(f"[归档] Vendor Extensions -> {vendor_path}")
-
-    if "html" in formats:
-        html_path = report_dir / "report.html"
-        with open(html_path, "w", encoding="utf-8") as f:
-            f.write(generate_html_report(report))
-        print(f"[归档] HTML -> {html_path}")
-
-    if "markdown" in formats:
-        md_path = report_dir / "report.md"
-        with open(md_path, "w", encoding="utf-8") as f:
-            f.write(generate_markdown_report(report))
-        print(f"[归档] MD   -> {md_path}")
-
-    return str(report_dir)
+def _validated_formal_eligibility(report: dict[str, Any], manifest: dict[str, Any]) -> bool:
+    if not report.get("formal_eligible") or not manifest.get("validated_combinations"):
+        return False
+    product_version = str((report.get("compatibility_target", {}).get("database_version") or {}).get("value", ""))
+    driver_version = str((report.get("compatibility_target", {}).get("jdbc_driver_version") or {}).get("value", ""))
+    return any(
+        _version_matches(product_version, item.get("database_version", ""))
+        and _version_matches(driver_version, item.get("driver_version", ""))
+        for item in manifest.get("validated_combinations", [])
+    )
 
 
-def main():
-    config_path = sys.argv[1] if len(sys.argv) > 1 else None
+def _version_matches(observed: str, expected: str) -> bool:
+    return bool(expected) and str(expected) in observed
 
-    print("=" * 60)
-    print("JDBC Test Runner")
-    print("=" * 60)
 
-    # 1. 加载配置
-    print("[1/5] 加载配置...")
-    config = load_config(config_path)
-    db = config.get("db", {})
-    print(f"  数据库类型: {db.get('type')}")
-    print(f"  JDBC URL: {db.get('url', '')}")
+def _assessment_exit_code(report: dict[str, Any]) -> int:
+    blocking = {
+        CompatibilityStatus.COMPATIBILITY_FAILURE.value,
+        CompatibilityStatus.EXECUTION_ERROR.value,
+        CompatibilityStatus.UNKNOWN_CAPABILITY.value,
+        CompatibilityStatus.CAPABILITY_DECLARATION_MISMATCH.value,
+        CompatibilityStatus.NOT_RUN.value,
+        CompatibilityStatus.ADAPTER_INCOMPLETE.value,
+        CompatibilityStatus.CLEANUP_FAILURE.value,
+    }
+    if report.get("environment_cleanup_issues"):
+        return 1
+    if report.get("environment_preflight_issues"):
+        return 1
+    return 1 if any(item.get("compatibility_status") in blocking for item in report.get("scenario_results", {}).values()) else 0
 
-    # 2. 生成 junit-platform.properties
-    print("[2/5] 生成 JUnit 平台配置...")
-    generate_junit_properties(config)
 
-    # 3. 执行测试
-    print("[3/5] 执行测试...")
-    exec_mode = config.get("execution", {}).get("mode", "local")
-    if exec_mode == "docker":
-        execution = run_docker_test(config)
-    else:
-        execution = run_maven_test(config)
+def _report_identity(report: dict[str, Any]) -> dict[str, Any]:
+    target = report.get("compatibility_target", {})
+    return {
+        "adapter": report.get("adapter", {}),
+        "database_version": (target.get("database_version") or {}).get("value"),
+        "driver_version": (target.get("jdbc_driver_version") or {}).get("value"),
+        "driver_sha256": (report.get("driver_artifact") or {}).get("sha256"),
+    }
 
-    # 4. 解析报告
-    print("[4/5] 解析测试报告...")
-    test_suites, env_info = parse_surefire_reports()
 
-    # 5. 生成报告并归档
-    print("[5/5] 生成报告...")
-    report = generate_json_report(config, execution, test_suites, env_info)
-    report["v1_compatibility_report"] = build_v1_report(config, execution, test_suites, env_info, PROJECT_ROOT)
-    archive_path = archive_report(config, report)
+def _load_user_config(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        raise ValueError(f"配置文件不存在: {path}")
+    if path.suffix.lower() == ".json":
+        return json.loads(path.read_text(encoding="utf-8"))
+    try:
+        import yaml
+    except ImportError as exc:
+        raise ValueError("旧 YAML 配置需要 PyYAML；请使用 runner.py init 生成零依赖 JSON 配置") from exc
+    with path.open("r", encoding="utf-8") as stream:
+        legacy = yaml.safe_load(stream) or {}
+    adapter = (legacy.get("db") or {}).get("type", "")
+    password_value = (legacy.get("db") or {}).get("password", "")
+    match = re.fullmatch(r"\$\{([^}]+)}", str(password_value))
+    return {
+        "adapter": adapter,
+        "db": {
+            "url": (legacy.get("db") or {}).get("url", ""),
+            "username": (legacy.get("db") or {}).get("username", ""),
+            "password_env": match.group(1) if match else "DB_PASSWORD",
+        },
+        "namespace": {"mode": "auto", "destructive_consent": False},
+        "report": legacy.get("report") or {},
+        "test_filter": legacy.get("test_filter") or {},
+        "execution": legacy.get("execution") or {},
+    }
 
-    print("=" * 60)
-    summary = report["测试汇总"]
-    print(f"  测试类: {summary['测试类数量']}")
-    print(f"  测试用例: {summary['测试方法总数']}")
-    print(f"  通过: {summary['通过']} | 失败: {summary['失败']} | 错误: {summary['错误']} | 跳过: {summary['跳过']}")
-    print(f"  通过率: {summary['通过率']}")
-    print(f"  Target Outcome: {report['v1_compatibility_report']['target_outcome']}")
-    print(f"  总耗时: {summary.get('总耗时秒', execution['elapsed_seconds'])}s")
-    print(f"  报告目录: {archive_path}")
-    print("=" * 60)
 
-    return 0 if execution["exit_code"] == 0 else 1
+def _prompt(label: str, hint: str = "", default: str = "") -> str:
+    suffix = f" [{default}]" if default else ""
+    if hint:
+        suffix += f" ({hint})"
+    value = input(f"{label}{suffix}: ").strip()
+    return value or default
+
+
+# Backward-compatible report helpers for callers of the former runner module.
+def generate_json_report(config: dict[str, Any], execution: dict[str, Any], test_suites: list[dict[str, Any]], env_info: dict[str, str]) -> dict[str, Any]:
+    return {
+        "report_schema_version": REPORT_SCHEMA_VERSION,
+        "execution": {key: execution.get(key) for key in ("start_time", "end_time", "elapsed_seconds", "exit_code")},
+        "test_suites": test_suites,
+        "environment": {
+            "database_product": env_info.get("jdbc.test.databaseProductName", ""),
+            "database_version": env_info.get("jdbc.test.databaseProductVersion", ""),
+            "driver_name": env_info.get("jdbc.test.driverName", ""),
+            "driver_version": env_info.get("jdbc.test.driverVersion", ""),
+            "java_version": env_info.get("java.version", ""),
+        },
+    }
+
+
+def generate_html_report(report: dict[str, Any]) -> str:
+    return _html(report.get("v1_compatibility_report", report))
+
+
+def generate_markdown_report(report: dict[str, Any]) -> str:
+    return _markdown(report.get("v1_compatibility_report", report))
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

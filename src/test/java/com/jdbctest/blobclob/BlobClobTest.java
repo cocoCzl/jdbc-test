@@ -1,6 +1,7 @@
 package com.jdbctest.blobclob;
 
 import com.jdbctest.extension.JdbcTestExtension;
+import com.jdbctest.extension.RequiresFeature;
 import com.jdbctest.extension.UseSqlScripts;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,6 +13,7 @@ import java.sql.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 @ExtendWith(JdbcTestExtension.class)
+@RequiresFeature({"blobs", "clobs"})
 @UseSqlScripts(
     ddl = {"blobclob_ddl.sql"},
     dml = {"blobclob_dml.sql"}

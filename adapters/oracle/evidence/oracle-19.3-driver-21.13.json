@@ -1,0 +1,11 @@
+{
+  "database_product": "Oracle",
+  "database_version": "19.3.0.0.0",
+  "driver_version": "21.13.0.0.0",
+  "test_suite_version": "1.0.0",
+  "target_outcome": "target_compatible",
+  "passed": 181,
+  "known_unsupported": 12,
+  "cleanup_failures": 0,
+  "report_sha256": "0a300b6852abf82e8bbaa24d03308ad034ee399a16397f922e16a30970e6676a"
+}

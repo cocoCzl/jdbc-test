@@ -1,49 +1,39 @@
 package com.jdbctest.config;
 
 import java.util.List;
-import java.util.Locale;
+import java.util.Map;
 
 public class Config {
-
-    public enum DbType {
-        POSTGRESQL, GAUSSDB, MYSQL, ORACLE, SQLSERVER, UNKNOWN;
-
-        public static DbType from(String s) {
-            if (s == null) return UNKNOWN;
-            return switch (s.toLowerCase(Locale.ENGLISH)) {
-                case "postgresql" -> POSTGRESQL;
-                case "gaussdb" -> GAUSSDB;
-                case "mysql" -> MYSQL;
-                case "oracle" -> ORACLE;
-                case "sqlserver" -> SQLSERVER;
-                default -> UNKNOWN;
-            };
-        }
-
-        public String getIdentifierQuote() {
-            return switch (this) {
-                case MYSQL -> "`";
-                case POSTGRESQL, GAUSSDB, ORACLE, SQLSERVER -> "\"";
-                default -> "\"";
-            };
-        }
-    }
 
     public DbConfig db;
     public DdlConfig ddl;
     public DmlConfig dml;
     public PoolConfig pool;
     public ProfileConfig profile;
+    public NamespaceConfig namespace;
+    public AdapterConfig adapter;
+    public PreflightConfig preflight;
     public ConcurrencyConfig concurrency;
     public ExecutionConfig execution;
     public ReportConfig report;
     public TestFilterConfig testFilter;
 
     public static class DbConfig {
-        public DbType type = DbType.UNKNOWN;
+        public String type = "unknown";
+        public String adapterId = "unknown";
+        public String assetId = "unknown";
+        public String dialect = "generic";
         public String username;
         public String password;
         public String url;
+        public String driverClass;
+        public String identifierQuote = "\"";
+        public String expectedDatabaseProductRegex;
+        public String expectedDriverNameRegex;
+        public String databaseVersionMin;
+        public String databaseVersionMax;
+        public String driverVersionMin;
+        public String driverVersionMax;
 
         public String getJdbcUrl() {
             if (url != null && !url.isBlank()) {
@@ -53,48 +43,54 @@ public class Config {
         }
 
         public String getDriverClass() {
-            return switch (type) {
-                case POSTGRESQL, GAUSSDB -> "org.postgresql.Driver";
-                case MYSQL -> "com.mysql.cj.jdbc.Driver";
-                case ORACLE -> "oracle.jdbc.OracleDriver";
-                case SQLSERVER -> "com.microsoft.sqlserver.jdbc.SQLServerDriver";
-                default -> "";
-            };
+            return driverClass == null ? "" : driverClass;
         }
 
+        public String getIdentifierQuote() {
+            return identifierQuote == null || identifierQuote.isEmpty() ? "\"" : identifierQuote;
+        }
+
+        public boolean isDialect(String expected) {
+            return expected != null && expected.equalsIgnoreCase(dialect);
+        }
     }
 
-    public static class DdlConfig {
-        public String basePath;
+    public static class NamespaceConfig {
+        public String mode = "existing";
+        public String name;
+        public String selection = "none";
+        public String createSql;
+        public String dropSql;
+        public String selectSql;
+        public boolean dropOnExit;
+        public boolean destructiveConsent;
     }
 
-    public static class DmlConfig {
-        public String basePath;
+    public static class AdapterConfig {
+        public String id;
+        public String trust;
+        public Map<String, Boolean> capabilities = Map.of();
     }
 
-    public static class PoolConfig {
-        public String profileDir;
+    public static class PreflightConfig {
+        public String namespaceCreatePrivilege;
+        public String probeName;
+        public List<PrivilegeCheck> privilegeChecks = List.of();
     }
 
-    public static class ProfileConfig {
-        public String profileDir;
+    public static class PrivilegeCheck {
+        public String privilege;
+        public String sql;
+        public String cleanupSql;
     }
 
-    public static class ConcurrencyConfig {
-        public boolean enabled;
-        public int threads;
-        public long timeout;
-    }
-
-    public static class ExecutionConfig {
-        public String mode;
-    }
-
-    public static class ReportConfig {
-        public String outputDir;
-        public List<String> format;
-    }
-
+    public static class DdlConfig { public String basePath; }
+    public static class DmlConfig { public String basePath; }
+    public static class PoolConfig { public String profileDir; }
+    public static class ProfileConfig { public String profileDir; }
+    public static class ConcurrencyConfig { public boolean enabled; public int threads; public long timeout; }
+    public static class ExecutionConfig { public String mode; }
+    public static class ReportConfig { public String outputDir; public List<String> format; }
     public static class TestFilterConfig {
         public List<String> includeTests;
         public List<String> excludeTests;

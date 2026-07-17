@@ -3,6 +3,7 @@ package com.jdbctest.savepoint;
 import com.jdbctest.config.Config;
 import com.jdbctest.config.ConfigLoader;
 import com.jdbctest.extension.JdbcTestExtension;
+import com.jdbctest.extension.RequiresFeature;
 import com.jdbctest.extension.UseSqlScripts;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,6 +13,7 @@ import java.sql.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 @ExtendWith(JdbcTestExtension.class)
+@RequiresFeature("savepoint")
 @UseSqlScripts(
     ddl = {"savepoint_ddl.sql"},
     dml = {"savepoint_dml.sql"}
@@ -20,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class SavepointTest {
 
     private static boolean isOracle() {
-        return ConfigLoader.load().db.type == Config.DbType.ORACLE;
+        return ConfigLoader.load().db.isDialect("oracle");
     }
 
     @Test

@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class DatabaseMetaDataTest {
 
     private static boolean isOracle() {
-        return ConfigLoader.load().db.type == Config.DbType.ORACLE;
+        return ConfigLoader.load().db.isDialect("oracle");
     }
 
     private String getSchema(Connection conn) throws SQLException {

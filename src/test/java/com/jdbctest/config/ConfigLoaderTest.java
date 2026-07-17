@@ -49,7 +49,7 @@ class ConfigLoaderTest {
 
         Config loaded = ConfigLoader.load();
 
-        assertEquals(Config.DbType.MYSQL, loaded.db.type);
+        assertEquals("mysql", loaded.db.type);
         assertEquals("jdbc:mysql://127.0.0.1:3306/sample", loaded.db.getJdbcUrl());
         assertEquals("ddl", loaded.ddl.basePath);
         assertEquals("dml", loaded.dml.basePath);
@@ -71,7 +71,7 @@ class ConfigLoaderTest {
 
         Config loaded = ConfigLoader.load();
 
-        assertEquals(Config.DbType.POSTGRESQL, loaded.db.type);
+        assertEquals("postgresql", loaded.db.type);
         assertEquals("", loaded.db.password);
     }
 
@@ -119,7 +119,7 @@ class ConfigLoaderTest {
         System.setProperty("config.yaml", postgresConfig.toString());
         Config postgres = ConfigLoader.load();
 
-        assertEquals(Config.DbType.MYSQL, mysql.db.type);
-        assertEquals(Config.DbType.POSTGRESQL, postgres.db.type);
+        assertEquals("mysql", mysql.db.type);
+        assertEquals("postgresql", postgres.db.type);
     }
 }
