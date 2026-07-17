@@ -41,7 +41,13 @@ python3 scripts/runner.py compare \
   --current report/postgresql_YYYY-MM-DD_HH-MM-SS/report.json
 ```
 
-详细步骤见 [中文快速开始](docs/QUICKSTART.zh-CN.md)。
+运行前可使用 `python3 scripts/runner.py adapters` 查看内置适配包。生成的本地配置不要保存明文密码，也不要提交到 Git；Oracle 必须使用专用测试账号/schema。运行结果位于 `report.json`、`report.md` 和 `report.html`，`diagnostics.log` 仅用于本地排障。
+
+## 本地适配包
+
+本地适配包由 `adapter.json` 和数据库专用 SQL 资产组成，可通过 `runner.py init --adapter /path/to/adapter` 使用，无需修改 Java 核心代码。可参考 `examples/adapters/postgresql-local/adapter.json`。
+
+适配包必须声明产品/驱动身份与版本范围、能力、测试资产、命名空间生命周期、最小权限、已验证组合和已知差异。本地适配包生成的结果始终标记为本地/试验性，不能直接作为正式基线。
 
 ## 安全边界
 

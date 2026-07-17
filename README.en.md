@@ -41,7 +41,13 @@ python3 scripts/runner.py compare \
   --current report/postgresql_YYYY-MM-DD_HH-MM-SS/report.json
 ```
 
-See the [English quick start](docs/QUICKSTART.en.md) for details.
+Run `python3 scripts/runner.py adapters` to list bundled adapters. Never store a plaintext password in the generated local config or commit that config. Oracle requires a dedicated test account/schema. Results are written to `report.json`, `report.md`, and `report.html`; keep `diagnostics.log` local.
+
+## Local adapters
+
+A local adapter contains `adapter.json` plus database-specific SQL assets and can be selected with `runner.py init --adapter /path/to/adapter` without changing Java core code. See `examples/adapters/postgresql-local/adapter.json` for an example.
+
+Adapters must declare product and driver identity/ranges, capabilities, test assets, namespace lifecycle, least privileges, validated combinations, and known differences. Local adapter results remain local/experimental and cannot directly become formal baselines.
 
 ## Safety
 
