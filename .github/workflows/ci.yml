@@ -24,7 +24,7 @@ jobs:
       - name: Validate Python contracts and adapters
         env:
           PYTHONPATH: scripts
-        run: python -m unittest scripts/test_compatibility_v1.py scripts/test_adapter_runtime.py
+        run: python -m unittest scripts.test_compatibility_v1 scripts.test_adapter_runtime
       - name: Validate Java configuration and SQL splitting
         run: mvn -q -Dtest=ConfigLoaderTest,SqlSplitterTest test
       - name: Build driver-free release archive
