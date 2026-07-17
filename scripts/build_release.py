@@ -22,12 +22,15 @@ def project_version() -> str:
 
 def build(output: Path) -> tuple[Path, Path]:
     version = project_version()
+    output = output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     archive = output / f"jdbc-test-{version}.zip"
     prefix = f"jdbc-test-{version}"
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
         for path in sorted(PROJECT_ROOT.rglob("*")):
             relative = path.relative_to(PROJECT_ROOT)
+            if path == output or output in path.parents:
+                continue
             if path.is_dir() or EXCLUDED_PARTS.intersection(relative.parts):
                 continue
             if path.suffix == ".jar" or path.name.endswith(".local.json"):
