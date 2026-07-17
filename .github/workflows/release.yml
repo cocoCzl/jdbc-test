@@ -17,7 +17,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Build driver-free release archive
-        run: python3 scripts/build_release.py --output dist
+        run: python scripts/build_release.py --output dist
       - name: Verify checksum and archive contents
         working-directory: dist
         run: |
