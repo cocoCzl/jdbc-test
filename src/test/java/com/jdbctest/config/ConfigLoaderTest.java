@@ -57,6 +57,28 @@ class ConfigLoaderTest {
     }
 
     @Test
+    void loadsConnectionModeAndVendorProperties() throws Exception {
+        Path config = tempDir.resolve("jdbc-test.yaml");
+        Files.writeString(config, """
+                db:
+                  type: oracle
+                  url: jdbc:vendor://127.0.0.1/test
+                  username: develop
+                  password: secret
+                  driver_class: example.jdbc.Driver
+                  connection_mode: driver_manager
+                  properties:
+                    vendor.app.name: jdbc-test
+                """);
+        System.setProperty("config.yaml", config.toString());
+
+        Config loaded = ConfigLoader.load();
+
+        assertTrue(loaded.db.isDriverManagerMode());
+        assertEquals("jdbc-test", loaded.db.properties.get("vendor.app.name"));
+    }
+
+    @Test
     void resolvesEnvironmentPlaceholdersToEmptyStringWhenMissing() throws Exception {
         Path config = tempDir.resolve("jdbc-test.yaml");
         Files.writeString(config, """

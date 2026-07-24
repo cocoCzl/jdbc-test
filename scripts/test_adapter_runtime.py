@@ -6,10 +6,10 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from adapter_runtime import AdapterPackage, build_runtime_config, discover_adapters, load_adapter, validate_adapter
+from adapter_runtime import AdapterPackage, build_runtime_config, discover_adapters, load_adapter, resolve_driver, validate_adapter
 from build_release import project_version, release_files
 from compatibility_v1 import RunKind, aggregate_target_outcome, build_v1_report, collect_preflight_issues
-from runner import _assessment_exit_code, compare_reports
+from runner import _assessment_exit_code, _custom_adapter_manifest, _parse_connection_properties, compare_reports
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -46,6 +46,60 @@ class AdapterRuntimeTest(unittest.TestCase):
         package = load_adapter(PROJECT_ROOT, "examples/adapters/postgresql-local")
         self.assertEqual("postgresql-local", package.adapter_id)
         self.assertEqual("local", package.manifest["trust"])
+
+    def test_custom_adapter_reuses_selected_dialect_assets(self):
+        for dialect in ("oracle", "mysql", "postgresql"):
+            manifest = _custom_adapter_manifest("database-a", dialect, "example.jdbc.Driver", "local-drivers/database-a")
+            package = AdapterPackage(PROJECT_ROOT / "configs" / "custom-adapters" / "database-a", manifest)
+            validate_adapter(package, PROJECT_ROOT)
+            self.assertEqual("local", manifest["trust"])
+            self.assertEqual(dialect, manifest["assets"]["directory"])
+            self.assertEqual("example.jdbc.Driver", manifest["driver"]["class"])
+
+    def test_local_driver_directory_resolves_all_jars(self):
+        adapter = load_adapter(PROJECT_ROOT, "postgresql")
+        with tempfile.TemporaryDirectory() as directory:
+            driver_dir = Path(directory)
+            (driver_dir / "dependency.jar").write_bytes(b"dependency")
+            (driver_dir / "driver.jar").write_bytes(b"driver")
+            driver = resolve_driver(
+                PROJECT_ROOT,
+                {"db": {"driver": {"kind": "local", "path": str(driver_dir)}}},
+                adapter,
+            )
+        self.assertEqual("local", driver["source"])
+        self.assertEqual(["dependency.jar", "driver.jar"], [Path(path).name for path in driver["classpath"]])
+        self.assertTrue(driver["sha256"])
+
+    def test_connection_properties_support_values_and_environment_references(self):
+        properties, property_env = _parse_connection_properties(
+            ["vendor.app.name=jdbc-test"],
+            ["vendor.token=VENDOR_TOKEN"],
+        )
+        self.assertEqual({"vendor.app.name": "jdbc-test"}, properties)
+        self.assertEqual({"vendor.token": "VENDOR_TOKEN"}, property_env)
+        with self.assertRaisesRegex(ValueError, "不能重复配置"):
+            _parse_connection_properties(["user=develop"], [])
+
+    def test_runtime_resolves_property_environment_without_persisting_reference(self):
+        adapter = load_adapter(PROJECT_ROOT, "oracle")
+        user = {
+            "db": {
+                "url": "jdbc:oracle:thin:@example:1521/test",
+                "username": "tester",
+                "password_env": "TEST_DB_PASSWORD",
+                "connection_mode": "driver_manager",
+                "properties": {"vendor.app.name": "jdbc-test"},
+                "property_env": {"vendor.token": "VENDOR_TOKEN"},
+            },
+            "namespace": {"mode": "existing", "destructive_consent": True},
+        }
+        with patch.dict(os.environ, {"TEST_DB_PASSWORD": "secret", "VENDOR_TOKEN": "token-value"}):
+            runtime = build_runtime_config(PROJECT_ROOT, user, adapter, {"sha256": "abc", "path": "/tmp/driver.jar"})
+        self.assertEqual("driver_manager", runtime["db"]["connection_mode"])
+        self.assertEqual("jdbc-test", runtime["db"]["properties"]["vendor.app.name"])
+        self.assertEqual("token-value", runtime["db"]["properties"]["vendor.token"])
+        self.assertNotIn("property_env", runtime["db"])
 
     def test_runtime_config_resolves_password_without_persisting_connection_identity_in_adapter(self):
         adapter = load_adapter(PROJECT_ROOT, "postgresql")

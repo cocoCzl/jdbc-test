@@ -26,6 +26,8 @@ public class Config {
         public String password;
         public String url;
         public String driverClass;
+        public String connectionMode = "hikari";
+        public Map<String, String> properties = Map.of();
         public String identifierQuote = "\"";
         public String expectedDatabaseProductRegex;
         public String expectedDriverNameRegex;
@@ -43,6 +45,10 @@ public class Config {
 
         public String getDriverClass() {
             return driverClass == null ? "" : driverClass;
+        }
+
+        public boolean isDriverManagerMode() {
+            return "driver_manager".equalsIgnoreCase(connectionMode);
         }
 
         public String getIdentifierQuote() {

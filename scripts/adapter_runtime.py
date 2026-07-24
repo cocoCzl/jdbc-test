@@ -158,6 +158,23 @@ def build_runtime_config(
     password = os.environ.get(password_env, "")
     if not password:
         raise ValueError(f"环境变量 {password_env} 未设置")
+    connection_mode = str(db.get("connection_mode", "hikari"))
+    if connection_mode not in {"hikari", "driver_manager"}:
+        raise ValueError("db.connection_mode 必须是 hikari 或 driver_manager")
+    properties = _string_map(db.get("properties"), "db.properties")
+    property_env = _string_map(db.get("property_env"), "db.property_env")
+    reserved = {"user", "password"}
+    forbidden = sorted(reserved & (properties.keys() | property_env.keys()))
+    if forbidden:
+        raise ValueError(f"db.properties 中不能配置保留属性: {', '.join(forbidden)}")
+    overlap = sorted(properties.keys() & property_env.keys())
+    if overlap:
+        raise ValueError(f"连接属性不能同时使用普通值和环境变量: {', '.join(overlap)}")
+    for key, env_name in property_env.items():
+        env_value = os.environ.get(env_name)
+        if env_value is None:
+            raise ValueError(f"连接属性 {key} 所需环境变量 {env_name} 未设置")
+        properties[key] = env_value
     identity = manifest["identity"]
     versions = manifest["supported_versions"]
     namespace_spec = dict(manifest["namespace"])
@@ -188,6 +205,8 @@ def build_runtime_config(
             "username": db.get("username", ""),
             "password": password,
             "driver_class": manifest["driver"]["class"],
+            "connection_mode": connection_mode,
+            "properties": properties,
             "identifier_quote": manifest.get("identifier_quote", '"'),
             "expected_database_product_regex": identity["database_product_regex"],
             "expected_driver_name_regex": identity["driver_name_regex"],
@@ -238,6 +257,19 @@ def build_runtime_config(
     return runtime
 
 
+def _string_map(value: Any, field: str) -> dict[str, str]:
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ValueError(f"{field} 必须是字符串映射")
+    result: dict[str, str] = {}
+    for key, item in value.items():
+        if not isinstance(key, str) or not key or not isinstance(item, str) or not item:
+            raise ValueError(f"{field} 的键和值必须是非空字符串")
+        result[key] = item
+    return result
+
+
 def resolve_driver(project_root: Path, user_config: dict[str, Any], adapter: AdapterPackage) -> dict[str, Any]:
     requested = (user_config.get("db") or {}).get("driver") or adapter.manifest["driver"].get("source")
     if not isinstance(requested, dict):
@@ -247,9 +279,20 @@ def resolve_driver(project_root: Path, user_config: dict[str, Any], adapter: Ada
         path = Path(requested.get("path", ""))
         if not path.is_absolute():
             path = project_root / path
-        if not path.is_file():
+        if path.is_file():
+            jars = [path.resolve()]
+        elif path.is_dir():
+            jars = sorted((jar.resolve() for jar in path.glob("*.jar") if jar.is_file()), key=lambda jar: jar.name)
+            if not jars:
+                raise ValueError(f"本地 JDBC 驱动目录中没有 JAR: {path}")
+        else:
             raise ValueError(f"本地 JDBC 驱动不存在: {path}")
-        return {"source": "local", "path": str(path.resolve()), "sha256": sha256(path)}
+        return {
+            "source": "local",
+            "path": str(path.resolve()),
+            "classpath": [str(jar) for jar in jars],
+            "sha256": sha256_bundle(jars),
+        }
     if kind != "maven":
         raise ValueError("驱动来源 kind 必须是 maven 或 local")
     coordinate = requested.get("coordinate", "")
@@ -267,7 +310,13 @@ def resolve_driver(project_root: Path, user_config: dict[str, Any], adapter: Ada
         )
         if result.returncode != 0 or not jar.exists():
             raise ValueError(f"无法解析固定 Maven 驱动 {coordinate}: {result.stderr[-300:]}")
-    return {"source": "maven", "coordinate": coordinate, "path": str(jar), "sha256": sha256(jar)}
+    return {
+        "source": "maven",
+        "coordinate": coordinate,
+        "path": str(jar),
+        "classpath": [str(jar)],
+        "sha256": sha256_bundle([jar]),
+    }
 
 
 def runtime_dependencies() -> dict[str, str | None]:
@@ -283,6 +332,17 @@ def sha256(path: Path) -> str:
     with path.open("rb") as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
+    return digest.hexdigest()
+
+
+def sha256_bundle(paths: list[Path]) -> str:
+    """Create a stable fingerprint for one driver JAR or a directory of JARs."""
+    digest = hashlib.sha256()
+    for path in paths:
+        digest.update(path.name.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(sha256(path).encode("ascii"))
+        digest.update(b"\0")
     return digest.hexdigest()
 
 

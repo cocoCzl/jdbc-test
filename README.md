@@ -43,6 +43,16 @@ python3 scripts/runner.py compare \
 
 运行前可使用 `python3 scripts/runner.py adapters` 查看内置适配包。生成的本地配置不要保存明文密码，也不要提交到 Git；Oracle 必须使用专用测试账号/schema。运行结果位于 `report.json`、`report.md` 和 `report.html`，`diagnostics.log` 仅用于本地排障。
 
+## 使用示例
+
+完整、可复制的示例见 [examples/README.md](examples/README.md)：
+
+- PostgreSQL、MySQL、Oracle 内置适配包
+- Oracle、MySQL、PostgreSQL 方言兼容的自研数据库
+- Hikari 连接池与 DriverManager 直连
+- 普通 JDBC Properties、环境变量属性和 URL 参数
+- 单个驱动 JAR 与包含依赖的多 JAR 目录
+
 ## 本地适配包
 
 本地适配包由 `adapter.json` 和数据库专用 SQL 资产组成，可通过 `runner.py init --adapter /path/to/adapter` 使用，无需修改 Java 核心代码。可参考 `examples/adapters/postgresql-local/adapter.json`。
@@ -56,6 +66,10 @@ python3 scripts/runner.py compare \
 ```
 
 驱动 JAR 不应复制或提交到本项目仓库。
+
+### 自研数据库与私有驱动
+
+如果数据库兼容 Oracle、MySQL 或 PostgreSQL 方言，可使用 `init-custom` 生成仅保存在本机的适配包并复用对应 SQL 资产。自研驱动默认使用 `DriverManager`，也可切换到 Hikari；任意厂商属性和 URL 参数均可配置。完整命令见 [自研数据库示例](examples/README.md#自研数据库与私有驱动)。
 
 ## 安全边界
 

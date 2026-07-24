@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import html
 import json
 import os
@@ -35,12 +36,14 @@ REPORT_SCHEMA_VERSION = "1.0.0"
 
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
-    if argv and argv[0] not in {"init", "run", "compare", "adapters", "--help", "-h"}:
+    if argv and argv[0] not in {"init", "init-custom", "run", "compare", "adapters", "--help", "-h"}:
         argv.insert(0, "run")
     parser = _parser()
     args = parser.parse_args(argv)
     if args.command == "init":
         return command_init(args)
+    if args.command == "init-custom":
+        return command_init_custom(args)
     if args.command == "run":
         return command_run(args)
     if args.command == "compare":
@@ -62,6 +65,21 @@ def _parser() -> argparse.ArgumentParser:
     init.add_argument("--namespace")
     init.add_argument("--consent", action="store_true")
     init.add_argument("--output", default="configs/config.local.json")
+    _add_connection_arguments(init, "hikari")
+
+    custom = sub.add_parser("init-custom", help="Generate a private adapter from a bundled SQL dialect")
+    custom.add_argument("--id", required=True, help="Local adapter id, for example database-a")
+    custom.add_argument("--dialect", required=True, choices=("oracle", "mysql", "postgresql"))
+    custom.add_argument("--driver-class", required=True)
+    custom.add_argument("--driver-dir", required=True, help="Local JAR file or directory (may be populated later)")
+    custom.add_argument("--url", required=True)
+    custom.add_argument("--username", required=True)
+    custom.add_argument("--password-env", default="DB_PASSWORD")
+    custom.add_argument("--namespace")
+    custom.add_argument("--consent", action="store_true")
+    custom.add_argument("--adapter-output")
+    custom.add_argument("--output")
+    _add_connection_arguments(custom, "driver_manager")
 
     run = sub.add_parser("run", help="Run compatibility assessment")
     run.add_argument("config")
@@ -73,6 +91,40 @@ def _parser() -> argparse.ArgumentParser:
     compare.add_argument("--output")
     sub.add_parser("adapters", help="List bundled adapters")
     return parser
+
+
+def _add_connection_arguments(parser: argparse.ArgumentParser, default_mode: str) -> None:
+    parser.add_argument("--connection-mode", choices=("hikari", "driver_manager"), default=default_mode)
+    parser.add_argument("--property", action="append", default=[], metavar="KEY=VALUE")
+    parser.add_argument("--property-env", action="append", default=[], metavar="KEY=ENV_NAME")
+
+
+def _parse_connection_properties(values: list[str], environment_values: list[str]) -> tuple[dict[str, str], dict[str, str]]:
+    properties = _parse_key_value_options(values, "--property")
+    property_env = _parse_key_value_options(environment_values, "--property-env")
+    reserved = {"user", "password"}
+    forbidden = sorted(reserved & (properties.keys() | property_env.keys()))
+    if forbidden:
+        raise ValueError(f"连接属性由 --username/--password-env 管理，不能重复配置: {', '.join(forbidden)}")
+    duplicate_sources = sorted(properties.keys() & property_env.keys())
+    if duplicate_sources:
+        raise ValueError(f"连接属性不能同时使用普通值和环境变量: {', '.join(duplicate_sources)}")
+    return properties, property_env
+
+
+def _parse_key_value_options(values: list[str], option: str) -> dict[str, str]:
+    parsed: dict[str, str] = {}
+    for value in values:
+        if "=" not in value:
+            raise ValueError(f"{option} 必须使用 KEY=VALUE 格式: {value}")
+        key, item_value = value.split("=", 1)
+        key = key.strip()
+        if not key or not item_value:
+            raise ValueError(f"{option} 的键和值不能为空: {value}")
+        if key in parsed:
+            raise ValueError(f"重复的连接属性: {key}")
+        parsed[key] = item_value
+    return parsed
 
 
 def command_adapters() -> int:
@@ -90,6 +142,7 @@ def command_init(args: argparse.Namespace) -> int:
     adapter_ref = args.adapter or _prompt("Adapter", ", ".join(discovered), next(iter(discovered)))
     try:
         adapter = load_adapter(PROJECT_ROOT, adapter_ref)
+        properties, property_env = _parse_connection_properties(args.property, args.property_env)
     except ValueError as exc:
         print(f"[错误] {exc}", file=sys.stderr)
         return 2
@@ -107,6 +160,9 @@ def command_init(args: argparse.Namespace) -> int:
             "username": username,
             "password_env": args.password_env,
             "driver": adapter.manifest["driver"]["source"],
+            "connection_mode": args.connection_mode,
+            "properties": properties,
+            "property_env": property_env,
         },
         "namespace": {
             "mode": adapter.manifest["namespace"]["mode"],
@@ -129,6 +185,96 @@ def command_init(args: argparse.Namespace) -> int:
     print(f"[生成] {output}")
     print(f"[提示] 运行前设置环境变量 {args.password_env}")
     if not consent:
+        print("[安全] destructive_consent=false；run 将拒绝执行数据库变更")
+    return 0
+
+
+def _custom_adapter_manifest(adapter_id: str, dialect: str, driver_class: str, driver_dir: str) -> dict[str, Any]:
+    """Create a local adapter that reuses a bundled dialect's SQL assets."""
+    base = load_adapter(PROJECT_ROOT, dialect).manifest
+    assets = copy.deepcopy(base["assets"])
+    # The adapter id is private, but its SQL assets deliberately come from the selected dialect.
+    assets["directory"] = str(assets.get("directory") or dialect)
+    return {
+        "id": adapter_id,
+        "name": f"Local {dialect} compatible JDBC adapter",
+        "version": "0.1.0",
+        "revision": "local",
+        "trust": "local",
+        "dialect": base["dialect"],
+        "identifier_quote": base.get("identifier_quote", '\"'),
+        "driver": {
+            "class": driver_class,
+            "source": {"kind": "local", "path": driver_dir},
+        },
+        # Keep the template usable before a first successful metadata probe.
+        "identity": {"database_product_regex": ".*", "driver_name_regex": ".*"},
+        "supported_versions": {
+            "database": {"min": "0", "max": "999"},
+            "driver": {"min": "0", "max": "999"},
+        },
+        "validated_combinations": [],
+        "capabilities": copy.deepcopy(base["capabilities"]),
+        "assets": assets,
+        "namespace": copy.deepcopy(base["namespace"]),
+        "minimum_privileges": copy.deepcopy(base["minimum_privileges"]),
+        "privilege_checks": copy.deepcopy(base["privilege_checks"]),
+        "known_differences": [],
+    }
+
+
+def command_init_custom(args: argparse.Namespace) -> int:
+    try:
+        manifest = _custom_adapter_manifest(args.id, args.dialect, args.driver_class, args.driver_dir)
+        properties, property_env = _parse_connection_properties(args.property, args.property_env)
+        # Validate the generated manifest before writing it, including the inherited SQL assets.
+        from adapter_runtime import AdapterPackage, validate_adapter
+        validate_adapter(AdapterPackage(PROJECT_ROOT / "configs" / "custom-adapters" / args.id, manifest), PROJECT_ROOT)
+    except ValueError as exc:
+        print(f"[错误] {exc}", file=sys.stderr)
+        return 2
+
+    adapter_output = Path(args.adapter_output or f"configs/custom-adapters/{args.id}")
+    if not adapter_output.is_absolute():
+        adapter_output = PROJECT_ROOT / adapter_output
+    adapter_output.mkdir(parents=True, exist_ok=True)
+    (adapter_output / "adapter.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    output = Path(args.output or f"configs/{args.id}.local.json")
+    if not output.is_absolute():
+        output = PROJECT_ROOT / output
+    output.parent.mkdir(parents=True, exist_ok=True)
+    config = {
+        "schema_version": "1.0.0",
+        "adapter": str(adapter_output),
+        "db": {
+            "url": args.url,
+            "username": args.username,
+            "password_env": args.password_env,
+            "driver": manifest["driver"]["source"],
+            "connection_mode": args.connection_mode,
+            "properties": properties,
+            "property_env": property_env,
+        },
+        "namespace": {
+            "mode": manifest["namespace"]["mode"],
+            "name": args.namespace,
+            "destructive_consent": bool(args.consent),
+        },
+        "execution": {"mode": "local"},
+        "report": {"output_dir": "report", "format": ["json", "html", "markdown"]},
+        "test_filter": {"include_tests": [], "exclude_tests": [], "timeout": 60000},
+    }
+    output.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    for path in (adapter_output / "adapter.json", output):
+        try:
+            path.chmod(0o600)
+        except OSError:
+            pass
+    print(f"[生成] 本地适配包 {adapter_output}")
+    print(f"[生成] 本地配置 {output}")
+    print(f"[提示] 将 JDBC 驱动及依赖 JAR 放入 {args.driver_dir}，然后设置环境变量 {args.password_env}")
+    if not args.consent:
         print("[安全] destructive_consent=false；run 将拒绝执行数据库变更")
     return 0
 
@@ -160,7 +306,7 @@ def command_run(args: argparse.Namespace) -> int:
             runtime_path.chmod(0o600)
         except OSError:
             pass
-        execution = _run_maven(runtime, runtime_path, Path(driver["path"]))
+        execution = _run_maven(runtime, runtime_path, list(driver["classpath"]))
         suites, env_info = _parse_surefire_reports()
         report = build_v1_report(runtime, execution, suites, env_info, PROJECT_ROOT)
         report["report_schema_version"] = REPORT_SCHEMA_VERSION
@@ -246,7 +392,7 @@ def _preflight_dependencies() -> dict[str, str]:
     return {name: str(path) for name, path in found.items() if path}
 
 
-def _run_maven(runtime: dict[str, Any], runtime_path: Path, driver_path: Path) -> dict[str, Any]:
+def _run_maven(runtime: dict[str, Any], runtime_path: Path, driver_classpath: list[str]) -> dict[str, Any]:
     surefire = PROJECT_ROOT / "target" / "surefire-reports"
     if surefire.exists():
         for path in surefire.glob("TEST-*.xml"):
@@ -254,7 +400,7 @@ def _run_maven(runtime: dict[str, Any], runtime_path: Path, driver_path: Path) -
     command = [
         "mvn", "-q", "test",
         f"-Dconfig.yaml={runtime_path}",
-        f"-Dsurefire.additionalClasspath={driver_path}",
+        f"-Dsurefire.additionalClasspath={os.pathsep.join(driver_classpath)}",
     ]
     filters = runtime.get("test_filter") or {}
     includes = filters.get("include_tests") or []

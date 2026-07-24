@@ -43,6 +43,16 @@ python3 scripts/runner.py compare \
 
 Run `python3 scripts/runner.py adapters` to list bundled adapters. Never store a plaintext password in the generated local config or commit that config. Oracle requires a dedicated test account/schema. Results are written to `report.json`, `report.md`, and `report.html`; keep `diagnostics.log` local.
 
+## Usage examples
+
+See [examples/README.en.md](examples/README.en.md) for complete copyable examples covering:
+
+- Bundled PostgreSQL, MySQL, and Oracle adapters
+- Private databases compatible with Oracle, MySQL, or PostgreSQL dialects
+- Hikari pooling and direct DriverManager connections
+- JDBC properties, environment-backed properties, and URL parameters
+- One driver JAR or a directory containing multiple dependency JARs
+
 ## Local adapters
 
 A local adapter contains `adapter.json` plus database-specific SQL assets and can be selected with `runner.py init --adapter /path/to/adapter` without changing Java core code. See `examples/adapters/postgresql-local/adapter.json` for an example.
@@ -56,6 +66,10 @@ To use a local JDBC driver JAR, replace `db.driver` in the generated config with
 ```
 
 Do not copy or commit driver JARs into this repository.
+
+### Private databases and drivers
+
+For a database compatible with the Oracle, MySQL, or PostgreSQL dialect, `init-custom` creates a local-only adapter that reuses the corresponding SQL assets. Private drivers default to DriverManager but may use Hikari, and arbitrary vendor properties or URL parameters are supported. See the [private database examples](examples/README.en.md#private-databases-and-drivers) for complete commands.
 
 ## Safety
 

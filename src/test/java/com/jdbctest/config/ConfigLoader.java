@@ -78,6 +78,26 @@ public class ConfigLoader {
         config.db.password = resolveEnv(str(db.get("password")));
         config.db.url = str(db.get("url"));
         config.db.driverClass = str(db.get("driver_class"));
+        config.db.connectionMode = nonBlank(str(db.get("connection_mode")), "hikari");
+        if (!config.db.connectionMode.equalsIgnoreCase("hikari")
+                && !config.db.connectionMode.equalsIgnoreCase("driver_manager")) {
+            throw new IllegalStateException("db.connection_mode 必须是 hikari 或 driver_manager");
+        }
+        Map<String, Object> connectionProperties = (Map<String, Object>) db.get("properties");
+        if (connectionProperties != null) {
+            Map<String, String> parsedProperties = new HashMap<>();
+            for (var entry : connectionProperties.entrySet()) {
+                String key = entry.getKey();
+                if (key == null || key.isBlank() || !(entry.getValue() instanceof String value) || value.isEmpty()) {
+                    throw new IllegalStateException("db.properties 的键和值必须是非空字符串");
+                }
+                if ("user".equals(key) || "password".equals(key)) {
+                    throw new IllegalStateException("db.properties 不能覆盖 user/password");
+                }
+                parsedProperties.put(key, value);
+            }
+            config.db.properties = Map.copyOf(parsedProperties);
+        }
         config.db.identifierQuote = nonBlank(str(db.get("identifier_quote")), "\"");
         config.db.expectedDatabaseProductRegex = str(db.get("expected_database_product_regex"));
         config.db.expectedDriverNameRegex = str(db.get("expected_driver_name_regex"));

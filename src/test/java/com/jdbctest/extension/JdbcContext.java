@@ -20,7 +20,7 @@ import java.util.regex.Pattern;
 public final class JdbcContext {
 
     private static final Pattern SAFE_NAMESPACE = Pattern.compile("[A-Za-z][A-Za-z0-9_]{0,62}");
-    private static volatile HikariDataSource dataSource;
+    private static volatile DataSource dataSource;
     private static volatile String currentAdapterId;
     private static volatile Config.NamespaceConfig namespace;
 
@@ -29,15 +29,26 @@ public final class JdbcContext {
     public static void init(Config config) {
         currentAdapterId = config.db.adapterId;
         namespace = config.namespace;
-        Map<String, Object> poolConfig = loadPoolConfig(config.db.adapterId, config.pool.profileDir);
+        DataSource replacement = config.db.isDriverManagerMode()
+                ? new DriverManagerDataSource(
+                        config.db.getDriverClass(), config.db.getJdbcUrl(), config.db.username,
+                        config.db.password, config.db.properties)
+                : createHikariDataSource(config);
+        closeDataSource(dataSource);
+        dataSource = replacement;
+        provisionNamespace(config);
+        runPrivilegeChecks(config);
+        publishAndValidateMetadata(config);
+    }
 
+    private static HikariDataSource createHikariDataSource(Config config) {
+        Map<String, Object> poolConfig = loadPoolConfig(config.db.adapterId, config.pool.profileDir);
         HikariConfig hikari = new HikariConfig();
         hikari.setJdbcUrl(config.db.getJdbcUrl());
         hikari.setUsername(config.db.username);
         hikari.setPassword(config.db.password);
-        if (!config.db.getDriverClass().isEmpty()) {
-            hikari.setDriverClassName(config.db.getDriverClass());
-        }
+        if (!config.db.getDriverClass().isEmpty()) hikari.setDriverClassName(config.db.getDriverClass());
+        config.db.properties.forEach(hikari::addDataSourceProperty);
         hikari.setMaximumPoolSize(intVal(poolConfig, "maximumPoolSize", 10));
         hikari.setMinimumIdle(intVal(poolConfig, "minimumIdle", 2));
         hikari.setConnectionTimeout(intVal(poolConfig, "connectionTimeout", 30000));
@@ -46,13 +57,17 @@ public final class JdbcContext {
         if (poolConfig.containsKey("leakDetectionThreshold")) {
             hikari.setLeakDetectionThreshold(((Number) poolConfig.get("leakDetectionThreshold")).longValue());
         }
+        return new HikariDataSource(hikari);
+    }
 
-        HikariDataSource replacement = new HikariDataSource(hikari);
-        if (dataSource != null) dataSource.close();
-        dataSource = replacement;
-        provisionNamespace(config);
-        runPrivilegeChecks(config);
-        publishAndValidateMetadata(config);
+    private static void closeDataSource(DataSource source) {
+        if (source instanceof AutoCloseable closeable) {
+            try {
+                closeable.close();
+            } catch (Exception e) {
+                throw new IllegalStateException("关闭数据源失败", e);
+            }
+        }
     }
 
     private static void provisionNamespace(Config config) {
@@ -237,7 +252,7 @@ public final class JdbcContext {
                         + json(namespace.name) + "\",\"message\":\"" + json(message) + "\"}");
             }
         }
-        dataSource.close();
+        closeDataSource(dataSource);
         dataSource = null;
         namespace = null;
     }

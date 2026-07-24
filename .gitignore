@@ -41,5 +41,8 @@ configs/
 config*.yaml
 *.local.json
 
+# Private JDBC drivers (including transitive dependency JARs)
+local-drivers/
+
 # Logs
 *.log
