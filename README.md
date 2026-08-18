@@ -83,6 +83,18 @@ python3 scripts/runner.py compare \
 
 `report.json` 是权威格式，Markdown/HTML 由它派生。新增兼容性失败、环境错误、预检失败、适配包不完整或清理失败返回非零退出码；明确的能力跳过和审核后的已知差异不阻断。
 
+## 测试范围与选择
+
+默认 `test_profile=full` 运行全部 JDBC 4.3 基线：连接和事务、Statement/PreparedStatement、批处理失败语义、生成键、ResultSet 生命周期与 NULL 语义、类型映射、元数据、LOB、RowSet、SQLXML、保存点和 CallableStatement。使用 `core` 只运行无需能力声明的严格跨数据库场景：
+
+```json
+{"test_profile": "core", "test_filter": {"timeout_ms": 60000}}
+```
+
+`full` 中的 Array、SQLXML、NClob、参数元数据和请求边界等可选 API 由适配包能力声明控制：`false` 显示为 `known_unsupported`，`true` 后失败即为兼容性失败。使用 `python3 scripts/runner.py coverage --profile full` 查看稳定场景 ID；`test_filter.include_tests` 与 `exclude_tests` 可进一步筛选。报告会按 JDBC 域和能力汇总结果。
+
+本项目测试标准 JDBC 驱动契约，不是厂商专有 SQL 认证、性能压测或共享连接并发压测。`concurrency.enabled=true` 会被明确拒绝，避免产生未实际执行的覆盖结论。
+
 ## 构建发布包
 
 ```bash

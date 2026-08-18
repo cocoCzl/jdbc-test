@@ -9,7 +9,7 @@ from unittest.mock import patch
 from adapter_runtime import AdapterPackage, build_runtime_config, discover_adapters, load_adapter, resolve_driver, validate_adapter
 from build_release import project_version, release_files
 from compatibility_v1 import RunKind, aggregate_target_outcome, build_v1_report, collect_preflight_issues
-from runner import _assessment_exit_code, _custom_adapter_manifest, _parse_connection_properties, compare_reports
+from runner import _assessment_exit_code, _custom_adapter_manifest, _parse_connection_properties, _profile_test_patterns, compare_reports
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -80,6 +80,13 @@ class AdapterRuntimeTest(unittest.TestCase):
         self.assertEqual({"vendor.token": "VENDOR_TOKEN"}, property_env)
         with self.assertRaisesRegex(ValueError, "不能重复配置"):
             _parse_connection_properties(["user=develop"], [])
+
+    def test_core_profile_selects_only_reportable_core_methods(self):
+        selectors = _profile_test_patterns("core", [], [])
+        self.assertTrue(selectors)
+        self.assertTrue(all("#test" in selector for selector in selectors))
+        self.assertNotIn("com.jdbctest.lifecycle.LifecycleTest#testRequestBoundaries", selectors)
+        self.assertIn("com.jdbctest.lifecycle.LifecycleTest#testClosedConnectionRejectsOperations", selectors)
 
     def test_runtime_resolves_property_environment_without_persisting_reference(self):
         adapter = load_adapter(PROJECT_ROOT, "oracle")

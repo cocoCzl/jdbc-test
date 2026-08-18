@@ -1,6 +1,63 @@
-compatibility_baseline_version: 1.0.0
+compatibility_baseline_version: 1.1.0
 deprecated_scenario_ids: []
 scenarios:
+- scenario_id: lifecycle.closed_connection_rejects_operations
+  category: core
+  contract: a closed connection rejects new JDBC operations and close is idempotent.
+  source_class: com.jdbctest.lifecycle.LifecycleTest
+  source_method: testClosedConnectionRejectsOperations
+  required_capabilities: []
+- scenario_id: lifecycle.statement_close_closes_current_result_set
+  category: core
+  contract: closing a statement closes its current result set.
+  source_class: com.jdbctest.lifecycle.LifecycleTest
+  source_method: testStatementCloseClosesCurrentResultSet
+  required_capabilities: []
+- scenario_id: lifecycle.request_boundaries
+  category: extended
+  contract: request boundaries are supported when declared by the adapter.
+  source_class: com.jdbctest.lifecycle.LifecycleTest
+  source_method: testRequestBoundaries
+  required_capabilities:
+  - request_boundaries
+- scenario_id: prepared_statement.binary_parameter_round_trip
+  category: core
+  contract: binary parameters round trip without data loss.
+  source_class: com.jdbctest.preparedstatement.PreparedStatementTest
+  source_method: testBinaryParameterRoundTrip
+  required_capabilities: []
+- scenario_id: prepared_statement.java_time_object_mapping
+  category: extended
+  contract: Java time values can be bound and retrieved through JDBC object mappings when declared.
+  source_class: com.jdbctest.preparedstatement.PreparedStatementTest
+  source_method: testJavaTimeObjectMapping
+  required_capabilities:
+  - java_time
+- scenario_id: prepared_statement.batch_failure_reports_update_counts
+  category: core
+  contract: a failed batch reports BatchUpdateException update counts.
+  source_class: com.jdbctest.preparedstatement.PreparedStatementTest
+  source_method: testBatchFailureReportsUpdateCounts
+  required_capabilities: []
+- scenario_id: result_set.column_index_and_label_read_same_value
+  category: core
+  contract: column-index and column-label access return the same value.
+  source_class: com.jdbctest.resultset.ResultSetTest
+  source_method: testColumnIndexAndLabelReadSameValue
+  required_capabilities: []
+- scenario_id: result_set.null_value_and_was_null
+  category: core
+  contract: SQL NULL values are exposed with correct wasNull semantics.
+  source_class: com.jdbctest.resultset.ResultSetTest
+  source_method: testNullValueAndWasNull
+  required_capabilities: []
+- scenario_id: result_set.get_object_as_local_date
+  category: extended
+  contract: getObject(Class) maps DATE values to LocalDate when declared.
+  source_class: com.jdbctest.resultset.ResultSetTest
+  source_method: testGetObjectAsLocalDate
+  required_capabilities:
+  - java_time
 - scenario_id: jdbc_type.common_type_metadata
   category: core
   contract: common JDBC scalar types are exposed through DatabaseMetaData type information.
@@ -600,11 +657,12 @@ scenarios:
   source_method: testExecuteUpdate
   required_capabilities: []
 - scenario_id: prepared_statement.get_generated_keys
-  category: core
-  contract: prepared statement get generated keys follows the JDBC-facing API contract.
+  category: extended
+  contract: prepared statement generated keys are available when generated_keys is declared.
   source_class: com.jdbctest.preparedstatement.PreparedStatementTest
   source_method: testGetGeneratedKeys
-  required_capabilities: []
+  required_capabilities:
+  - generated_keys
 - scenario_id: prepared_statement.get_meta_data
   category: core
   contract: prepared statement get meta data follows the JDBC-facing API contract.
@@ -612,12 +670,12 @@ scenarios:
   source_method: testGetMetaData
   required_capabilities: []
 - scenario_id: prepared_statement.get_parameter_meta_data
-  category: core
-  contract: prepared statement get parameter meta data follows the JDBC-facing API
-    contract.
+  category: extended
+  contract: prepared statement parameter metadata is available when parameter_metadata is declared.
   source_class: com.jdbctest.preparedstatement.PreparedStatementTest
   source_method: testGetParameterMetaData
-  required_capabilities: []
+  required_capabilities:
+  - parameter_metadata
 - scenario_id: prepared_statement.is_closed
   category: core
   contract: prepared statement is closed follows the JDBC-facing API contract.

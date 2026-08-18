@@ -78,6 +78,18 @@ For a database compatible with the Oracle, MySQL, or PostgreSQL dialect, `init-c
 - Shareable reports redact connection and raw diagnostic details.
 - Full SQL, exceptions, and stack traces remain only in local `diagnostics.log`.
 
+## Coverage and selection
+
+The default `test_profile=full` runs the complete JDBC 4.3 baseline: connections and transactions, Statement/PreparedStatement, batch-failure semantics, generated keys, ResultSet lifecycle and NULL semantics, type mappings, metadata, LOBs, RowSets, SQLXML, savepoints, and CallableStatement. Use `core` for strict cross-database scenarios that require no capability declaration:
+
+```json
+{"test_profile": "core", "test_filter": {"timeout_ms": 60000}}
+```
+
+In `full`, optional APIs such as Array, SQLXML, NClob, parameter metadata, and request boundaries are controlled by the adapter capability declaration. A declared `false` becomes `known_unsupported`; a declared `true` that fails is a compatibility failure. Run `python3 scripts/runner.py coverage --profile full` for stable scenario IDs. `test_filter.include_tests` and `exclude_tests` further narrow a run, and reports include summaries by JDBC area and capability.
+
+This project tests standard JDBC driver contracts, not vendor-specific SQL certification, performance testing, or shared-connection concurrency stress. `concurrency.enabled=true` is rejected so no unexecuted test is represented as coverage.
+
 ## License
 
 Apache License 2.0.

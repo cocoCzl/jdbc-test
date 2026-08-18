@@ -25,7 +25,12 @@
     "savepoint": true, "callable_statement": true, "array_type": false,
     "ref_type": false, "struct_type": false, "rowid_type": false, "sqlxml": true,
     "rowset": true, "blobs": true, "clobs": true, "nclobs": true,
-    "parameter_metadata": true
+    "parameter_metadata": true,
+    "updatable_result_set": true, "scrollable_result_set": true,
+    "generated_keys": true, "multiple_result_sets": true,
+    "statement_cancel": true, "query_timeout": true, "network_timeout": true,
+    "client_info": true, "request_boundaries": false, "sharding": false,
+    "connection_pool": false, "xa_data_source": false, "java_time": true
   },
   "assets": {
     "ddl": "ddl", "dml": "dml", "pool": "pool",

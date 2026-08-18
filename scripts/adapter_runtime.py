@@ -28,6 +28,18 @@ REQUIRED_ASSET_AREAS = {
     "sqlxml", "advancedtype",
 }
 
+# Every capability used by a reportable JDBC scenario must be explicitly
+# declared by an adapter.  This keeps an omitted declaration from looking like
+# a supported feature (or a harmless skip) in a compatibility report.
+MANAGED_CAPABILITIES = {
+    "savepoint", "callable_statement", "array_type", "ref_type", "struct_type",
+    "rowid_type", "sqlxml", "rowset", "blobs", "clobs", "nclobs",
+    "parameter_metadata", "updatable_result_set", "scrollable_result_set",
+    "generated_keys", "multiple_result_sets", "statement_cancel",
+    "query_timeout", "network_timeout", "client_info", "request_boundaries",
+    "sharding", "connection_pool", "xa_data_source", "java_time",
+}
+
 
 @dataclass(frozen=True)
 class AdapterPackage:
@@ -89,6 +101,9 @@ def validate_adapter(package: AdapterPackage, project_root: Path) -> None:
     capabilities = manifest.get("capabilities")
     if not isinstance(capabilities, dict) or not all(isinstance(v, bool) for v in capabilities.values()):
         raise ValueError("适配包 capabilities 必须是布尔值映射")
+    missing_capabilities = sorted(MANAGED_CAPABILITIES - set(capabilities))
+    if missing_capabilities:
+        raise ValueError(f"适配包缺少能力声明: {', '.join(missing_capabilities)}")
 
     assets = manifest.get("assets") or {}
     ddl_root = _asset_root(project_root, package.root, assets.get("ddl"))
@@ -194,6 +209,13 @@ def build_runtime_config(
     dml_root = _asset_root(project_root, adapter.root, assets["dml"])
     pool_root = _asset_root(project_root, adapter.root, assets.get("pool", "pool"))
 
+    test_filter = dict(user_config.get("test_filter") or {})
+    if "timeout_ms" not in test_filter and "timeout" in test_filter:
+        test_filter["timeout_ms"] = test_filter.pop("timeout")
+    test_filter.setdefault("include_tests", [])
+    test_filter.setdefault("exclude_tests", [])
+    test_filter.setdefault("timeout_ms", 60_000)
+
     runtime = {
         "schema_version": "1.0.0",
         "db": {
@@ -233,10 +255,10 @@ def build_runtime_config(
         "ddl": {"base_path": str(ddl_root)},
         "dml": {"base_path": str(dml_root)},
         "pool": {"profile_dir": str(pool_root)},
-        "concurrency": {"enabled": False, "threads": 1, "timeout": 300000},
         "execution": {"mode": (user_config.get("execution") or {}).get("mode", "local")},
         "report": user_config.get("report") or {"output_dir": "report", "format": ["json", "html", "markdown"]},
-        "test_filter": user_config.get("test_filter") or {"include_tests": [], "exclude_tests": [], "timeout": 60000},
+        "test_profile": str(user_config.get("test_profile", "full")),
+        "test_filter": test_filter,
         "adapter": {
             "id": manifest["id"],
             "name": manifest["name"],
@@ -254,6 +276,11 @@ def build_runtime_config(
         raise ValueError("本地配置必须包含 db.url 和 db.username")
     if not runtime["namespace"]["destructive_consent"]:
         raise ValueError("未设置 namespace.destructive_consent=true；只允许预检，不执行测试")
+    if runtime["test_profile"] not in {"core", "full"}:
+        raise ValueError("test_profile 必须是 core 或 full")
+    concurrency = user_config.get("concurrency") or {}
+    if concurrency.get("enabled"):
+        raise ValueError("并发压测不属于 JDBC 4.3 兼容性基线；请移除 concurrency.enabled")
     return runtime
 
 

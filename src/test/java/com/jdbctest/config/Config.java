@@ -12,7 +12,6 @@ public class Config {
     public NamespaceConfig namespace;
     public AdapterConfig adapter;
     public PreflightConfig preflight;
-    public ConcurrencyConfig concurrency;
     public ExecutionConfig execution;
     public ReportConfig report;
     public TestFilterConfig testFilter;
@@ -92,12 +91,11 @@ public class Config {
     public static class DdlConfig { public String basePath; }
     public static class DmlConfig { public String basePath; }
     public static class PoolConfig { public String profileDir; }
-    public static class ConcurrencyConfig { public boolean enabled; public int threads; public long timeout; }
     public static class ExecutionConfig { public String mode; }
     public static class ReportConfig { public String outputDir; public List<String> format; }
     public static class TestFilterConfig {
         public List<String> includeTests;
         public List<String> excludeTests;
-        public long timeout;
+        public long timeoutMs;
     }
 }

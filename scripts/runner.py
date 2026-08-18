@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import fnmatch
 import html
 import json
 import os
@@ -25,6 +26,8 @@ from adapter_runtime import (
 )
 from compatibility_v1 import (
     CompatibilityStatus,
+    ScenarioCategory,
+    build_scenario_inventory,
     build_v1_report,
     load_v1_report,
 )
@@ -36,7 +39,7 @@ REPORT_SCHEMA_VERSION = "1.0.0"
 
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
-    if argv and argv[0] not in {"init", "init-custom", "run", "compare", "adapters", "--help", "-h"}:
+    if argv and argv[0] not in {"init", "init-custom", "run", "compare", "adapters", "coverage", "--help", "-h"}:
         argv.insert(0, "run")
     parser = _parser()
     args = parser.parse_args(argv)
@@ -50,6 +53,8 @@ def main(argv: list[str] | None = None) -> int:
         return command_compare(args)
     if args.command == "adapters":
         return command_adapters()
+    if args.command == "coverage":
+        return command_coverage(args)
     parser.print_help()
     return 0
 
@@ -84,6 +89,10 @@ def _parser() -> argparse.ArgumentParser:
     run = sub.add_parser("run", help="Run compatibility assessment")
     run.add_argument("config")
     run.add_argument("--experimental-override", action="store_true")
+
+    coverage = sub.add_parser("coverage", help="List versioned JDBC compatibility scenarios")
+    coverage.add_argument("--profile", choices=("core", "full"), default="full")
+    coverage.add_argument("--format", choices=("text", "json"), default="text")
 
     compare = sub.add_parser("compare", help="Compare an assessment with an approved baseline")
     compare.add_argument("--baseline", required=True)
@@ -134,6 +143,21 @@ def command_adapters() -> int:
     return 0
 
 
+def command_coverage(args: argparse.Namespace) -> int:
+    scenarios = list(build_scenario_inventory(PROJECT_ROOT).values())
+    if args.profile == "core":
+        scenarios = [scenario for scenario in scenarios if scenario.category == ScenarioCategory.CORE]
+    rows = [scenario.to_report_dict() for scenario in sorted(scenarios, key=lambda item: item.scenario_id)]
+    if args.format == "json":
+        print(json.dumps({"baseline_version": "1.1.0", "profile": args.profile, "scenarios": rows}, ensure_ascii=False, indent=2))
+        return 0
+    print(f"JDBC compatibility baseline 1.1.0 ({args.profile}): {len(rows)} scenarios")
+    for row in rows:
+        required = ", ".join(row["required_capabilities"]) or "core"
+        print(f"{row['scenario_id']:52} {required}")
+    return 0
+
+
 def command_init(args: argparse.Namespace) -> int:
     discovered = discover_adapters(PROJECT_ROOT)
     if not discovered:
@@ -170,8 +194,9 @@ def command_init(args: argparse.Namespace) -> int:
             "destructive_consent": consent,
         },
         "execution": {"mode": "local"},
+        "test_profile": "full",
         "report": {"output_dir": "report", "format": ["json", "html", "markdown"]},
-        "test_filter": {"include_tests": [], "exclude_tests": [], "timeout": 60000},
+        "test_filter": {"include_tests": [], "exclude_tests": [], "timeout_ms": 60000},
     }
     output = Path(args.output)
     if not output.is_absolute():
@@ -262,8 +287,9 @@ def command_init_custom(args: argparse.Namespace) -> int:
             "destructive_consent": bool(args.consent),
         },
         "execution": {"mode": "local"},
+        "test_profile": "full",
         "report": {"output_dir": "report", "format": ["json", "html", "markdown"]},
-        "test_filter": {"include_tests": [], "exclude_tests": [], "timeout": 60000},
+        "test_filter": {"include_tests": [], "exclude_tests": [], "timeout_ms": 60000},
     }
     output.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     for path in (adapter_output / "adapter.json", output):
@@ -405,11 +431,13 @@ def _run_maven(runtime: dict[str, Any], runtime_path: Path, driver_classpath: li
     filters = runtime.get("test_filter") or {}
     includes = filters.get("include_tests") or []
     excludes = filters.get("exclude_tests") or []
-    patterns = list(includes)
-    if excludes:
-        if not patterns:
-            patterns.append("*Test")
-        patterns.extend(f"!{value}" for value in excludes)
+    profile = runtime.get("test_profile", "full")
+    timeout_ms = int(filters.get("timeout_ms", 60_000))
+    if timeout_ms <= 0:
+        raise ValueError("test_filter.timeout_ms 必须大于 0")
+    command.append(f"-Djunit.jupiter.execution.timeout.default={timeout_ms} ms")
+
+    patterns = _profile_test_patterns(profile, includes, excludes)
     if patterns:
         command.append(f"-Dtest={','.join(patterns)}")
     started = datetime.now(timezone.utc)
@@ -423,6 +451,39 @@ def _run_maven(runtime: dict[str, Any], runtime_path: Path, driver_classpath: li
         "stdout": result.stdout,
         "stderr": result.stderr,
     }
+
+
+def _profile_test_patterns(profile: str, includes: list[str], excludes: list[str]) -> list[str]:
+    """Return Surefire selectors for a profile while preserving filter semantics.
+
+    Full without filters intentionally returns an empty selector, so local unit
+    tests continue to run alongside reportable database scenarios.
+    """
+    if profile == "full" and not includes and not excludes:
+        return []
+    if profile not in {"core", "full"}:
+        raise ValueError("test_profile 必须是 core 或 full")
+    selected = build_scenario_inventory(PROJECT_ROOT).values()
+    if profile == "core":
+        selected = [item for item in selected if item.category == ScenarioCategory.CORE]
+
+    def matches(patterns: list[str], scenario: Any) -> bool:
+        candidates = (
+            scenario.class_name,
+            scenario.class_name.rsplit(".", 1)[-1],
+            f"{scenario.class_name}#{scenario.method_name}",
+            f"{scenario.class_name.rsplit('.', 1)[-1]}#{scenario.method_name}",
+        )
+        return any(fnmatch.fnmatch(candidate, pattern) for pattern in patterns for candidate in candidates)
+
+    result = []
+    for scenario in selected:
+        if includes and not matches(includes, scenario):
+            continue
+        if excludes and matches(excludes, scenario):
+            continue
+        result.append(f"{scenario.class_name}#{scenario.method_name}")
+    return result
 
 
 def _parse_surefire_reports() -> tuple[list[dict[str, Any]], dict[str, str]]:
@@ -496,9 +557,13 @@ def _markdown(report: dict[str, Any]) -> str:
         f"- Database: `{(target.get('database_product') or {}).get('value', '')}`",
         f"- Database version: `{(target.get('database_version') or {}).get('value', '')}`",
         f"- Driver version: `{(target.get('jdbc_driver_version') or {}).get('value', '')}`",
-        "", "## Outcome matrix", "",
-        "| Scenario ID | Category | Outcome |", "|---|---|---|",
+        "", "## Coverage summary", "",
+        "| Area | Outcomes |", "|---|---|",
     ]
+    for area, outcomes in (report.get("coverage_summary", {}).get("by_area", {}) or {}).items():
+        summary = ", ".join(f"{status}: {count}" for status, count in sorted(outcomes.items()))
+        lines.append(f"| {area} | {summary} |")
+    lines.extend(["", "## Outcome matrix", "", "| Scenario ID | Category | Outcome |", "|---|---|---|"])
     for scenario_id, result in report.get("scenario_results", {}).items():
         lines.append(f"| {scenario_id} | {result.get('category', '')} | {result.get('compatibility_status', '')} |")
     return "\n".join(lines) + "\n"

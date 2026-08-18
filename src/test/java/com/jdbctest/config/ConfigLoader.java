@@ -171,12 +171,9 @@ public class ConfigLoader {
             }
         }
 
-        config.concurrency = new Config.ConcurrencyConfig();
         Map<String, Object> concurrency = (Map<String, Object>) raw.get("concurrency");
-        if (concurrency != null) {
-            config.concurrency.enabled = Boolean.TRUE.equals(concurrency.get("enabled"));
-            config.concurrency.threads = numVal(concurrency.get("threads"), 1).intValue();
-            config.concurrency.timeout = numVal(concurrency.get("timeout"), 300).longValue();
+        if (concurrency != null && Boolean.TRUE.equals(concurrency.get("enabled"))) {
+            throw new IllegalStateException("并发压测不属于 JDBC 4.3 兼容性基线；请移除 concurrency.enabled");
         }
 
         config.execution = new Config.ExecutionConfig();
@@ -195,7 +192,8 @@ public class ConfigLoader {
         if (testFilter != null) {
             config.testFilter.includeTests = (List<String>) testFilter.get("include_tests");
             config.testFilter.excludeTests = (List<String>) testFilter.get("exclude_tests");
-            config.testFilter.timeout = numVal(testFilter.get("timeout"), 300).longValue();
+            Object timeout = testFilter.containsKey("timeout_ms") ? testFilter.get("timeout_ms") : testFilter.get("timeout");
+            config.testFilter.timeoutMs = numVal(timeout, 60_000).longValue();
         }
 
         return config;

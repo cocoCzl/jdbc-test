@@ -32,7 +32,7 @@ from compatibility_v1 import (
 
 class CompatibilityV1Test(unittest.TestCase):
     def test_stable_enum_values(self):
-        self.assertEqual("1.0.0", COMPATIBILITY_BASELINE_VERSION)
+        self.assertEqual("1.1.0", COMPATIBILITY_BASELINE_VERSION)
         self.assertEqual("1.0.0", REPORT_SCHEMA_VERSION)
         self.assertEqual(
             {
@@ -231,6 +231,7 @@ class CompatibilityV1Test(unittest.TestCase):
             "passed",
             report["scenario_results"]["connection.get_auto_commit"]["compatibility_status"],
         )
+        self.assertEqual(1, report["coverage_summary"]["by_area"]["connection"]["passed"])
         self.assertEqual("PostgreSQL", report["compatibility_target"]["database_product"]["value"])
 
     def test_target_identity_mismatch_and_diagnostic_run_are_inconclusive(self):

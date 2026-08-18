@@ -3,12 +3,14 @@ package com.jdbctest.resultset;
 import com.jdbctest.config.Config;
 import com.jdbctest.config.ConfigLoader;
 import com.jdbctest.extension.JdbcTestExtension;
+import com.jdbctest.extension.RequiresFeature;
 import com.jdbctest.extension.UseSqlScripts;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.math.BigDecimal;
 import java.sql.*;
+import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -351,6 +353,42 @@ class ResultSetTest {
             assertEquals(1, rs.findColumn("id"));
             assertEquals(2, rs.findColumn("name"));
             assertEquals(3, rs.findColumn("value"));
+        }
+    }
+
+    @Test
+    @Order(26)
+    @DisplayName("列序号和标签读取一致")
+    void testColumnIndexAndLabelReadSameValue(Connection conn) throws SQLException {
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT id, name FROM resultset_test WHERE id = 1")) {
+            assertTrue(rs.next());
+            assertEquals(rs.getInt(1), rs.getInt("id"));
+            assertEquals(rs.getString(2), rs.getString("name"));
+        }
+    }
+
+    @Test
+    @Order(27)
+    @DisplayName("NULL 值与 wasNull 语义")
+    void testNullValueAndWasNull(Connection conn) throws SQLException {
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT data FROM resultset_test WHERE id = 1")) {
+            assertTrue(rs.next());
+            assertNull(rs.getBytes(1));
+            assertTrue(rs.wasNull(), "读取 SQL NULL 后 wasNull 应为 true");
+        }
+    }
+
+    @Test
+    @Order(28)
+    @RequiresFeature("java_time")
+    @DisplayName("getObject(Class) 返回 Java LocalDate")
+    void testGetObjectAsLocalDate(Connection conn) throws SQLException {
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT updated_at FROM resultset_test WHERE id = 1")) {
+            assertTrue(rs.next());
+            assertEquals(LocalDate.of(2024, 1, 1), rs.getObject(1, LocalDate.class));
         }
     }
 }

@@ -17,7 +17,7 @@ except ImportError:  # Zero-dependency launcher fallback.
     yaml = None
 
 
-COMPATIBILITY_BASELINE_VERSION = "1.0.0"
+COMPATIBILITY_BASELINE_VERSION = "1.1.0"
 REPORT_SCHEMA_VERSION = "1.0.0"
 
 
@@ -321,6 +321,7 @@ def build_v1_report(
         }
 
     capability_profile = build_capability_profile(scenario_results, capability_declarations)
+    coverage_summary = build_coverage_summary(scenario_results)
     target_outcome = aggregate_target_outcome(scenario_results, run_kind, identity_mismatch)
 
     return {
@@ -333,6 +334,7 @@ def build_v1_report(
         "evaluation_context": evaluation_context,
         "scenario_results": dict(sorted(scenario_results.items())),
         "capability_profile": capability_profile,
+        "coverage_summary": coverage_summary,
         "known_deviations": collect_report_known_deviations(scenario_results),
         "expired_known_deviations": collect_expired_known_deviations(config),
         "environment_cleanup_issues": collect_cleanup_issues(execution, test_suites),
@@ -348,9 +350,24 @@ def build_v1_report(
     }
 
 
+def build_coverage_summary(scenario_results: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """Summarize scenario outcomes by JDBC area and required capability."""
+    by_area: dict[str, dict[str, int]] = {}
+    by_capability: dict[str, dict[str, int]] = {}
+    for scenario_id, result in scenario_results.items():
+        status = str(result.get("compatibility_status", "not_run"))
+        area = scenario_id.split(".", 1)[0]
+        area_bucket = by_area.setdefault(area, {})
+        area_bucket[status] = area_bucket.get(status, 0) + 1
+        for capability in result.get("required_capabilities", []) or []:
+            capability_bucket = by_capability.setdefault(str(capability), {})
+            capability_bucket[status] = capability_bucket.get(status, 0) + 1
+    return {"by_area": dict(sorted(by_area.items())), "by_capability": dict(sorted(by_capability.items()))}
+
+
 def classify_run(config: dict[str, Any]) -> RunKind:
     test_filter = config.get("test_filter", {}) or {}
-    if test_filter.get("include_tests") or test_filter.get("exclude_tests"):
+    if config.get("test_profile", "full") != "full" or test_filter.get("include_tests") or test_filter.get("exclude_tests"):
         return RunKind.DIAGNOSTIC_RUN
     return RunKind.FORMAL_COMPATIBILITY_EVALUATION
 

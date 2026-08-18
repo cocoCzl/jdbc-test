@@ -3,12 +3,14 @@ package com.jdbctest.preparedstatement;
 import com.jdbctest.config.Config;
 import com.jdbctest.config.ConfigLoader;
 import com.jdbctest.extension.JdbcTestExtension;
+import com.jdbctest.extension.RequiresFeature;
 import com.jdbctest.extension.UseSqlScripts;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.math.BigDecimal;
 import java.sql.*;
+import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -239,6 +241,7 @@ class PreparedStatementTest {
 
     @Test
     @Order(16)
+    @RequiresFeature("parameter_metadata")
     @DisplayName("getParameterMetaData 获取参数元数据")
     void testGetParameterMetaData(Connection conn) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(
@@ -267,6 +270,7 @@ class PreparedStatementTest {
 
     @Test
     @Order(18)
+    @RequiresFeature("generated_keys")
     @DisplayName("getGeneratedKeys 获取自增主键")
     void testGetGeneratedKeys(Connection conn) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(
@@ -290,6 +294,63 @@ class PreparedStatementTest {
 
     @Test
     @Order(19)
+    @DisplayName("二进制参数 setBytes/getBytes 往返")
+    void testBinaryParameterRoundTrip(Connection conn) throws SQLException {
+        byte[] expected = {0, 1, 2, 127, -1};
+        try (PreparedStatement update = conn.prepareStatement(
+                "UPDATE preparedstatement_test SET data = ? WHERE id = 1")) {
+            update.setBytes(1, expected);
+            assertEquals(1, update.executeUpdate());
+        }
+        try (PreparedStatement query = conn.prepareStatement(
+                "SELECT data FROM preparedstatement_test WHERE id = 1");
+             ResultSet rs = query.executeQuery()) {
+            assertTrue(rs.next());
+            assertArrayEquals(expected, rs.getBytes(1));
+        }
+    }
+
+    @Test
+    @Order(20)
+    @RequiresFeature("java_time")
+    @DisplayName("setObject/getObject(Class) Java 时间类型")
+    void testJavaTimeObjectMapping(Connection conn) throws SQLException {
+        LocalDate expected = LocalDate.of(2024, 6, 15);
+        try (PreparedStatement update = conn.prepareStatement(
+                "UPDATE preparedstatement_test SET updated_at = ? WHERE id = 1")) {
+            update.setObject(1, expected);
+            assertEquals(1, update.executeUpdate());
+        }
+        try (PreparedStatement query = conn.prepareStatement(
+                "SELECT updated_at FROM preparedstatement_test WHERE id = 1");
+             ResultSet rs = query.executeQuery()) {
+            assertTrue(rs.next());
+            assertEquals(expected, rs.getObject(1, LocalDate.class));
+        }
+    }
+
+    @Test
+    @Order(21)
+    @DisplayName("批处理失败返回 BatchUpdateException")
+    void testBatchFailureReportsUpdateCounts(Connection conn) throws SQLException {
+        boolean autoCommit = conn.getAutoCommit();
+        conn.setAutoCommit(false);
+        try (PreparedStatement ps = conn.prepareStatement(
+                "INSERT INTO preparedstatement_test (id, name, value) VALUES (?, ?, ?)")) {
+            ps.setInt(1, 1); // ID 1 is seeded by every adapter's SQL asset.
+            ps.setString(2, "duplicate-key");
+            ps.setInt(3, 1);
+            ps.addBatch();
+            BatchUpdateException error = assertThrows(BatchUpdateException.class, ps::executeBatch);
+            assertNotNull(error.getUpdateCounts(), "BatchUpdateException 必须提供更新计数");
+        } finally {
+            conn.rollback();
+            conn.setAutoCommit(autoCommit);
+        }
+    }
+
+    @Test
+    @Order(22)
     @DisplayName("isClosed 和 close 状态")
     void testIsClosed(Connection conn) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement("SELECT 1")) {

@@ -143,4 +143,32 @@ class ConfigLoaderTest {
         assertEquals("mysql", mysql.db.type);
         assertEquals("postgresql", postgres.db.type);
     }
+
+    @Test
+    void loadsExplicitMillisecondTestTimeout() throws Exception {
+        Path config = tempDir.resolve("timeout.yaml");
+        Files.writeString(config, """
+                db:
+                  url: jdbc:postgresql://localhost:5432/postgres
+                test_filter:
+                  timeout_ms: 12345
+                """);
+        System.setProperty("config.yaml", config.toString());
+
+        assertEquals(12345, ConfigLoader.load().testFilter.timeoutMs);
+    }
+
+    @Test
+    void rejectsEnabledConcurrencyConfiguration() throws Exception {
+        Path config = tempDir.resolve("concurrency.yaml");
+        Files.writeString(config, """
+                db:
+                  url: jdbc:postgresql://localhost:5432/postgres
+                concurrency:
+                  enabled: true
+                """);
+        System.setProperty("config.yaml", config.toString());
+
+        assertThrows(RuntimeException.class, ConfigLoader::load);
+    }
 }
