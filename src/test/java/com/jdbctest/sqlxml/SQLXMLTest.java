@@ -1,6 +1,5 @@
 package com.jdbctest.sqlxml;
 
-import com.jdbctest.config.Config;
 import com.jdbctest.config.ConfigLoader;
 import com.jdbctest.extension.JdbcTestExtension;
 import com.jdbctest.extension.RequiresFeature;

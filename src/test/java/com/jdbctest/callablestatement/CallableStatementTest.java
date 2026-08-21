@@ -1,6 +1,5 @@
 package com.jdbctest.callablestatement;
 
-import com.jdbctest.config.Config;
 import com.jdbctest.config.ConfigLoader;
 import com.jdbctest.extension.JdbcTestExtension;
 import com.jdbctest.extension.RequiresFeature;
@@ -54,9 +53,9 @@ class CallableStatementTest {
         }
     }
 
-    private Object callFunctionObj(Connection conn, String name, int sqlType, Object... params) throws SQLException {
+    private Object callFunctionObj(Connection conn, Object... params) throws SQLException {
         if (isOracle()) {
-            try (PreparedStatement ps = conn.prepareStatement("SELECT " + fn(name) + "(" + paramPlaceholders(params.length) + ") FROM DUAL")) {
+            try (PreparedStatement ps = conn.prepareStatement("SELECT " + fn("get_name_by_id") + "(" + paramPlaceholders(params.length) + ") FROM DUAL")) {
                 for (int i = 0; i < params.length; i++) {
                     ps.setObject(i + 1, params[i]);
                 }
@@ -67,8 +66,8 @@ class CallableStatementTest {
                 }
             }
         }
-        try (CallableStatement cs = conn.prepareCall(buildCall(name, params.length))) {
-            cs.registerOutParameter(1, sqlType);
+        try (CallableStatement cs = conn.prepareCall(buildCall("get_name_by_id", params.length))) {
+            cs.registerOutParameter(1, Types.VARCHAR);
             for (int i = 0; i < params.length; i++) {
                 cs.setObject(i + 2, params[i]);
             }
@@ -108,14 +107,14 @@ class CallableStatementTest {
     @Order(2)
     @DisplayName("调用函数获取名称")
     void testCallFunctionGetName(Connection conn) throws SQLException {
-        assertEquals("张三", callFunctionObj(conn, "get_name_by_id", Types.VARCHAR, 1), "ID=1 的名称应为 张三");
+        assertEquals("张三", callFunctionObj(conn, 1), "ID=1 的名称应为 张三");
     }
 
     @Test
     @Order(3)
     @DisplayName("调用函数获取名称（ID=2）")
     void testCallFunctionGetNameId2(Connection conn) throws SQLException {
-        assertEquals("李四", callFunctionObj(conn, "get_name_by_id", Types.VARCHAR, 2), "ID=2 的名称应为 李四");
+        assertEquals("李四", callFunctionObj(conn, 2), "ID=2 的名称应为 李四");
     }
 
     @Test
@@ -137,7 +136,7 @@ class CallableStatementTest {
     @Order(6)
     @DisplayName("wasNull 检查 NULL 输出")
     void testWasNull(Connection conn) throws SQLException {
-        Object result = callFunctionObj(conn, "get_name_by_id", Types.VARCHAR, 999);
+        Object result = callFunctionObj(conn, 999);
         assertNull(result, "不存在的 ID 应返回 null");
     }
 

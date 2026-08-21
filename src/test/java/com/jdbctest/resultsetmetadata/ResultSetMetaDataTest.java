@@ -1,6 +1,5 @@
 package com.jdbctest.resultsetmetadata;
 
-import com.jdbctest.config.Config;
 import com.jdbctest.config.ConfigLoader;
 import com.jdbctest.extension.JdbcTestExtension;
 import com.jdbctest.extension.UseSqlScripts;
@@ -8,7 +7,6 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.sql.*;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 @ExtendWith(JdbcTestExtension.class)
@@ -172,7 +170,7 @@ class ResultSetMetaDataTest {
                 assertFalse(meta.isCurrency(2), "INT 不应为货币类型");
             }
             assertTrue(meta.isSigned(2), "INT 应为有符号");
-            assertNotNull(meta.isReadOnly(1), "isReadOnly 应返回有效值");
+            meta.isReadOnly(1);
         }
     }
 

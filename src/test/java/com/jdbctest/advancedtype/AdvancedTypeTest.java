@@ -7,7 +7,6 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.sql.*;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 @ExtendWith(JdbcTestExtension.class)

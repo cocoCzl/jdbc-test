@@ -1,7 +1,7 @@
 package com.jdbctest.config;
 
+import org.checkerframework.checker.nullness.qual.NonNull;
 import org.yaml.snakeyaml.Yaml;
-
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -85,17 +85,7 @@ public class ConfigLoader {
         }
         Map<String, Object> connectionProperties = (Map<String, Object>) db.get("properties");
         if (connectionProperties != null) {
-            Map<String, String> parsedProperties = new HashMap<>();
-            for (var entry : connectionProperties.entrySet()) {
-                String key = entry.getKey();
-                if (key == null || key.isBlank() || !(entry.getValue() instanceof String value) || value.isEmpty()) {
-                    throw new IllegalStateException("db.properties 的键和值必须是非空字符串");
-                }
-                if ("user".equals(key) || "password".equals(key)) {
-                    throw new IllegalStateException("db.properties 不能覆盖 user/password");
-                }
-                parsedProperties.put(key, value);
-            }
+            Map<String, String> parsedProperties = createParsedProperties(connectionProperties);
             config.db.properties = Map.copyOf(parsedProperties);
         }
         config.db.identifierQuote = nonBlank(str(db.get("identifier_quote")), "\"");
@@ -193,10 +183,26 @@ public class ConfigLoader {
             config.testFilter.includeTests = (List<String>) testFilter.get("include_tests");
             config.testFilter.excludeTests = (List<String>) testFilter.get("exclude_tests");
             Object timeout = testFilter.containsKey("timeout_ms") ? testFilter.get("timeout_ms") : testFilter.get("timeout");
-            config.testFilter.timeoutMs = numVal(timeout, 60_000).longValue();
+            config.testFilter.timeoutMs = numVal(timeout).longValue();
         }
 
         return config;
+    }
+
+    private static @NonNull Map<String, String> createParsedProperties(
+        Map<String, Object> connectionProperties) {
+        Map<String, String> parsedProperties = new HashMap<>();
+        for (var entry : connectionProperties.entrySet()) {
+            String key = entry.getKey();
+            if (key == null || key.isBlank() || !(entry.getValue() instanceof String value) || value.isEmpty()) {
+                throw new IllegalStateException("db.properties 的键和值必须是非空字符串");
+            }
+            if ("user".equals(key) || "password".equals(key)) {
+                throw new IllegalStateException("db.properties 不能覆盖 user/password");
+            }
+            parsedProperties.put(key, value);
+        }
+        return parsedProperties;
     }
 
     static void resetForTesting() {
@@ -205,9 +211,9 @@ public class ConfigLoader {
         }
     }
 
-    private static Number numVal(Object v, int defaultVal) {
+    private static Number numVal(Object v) {
         if (v instanceof Number n) return n;
-        return defaultVal;
+        return 60000;
     }
 
     private static String str(Object v) {

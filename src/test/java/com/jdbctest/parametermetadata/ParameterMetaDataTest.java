@@ -52,7 +52,7 @@ class ParameterMetaDataTest {
             // PG 可能返回类型名或 null
             String typeName = meta.getParameterTypeName(1);
             if (typeName != null) {
-                assertTrue(typeName.length() > 0);
+                assertFalse(typeName.isEmpty());
             }
         }
     }
@@ -108,7 +108,7 @@ class ParameterMetaDataTest {
             ParameterMetaData meta = ps.getParameterMetaData();
             String className = meta.getParameterClassName(1);
             if (className != null) {
-                assertTrue(className.length() > 0);
+                assertFalse(className.isEmpty());
             }
         }
     }

@@ -9,7 +9,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 @ExtendWith(JdbcTestExtension.class)

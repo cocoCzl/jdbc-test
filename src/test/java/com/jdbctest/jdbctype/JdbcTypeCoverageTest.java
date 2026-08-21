@@ -12,6 +12,7 @@ import java.sql.Types;
 import java.util.HashSet;
 import java.util.Set;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @ExtendWith(JdbcTestExtension.class)
@@ -35,7 +36,7 @@ class JdbcTypeCoverageTest {
     @Test
     @RequiresFeature("sqlxml")
     void testSqlXmlApi(Connection connection) throws SQLException {
-        assertTrue(connection.createSQLXML() != null);
+        assertNotNull(connection.createSQLXML());
     }
 
     @Test

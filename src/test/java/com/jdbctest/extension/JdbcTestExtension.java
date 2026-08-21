@@ -345,8 +345,6 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
                         && (i + 1 >= sql.length() || Character.isWhitespace(sql.charAt(i + 1)));
             }
 
-            @Override
-            public int skipAfterMatch() { return 0; }
         });
         for (int i = 0; i < raw.length; i++) {
             String trimmed = raw[i].trim().toUpperCase(Locale.ENGLISH);
