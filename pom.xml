@@ -1,19 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-
     <groupId>com.jdbctest</groupId>
     <artifactId>jdbc-test</artifactId>
     <version>1.2.1-SNAPSHOT</version>
-
+    <packaging>pom</packaging>
+    <modules>
+        <module>jdbc-test-core</module>
+        <module>jdbc-test-suite</module>
+        <module>jdbc-test-worker</module>
+        <module>jdbc-test-server</module>
+    </modules>
     <properties>
-        <maven.compiler.source>21</maven.compiler.source>
-        <maven.compiler.target>21</maven.compiler.target>
+        <java.version>21</java.version>
+        <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-
-        <junit.version>5.10.2</junit.version>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <junit.version>6.0.3</junit.version>
         <hikaricp.version>5.1.0</hikaricp.version>
         <snakeyaml.version>2.2</snakeyaml.version>
         <postgresql.version>42.7.2</postgresql.version>
@@ -21,128 +26,65 @@
         <oracle.version>21.13.0.0</oracle.version>
         <mssql.version>12.6.0.jre11</mssql.version>
         <slf4j.version>1.7.36</slf4j.version>
+        <jackson.version>2.17.2</jackson.version>
+        <junit.platform.version>6.0.3</junit.platform.version>
+        <testcontainers.version>1.19.8</testcontainers.version>
+        <spring-boot.version>4.1.0</spring-boot.version>
+        <maven.compiler.plugin.version>3.13.0</maven.compiler.plugin.version>
+        <maven.enforcer.version>3.5.0</maven.enforcer.version>
         <maven.surefire.version>3.2.5</maven.surefire.version>
+        <mockito.version>5.23.0</mockito.version>
+        <maven.jar.version>3.4.2</maven.jar.version>
+        <surefire.excluded.groups>integration</surefire.excluded.groups>
     </properties>
-
-    <dependencies>
-        <!-- JUnit 5 -->
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <version>${junit.version}</version>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- HikariCP 连接池 -->
-        <dependency>
-            <groupId>com.zaxxer</groupId>
-            <artifactId>HikariCP</artifactId>
-            <version>${hikaricp.version}</version>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- Test logger binding for HikariCP and JDBC drivers -->
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-nop</artifactId>
-            <version>${slf4j.version}</version>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- SnakeYAML -->
-        <dependency>
-            <groupId>org.yaml</groupId>
-            <artifactId>snakeyaml</artifactId>
-            <version>${snakeyaml.version}</version>
-        </dependency>
-
-        <!-- PostgreSQL JDBC Driver -->
-        <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>postgresql</artifactId>
-            <version>${postgresql.version}</version>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- MySQL JDBC Driver -->
-        <dependency>
-            <groupId>com.mysql</groupId>
-            <artifactId>mysql-connector-j</artifactId>
-            <version>${mysql.version}</version>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- Oracle JDBC Driver -->
-        <dependency>
-            <groupId>com.oracle.database.jdbc</groupId>
-            <artifactId>ojdbc11</artifactId>
-            <version>${oracle.version}</version>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- Oracle NLS (for non-UTF8 charsets like ZHS16GBK) -->
-        <dependency>
-            <groupId>com.oracle.database.nls</groupId>
-            <artifactId>orai18n</artifactId>
-            <version>${oracle.version}</version>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- Oracle XML DB (xdb + xmlparserv2) for XMLType support -->
-        <dependency>
-            <groupId>com.oracle.database.xml</groupId>
-            <artifactId>xdb</artifactId>
-            <version>${oracle.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.oracle.database.xml</groupId>
-            <artifactId>xmlparserv2</artifactId>
-            <version>${oracle.version}</version>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- SQL Server JDBC Driver -->
-        <dependency>
-            <groupId>com.microsoft.sqlserver</groupId>
-            <artifactId>mssql-jdbc</artifactId>
-            <version>${mssql.version}</version>
-            <scope>test</scope>
-        </dependency>
-    </dependencies>
-
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><version>${junit.version}</version></dependency>
+            <dependency><groupId>com.zaxxer</groupId><artifactId>HikariCP</artifactId><version>${hikaricp.version}</version></dependency>
+            <dependency><groupId>org.yaml</groupId><artifactId>snakeyaml</artifactId><version>${snakeyaml.version}</version></dependency>
+            <dependency><groupId>org.junit.platform</groupId><artifactId>junit-platform-launcher</artifactId><version>${junit.platform.version}</version></dependency>
+        </dependencies>
+    </dependencyManagement>
     <build>
+        <pluginManagement>
+            <plugins>
+                <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>${maven.compiler.plugin.version}</version><configuration><release>${maven.compiler.release}</release><encoding>${project.build.sourceEncoding}</encoding></configuration></plugin>
+                <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><version>${maven.surefire.version}</version><configuration><excludedGroups>${surefire.excluded.groups}</excludedGroups><failIfNoSpecifiedTests>false</failIfNoSpecifiedTests><argLine>-javaagent:${settings.localRepository}/org/mockito/mockito-core/${mockito.version}/mockito-core-${mockito.version}.jar</argLine></configuration></plugin>
+                <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-jar-plugin</artifactId><version>${maven.jar.version}</version></plugin>
+            </plugins>
+        </pluginManagement>
         <plugins>
             <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>exec-maven-plugin</artifactId>
-                <version>3.1.0</version>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>${maven.enforcer.version}</version>
                 <executions>
                     <execution>
-                        <id>generate-junit-platform-properties</id>
-                        <phase>process-test-resources</phase>
-                        <goals>
-                            <goal>java</goal>
-                        </goals>
+                        <id>enforce-build-baseline</id>
+                        <goals><goal>enforce</goal></goals>
                         <configuration>
-                            <mainClass>com.jdbctest.config.PropertyGenerator</mainClass>
+                            <rules>
+                                <requireMavenVersion><version>[3.9.0,)</version></requireMavenVersion>
+                                <requireJavaVersion><version>[21,22)</version></requireJavaVersion>
+                            </rules>
+                            <failFast>true</failFast>
                         </configuration>
                     </execution>
                 </executions>
             </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <version>${maven.surefire.version}</version>
-                <configuration>
-                    <includes>
-                        <include>**/*Test.java</include>
-                    </includes>
-                    <additionalClasspathElements>
-                        <additionalClasspathElement>${surefire.additionalClasspath}</additionalClasspathElement>
-                    </additionalClasspathElements>
-                </configuration>
-            </plugin>
         </plugins>
     </build>
+    <profiles>
+        <profile>
+            <id>integration-tests</id>
+            <properties><surefire.excluded.groups>none</surefire.excluded.groups></properties>
+        </profile>
+    </profiles>
 </project>

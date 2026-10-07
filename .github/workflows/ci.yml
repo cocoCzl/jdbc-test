@@ -35,3 +35,29 @@ jobs:
         run: mvn -q '-Dtest=ConfigLoaderTest,SqlSplitterTest' test
       - name: Build driver-free release archive
         run: python scripts/build_release.py --output dist
+
+  production-packaging:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: jdbc-test-web/package-lock.json
+      - run: ./mvnw -B clean verify
+      - name: Frontend regression
+        working-directory: jdbc-test-web
+        run: npm ci && npm run lint && npm run test && npm run build
+      - name: Validate Compose contract
+        env:
+          POSTGRES_PASSWORD: ci-validation-only
+          JDBC_TEST_MASTER_KEY: ci-validation-only
+        run: docker compose config --quiet
+      - name: Build production image without publishing
+        run: docker build --build-arg REVISION=${{ github.sha }} -t jdbc-test:ci .

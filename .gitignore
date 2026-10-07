@@ -46,3 +46,16 @@ local-drivers/
 
 # Logs
 *.log
+
+# Frontend
+node_modules/
+playwright-report/
+test-results/
+*.tsbuildinfo
+
+# Deployment secrets and runtime data
+.env
+.env.*
+!.env.example
+data/
+coverage/

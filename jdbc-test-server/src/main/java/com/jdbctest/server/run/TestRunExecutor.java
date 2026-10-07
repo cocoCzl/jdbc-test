@@ -1,0 +1,170 @@
+package com.jdbctest.server.run;
+
+import com.jdbctest.server.connection.DatabaseConnectionProfileEntity;
+import com.jdbctest.server.driver.DriverStorage;
+import com.jdbctest.server.driver.DriverStorageProperties;
+import com.jdbctest.server.driver.DriverWorkerProperties;
+import com.jdbctest.server.driver.JdbcDriverArtifactRepository;
+import com.jdbctest.server.security.CredentialEncryptionService;
+import com.jdbctest.server.security.JdbcUrlSanitizer;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+
+/** Owns one long lived Worker process and consumes its NDJSON incrementally. */
+@Component
+final class TestRunExecutor {
+    private final TestRunRepository runs; private final TestRunSelectedScenarioRepository selected; private final TestRunCredentialRepository credentials;
+    private final TestCaseResultRepository results; private final JdbcDriverArtifactRepository artifacts; private final DriverStorage storage;
+    private final CredentialEncryptionService encryption; private final DriverStorageProperties storageProperties; private final DriverWorkerProperties workerProperties;
+    private final ExecutionProperties execution; private final ObjectMapper mapper; private final TransactionTemplate transactions; private final RunEventPublisher events;
+    private final Map<UUID, Process> active = new ConcurrentHashMap<>();
+    TestRunExecutor(TestRunRepository runs, TestRunSelectedScenarioRepository selected, TestRunCredentialRepository credentials, TestCaseResultRepository results,
+                    JdbcDriverArtifactRepository artifacts, DriverStorage storage, CredentialEncryptionService encryption, DriverStorageProperties storageProperties,
+                    DriverWorkerProperties workerProperties, ExecutionProperties execution, ObjectMapper mapper, TransactionTemplate transactions, RunEventPublisher events) {
+        this.runs = runs; this.selected = selected; this.credentials = credentials; this.results = results; this.artifacts = artifacts; this.storage = storage; this.encryption = encryption;
+        this.storageProperties = storageProperties; this.workerProperties = workerProperties; this.execution = execution; this.mapper = mapper; this.transactions = transactions; this.events = events;
+    }
+    void execute(UUID runId) {
+        RunInput input;
+        try { input = prepare(runId); } catch (IllegalArgumentException exception) { fail(runId, "PREPARATION_FAILED"); cleanup(runId); events.complete(runId); return; }
+        if (input == null) { cleanup(runId); if (TestRunStateTransitions.terminal(status(runId))) events.complete(runId); return; }
+        Process process = null;
+        boolean finishedEvent = false;
+        try {
+            Path workspace = workspace(runId); Files.createDirectories(workspace.resolve("report")); Files.createDirectories(workspace.resolve("logs"));
+            process = start(input, workspace); active.put(runId, process);
+            if (!transition(runId, TestRunStatus.RUNNING, null)) { terminate(process); return; }
+            Process actual = process;
+            Thread stderr = Thread.ofVirtual().start(() -> drainStderr(actual, workspace.resolve("logs/worker.log")));
+            AtomicReference<JsonNode> terminalEvent = new AtomicReference<>();
+            Thread stdout = Thread.ofVirtual().start(() -> {
+                try (BufferedReader reader = actual.inputReader(StandardCharsets.UTF_8)) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        if (terminalEvent.get() != null) throw new RunException(org.springframework.http.HttpStatus.UNPROCESSABLE_CONTENT, "WORKER_PROTOCOL_ERROR", "Event after RUN_FINISHED");
+                        if (handle(runId, line)) terminalEvent.set(mapper.readTree(line));
+                    }
+                } catch (IOException | RunException | tools.jackson.core.JacksonException exception) { fail(runId, "WORKER_PROTOCOL_ERROR"); terminateQuietly(actual); }
+            });
+            boolean exited = process.waitFor(execution.getRunTimeout().toMillis(), TimeUnit.MILLISECONDS);
+            if (!exited) { fail(runId, "RUN_TIMEOUT"); terminate(process); stdout.join(); stderr.join(); return; }
+            stdout.join(); stderr.join(); finishedEvent = terminalEvent.get() != null;
+            TestRunStatus current = status(runId);
+            if (TestRunStateTransitions.terminal(current)) return;
+            if (!finishedEvent) { fail(runId, "WORKER_EXITED_UNEXPECTEDLY"); return; }
+            if (!transition(runId, TestRunStatus.GENERATING_REPORT, null)) return;
+            if (!consistent(runId, terminalEvent.get(), workspace.resolve("report/report.json"))) { fail(runId, "REPORT_INCONSISTENT"); return; }
+            if (process.exitValue() != 0 || "FAILED".equals(text(terminalEvent.get(), "status"))) { fail(runId, "WORKER_EXECUTION_FAILED"); return; }
+            transition(runId, TestRunStatus.SUCCEEDED, null);
+        } catch (IOException exception) { fail(runId, "WORKER_UNAVAILABLE"); }
+        catch (InterruptedException exception) { Thread.currentThread().interrupt(); if (process != null) terminateQuietly(process); if (status(runId) != TestRunStatus.CANCELLED) fail(runId, "INTERRUPTED"); }
+        finally { if (process != null && process.isAlive()) terminateQuietly(process); active.remove(runId); cleanup(runId); if (TestRunStateTransitions.terminal(status(runId))) events.complete(runId); }
+    }
+    boolean cancel(UUID runId) { Process process = active.get(runId); if (process == null) return false; terminateQuietly(process); return true; }
+    void interruptAll() { active.values().forEach(this::terminateQuietly); }
+    private RunInput prepare(UUID runId) {
+        return transactions.execute(tx -> {
+            TestRunEntity run = runs.findForUpdate(runId).orElse(null); if (run == null || run.getStatus() != TestRunStatus.QUEUED) return null;
+            transition(run, TestRunStatus.PREPARING, null);
+            TestRunCredentialEntity credential = credentials.findById(runId).orElse(null); if (credential == null) { transition(run, TestRunStatus.FAILED, "CONNECTION_PASSWORD_REQUIRED"); return null; }
+            String password = encryption.decrypt(credential.getEncryptedPassword()); credentials.delete(credential);
+            DatabaseConnectionProfileEntity connection = run.getConnection();
+            List<String> paths = artifacts.findByDriver_Id(run.getDriver().getId()).stream().map(item -> storage.resolve(item.getStorageKey()).toAbsolutePath().toString()).toList();
+            List<TestRunSelectedScenarioEntity> scenarios = selected.findByRun_IdOrderByScenarioId(runId);
+            return new RunInput(runId, run.getDriverClassSnapshot(), paths, connection.getJdbcUrl(), connection.getUsername(), run.getAdapterIdSnapshot(), password,
+                    "CUSTOM".equals(run.getProfile()) ? "FULL" : run.getProfile(), scenarios.stream().map(TestRunSelectedScenarioEntity::getModuleId).collect(java.util.stream.Collectors.toSet()).stream().toList(), scenarios.stream().map(TestRunSelectedScenarioEntity::getScenarioId).toList());
+        });
+    }
+    private Process start(RunInput input, Path workspace) throws IOException {
+        Path executable = workerProperties.getExecutable(); if (executable == null || !Files.isRegularFile(executable)) throw new IOException("Worker executable unavailable");
+        String java = Path.of(System.getProperty("java.home"), "bin", "java").toString(); Process process = new ProcessBuilder(java, "-jar", executable.toAbsolutePath().toString()).start();
+        Map<String, Object> request = Map.of("runId", input.runId().toString(), "driver", Map.of("driverClass", input.driverClass(), "artifacts", input.artifacts()),
+                "connection", Map.of("jdbcUrl", input.jdbcUrl(), "username", input.username() == null ? "" : input.username(), "password", input.password(), "properties", Map.of(), "adapterId", input.adapterId()),
+                "selection", Map.of("profile", input.profile(), "modules", input.modules(), "includeScenarios", input.scenarios(), "excludeScenarios", List.of()), "workspace", workspace.toString(), "timeoutMs", execution.getRunTimeout().toMillis());
+        try (OutputStream output = process.getOutputStream()) { mapper.writeValue(output, request); }
+        catch (IOException | tools.jackson.core.JacksonException exception) { terminateQuietly(process); throw exception; }
+        return process;
+    }
+    private boolean handle(UUID runId, String line) {
+        JsonNode event = mapper.readTree(line);
+        if (event == null || !event.isObject() || !runId.toString().equals(text(event, "runId"))) throw new RunException(org.springframework.http.HttpStatus.UNPROCESSABLE_CONTENT, "WORKER_PROTOCOL_ERROR", "Worker runId does not match");
+        if (TestRunStateTransitions.terminal(status(runId))) return false;
+        String type = required(event, "type");
+        switch (type) {
+            case "MODULE_STARTED" -> updateCurrent(runId, required(event, "moduleId"), null, "module.started");
+            case "CASE_STARTED" -> updateCurrent(runId, required(event, "moduleId"), required(event, "scenarioId"), "case.started");
+            case "CASE_FINISHED" -> persistCase(runId, event);
+            case "RUN_FAILED" -> fail(runId, text(event, "errorType") == null ? "WORKER_EXECUTION_FAILED" : text(event, "errorType"));
+            case "RUN_FINISHED" -> { if (!List.of("PASSED", "FAILED").contains(required(event, "status")) || !event.path("scenarioCount").isInt()) throw new RunException(org.springframework.http.HttpStatus.UNPROCESSABLE_CONTENT, "WORKER_PROTOCOL_ERROR", "Invalid finish summary"); return true; }
+            case "RUN_STARTED", "MODULE_FINISHED" -> { }
+            default -> throw new RunException(org.springframework.http.HttpStatus.UNPROCESSABLE_CONTENT, "WORKER_PROTOCOL_ERROR", "Unknown worker event");
+        }
+        return false;
+    }
+    private void persistCase(UUID runId, JsonNode event) {
+        transactions.executeWithoutResult(tx -> {
+            TestRunEntity run = runs.findForUpdate(runId).orElseThrow(); if (TestRunStateTransitions.terminal(run.getStatus())) return;
+            String scenario = required(event, "scenarioId"); String module = required(event, "moduleId"); String status = required(event, "status");
+            if (selected.findByRun_IdOrderByScenarioId(runId).stream().noneMatch(item -> scenario.equals(item.getScenarioId()) && module.equals(item.getModuleId())) || results.findByRun_Id(runId).stream().anyMatch(item -> scenario.equals(item.getScenarioId()))) throw new RunException(org.springframework.http.HttpStatus.UNPROCESSABLE_CONTENT, "WORKER_PROTOCOL_ERROR", "Unselected or duplicate scenario");
+            TestCaseResultStatus parsed; try { parsed = TestCaseResultStatus.valueOf(status); } catch (IllegalArgumentException exception) { throw new RunException(org.springframework.http.HttpStatus.UNPROCESSABLE_CONTENT, "WORKER_PROTOCOL_ERROR", "Unknown result status"); }
+            TestCaseResultEntity value = new TestCaseResultEntity(run, scenario, module, text(event, "displayName") == null ? scenario : sanitize(text(event, "displayName")), parsed);
+            value.complete(event.path("durationMs").isNumber() ? event.path("durationMs").asLong() : 0L, sanitize(text(event, "message")), sanitize(text(event, "stackTrace"))); results.save(value); run.recordCase(parsed); runs.save(run);
+            events.publish(runId, "case.finished", Map.of("runId", runId, "scenarioId", scenario, "moduleId", module, "displayName", value.getDisplayName(), "status", parsed.name(), "durationMs", value.getDurationMs(), "completedCases", run.getCompletedCases(), "totalCases", run.getTotalCases()));
+            events.publish(runId, "run.progress", Map.of("runId", runId, "completedCases", run.getCompletedCases(), "totalCases", run.getTotalCases(), "passed", run.getPassed(), "failed", run.getFailed(), "skipped", run.getSkipped()));
+        });
+    }
+    private void updateCurrent(UUID id, String module, String test, String name) { transactions.executeWithoutResult(tx -> { TestRunEntity run = runs.findForUpdate(id).orElseThrow(); if (!TestRunStateTransitions.terminal(run.getStatus())) { run.setCurrentModule(module); if (test != null) run.setCurrentTestCase(test); runs.save(run); events.publish(id, name, test == null ? Map.of("runId", id, "moduleId", module) : Map.of("runId", id, "moduleId", module, "scenarioId", test)); } }); }
+    private boolean transition(UUID id, TestRunStatus next, String reason) { return Boolean.TRUE.equals(transactions.execute(tx -> { TestRunEntity run = runs.findForUpdate(id).orElse(null); return run != null && transition(run, next, reason); })); }
+    private boolean transition(TestRunEntity run, TestRunStatus next, String reason) {
+        if (!TestRunStateTransitions.allows(run.getStatus(), next)) return false;
+        run.setStatus(next); if (next == TestRunStatus.PREPARING) run.markStarted();
+        if (TestRunStateTransitions.terminal(next)) { run.markFinished(); run.setFailureReason(sanitize(reason)); }
+        runs.save(run);
+        String name = next == TestRunStatus.SUCCEEDED ? "run.finished" : next == TestRunStatus.FAILED ? "run.failed" : "run.status";
+        events.publish(run.getId(), name, reason == null ? Map.of("runId", run.getId(), "status", next.name()) : Map.of("runId", run.getId(), "status", next.name(), "reason", sanitize(reason)));
+        return true;
+    }
+    private void fail(UUID id, String reason) { transition(id, TestRunStatus.FAILED, reason); }
+    private boolean consistent(UUID runId, JsonNode finish, Path artifact) throws IOException {
+        if (!Files.isRegularFile(artifact)) return false;
+        JsonNode report;
+        try { String safe = JdbcUrlSanitizer.sanitizeJson(Files.readString(artifact)); Files.writeString(artifact, safe); report = mapper.readTree(safe); }
+        catch (tools.jackson.core.JacksonException exception) { return false; }
+        if (report == null || !runId.toString().equals(text(report, "runId"))) return false;
+        return Boolean.TRUE.equals(transactions.execute(tx -> {
+            TestRunEntity run = runs.findForUpdate(runId).orElseThrow(); List<TestCaseResultEntity> cases = results.findByRun_Id(runId);
+            JsonNode summary = report.path("summary"); JsonNode reportCases = report.path("scenario_results");
+            boolean failed = cases.stream().anyMatch(item -> item.getStatus() == TestCaseResultStatus.FAILED || item.getStatus() == TestCaseResultStatus.ABORTED);
+            return run.getCompletedCases() == run.getTotalCases() && cases.size() == run.getTotalCases()
+                    && finish.path("scenarioCount").asInt(-1) == run.getTotalCases() && (failed ? "FAILED" : "PASSED").equals(text(finish, "status"))
+                    && summary.path("total").asInt(-1) == run.getTotalCases() && summary.path("passed").asInt(-1) == run.getPassed()
+                    && summary.path("failed").asInt(-1) == run.getFailed() && summary.path("skipped").asInt(-1) == run.getSkipped()
+                    && reportCases.isObject() && reportCases.size() == cases.size()
+                    && cases.stream().allMatch(item -> item.getStatus().name().equals(text(reportCases.path(item.getScenarioId()), "status")) && item.getModuleId().equals(text(reportCases.path(item.getScenarioId()), "moduleId")));
+        }));
+    }
+    private TestRunStatus status(UUID id) { return transactions.execute(tx -> runs.findById(id).map(TestRunEntity::getStatus).orElse(TestRunStatus.FAILED)); }
+    private void cleanup(UUID id) { transactions.executeWithoutResult(tx -> credentials.deleteById(id)); }
+    private Path workspace(UUID id) { return storageProperties.getDataDirectory().toAbsolutePath().normalize().resolve("runs").resolve(id.toString()); }
+    private void drainStderr(Process process, Path log) { try (var input = process.errorReader(StandardCharsets.UTF_8); var output = Files.newBufferedWriter(log)) { int total = 0; String line; while ((line = input.readLine()) != null) { String safe = sanitize(line) + System.lineSeparator(); int allowed = Math.min(safe.length(), 10 * 1024 * 1024 - total); if (allowed > 0) { output.write(safe, 0, allowed); total += allowed; } } } catch (IOException exception) { org.slf4j.LoggerFactory.getLogger(TestRunExecutor.class).warn("Worker diagnostic stream unavailable"); } }
+    private void terminate(Process process) throws InterruptedException { process.destroy(); if (!process.waitFor(execution.getTerminationGracePeriod().toMillis(), TimeUnit.MILLISECONDS)) { process.destroyForcibly(); process.waitFor(); } }
+    private void terminateQuietly(Process process) { try { terminate(process); } catch (InterruptedException exception) { process.destroyForcibly(); Thread.currentThread().interrupt(); } }
+    private static String text(JsonNode node, String field) { return node.path(field).isMissingNode() ? null : node.path(field).asString(null); }
+    private static String required(JsonNode node, String field) { String value = text(node, field); if (value == null || value.isBlank()) throw new RunException(org.springframework.http.HttpStatus.UNPROCESSABLE_CONTENT, "WORKER_PROTOCOL_ERROR", "Worker event is missing " + field); return value; }
+    private static String sanitize(String value) { return JdbcUrlSanitizer.sanitize(value == null ? null : value); }
+    private record RunInput(UUID runId, String driverClass, List<String> artifacts, String jdbcUrl, String username, String adapterId, String password, String profile, List<String> modules, List<String> scenarios) { }
+}

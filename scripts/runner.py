@@ -419,12 +419,13 @@ def _preflight_dependencies() -> dict[str, str]:
 
 
 def _run_maven(runtime: dict[str, Any], runtime_path: Path, driver_classpath: list[str]) -> dict[str, Any]:
-    surefire = PROJECT_ROOT / "target" / "surefire-reports"
+    surefire = _surefire_reports_directory()
     if surefire.exists():
         for path in surefire.glob("TEST-*.xml"):
             path.unlink(missing_ok=True)
+    maven_command = str(PROJECT_ROOT / "mvnw") if (PROJECT_ROOT / "mvnw").exists() else "mvn"
     command = [
-        "mvn", "-q", "test",
+        maven_command, "-q", "-Pintegration-tests", "test",
         f"-Dconfig.yaml={runtime_path}",
         f"-Dsurefire.additionalClasspath={os.pathsep.join(driver_classpath)}",
     ]
@@ -487,7 +488,7 @@ def _profile_test_patterns(profile: str, includes: list[str], excludes: list[str
 
 
 def _parse_surefire_reports() -> tuple[list[dict[str, Any]], dict[str, str]]:
-    directory = PROJECT_ROOT / "target" / "surefire-reports"
+    directory = _surefire_reports_directory()
     suites: list[dict[str, Any]] = []
     env: dict[str, str] = {}
     for xml_file in sorted(directory.glob("TEST-*.xml")) if directory.exists() else []:
@@ -546,6 +547,17 @@ def _archive_report(runtime: dict[str, Any], report: dict[str, Any], execution: 
     }
     (directory / "diagnostics.log").write_text(json.dumps(diagnostic, ensure_ascii=False, indent=2), encoding="utf-8")
     return directory
+
+
+def _surefire_reports_directory() -> Path:
+    """Locate packaged suite reports, with legacy/core fallback."""
+    suite_directory = PROJECT_ROOT / "jdbc-test-suite" / "target" / "surefire-reports"
+    if suite_directory.exists() or (PROJECT_ROOT / "jdbc-test-suite").exists():
+        return suite_directory
+    module_directory = PROJECT_ROOT / "jdbc-test-core" / "target" / "surefire-reports"
+    if module_directory.exists() or (PROJECT_ROOT / "jdbc-test-core").exists():
+        return module_directory
+    return PROJECT_ROOT / "target" / "surefire-reports"
 
 
 def _markdown(report: dict[str, Any]) -> str:

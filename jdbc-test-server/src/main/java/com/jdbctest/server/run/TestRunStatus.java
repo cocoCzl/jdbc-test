@@ -1,0 +1,3 @@
+package com.jdbctest.server.run;
+
+public enum TestRunStatus { QUEUED, PREPARING, PROBING, RUNNING, GENERATING_REPORT, SUCCEEDED, FAILED, CANCELLED, INTERRUPTED }

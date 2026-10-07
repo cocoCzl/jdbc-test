@@ -12,7 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 EXCLUDED_PARTS = {".git", ".idea", ".vscode", "target", "report", "configs", "__pycache__", ".venv"}
 INCLUDED_PATHS = (
     ".gitignore",
-    "Dockerfile",
+    "Dockerfile.cli",
     "LICENSE",
     "README.en.md",
     "README.md",
@@ -24,7 +24,12 @@ INCLUDED_PATHS = (
     "pom.xml",
     "pool",
     "scripts",
-    "src",
+    "jdbc-test-core",
+    "jdbc-test-worker",
+    "jdbc-test-server",
+    "mvnw",
+    "mvnw.cmd",
+    ".mvn",
 )
 
 

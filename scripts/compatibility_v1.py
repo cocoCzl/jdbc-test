@@ -61,7 +61,11 @@ class RunKind(StableValueEnum):
 
 
 DEPRECATED_SCENARIO_IDS: dict[str, str | None] = {}
-REPORTABLE_TEST_ROOT = Path("src/test/java/com/jdbctest")
+REPORTABLE_TEST_ROOTS = (
+    Path("jdbc-test-suite/src/main/java/com/jdbctest"),
+    Path("jdbc-test-core/src/test/java/com/jdbctest"),
+    Path("src/test/java/com/jdbctest"),
+)
 SCENARIO_INVENTORY_PATH = Path("compatibility/v1/scenario-inventory.yaml")
 
 
@@ -113,8 +117,12 @@ def build_scenario_inventory(project_root: Path) -> dict[tuple[str, str], Scenar
 
 def discover_source_scenarios(project_root: Path) -> dict[tuple[str, str], Scenario]:
     inventory: dict[tuple[str, str], Scenario] = {}
-    java_root = project_root / REPORTABLE_TEST_ROOT
-    for java_file in sorted(java_root.glob("**/*Test.java")):
+    java_files = []
+    for relative_root in REPORTABLE_TEST_ROOTS:
+        java_root = project_root / relative_root
+        if java_root.exists():
+            java_files.extend(java_root.glob("**/*Test.java"))
+    for java_file in sorted(java_files):
         text = java_file.read_text(encoding="utf-8")
         if "@ExtendWith(JdbcTestExtension.class)" not in text:
             continue

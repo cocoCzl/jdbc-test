@@ -1,0 +1,18 @@
+jdbc-test Worker runtime third-party components
+
+The shaded Worker JAR includes the original dependency license and notice texts
+under META-INF/LICENSE, META-INF/LICENSE.md, META-INF/LICENSE-notice.md,
+META-INF/LICENSE.txt, and META-INF/NOTICE. Components represented by those texts
+are:
+
+- API Guardian 1.1.2 — Apache License 2.0
+- Checker Qual 3.42.0 — MIT License
+- HikariCP 5.1.0 — Apache License 2.0
+- Jackson Annotations 2.21, Core 2.21.4, Databind 2.17.2 — Apache License 2.0
+- JSpecify 1.0.0 — Apache License 2.0
+- JUnit Jupiter and JUnit Platform 6.0.3 — Eclipse Public License 2.0
+- OpenTest4J 1.3.0 — Apache License 2.0
+- SLF4J API 2.0.18 — MIT License
+- SnakeYAML 2.2 — Apache License 2.0
+
+This index is informational and does not replace the included license texts.

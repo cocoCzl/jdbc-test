@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent><groupId>com.jdbctest</groupId><artifactId>jdbc-test</artifactId><version>1.2.1-SNAPSHOT</version></parent>
+    <artifactId>jdbc-test-suite</artifactId>
+    <name>jdbc-test-suite</name>
+
+    <dependencies>
+        <dependency><groupId>com.jdbctest</groupId><artifactId>jdbc-test-core</artifactId><version>${project.version}</version></dependency>
+        <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter-api</artifactId><version>${junit.version}</version></dependency>
+        <dependency><groupId>com.zaxxer</groupId><artifactId>HikariCP</artifactId><version>${hikaricp.version}</version></dependency>
+        <dependency><groupId>org.yaml</groupId><artifactId>snakeyaml</artifactId><version>${snakeyaml.version}</version></dependency>
+        <dependency><groupId>org.checkerframework</groupId><artifactId>checker-qual</artifactId><version>3.42.0</version></dependency>
+        <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><version>${junit.version}</version><scope>test</scope></dependency>
+        <dependency><groupId>org.slf4j</groupId><artifactId>slf4j-nop</artifactId><version>${slf4j.version}</version><scope>test</scope></dependency>
+    </dependencies>
+
+    <build>
+        <resources>
+            <resource><directory>${maven.multiModuleProjectDirectory}/compatibility/v1</directory><targetPath>compatibility/v1</targetPath><includes><include>scenario-inventory.yaml</include></includes></resource>
+            <resource><directory>${maven.multiModuleProjectDirectory}/ddl</directory><targetPath>ddl</targetPath></resource>
+            <resource><directory>${maven.multiModuleProjectDirectory}/dml</directory><targetPath>dml</targetPath></resource>
+            <resource><directory>${maven.multiModuleProjectDirectory}/pool</directory><targetPath>pool</targetPath></resource>
+        </resources>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId><artifactId>exec-maven-plugin</artifactId><version>3.1.0</version>
+                <executions><execution><id>generate-junit-platform-properties</id><phase>process-test-resources</phase><goals><goal>java</goal></goals><configuration><mainClass>com.jdbctest.config.PropertyGenerator</mainClass><systemProperties><systemProperty><key>output.dir</key><value>${project.build.testOutputDirectory}</value></systemProperty></systemProperties></configuration></execution></executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId>
+                <configuration><includes><include>**/*Test.java</include></includes><additionalClasspathElements><additionalClasspathElement>${surefire.additionalClasspath}</additionalClasspathElement></additionalClasspathElements></configuration>
+            </plugin>
+        </plugins>
+    </build>
+    <profiles>
+        <profile>
+            <id>integration-tests</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>run-packaged-integration-suite</id>
+                                <phase>test</phase>
+                                <goals><goal>test</goal></goals>
+                                <configuration>
+                                    <testClassesDirectory>${project.build.outputDirectory}</testClassesDirectory>
+                                    <includes><include>**/*Test.class</include></includes>
+                                    <additionalClasspathElements>
+                                        <additionalClasspathElement>${surefire.additionalClasspath}</additionalClasspathElement>
+                                    </additionalClasspathElements>
+                                    <excludedGroups>none</excludedGroups>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>

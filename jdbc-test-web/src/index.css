@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: "DM Sans", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--foreground);
+  --color-popover: var(--card);
+  --color-popover-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #edf1f5;
+  --color-secondary-foreground: #344256;
+  --color-muted: #f2f5f8;
+  --color-muted-foreground: #69778a;
+  --color-accent: #eaf1fb;
+  --color-accent-foreground: #2556a3;
+  --color-destructive: #be3847;
+  --color-border: #e5eaf0;
+  --color-input: #dbe2ea;
+  --color-ring: #3676d8;
+  --color-success: #14836b;
+  --color-warning: #a77319;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+}
+
+:root {
+  --background: #f7f9fb;
+  --foreground: #1c2a3b;
+  --card: #ffffff;
+  --primary: #2865c5;
+  --radius: 1rem;
+}
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply m-0 bg-background text-foreground font-sans antialiased;
+  }
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+  }
+  button:not(:disabled),
+  select {
+    cursor: pointer;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply tracking-tight;
+  }
+  ::selection {
+    background: #dbe9ff;
+  }
+}
+@layer components {
+  .panel {
+    @apply rounded-3xl border border-border bg-card p-6 shadow-[0_3px_20px_-12px_#25395625];
+  }
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground;
+  }
+  .page-title {
+    @apply text-3xl font-semibold tracking-[-0.035em];
+  }
+  .field {
+    @apply flex flex-col gap-2;
+  }
+  .select {
+    @apply h-10 w-full rounded-md border border-input bg-white px-3 text-sm;
+  }
+  .subtle-link {
+    @apply font-medium text-primary hover:underline;
+  }
+  .step-card {
+    @apply rounded-2xl border bg-white p-5 text-left transition-colors hover:border-primary;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .page-enter {
+    animation: page-enter 180ms ease-out;
+  }
+  @keyframes page-enter {
+    from {
+      opacity: 0;
+      transform: translateY(5px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}

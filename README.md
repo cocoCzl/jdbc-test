@@ -6,6 +6,35 @@
 
 它不是官方 JDBC 认证工具，也不用于业务 SQL、性能压测、数据库迁移或厂商专有 API 认证。
 
+## Quick Start — Self-hosted Docker
+
+需要 Docker Engine/Desktop 与 Compose v2；生产部署无需在主机安装 Java、Maven、
+Node 或 PostgreSQL。获取仓库后：
+
+```bash
+cp .env.example .env
+chmod 600 .env
+openssl rand -base64 32
+```
+
+编辑 `.env`：设置独立强密码 `POSTGRES_PASSWORD`，将生成的 32-byte Base64 key
+填入 `JDBC_TEST_MASTER_KEY`。示例故意不提供可用 secret；不要提交 `.env`。
+保存过 Connection password 后必须保留同一个 master key，否则无法解密旧密码。
+
+```bash
+docker compose up -d --build
+docker compose ps
+```
+
+两项服务健康后打开 **http://localhost:8080**：React、API、SSE 同源提供，上传 JDBC
+Driver 后创建测试连接并运行。首次构建需要访问 npm、Maven 和镜像仓库。默认只将
+Web 端口绑定到 host loopback；Platform PostgreSQL 不发布 host 端口。
+
+当前无用户认证，只适合 localhost/可信内部网络，不要裸露公网。连接目标数据库
+需容器网络可达；测试会执行 DDL/DML，请使用专用测试库/命名空间。
+部署、网络、备份和安全边界见 [Deployment](docs/deployment.md)。
+Phase 9 Docker 验收结果与验证命令见 [Phase 9 verification](docs/phase9-verification.md)。
+
 ## 已有适配包
 
 - 官方且已有真实验证证据：PostgreSQL、MySQL、Oracle
@@ -15,11 +44,41 @@
 ## 环境
 
 - JDK 21
-- Maven 3.8+
+- Maven >=3.9（Wrapper 3.9.15）
 - Python 3.9+（核心命令只使用标准库）
 - 使用者提供的目标数据库实例和固定版本 JDBC 驱动
 
-## 三步开始
+## Frontend Development
+
+Phase 8 提供独立 `jdbc-test-web/`（不是 Maven module）：React + TypeScript +
+Vite，开发地址 `http://localhost:5173`，`/api` 代理至 Server `localhost:8080`。
+需要 Node >=22.12.0（推荐受支持 LTS）和 npm。
+
+后端先准备 Platform PostgreSQL、稳定的 `JDBC_TEST_MASTER_KEY`、data directory 和
+Worker executable；并非零配置启动。详细环境与命令见
+[Web UI](docs/web-ui.md) 和 [Platform Database](docs/platform-database.md)。
+
+```bash
+./mvnw -DskipTests install
+# 配置文档要求的 datasource / master key / Worker 环境变量之后：
+./mvnw -pl jdbc-test-server spring-boot:run
+```
+
+另开终端：
+
+```bash
+cd jdbc-test-web
+npm install
+npm run dev
+```
+
+浏览器可完成 Driver 上传/验证、Connection 创建/探测、Run selection、实时 SSE 与
+报告。前端验证：`npm run lint`、`npm run test`、`npm run build`；浏览器测试区分
+mocked `npm run test:e2e` 和真实 `npm run test:e2e:real`。
+开发模式仍保持 Vite/Server 分离；生产 Compose 从源码构建静态资源并由 Server
+同源托管，不启动 Vite。普通 Maven lifecycle 不执行 npm，也不需要 Node。
+
+## CLI 三步开始
 
 ```bash
 python3 scripts/runner.py init \

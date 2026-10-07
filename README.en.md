@@ -6,6 +6,34 @@ An open-source JDBC 4.3 compatibility and regression framework for database vend
 
 This project is not an official JDBC certification suite. It does not test business SQL, performance, migrations, or vendor-proprietary APIs.
 
+## Quick Start — Self-hosted Docker
+
+Use Docker Engine/Desktop with Compose v2; host Java, Maven, Node and PostgreSQL
+are not required for this deployment. From the repository checkout:
+
+```sh
+cp .env.example .env
+chmod 600 .env
+openssl rand -base64 32
+```
+
+Edit `.env`: set a strong unique `POSTGRES_PASSWORD` and put the generated
+32-byte Base64 key in `JDBC_TEST_MASTER_KEY`. There are no usable default secrets.
+Keep the key unchanged after saving credentials and never commit `.env`.
+
+```sh
+docker compose up -d --build
+docker compose ps
+```
+
+When both services are healthy, open **http://localhost:8080**. React, REST and
+SSE share the Spring Boot origin. The host Web port binds to loopback by default;
+Platform PostgreSQL does not publish a host port. Image/build registry access
+is required. This unauthenticated MVP is for localhost/trusted networks, not
+direct public exposure. Use a dedicated target database: tests execute DDL/DML.
+See [Deployment](docs/deployment.md) and the completed
+[Phase 9 verification](docs/phase9-verification.md) for the production acceptance evidence.
+
 ## Adapters
 
 - Official with real validation evidence: PostgreSQL, MySQL, Oracle
@@ -15,11 +43,37 @@ This project is not an official JDBC certification suite. It does not test busin
 ## Requirements
 
 - JDK 21
-- Maven 3.8+
+- Maven >=3.9 (Wrapper 3.9.15)
 - Python 3.9+; core commands use only the standard library
 - A user-provided target database and a pinned JDBC driver
 
-## Quick start
+## Web development
+
+`jdbc-test-web/` is an independent React/strict TypeScript/Vite npm project, not
+a Maven module. Development requires Node >=22.12.0 and npm. First prepare a
+Platform PostgreSQL database, persistent 32-byte Base64 master key, writable data
+directory and built Worker JAR as described in [Web UI](docs/web-ui.md) and
+[Platform Database](docs/platform-database.md); the Server is not zero-config.
+
+```sh
+./mvnw -DskipTests install
+# Set the documented datasource, master-key, data-directory and Worker variables.
+./mvnw -pl jdbc-test-server spring-boot:run
+```
+
+In another terminal:
+
+```sh
+cd jdbc-test-web
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173`; Vite proxies `/api` to the Server on port 8080.
+Production Compose builds the same frontend and serves it from Spring Boot on
+port 8080, without Vite. The ordinary Maven lifecycle does not run npm.
+
+## CLI Quick Start
 
 ```bash
 python3 scripts/runner.py init \

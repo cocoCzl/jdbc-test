@@ -1,0 +1,28 @@
+server:
+  address: 0.0.0.0
+  port: 8080
+  shutdown: graceful
+spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  flyway:
+    connect-retries: 10
+management:
+  health:
+    readinessstate:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      show-components: never
+jdbc-test:
+  web:
+    directory: /app/web
+  storage:
+    data-directory: ${JDBC_TEST_DATA_DIRECTORY:/data/jdbc-test}
+  worker:
+    executable: ${JDBC_TEST_WORKER_EXECUTABLE:/app/worker/jdbc-test-worker.jar}
