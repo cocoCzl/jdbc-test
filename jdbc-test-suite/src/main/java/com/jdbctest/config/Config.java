@@ -61,6 +61,9 @@ public class Config {
 
     public static class NamespaceConfig {
         public String mode = "existing";
+        public String database;
+        public String objectPrefix;
+        public String ledgerPath;
         public String name;
         public String selection = "none";
         public String createSql;

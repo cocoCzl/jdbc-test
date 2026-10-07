@@ -38,8 +38,8 @@ export const connectionPresentation: Record<
   ConnectionTestStatus,
   { label: string; tone: Tone }
 > = {
-  SUCCEEDED: { label: "Connected", tone: "success" },
-  FAILED: { label: "Failed", tone: "danger" },
+  SUCCEEDED: { label: "Last test succeeded", tone: "success" },
+  FAILED: { label: "Last test failed", tone: "danger" },
 };
 export function isTerminal(status: RunStatus) {
   return ["SUCCEEDED", "FAILED", "CANCELLED", "INTERRUPTED"].includes(status);

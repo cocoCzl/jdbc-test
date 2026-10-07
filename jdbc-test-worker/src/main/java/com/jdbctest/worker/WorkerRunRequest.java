@@ -7,12 +7,17 @@ import java.util.Map;
 
 @JsonIgnoreProperties(ignoreUnknown = false)
 public record WorkerRunRequest(
+        Integer protocolVersion,
         String runId,
         DriverRequest driver,
         ConnectionRequest connection,
         SelectionRequest selection,
         String workspace,
-        Long timeoutMs
+        Long timeoutMs,
+        com.jdbctest.catalog.ExecutionScope scope,
+        String objectPrefix,
+        Map<String, Boolean> capabilities,
+        Boolean destructiveConsent
 ) {
     @JsonIgnoreProperties(ignoreUnknown = false)
     public record DriverRequest(String driverClass, List<String> artifacts) { }

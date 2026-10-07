@@ -8,6 +8,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class SqlSplitterTest {
 
     @Test
+    void adjacentDollarQuotedFunctionsRemainSeparateOwnedStatements() {
+        String first = "CREATE FUNCTION {{add_numbers}}() RETURNS text AS $$ BEGIN RETURN 'literal; $tag$'; END; $$ LANGUAGE plpgsql";
+        String second = "-- next function\nCREATE FUNCTION {{get_count}}() RETURNS text AS $body$ BEGIN RETURN '$$;'; END; $body$ LANGUAGE plpgsql";
+        assertArrayEquals(new String[]{first, second, "SELECT 1"},
+                JdbcTestExtension.splitBySemicolon(first + ";\n" + second + ";\nSELECT 1;"));
+    }
+
+    @Test
     void semicolonSplitterIgnoresStringsAndComments() {
         String sql = """
                 CREATE TABLE t (name VARCHAR(20));

@@ -44,12 +44,21 @@ final class TestRunService {
             UUID driverId = request.driverId() == null ? connection.getDefaultDriver().getId() : request.driverId();
             JdbcDriverPackageEntity driver = drivers.findById(driverId).orElseThrow(() -> problem(HttpStatus.NOT_FOUND, "DRIVER_NOT_FOUND", "Driver was not found"));
             if (driver.getStatus() != DriverPackageStatus.VALIDATED) throw problem(HttpStatus.CONFLICT, "DRIVER_NOT_VALIDATED", "Driver must be validated before use");
+            com.jdbctest.catalog.ExecutionScope scope = new com.jdbctest.catalog.ExecutionScope(connection.getExecutionDatabase(), connection.getExecutionSchema());
+            try { scope.validate(connection.getAdapterId()); }
+            catch (IllegalArgumentException exception) { throw problem(HttpStatus.UNPROCESSABLE_CONTENT, "EXECUTION_SCOPE_REQUIRED", exception.getMessage()); }
             ResolvedSelection selection = resolve(request, catalog.catalog());
             String password = request.password() == null ? encryption.decrypt(connection.getEncryptedPassword()) : request.password();
             if (password == null || password.isEmpty()) throw problem(HttpStatus.BAD_REQUEST, "CONNECTION_PASSWORD_REQUIRED", "A password is required to run tests");
             TestRunEntity run = new TestRunEntity(connection, driver, selection.profile(), connection.getName(), connection.getDatabaseType(), connection.getAdapterId(),
                     JdbcUrlSanitizer.sanitize(connection.getJdbcUrl()), driver.getName(), driver.getVendor(), driver.getVersion(), driver.getDriverClass(), driver.getPackageFingerprint());
-            run.setTotalCases(selection.scenarios().size()); runs.save(run);
+            run.setTotalCases(selection.scenarios().size());
+            var execution = new java.util.LinkedHashMap<String, Object>();
+            execution.put("jdbcUrl", connection.getJdbcUrl()); execution.put("username", connection.getUsername());
+            execution.put("scope", scope); execution.put("destructiveConsent", request.destructiveConsent()); execution.put("objectPrefix", "j" + UUID.randomUUID().toString().replace("-", "").substring(0, 20));
+            execution.put("capabilities", com.jdbctest.catalog.AdapterExecutionConfig.load(connection.getAdapterId()).capabilities());
+            run.freezeExecutionInput(new tools.jackson.databind.ObjectMapper().writeValueAsString(execution));
+            runs.save(run);
             selected.saveAll(selection.scenarios().stream().map(item -> new TestRunSelectedScenarioEntity(run, item.id(), item.moduleId())).toList());
             selection.modules().forEach(item -> modules.save(new TestRunModuleEntity(run, item.id(), item.name())));
             credentials.save(new TestRunCredentialEntity(run.getId(), encryption.encrypt(password)));
@@ -108,8 +117,53 @@ final class TestRunService {
     private static Set<String> names(List<String> values) { if (values == null) return Set.of(); LinkedHashSet<String> result = new LinkedHashSet<>(); for (String value : values) { if (value == null || value.isBlank()) throw problem(HttpStatus.UNPROCESSABLE_CONTENT, "INVALID_SELECTION", "Selection contains a blank name"); result.add(value); } return Set.copyOf(result); }
     private static PageRequest page(int page, int size, String sort, Set<String> allowed, String defaultSort) { if (page < 0 || size < 1 || size > 100) throw problem(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Invalid pagination parameters"); String[] parts = (sort == null ? defaultSort : sort).split(",", -1); if (parts.length != 2 || !allowed.contains(parts[0])) throw problem(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Unsupported sort field"); return PageRequest.of(page, size, Sort.by(Sort.Direction.fromString(parts[1]), parts[0])); }
     private List<String> moduleIds(UUID runId) { return selected.findByRun_IdOrderByScenarioId(runId).stream().map(TestRunSelectedScenarioEntity::getModuleId).distinct().toList(); }
-    private TestRunResponse response(TestRunEntity run, List<String> moduleIds) { Long duration = run.getStartedAt() == null ? null : Duration.between(run.getStartedAt(), run.getFinishedAt() == null ? Instant.now() : run.getFinishedAt()).toMillis(); return new TestRunResponse(run.getId(), run.getStatus(), run.getProfile(), new TestRunResponse.ConnectionSnapshot(run.getConnectionNameSnapshot(), run.getDatabaseTypeSnapshot(), run.getAdapterIdSnapshot(), run.getJdbcUrlSanitizedSnapshot()), new TestRunResponse.DriverSnapshot(run.getDriver().getId(), run.getDriverNameSnapshot(), run.getDriverVendorSnapshot(), run.getDriverVersionSnapshot(), run.getDriverClassSnapshot(), run.getDriverFingerprintSnapshot()), moduleIds, run.getTotalCases(), run.getCompletedCases(), run.getPassed(), run.getFailed(), run.getSkipped(), run.getCurrentModule(), run.getCurrentTestCase(), run.getCreatedAt(), run.getStartedAt(), run.getFinishedAt(), duration, run.getFailureReason()); }
-    private TestCaseResultResponse result(TestCaseResultEntity value) { return new TestCaseResultResponse(value.getId(), value.getScenarioId(), value.getModuleId(), value.getDisplayName(), value.getStatus(), value.getDurationMs(), value.getMessage(), value.getStackTrace(), value.getStartedAt(), value.getFinishedAt()); }
+    private TestRunResponse response(TestRunEntity run, List<String> moduleIds) { Long duration = run.getStartedAt() == null ? null : Duration.between(run.getStartedAt(), run.getFinishedAt() == null ? Instant.now() : run.getFinishedAt()).toMillis(); return new TestRunResponse(run.getId(), run.getStatus(), run.getProfile(), new TestRunResponse.ConnectionSnapshot(run.getConnectionNameSnapshot(), run.getDatabaseTypeSnapshot(), run.getAdapterIdSnapshot(), run.getJdbcUrlSanitizedSnapshot()), new TestRunResponse.DriverSnapshot(run.getDriver().getId(), run.getDriverNameSnapshot(), run.getDriverVendorSnapshot(), run.getDriverVersionSnapshot(), run.getDriverClassSnapshot(), run.getDriverFingerprintSnapshot()), moduleIds, run.getTotalCases(), run.getCompletedCases(), run.getPassed(), run.getFailed(), run.getSkipped(), run.getCurrentModule(), run.getCurrentTestCase(), run.getCreatedAt(), run.getStartedAt(), run.getFinishedAt(), duration, run.getFailureReason(), ExecutionAccounting.of(run, selected.findByRun_IdOrderByScenarioId(run.getId())), scopeSnapshot(run), issueSnapshot(run)); }
+    @SuppressWarnings("unchecked")
+    private java.util.Map<String,Object> scopeSnapshot(TestRunEntity run) {
+        if (run.getExecutionInput() == null) return java.util.Map.of();
+        var mapper = new tools.jackson.databind.ObjectMapper();
+        var input = mapper.readTree(run.getExecutionInput());
+        java.util.Map<String,Object> scope = new java.util.LinkedHashMap<>(mapper.convertValue(input.path("scope"), java.util.Map.class));
+        scope.put("objectPrefix", input.path("objectPrefix").asString()); return scope;
+    }
+    @SuppressWarnings("unchecked")
+    private List<java.util.Map<String,Object>> issueSnapshot(TestRunEntity run) {
+        return run.getExecutionIssues() == null ? List.of() : new tools.jackson.databind.ObjectMapper().readValue(run.getExecutionIssues(), List.class);
+    }
+    java.util.Map<String,Object> evidenceReport(UUID id) {
+        return transactions.execute(tx -> {
+            TestRunEntity run = requiredRun(id);
+            if (!Integer.valueOf(2).equals(run.getEvidenceVersion())) return null;
+            if (!TestRunStateTransitions.terminal(run.getStatus())) throw problem(HttpStatus.CONFLICT, "RUN_NOT_FINISHED", "Run has not finished");
+            var value = response(run, moduleIds(id));
+            java.util.Map<String,Object> report = new java.util.LinkedHashMap<>();
+            report.put("report_schema_version", "2.0.0"); report.put("runId", id); report.put("source", "PERSISTED_WORKER_EVENTS");
+            boolean validated = run.isWorkerReportValidated();
+            var accounting = value.accounting();
+            String reason = validated ? !value.executionIssues().isEmpty() ? "CONTAINER_FAILURE"
+                    : accounting.started() == 0 ? "NO_TESTS_EXECUTED" : accounting.failed() + accounting.aborted() > 0 ? "TEST_FAILURE" : "COMPLETED"
+                    : run.getFailureReason();
+            report.put("runStatus", run.getStatus()); report.put("terminationReason", reason);
+            report.put("scope", new tools.jackson.databind.ObjectMapper().readTree(run.getExecutionInput()).path("scope"));
+            report.put("objectPrefix", value.executionScope().get("objectPrefix"));
+            report.put("capabilities", new tools.jackson.databind.ObjectMapper().readTree(run.getExecutionInput()).path("capabilities"));
+            report.put("accounting", accounting);
+            report.put("summary", java.util.Map.of("total", accounting.selected(), "started", accounting.started(), "completed", accounting.completed(),
+                    "passed", accounting.passed(), "failed", accounting.failed(), "skipped", accounting.skipped(), "aborted", accounting.aborted()));
+            report.put("selected", accounting.scenarios().stream().map(ExecutionAccounting.Scenario::scenarioId).toList());
+            report.put("started", accounting.scenarios().stream().filter(row -> row.startedAt() != null).map(ExecutionAccounting.Scenario::scenarioId).toList());
+            report.put("notRun", accounting.scenarios().stream().filter(row -> row.state().equals("NOT_RUN")).map(ExecutionAccounting.Scenario::scenarioId).toList());
+            report.put("incomplete", accounting.scenarios().stream().filter(row -> row.state().equals("INCOMPLETE")).map(ExecutionAccounting.Scenario::scenarioId).toList());
+            report.put("issues", value.executionIssues());
+            report.put("scenario_results", results.findByRun_Id(id).stream().collect(java.util.stream.Collectors.toMap(TestCaseResultEntity::getScenarioId, row -> {
+                var event = new tools.jackson.databind.ObjectMapper().readValue(row.getExecutionEvidence(), java.util.Map.class);
+                event.remove("type"); event.remove("timestamp"); event.remove("runId"); return event;
+            })));
+            report.put("workerReportValidated", validated);
+            return report;
+        });
+    }
+    private TestCaseResultResponse result(TestCaseResultEntity value) { return new TestCaseResultResponse(value.getId(), value.getScenarioId(), value.getModuleId(), value.getDisplayName(), value.getStatus(), value.getDurationMs(), value.getMessage(), value.getStackTrace(), value.getStartedAt(), value.getFinishedAt(), value.getExecutionEvidence() == null ? null : new tools.jackson.databind.ObjectMapper().readValue(value.getExecutionEvidence(), java.util.Map.class)); }
     private static RunException problem(HttpStatus status, String code, String detail) { return new RunException(status, code, detail); }
     private record ResolvedSelection(String profile, List<RunCatalogService.Scenario> scenarios, List<RunCatalogService.Module> modules) { }
 }

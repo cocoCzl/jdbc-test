@@ -1,4 +1,1 @@
-DROP FUNCTION IF EXISTS add_numbers;
-DROP FUNCTION IF EXISTS get_name_by_id;
-DROP FUNCTION IF EXISTS multiply_numbers;
-DROP FUNCTION IF EXISTS get_count;
+-- Cleanup is performed by the run ownership journal, only after confirmed CREATE.

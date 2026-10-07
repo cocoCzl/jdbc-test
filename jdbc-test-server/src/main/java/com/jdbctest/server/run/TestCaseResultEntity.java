@@ -20,6 +20,10 @@ public class TestCaseResultEntity {
     @Column(name = "stack_trace", length = 12000) private String stackTrace;
     @Column(name = "started_at") private Instant startedAt;
     @Column(name = "finished_at") private Instant finishedAt;
+    @Column(name = "execution_evidence", columnDefinition = "text") private String executionEvidence;
+    public String getExecutionEvidence() { return executionEvidence; }
+    void setExecutionEvidence(String value) { executionEvidence = value; }
+    void setExecutionStartedAt(Instant value) { startedAt = value; }
     protected TestCaseResultEntity() { }
     public TestCaseResultEntity(TestRunEntity run, String scenarioId, String moduleId, String displayName, TestCaseResultStatus status) {
         this.run = run; this.scenarioId = scenarioId; this.moduleId = moduleId; this.displayName = displayName; this.status = status;

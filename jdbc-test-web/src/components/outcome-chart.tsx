@@ -3,14 +3,12 @@ import * as echarts from "echarts/core";
 import { PieChart } from "echarts/charts";
 import {
   AriaComponent,
-  LegendComponent,
   TooltipComponent,
 } from "echarts/components";
 import { CanvasRenderer } from "echarts/renderers";
 echarts.use([
   PieChart,
   AriaComponent,
-  LegendComponent,
   TooltipComponent,
   CanvasRenderer,
 ]);
@@ -20,29 +18,25 @@ export default function OutcomeChart({
   skipped,
   aborted,
 }: {
-  passed: number;
-  failed: number;
-  skipped: number;
-  aborted: number;
+  passed: number | null;
+  failed: number | null;
+  skipped: number | null;
+  aborted: number | null;
 }) {
   const container = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!container.current) return;
     const chart = echarts.init(container.current);
+    const style = getComputedStyle(document.documentElement);
     chart.setOption({
       aria: { enabled: true },
-      color: ["#14836b", "#be3847", "#9da8b8", "#c18a30"],
+      color: ["--success", "--danger", "--neutral", "--warning"].map((token) => style.getPropertyValue(token).trim()),
       tooltip: { trigger: "item", renderMode: "richText" },
-      legend: {
-        bottom: 0,
-        icon: "circle",
-        textStyle: { color: "#69778a", fontFamily: "DM Sans" },
-      },
       series: [
         {
           type: "pie",
-          radius: ["58%", "78%"],
-          center: ["50%", "44%"],
+          radius: ["70%", "88%"],
+          center: ["50%", "50%"],
           padAngle: 3,
           itemStyle: { borderRadius: 6 },
           label: { show: false },
@@ -51,23 +45,38 @@ export default function OutcomeChart({
             { name: "Failed", value: failed },
             { name: "Skipped", value: skipped },
             { name: "Aborted", value: aborted },
-          ].filter((item) => item.value > 0),
+          ].map((item, index) => ({...item, itemStyle: {color: style.getPropertyValue(["--success", "--danger", "--neutral", "--warning"][index]).trim()}})).filter((item) => item.value != null && item.value > 0),
         },
       ],
     });
     const observer = new ResizeObserver(() => chart.resize());
     observer.observe(container.current);
-    return () => {
-      observer.disconnect();
-      chart.dispose();
-    };
+    return () => { observer.disconnect(); chart.dispose(); };
   }, [passed, failed, skipped, aborted]);
+  const entries = [
+    { label: "Passed", value: passed, color: "text-success" },
+    { label: "Failed", value: failed, color: "text-destructive" },
+    { label: "Skipped", value: skipped, color: "text-neutral" },
+    { label: "Aborted", value: aborted, color: "text-warning" },
+  ];
+  const known = entries.filter((entry) => entry.value != null);
+  const total = known.reduce((sum, entry) => sum + entry.value!, 0);
   return (
-    <div
-      ref={container}
-      className="h-64 w-full"
-      role="img"
-      aria-label={`Outcomes: ${passed} passed, ${failed} failed, ${skipped} skipped, ${aborted} aborted`}
-    />
+    <div>
+      <div className="relative mx-auto max-w-64">
+        <div ref={container} className="h-44 w-full" role="img"
+          aria-label={`Outcomes: ${passed ?? "unknown"} passed, ${failed ?? "unknown"} failed, ${skipped ?? "unknown"} skipped, ${aborted ?? "unknown"} aborted`} />
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center" aria-hidden="true">
+          <strong className="text-3xl tabular-nums">{known.length ? total : "—"}</strong>
+          <span className="text-xs text-muted-foreground">{known.length === 4 ? "Recorded outcomes" : "Known outcomes"}</span>
+        </div>
+      </div>
+      <dl className="grid grid-cols-2 gap-x-5 gap-y-2 text-sm" aria-label="Outcome counts">
+        {entries.map(({ label, value, color }) => <div key={label} className="flex items-center justify-between gap-2">
+          <dt className={`flex items-center gap-2 ${value != null && value > 0 ? color : "text-muted-foreground"}`}><span className="size-2 rounded-full bg-current" />{label}</dt>
+          <dd className={value != null && value > 0 ? "font-semibold tabular-nums" : "text-muted-foreground tabular-nums"}>{value ?? "—"}</dd>
+        </div>)}
+      </dl>
+    </div>
   );
 }

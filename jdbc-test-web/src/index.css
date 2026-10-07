@@ -14,15 +14,17 @@
   --color-secondary: #edf1f5;
   --color-secondary-foreground: #344256;
   --color-muted: #f2f5f8;
-  --color-muted-foreground: #69778a;
+  --color-muted-foreground: #475569;
   --color-accent: #eaf1fb;
-  --color-accent-foreground: #2556a3;
-  --color-destructive: #be3847;
+  --color-accent-foreground: #2563eb;
+  --color-destructive: var(--danger);
   --color-border: #e5eaf0;
   --color-input: #dbe2ea;
-  --color-ring: #3676d8;
-  --color-success: #14836b;
-  --color-warning: #a77319;
+  --color-ring: #2563eb;
+  --color-success: var(--success);
+  --color-neutral: var(--neutral);
+  --color-highlight: var(--highlight);
+  --color-warning: var(--warning);
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
   --radius-lg: 1rem;
@@ -30,11 +32,16 @@
 }
 
 :root {
-  --background: #f7f9fb;
-  --foreground: #1c2a3b;
+  --background: #f6f8fc;
+  --foreground: #0f172a;
   --card: #ffffff;
-  --primary: #2865c5;
+  --primary: #2563eb;
   --radius: 1rem;
+  --success: #0f766e;
+  --danger: #be123c;
+  --warning: #b45309;
+  --neutral: #5b6c83;
+  --highlight: #7c3aed;
 }
 @layer base {
   * {
@@ -47,7 +54,8 @@
   a,
   input,
   select,
-  textarea {
+  textarea,
+  summary {
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
   }
   button:not(:disabled),
@@ -65,13 +73,13 @@
 }
 @layer components {
   .panel {
-    @apply rounded-3xl border border-border bg-card p-6 shadow-[0_3px_20px_-12px_#25395625];
+    @apply rounded-xl border border-border bg-card p-4 shadow-[0_3px_20px_-12px_#25395625];
   }
   .eyebrow {
-    @apply text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground;
+    @apply text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground;
   }
   .page-title {
-    @apply text-3xl font-semibold tracking-[-0.035em];
+    @apply text-2xl font-semibold tracking-[-0.025em];
   }
   .field {
     @apply flex flex-col gap-2;
@@ -83,7 +91,7 @@
     @apply font-medium text-primary hover:underline;
   }
   .step-card {
-    @apply rounded-2xl border bg-white p-5 text-left transition-colors hover:border-primary;
+    @apply rounded-xl border bg-white p-4 text-left transition-colors hover:border-primary;
   }
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -100,4 +108,25 @@
       transform: none;
     }
   }
+}
+
+@layer components {
+  .tone-active { --tone: var(--primary); }
+  .tone-success { --tone: var(--success); }
+  .tone-danger { --tone: var(--danger); }
+  .tone-warning { --tone: var(--warning); }
+  .tone-neutral { --tone: var(--neutral); }
+  .tone-highlight { --tone: var(--highlight); }
+  .status-badge { color: var(--tone); background: color-mix(in srgb, var(--tone) 8%, white); }
+  .metric { border-top: 3px solid var(--tone, var(--primary)); }
+  .metric-icon { color: var(--tone, var(--primary)); background: color-mix(in srgb, var(--tone, var(--primary)) 9%, white); }
+  .run-progress { appearance: none; display: block; background: var(--color-secondary); }
+  .run-progress::-webkit-progress-bar { background: var(--color-secondary); border-radius: 999px; }
+  .run-progress::-webkit-progress-value { background: var(--tone, var(--primary)); border-radius: 999px; }
+  .run-progress::-moz-progress-bar { background: var(--tone, var(--primary)); border-radius: 999px; }
+  .metric-subdued { border-top-color: var(--color-border); }
+  .metric-subdued .metric-icon { color: var(--color-muted-foreground); background: var(--color-muted); }
+  .metric-subdued > p { color: var(--color-muted-foreground); }
+  .step-card:has(input:checked) { border-color: var(--primary); background: var(--color-accent); }
+  .step-card:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
 }

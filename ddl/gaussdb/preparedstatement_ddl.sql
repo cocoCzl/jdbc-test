@@ -1,6 +1,5 @@
-DROP TABLE IF EXISTS preparedstatement_test;
 
-CREATE TABLE preparedstatement_test (
+CREATE TABLE {{preparedstatement_test}} (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100),
     value INTEGER,

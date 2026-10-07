@@ -1,5 +1,6 @@
 package com.jdbctest.sqlxml;
 
+import com.jdbctest.extension.JdbcContext;
 import com.jdbctest.config.ConfigLoader;
 import com.jdbctest.extension.JdbcTestExtension;
 import com.jdbctest.extension.RequiresFeature;
@@ -34,7 +35,7 @@ class SQLXMLTest {
     @Order(1)
     @DisplayName("getSQLXML 读取 XML 数据")
     void testGetSQLXML(Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT xml_data FROM sqlxml_test WHERE id = 1");
+        try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql("SELECT xml_data FROM {{sqlxml_test}} WHERE id = 1"));
              ResultSet rs = ps.executeQuery()) {
             assertTrue(rs.next());
             SQLXML xml = rs.getSQLXML("xml_data");
@@ -51,7 +52,7 @@ class SQLXMLTest {
     void testSetSQLXML(Connection conn) throws SQLException {
         String xmlContent = "<root><data>测试XML写入</data></root>";
         try (PreparedStatement ps = conn.prepareStatement(
-                "INSERT INTO sqlxml_test (name, xml_data) VALUES (?, ?)")) {
+                JdbcContext.sql("INSERT INTO {{sqlxml_test}} (name, xml_data) VALUES (?, ?)"))) {
             ps.setString(1, "setSQLXML测试");
             SQLXML xml = conn.createSQLXML();
             xml.setString(xmlContent);
@@ -64,7 +65,7 @@ class SQLXMLTest {
     @Order(3)
     @DisplayName("SQLXML.getString 获取字符串")
     void testGetString(Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT xml_data FROM sqlxml_test WHERE id = 1");
+        try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql("SELECT xml_data FROM {{sqlxml_test}} WHERE id = 1"));
              ResultSet rs = ps.executeQuery()) {
             assertTrue(rs.next());
             SQLXML xml = rs.getSQLXML("xml_data");
@@ -94,7 +95,7 @@ class SQLXMLTest {
     @Order(5)
     @DisplayName("SQLXML.getSource 获取 Source")
     void testGetSource(Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT xml_data FROM sqlxml_test WHERE id = 1");
+        try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql("SELECT xml_data FROM {{sqlxml_test}} WHERE id = 1"));
              ResultSet rs = ps.executeQuery()) {
             assertTrue(rs.next());
             SQLXML xml = rs.getSQLXML("xml_data");
@@ -129,7 +130,7 @@ class SQLXMLTest {
 
             // 通过流写入数据库
             try (PreparedStatement ps = conn.prepareStatement(
-                    "INSERT INTO sqlxml_test (name, xml_data) VALUES (?, ?)")) {
+                    JdbcContext.sql("INSERT INTO {{sqlxml_test}} (name, xml_data) VALUES (?, ?)"))) {
                 ps.setString(1, "完整流程");
                 ps.setSQLXML(2, xml);
                 ps.executeUpdate();
@@ -140,7 +141,7 @@ class SQLXMLTest {
 
         // 读回验证
         try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT xml_data FROM sqlxml_test WHERE name = '完整流程'");
+                JdbcContext.sql("SELECT xml_data FROM {{sqlxml_test}} WHERE name = '完整流程'"));
              ResultSet rs = ps.executeQuery()) {
             assertTrue(rs.next());
             SQLXML result = rs.getSQLXML("xml_data");

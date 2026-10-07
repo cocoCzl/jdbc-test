@@ -8,8 +8,10 @@ export function DriverSelect({
   value,
   selected,
   onChange,
+  presentation = "select",
 }: {
   value: string;
+  presentation?: "select" | "cards";
   selected?: DriverSummary | null;
   onChange: (driver: DriverSummary) => void;
 }) {
@@ -35,7 +37,18 @@ export function DriverSelect({
     options.unshift(selected);
   return (
     <div>
-      <Field
+      {presentation === "cards" ? <fieldset className="space-y-3">
+        <legend className="mb-3 text-sm font-medium">Driver package</legend>
+        {options.map((driver) => <label key={driver.id} className="step-card flex cursor-pointer items-start gap-3">
+          <input type="radio" name="run-driver" aria-label={`${driver.name} · ${driver.version}`}
+            className="mt-1 size-4 shrink-0 accent-primary" checked={value === driver.id} onChange={() => onChange(driver)} />
+          <span className="min-w-0">
+            <span className="block break-words font-semibold">{driver.name}</span>
+            <span className="mt-1 block text-sm text-muted-foreground">{driver.vendor} · {driver.version}</span>
+            <span className="mt-2 block text-xs font-medium text-primary">{value === driver.id ? "Selected · Validated" : "Validated"}</span>
+          </span>
+        </label>)}
+      </fieldset> : <Field
         id="default-driver"
         label="Driver package"
         hint="Only validated packages can be used. Browse pages to find another driver."
@@ -59,7 +72,7 @@ export function DriverSelect({
             </option>
           ))}
         </select>
-      </Field>
+      </Field>}
       {!options.length ? (
         <p className="mt-3 text-sm text-muted-foreground">
           No validated drivers on this page. Validate a package in Drivers or

@@ -35,6 +35,18 @@ public class TestRunEntity {
     @Column(name = "driver_class_snapshot", nullable = false, length = 300) private String driverClassSnapshot;
     @Column(name = "driver_fingerprint_snapshot", length = 128) private String driverFingerprintSnapshot;
 
+    @Column(name = "execution_issues", columnDefinition = "text") private String executionIssues;
+    public String getExecutionIssues() { return executionIssues; }
+    void setExecutionIssues(String value) { executionIssues = value; }
+    @Column(name = "execution_input", columnDefinition = "text") private String executionInput;
+    @Column(name = "evidence_version") private Integer evidenceVersion;
+    public String getExecutionInput() { return executionInput; }
+    @Column(name = "worker_report_validated", nullable = false) private boolean workerReportValidated;
+    public boolean isWorkerReportValidated() { return workerReportValidated; }
+    void markWorkerReportValidated() { workerReportValidated = true; }
+    public Integer getEvidenceVersion() { return evidenceVersion; }
+    void freezeExecutionInput(String value) { executionInput = value; evidenceVersion = 2; }
+
     protected TestRunEntity() { }
     public TestRunEntity(DatabaseConnectionProfileEntity connection, JdbcDriverPackageEntity driver, String profile,
                          String connectionNameSnapshot, String databaseTypeSnapshot, String adapterIdSnapshot, String jdbcUrlSanitizedSnapshot,

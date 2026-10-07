@@ -10,6 +10,7 @@ const eventNames = [
   "case.started",
   "case.finished",
   "run.progress",
+  "run.issue",
   "run.finished",
   "run.failed",
   "run.cancelled",
@@ -63,13 +64,16 @@ export function useRunEvents(id: string, run: Run | undefined) {
           return {
             ...previous,
             ...Object.fromEntries(
-              Object.keys(previous)
+              [...Object.keys(previous), "accounting", "executionScope", "executionIssues"]
                 .filter((key) => key in body)
                 .map((key) => [key, body[key]]),
             ),
           } as Run;
         }
         const next = { ...previous };
+        if (body.accounting && typeof body.accounting === "object")
+          next.accounting = body.accounting as Run["accounting"];
+        if (event.type === "run.issue") next.executionIssues = [...(previous.executionIssues ?? []), body];
         if (status(body.status)) next.status = body.status;
         if (terminalStatus) next.status = terminalStatus;
         for (const key of [

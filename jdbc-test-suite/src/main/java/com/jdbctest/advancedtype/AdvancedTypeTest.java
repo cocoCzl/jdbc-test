@@ -1,5 +1,6 @@
 package com.jdbctest.advancedtype;
 
+import com.jdbctest.extension.JdbcContext;
 import com.jdbctest.extension.JdbcTestExtension;
 import com.jdbctest.extension.RequiresFeature;
 import com.jdbctest.extension.UseSqlScripts;
@@ -23,7 +24,7 @@ class AdvancedTypeTest {
     @Order(1)
     @DisplayName("getArray 读取数组")
     void testGetArray(Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT int_array FROM array_test WHERE id = 1");
+        try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql("SELECT int_array FROM {{array_test}} WHERE id = 1"));
              ResultSet rs = ps.executeQuery()) {
             assertTrue(rs.next());
             Array arr = rs.getArray("int_array");
@@ -37,7 +38,7 @@ class AdvancedTypeTest {
     @Order(2)
     @DisplayName("Array.getArray 获取 Java 数组")
     void testArrayGetArray(Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT int_array FROM array_test WHERE id = 1");
+        try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql("SELECT int_array FROM {{array_test}} WHERE id = 1"));
              ResultSet rs = ps.executeQuery()) {
             assertTrue(rs.next());
             Array arr = rs.getArray("int_array");
@@ -57,7 +58,7 @@ class AdvancedTypeTest {
         Array sqlArray = conn.createArrayOf("INTEGER", testArray);
 
         try (PreparedStatement ps = conn.prepareStatement(
-                "INSERT INTO array_test (name, int_array) VALUES (?, ?)")) {
+                JdbcContext.sql("INSERT INTO {{array_test}} (name, int_array) VALUES (?, ?)"))) {
             ps.setString(1, "setArray测试");
             ps.setArray(2, sqlArray);
             assertEquals(1, ps.executeUpdate());
@@ -65,7 +66,7 @@ class AdvancedTypeTest {
 
         // 验证
         try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT int_array FROM array_test WHERE name = 'setArray测试'");
+                JdbcContext.sql("SELECT int_array FROM {{array_test}} WHERE name = 'setArray测试'"));
              ResultSet rs = ps.executeQuery()) {
             assertTrue(rs.next());
             Array arr = rs.getArray("int_array");
@@ -78,7 +79,7 @@ class AdvancedTypeTest {
     @Order(4)
     @DisplayName("Array.getBaseType 获取基础类型")
     void testGetBaseType(Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT int_array FROM array_test WHERE id = 1");
+        try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql("SELECT int_array FROM {{array_test}} WHERE id = 1"));
              ResultSet rs = ps.executeQuery()) {
             assertTrue(rs.next());
             Array arr = rs.getArray("int_array");
@@ -91,7 +92,7 @@ class AdvancedTypeTest {
     @Order(5)
     @DisplayName("Array.getBaseTypeName 获取基础类型名称")
     void testGetBaseTypeName(Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT int_array FROM array_test WHERE id = 1");
+        try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql("SELECT int_array FROM {{array_test}} WHERE id = 1"));
              ResultSet rs = ps.executeQuery()) {
             assertTrue(rs.next());
             Array arr = rs.getArray("int_array");
@@ -106,7 +107,7 @@ class AdvancedTypeTest {
     @Order(6)
     @DisplayName("数组的 getResultSet 遍历")
     void testArrayGetResultSet(Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT int_array FROM array_test WHERE id = 1");
+        try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql("SELECT int_array FROM {{array_test}} WHERE id = 1"));
              ResultSet rs = ps.executeQuery()) {
             assertTrue(rs.next());
             Array arr = rs.getArray("int_array");
@@ -126,7 +127,7 @@ class AdvancedTypeTest {
     @Order(7)
     @DisplayName("String 数组的读写")
     void testStringArray(Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT text_array FROM array_test WHERE id = 1");
+        try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql("SELECT text_array FROM {{array_test}} WHERE id = 1"));
              ResultSet rs = ps.executeQuery()) {
             assertTrue(rs.next());
             Array arr = rs.getArray("text_array");
@@ -141,7 +142,7 @@ class AdvancedTypeTest {
     @Order(8)
     @DisplayName("空数组的处理")
     void testEmptyArray(Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT int_array FROM array_test WHERE id = 2");
+        try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql("SELECT int_array FROM {{array_test}} WHERE id = 2"));
              ResultSet rs = ps.executeQuery()) {
             assertTrue(rs.next());
             Array arr = rs.getArray("int_array");

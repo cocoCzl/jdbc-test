@@ -16,10 +16,10 @@ export function PageHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <h1 className="page-title">{title}</h1>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+    <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+      <div className="min-w-0 flex-1">
+        <h1 className="page-title break-words">{title}</h1>
+        <p className="mt-2 break-words text-sm leading-relaxed text-muted-foreground">
           {description}
         </p>
       </div>
@@ -48,7 +48,7 @@ export function ErrorState({
   return (
     <div role="alert" className="panel flex items-start gap-3">
       <TriangleAlert className="mt-1 size-5 shrink-0 text-destructive" />
-      <div>
+      <div className="min-w-0 break-words">
         <h2 className="font-semibold">Unable to load this resource</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           {errorMessage(error)}
@@ -88,14 +88,8 @@ export function StatusBadge({ label, tone }: { label: string; tone: Tone }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium",
-        {
-          "bg-blue-50 text-blue-700": tone === "active",
-          "bg-emerald-50 text-emerald-700": tone === "success",
-          "bg-rose-50 text-rose-700": tone === "danger",
-          "bg-slate-100 text-slate-600": tone === "neutral",
-          "bg-amber-50 text-amber-800": tone === "warning",
-        },
+        "status-badge inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium",
+        `tone-${tone}`,
       )}
     >
       <span className="size-1.5 rounded-full bg-current" />
@@ -131,7 +125,7 @@ export function FormError({ message }: { message: string | null }) {
   return message ? (
     <p
       role="alert"
-      className="rounded-xl bg-rose-50 p-3 text-sm text-destructive"
+      className="break-words rounded-xl bg-destructive/5 p-3 text-sm text-destructive"
     >
       {message}
     </p>
@@ -159,21 +153,25 @@ export function Metric({
   value,
   note,
   icon,
+  tone = "active",
+  subdued = false,
 }: {
   label: string;
   value: ReactNode;
   note?: string;
   icon?: ReactNode;
+  tone?: Tone | "highlight";
+  subdued?: boolean;
 }) {
   return (
-    <div className="panel">
-      <div className="flex items-center justify-between">
+    <div className={`panel metric tone-${tone}${subdued ? " metric-subdued" : ""}`} data-metric={label}>
+      <div className="flex items-center justify-between gap-2">
         <p className="text-sm text-muted-foreground">{label}</p>
         {icon ? (
-          <span className="rounded-xl bg-accent p-2 text-primary">{icon}</span>
+          <span className="metric-icon rounded-lg p-2">{icon}</span>
         ) : null}
       </div>
-      <p className="mt-4 text-3xl font-semibold tracking-tight">{value}</p>
+      <p className="mt-2 text-3xl font-semibold tracking-tight">{value}</p>
       {note ? (
         <p className="mt-2 text-xs text-muted-foreground">{note}</p>
       ) : null}
@@ -188,7 +186,7 @@ export function ProbeResult({
   return (
     <div
       role="status"
-      className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-5"
+      className="rounded-2xl border border-success/20 bg-success/5 p-5"
     >
       <h3 className="flex items-center gap-2 font-semibold text-success">
         <Check className="size-4" />

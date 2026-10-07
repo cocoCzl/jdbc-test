@@ -1,5 +1,10 @@
 # Worker Protocol (Phase 3)
 
+Current execution scope, ownership and protocol v2 accounting: [Execution safety](execution-safety.md). New runs require explicit scope; older protocol examples below describe the baseline.
+
+Protocol v2 compatibility: `--describe-catalog` declares `protocolVersion: 2` without loading a target Driver or receiving credentials. Server checks that declaration when loading the catalog and again before every queued execution (the execution check is not cached). An absent or different version rejects the run as `WORKER_PROTOCOL_MISMATCH` before sending any execution request. Run requests must also contain `protocolVersion: 2`; Worker rejects absent/different values before workspace creation or Driver loading. Deploy Server and Worker artifacts together; replacing either executable while a handshake/execution is in progress is unsupported. Driver validation and read-only probe modes keep their existing request contracts. Historical v1 report artifacts remain readable with their original statuses; migration does not infer v2 evidence for them.
+
+
 `jdbc-test-worker` is a single-run JVM executable. It reads one JSON request from
 stdin and writes newline-delimited JSON (NDJSON) events to stdout. Passwords are
 never command-line arguments.

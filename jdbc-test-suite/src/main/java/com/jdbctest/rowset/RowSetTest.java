@@ -1,5 +1,6 @@
 package com.jdbctest.rowset;
 
+import com.jdbctest.extension.JdbcContext;
 import com.jdbctest.config.Config;
 import com.jdbctest.config.ConfigLoader;
 import com.jdbctest.extension.JdbcTestExtension;
@@ -41,25 +42,16 @@ class RowSetTest {
     }
 
     private void setupRowSet(JdbcRowSet rowSet, String sql) throws SQLException {
+        System.setProperty(javax.naming.Context.INITIAL_CONTEXT_FACTORY, com.jdbctest.extension.RowSetContextFactory.class.getName());
         rowSet.setUrl(getJdbcUrl());
         rowSet.setUsername(getUsername());
         rowSet.setPassword(getPassword());
         rowSet.setCommand(qualifyRowSetTable(sql));
+        rowSet.setDataSourceName("jdbc-test/run");
     }
 
     private String qualifyRowSetTable(String sql) {
-        Config config = ConfigLoader.load();
-        String namespace = config.namespace == null ? "" : config.namespace.name;
-        if (namespace == null || namespace.isBlank()) return sql;
-        String table = "rowset_test";
-        if (config.db.isDialect("oracle")) {
-            namespace = namespace.toUpperCase();
-            table = table.toUpperCase();
-        }
-        String quote = config.db.getIdentifierQuote();
-        String qualified = quote + namespace.replace(quote, quote + quote) + quote
-                + "." + quote + table + quote;
-        return sql.replace("rowset_test", qualified);
+        return JdbcContext.sql(sql);
     }
 
     @Test
@@ -76,10 +68,13 @@ class RowSetTest {
     @DisplayName("设置 URL、用户名、密码和 SQL 命令")
     void testSetProperties(Connection conn) throws SQLException {
         try (JdbcRowSet rowSet = RowSetProvider.newFactory().createJdbcRowSet()) {
-            setupRowSet(rowSet, "SELECT * FROM rowset_test");
+            setupRowSet(rowSet, JdbcContext.sql("SELECT * FROM {{rowset_test}}"));
 
+            // Test the real URL property independently; execution below uses the scoped JNDI DataSource.
+            rowSet.setUrl(getJdbcUrl());
             assertEquals(getJdbcUrl(), rowSet.getUrl());
-            assertEquals(qualifyRowSetTable("SELECT * FROM rowset_test"), rowSet.getCommand());
+            rowSet.setDataSourceName("jdbc-test/run");
+            assertEquals(qualifyRowSetTable(JdbcContext.sql("SELECT * FROM {{rowset_test}}")), rowSet.getCommand());
         }
     }
 
@@ -88,7 +83,7 @@ class RowSetTest {
     @DisplayName("execute 执行查询并遍历")
     void testExecuteAndNavigate() throws SQLException {
         try (JdbcRowSet rowSet = RowSetProvider.newFactory().createJdbcRowSet()) {
-            setupRowSet(rowSet, "SELECT * FROM rowset_test");
+            setupRowSet(rowSet, JdbcContext.sql("SELECT * FROM {{rowset_test}}"));
 
             rowSet.execute();
             assertNotNull(rowSet);
@@ -107,7 +102,7 @@ class RowSetTest {
     @DisplayName("first / last 导航")
     void testFirstLast(Connection conn) throws SQLException {
         try (JdbcRowSet rowSet = RowSetProvider.newFactory().createJdbcRowSet()) {
-            setupRowSet(rowSet, "SELECT * FROM rowset_test");
+            setupRowSet(rowSet, JdbcContext.sql("SELECT * FROM {{rowset_test}}"));
 
             rowSet.execute();
             assertTrue(rowSet.first(), "first() 应成功");
@@ -122,7 +117,7 @@ class RowSetTest {
     @DisplayName("absolute 绝对定位")
     void testAbsolute(Connection conn) throws SQLException {
         try (JdbcRowSet rowSet = RowSetProvider.newFactory().createJdbcRowSet()) {
-            setupRowSet(rowSet, "SELECT * FROM rowset_test");
+            setupRowSet(rowSet, JdbcContext.sql("SELECT * FROM {{rowset_test}}"));
 
             rowSet.execute();
             assertTrue(rowSet.absolute(2), "absolute(2) 应成功");
@@ -137,7 +132,7 @@ class RowSetTest {
             return;
         }
         try (JdbcRowSet rowSet = RowSetProvider.newFactory().createJdbcRowSet()) {
-            setupRowSet(rowSet, "SELECT * FROM rowset_test");
+            setupRowSet(rowSet, JdbcContext.sql("SELECT * FROM {{rowset_test}}"));
 
             rowSet.execute();
             assertTrue(rowSet.first());
@@ -172,7 +167,7 @@ class RowSetTest {
             return;
         }
         try (JdbcRowSet rowSet = RowSetProvider.newFactory().createJdbcRowSet()) {
-            setupRowSet(rowSet, "SELECT * FROM rowset_test");
+            setupRowSet(rowSet, JdbcContext.sql("SELECT * FROM {{rowset_test}}"));
 
             rowSet.execute();
             rowSet.moveToInsertRow();
@@ -185,7 +180,7 @@ class RowSetTest {
         // 验证插入
         try (Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(
-                     "SELECT COUNT(*) FROM rowset_test WHERE name = 'RowSet插入'")) {
+                     JdbcContext.sql("SELECT COUNT(*) FROM {{rowset_test}} WHERE name = 'RowSet插入'"))) {
             assertTrue(rs.next());
             assertEquals(1, rs.getInt(1));
         }
@@ -200,7 +195,7 @@ class RowSetTest {
         }
         // 先插入一条测试数据
         try (JdbcRowSet insertRs = RowSetProvider.newFactory().createJdbcRowSet()) {
-            setupRowSet(insertRs, "SELECT id, name, value FROM rowset_test");
+            setupRowSet(insertRs, JdbcContext.sql("SELECT id, name, value FROM {{rowset_test}}"));
             insertRs.execute();
             insertRs.moveToInsertRow();
             insertRs.updateString("name", "待删除行");
@@ -210,7 +205,7 @@ class RowSetTest {
 
         // 删除刚插入的行
         try (JdbcRowSet rowSet = RowSetProvider.newFactory().createJdbcRowSet()) {
-            setupRowSet(rowSet, "SELECT * FROM rowset_test WHERE name = '待删除行'");
+            setupRowSet(rowSet, JdbcContext.sql("SELECT * FROM {{rowset_test}} WHERE name = '待删除行'"));
             rowSet.execute();
             if (rowSet.first()) {
                 rowSet.deleteRow();
@@ -220,7 +215,7 @@ class RowSetTest {
         // 验证删除
         try (Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery(
-                     "SELECT COUNT(*) FROM rowset_test WHERE name = '待删除行'")) {
+                     JdbcContext.sql("SELECT COUNT(*) FROM {{rowset_test}} WHERE name = '待删除行'"))) {
             assertTrue(rs.next());
             assertEquals(0, rs.getInt(1), "删除后应不存在");
         }

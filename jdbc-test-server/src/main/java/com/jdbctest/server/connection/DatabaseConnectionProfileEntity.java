@@ -22,6 +22,12 @@ public class DatabaseConnectionProfileEntity {
     @Column(name = "created_at", nullable = false, updatable = false) private Instant createdAt;
     @Column(name = "updated_at", nullable = false) private Instant updatedAt;
 
+    @Column(name = "execution_database", length = 63) private String executionDatabase;
+    @Column(name = "execution_schema", length = 63) private String executionSchema;
+    public String getExecutionDatabase() { return executionDatabase; }
+    public String getExecutionSchema() { return executionSchema; }
+    public void setExecutionScope(String database, String schema) { executionDatabase = database; executionSchema = schema; }
+
     protected DatabaseConnectionProfileEntity() { }
     public DatabaseConnectionProfileEntity(String name, String databaseType, String jdbcUrl, String username) {
         this(name, databaseType, databaseType, jdbcUrl, username);

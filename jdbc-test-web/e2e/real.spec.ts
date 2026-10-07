@@ -129,8 +129,8 @@ test("REAL PostgreSQL browser flow: external Driver → Statement 23 → Connect
     ["Connection", 17],
   ] as const) {
     await page.getByRole("link", { name: "Start run", exact: true }).click();
-    await page.getByRole("button", { name: "Continue" }).click();
-    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByRole("button", { name: /^Next:/ }).click();
+    await page.getByRole("button", { name: /^Next:/ }).click();
     await page.getByRole("button", { name: /Custom Choose/ }).click();
     await page
       .getByRole("checkbox", {
@@ -139,7 +139,7 @@ test("REAL PostgreSQL browser flow: external Driver → Statement 23 → Connect
       })
       .check();
     await expect(page.getByText(`${count} scenarios selected`)).toBeVisible();
-    await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByRole("button", { name: /^Next:/ }).click();
     await page.getByRole("checkbox", { name: /I understand/ }).check();
     await page.getByRole("button", { name: "Start test run" }).click();
     await expect(page).toHaveURL(/\/runs\/[a-f0-9-]+$/);

@@ -36,6 +36,24 @@ public final class WorkerProcessRunner {
         } catch (IOException | InterruptedException exception) { terminate(process); throw exception; }
     }
 
+    /** Metadata-only handshake: no driver, credentials or target request is sent. */
+    public void requireRunProtocol() throws IOException, InterruptedException {
+        Result result = run("--describe-catalog", java.util.Map.of(), java.time.Duration.ofSeconds(30));
+        if (!result.timedOut() && result.exitCode() == 0) {
+            for (String line : result.lines()) {
+                try {
+                    var event = mapper.readTree(line);
+                    if ("CATALOG_DESCRIBED".equals(event.path("type").asString())
+                            && event.path("protocolVersion").asInt(0) == 2) return;
+                } catch (RuntimeException ignored) { /* Not a valid handshake. */ }
+            }
+        }
+        throw new ProtocolMismatchException();
+    }
+    public static final class ProtocolMismatchException extends IOException {
+        public ProtocolMismatchException() { super("WORKER_PROTOCOL_MISMATCH: expected protocolVersion 2"); }
+    }
+
     private void terminate(Process process) throws InterruptedException {
         process.destroy();
         if (!process.waitFor(properties.getTerminationGracePeriod().toMillis(), TimeUnit.MILLISECONDS)) process.destroyForcibly();

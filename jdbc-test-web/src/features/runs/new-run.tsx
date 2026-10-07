@@ -1,3 +1,4 @@
+import { JdbcUrl } from "@/components/jdbc-url";
 import { useState } from "react";
 import {
   keepPreviousData,
@@ -26,8 +27,8 @@ import {
   PageHeader,
   StatusBadge,
 } from "@/components/common";
-import { connectionPresentation, driverPresentation } from "@/lib/status";
-import { shortId } from "@/lib/format";
+import { connectionPresentation } from "@/lib/status";
+import { formatDateTime, plural, shortId } from "@/lib/format";
 import { cn } from "@/lib/utils";
 export default function NewRun() {
   const navigate = useNavigate();
@@ -121,12 +122,12 @@ export default function NewRun() {
           ? profile !== "CUSTOM" || modules.length > 0
           : false;
   return (
-    <>
+    <div className="mx-auto max-w-5xl">
       <PageHeader
         title="New test run"
-        description="Choose the target. Define the contract. Capture the evidence."
+        description="Choose a connection and driver, select tests, then review before starting."
       />
-      <div className="mb-8 grid gap-2 sm:grid-cols-4">
+      <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-4">
         {["Connection", "Driver", "Test selection", "Review & confirm"].map(
           (label, index) => (
             <button
@@ -134,9 +135,9 @@ export default function NewRun() {
               disabled={index > step}
               onClick={() => setStep(index)}
               className={cn(
-                "flex items-center gap-3 rounded-2xl border p-4 text-left text-sm",
+                "flex items-center gap-3 rounded-xl border p-3 text-left text-sm",
                 index === step
-                  ? "border-primary bg-blue-50 text-primary"
+                  ? "border-primary bg-accent text-primary"
                   : "border-border bg-white text-muted-foreground",
               )}
             >
@@ -153,40 +154,37 @@ export default function NewRun() {
           ),
         )}
       </div>
-      <section className="panel min-h-80">
+      <section className="panel">
         <p className="eyebrow mb-2">Step {step + 1} of 4</p>
         {step === 0 ? (
           <>
-            <h2 className="mb-5 text-xl font-semibold">Choose a connection</h2>
+            <h2 className="mb-3 text-xl font-semibold">Choose a connection</h2>
             {connections.data.items.length ? (
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2">
                 {connections.data.items.map((item) => (
-                  <button
-                    key={item.id}
-                    aria-pressed={chosen?.id === item.id}
-                    className={cn(
-                      "step-card",
-                      chosen?.id === item.id && "border-primary bg-blue-50/40",
-                    )}
-                    onClick={() => {
-                      setConnection(item);
-                      setDriver(null);
-                      setPassword("");
-                      setDifferentPassword(false);
-                    }}
-                  >
+                  <div key={item.id} className="step-card min-w-0 cursor-pointer"
+                    onClick={(event) => {
+                      if ((event.target as HTMLElement).closest("button, input, label")) return;
+                      setConnection(item); setDriver(null); setPassword(""); setDifferentPassword(false);
+                    }}>
+                    <label className="mb-2 flex cursor-pointer items-center gap-2 text-sm font-medium text-primary">
+                      <input type="radio" name="run-connection" aria-label={item.name}
+                        className="size-4 accent-primary" checked={chosen?.id === item.id}
+                        onChange={() => { setConnection(item); setDriver(null); setPassword(""); setDifferentPassword(false); }} />
+                      {chosen?.id === item.id ? "Selected" : "Select connection"}
+                    </label>
                     <div className="flex items-center justify-between">
-                      <h3 className="font-semibold">{item.name}</h3>
+                      <h3 className="min-w-0 break-words font-semibold">{item.name}</h3>
                       {chosen?.id === item.id ? (
                         <Check className="size-4 text-primary" />
                       ) : null}
                     </div>
                     <p className="my-2 text-xs text-muted-foreground">
-                      {item.databaseType} · {item.adapterId}
+                      Database: {item.databaseType} · Adapter: {item.adapterId}
                     </p>
-                    <p className="mb-4 truncate font-mono text-xs">
-                      {item.jdbcUrl}
-                    </p>
+                    <div className="mb-3" onClick={(event) => event.stopPropagation()}>
+                      <JdbcUrl value={item.jdbcUrl} />
+                    </div>
                     {item.lastConnectionTestStatus ? (
                       <StatusBadge
                         {...connectionPresentation[
@@ -198,7 +196,8 @@ export default function NewRun() {
                         Not tested
                       </span>
                     )}
-                  </button>
+                    <p className="mt-2 text-xs text-muted-foreground">Last test: {formatDateTime(item.lastConnectionTestAt)}</p>
+                  </div>
                 ))}
               </div>
             ) : (
@@ -220,24 +219,14 @@ export default function NewRun() {
           </>
         ) : null}
         {step === 1 ? (
-          <div className="max-w-xl space-y-6">
+          <div className="max-w-xl space-y-4">
             <h2 className="text-xl font-semibold">Choose a validated driver</h2>
             <DriverSelect
+              presentation="cards"
               value={chosenDriver?.id ?? ""}
               selected={chosenDriver}
               onChange={setDriver}
             />
-            {chosenDriver ? (
-              <div className="rounded-2xl bg-background p-4">
-                <p className="font-medium">
-                  {chosenDriver.name} · {chosenDriver.vendor} ·{" "}
-                  {chosenDriver.version}
-                </p>
-                <div className="mt-3">
-                  <StatusBadge {...driverPresentation[chosenDriver.status]} />
-                </div>
-              </div>
-            ) : null}
             {chosen?.hasSavedPassword ? (
               <label className="flex items-center gap-2 text-sm">
                 <input
@@ -272,7 +261,7 @@ export default function NewRun() {
         ) : null}
         {step === 2 ? (
           <>
-            <h2 className="mb-5 text-xl font-semibold">
+            <h2 className="mb-3 text-xl font-semibold">
               Define your test selection
             </h2>
             <div className="mb-6 grid gap-4 sm:grid-cols-3">
@@ -287,14 +276,14 @@ export default function NewRun() {
                   aria-pressed={profile === item.id}
                   className={cn(
                     "step-card",
-                    profile === item.id && "border-primary bg-blue-50/40",
+                    profile === item.id && "border-primary bg-accent",
                   )}
                   onClick={() => setProfile(item.id as CreateRun["profile"])}
                 >
                   <h3 className="font-semibold">{item.name}</h3>
                   <p className="mt-2 text-sm text-muted-foreground">
                     {item.scenarioCount != null
-                      ? `${item.scenarioCount} scenarios`
+                      ? plural(item.scenarioCount, "scenario")
                       : "Choose individual modules"}
                   </p>
                 </button>
@@ -335,12 +324,12 @@ export default function NewRun() {
                       className={cn(
                         "step-card flex cursor-pointer items-start gap-3",
                         modules.includes(item.id) &&
-                          "border-primary bg-blue-50/40",
+                          "border-primary bg-accent",
                       )}
                     >
                       <input
                         type="checkbox"
-                        aria-label={`${item.name} ${item.scenarioCount} scenarios`}
+                        aria-label={`${item.name} ${plural(item.scenarioCount, "scenario")}`}
                         className="mt-1 size-4 accent-primary"
                         checked={modules.includes(item.id)}
                         onChange={(event) =>
@@ -354,7 +343,7 @@ export default function NewRun() {
                       <span>
                         <span className="block font-medium">{item.name}</span>
                         <span className="mt-1 block text-xs text-muted-foreground">
-                          {item.scenarioCount} scenarios
+                          {plural(item.scenarioCount, "scenario")}
                         </span>
                       </span>
                     </label>
@@ -363,34 +352,32 @@ export default function NewRun() {
               </>
             ) : (
               <p className="text-sm text-muted-foreground">
-                The backend resolves the {profile.toLowerCase()} profile from
-                the versioned catalog.
+                The {profile.toLowerCase()} selection uses the tests defined in the current catalog.
               </p>
             )}
             <p className="mt-5 text-sm font-semibold" aria-live="polite">
-              {selectionCount ?? "—"} scenarios selected
+              {selectionCount == null ? "— scenarios" : plural(selectionCount, "scenario")} selected
             </p>
           </>
         ) : null}
         {step === 3 ? (
           <>
-            <h2 className="mb-6 text-xl font-semibold">
+            <h2 className="mb-3 text-xl font-semibold">
               Review before you run
             </h2>
             <div className="grid gap-6 md:grid-cols-3">
               <div>
                 <p className="eyebrow">Target connection</p>
-                <p className="mt-3 font-semibold">{chosen?.name}</p>
+                <p className="mt-3 break-words font-semibold">{chosen?.name}</p>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  {chosen?.databaseType} · {chosen?.adapterId}
+                  Database: {chosen?.databaseType} · Adapter: {chosen?.adapterId}
                 </p>
-                <p className="mt-2 break-all font-mono text-xs">
-                  {chosen?.jdbcUrl}
-                </p>
+                {chosen ? <div className="mt-2"><JdbcUrl value={chosen.jdbcUrl} /></div> : null}
+                <p className="mt-2 text-sm">Authorized test scope: {chosen?.executionDatabase || "—"} / {chosen?.executionSchema || "—"}</p>
               </div>
               <div>
                 <p className="eyebrow">Driver package</p>
-                <p className="mt-3 font-semibold">{chosenDriver?.name}</p>
+                <p className="mt-3 break-words font-semibold">{chosenDriver?.name}</p>
                 <p className="mt-2 text-sm text-muted-foreground">
                   {chosenDriver?.vendor} · {chosenDriver?.version}
                 </p>
@@ -401,7 +388,7 @@ export default function NewRun() {
               </div>
               <div>
                 <p className="eyebrow">Selection</p>
-                <p className="mt-3 font-semibold">
+                <p className="mt-3 break-words font-semibold">
                   {profile} · {selectionCount ?? "—"} scenarios
                 </p>
                 <p className="mt-2 text-sm text-muted-foreground">
@@ -414,7 +401,7 @@ export default function NewRun() {
                 </p>
               </div>
             </div>
-            <div className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 p-5">
+            <div className="mt-4 rounded-xl border border-warning/30 bg-warning/5 p-4">
               <h3 className="flex items-center gap-2 font-semibold text-warning">
                 <ShieldAlert className="size-5" />
                 Destructive test warning
@@ -443,10 +430,8 @@ export default function NewRun() {
           </>
         ) : null}
       </section>
-      <div className="mt-5">
-        <FormError message={error} />
-      </div>
-      <div className="mt-6 flex justify-between">
+      {error ? <div className="mt-3"><FormError message={error} /></div> : null}
+      <div className="mt-4 flex items-center justify-between gap-4">
         <Button
           variant="outline"
           disabled={step === 0 || create.isPending}
@@ -455,13 +440,18 @@ export default function NewRun() {
           Back
         </Button>
         {step < 3 ? (
-          <Button
+          <div className="flex flex-wrap items-center justify-end gap-3">
+          {!continueAllowed ? <p id="continue-reason" className="text-sm text-muted-foreground">
+            {step === 0 ? "Select a connection to continue." : step === 1 ? chosenDriver?.status !== "VALIDATED" ? "Select a validated driver to continue." : "Enter the password for this run to continue." : "Select at least one module to continue."}
+          </p> : null}
+          <Button aria-describedby={!continueAllowed ? "continue-reason" : undefined}
             disabled={!continueAllowed}
             onClick={() => setStep((previous) => previous + 1)}
           >
-            Continue
+            {step === 0 ? "Next: Choose driver" : step === 1 ? "Next: Select tests" : "Next: Review run"}
             <ChevronRight />
           </Button>
+          </div>
         ) : (
           <Button
             disabled={
@@ -479,6 +469,6 @@ export default function NewRun() {
           </Button>
         )}
       </div>
-    </>
+    </div>
   );
 }

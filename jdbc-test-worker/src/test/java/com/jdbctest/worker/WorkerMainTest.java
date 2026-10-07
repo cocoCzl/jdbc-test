@@ -19,6 +19,20 @@ class WorkerMainTest {
     }
 
     @Test
+    void incompatibleOrMissingRequestProtocolIsRejectedBeforeDriverOrWorkspace() throws Exception {
+        for (String version : List.of("1", "null", "3")) {
+            Path workspace = Files.createTempDirectory("protocol-rejection-").resolve("must-not-exist");
+            Process process = new ProcessBuilder("java", "-cp", System.getProperty("java.class.path"), WorkerMain.class.getName()).start();
+            String request = "{\"protocolVersion\":" + version + ",\"workspace\":\"" + workspace + "\"}";
+            process.getOutputStream().write(request.getBytes(StandardCharsets.UTF_8)); process.getOutputStream().close();
+            assertTrue(process.waitFor(30, java.util.concurrent.TimeUnit.SECONDS));
+            assertNotEquals(0, process.exitValue());
+            assertTrue(new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8).contains("WORKER_PROTOCOL_MISMATCH"));
+            assertFalse(Files.exists(workspace));
+        }
+    }
+
+    @Test
     void sanitizerRemovesCredentialValues() {
         assertEquals("jdbc:x?password=[REDACTED]", CredentialSanitizer.sanitize("jdbc:x?password=secret"));
         assertFalse(CredentialSanitizer.sanitize("token:abc").contains("abc"));

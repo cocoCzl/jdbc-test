@@ -12,6 +12,9 @@ import java.util.jar.Manifest;
 final class FakeWorkerJar {
     private FakeWorkerJar() { }
     static Path create(Path directory) throws IOException, URISyntaxException {
+        return create(directory, 2);
+    }
+    static Path create(Path directory, int protocolVersion) throws IOException, URISyntaxException {
         Path classes = Path.of(FakeWorkerMain.class.getProtectionDomain().getCodeSource().getLocation().toURI());
         Path jar = directory.resolve("fake-worker.jar");
         Manifest manifest = new Manifest(); manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
@@ -23,7 +26,7 @@ final class FakeWorkerJar {
             var catalog = com.jdbctest.catalog.TestCatalog.fromScenarioInventory(Path.of("..", "compatibility", "v1", "scenario-inventory.yaml"), Path.of("..", "jdbc-test-suite", "src", "main", "java"));
             var scenarios = catalog.testCases().stream().map(item -> java.util.Map.of("id", item.scenarioId(), "moduleId", item.module().id(), "displayName", item.contract(), "profile", item.profile().name())).toList();
             var modules = catalog.modules().stream().map(item -> java.util.Map.of("id", item.id(), "name", item.displayName(), "description", item.description(), "scenarioCount", catalog.testCases().stream().filter(test -> test.module().id().equals(item.id())).count(), "coreScenarioCount", catalog.testCases().stream().filter(test -> test.module().id().equals(item.id()) && test.profile().name().equals("CORE")).count())).toList();
-            var payload = java.util.Map.of("type", "CATALOG_DESCRIBED", "runId", "catalog", "profiles", java.util.List.of(java.util.Map.of("id", "CORE", "name", "Core", "scenarioCount", catalog.select(com.jdbctest.catalog.TestSelection.core()).size()), java.util.Map.of("id", "FULL", "name", "Full", "scenarioCount", scenarios.size())), "modules", modules, "scenarios", scenarios, "totalScenarioCount", scenarios.size());
+            var payload = java.util.Map.of("type", "CATALOG_DESCRIBED", "protocolVersion", protocolVersion, "runId", "catalog", "profiles", java.util.List.of(java.util.Map.of("id", "CORE", "name", "Core", "scenarioCount", catalog.select(com.jdbctest.catalog.TestSelection.core()).size()), java.util.Map.of("id", "FULL", "name", "Full", "scenarioCount", scenarios.size())), "modules", modules, "scenarios", scenarios, "totalScenarioCount", scenarios.size());
             output.putNextEntry(new java.util.jar.JarEntry("fake-catalog.json"));
             output.write(new tools.jackson.databind.ObjectMapper().writeValueAsBytes(payload)); output.closeEntry();
         }

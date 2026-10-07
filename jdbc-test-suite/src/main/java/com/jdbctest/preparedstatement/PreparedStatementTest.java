@@ -1,5 +1,6 @@
 package com.jdbctest.preparedstatement;
 
+import com.jdbctest.extension.JdbcContext;
 import com.jdbctest.config.ConfigLoader;
 import com.jdbctest.extension.JdbcTestExtension;
 import com.jdbctest.extension.RequiresFeature;
@@ -30,7 +31,7 @@ class PreparedStatementTest {
     @Order(1)
     @DisplayName("setString 绑定字符串参数")
     void testSetString(Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM preparedstatement_test WHERE name = ?")) {
+        try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql("SELECT * FROM {{preparedstatement_test}} WHERE name = ?"))) {
             ps.setString(1, "测试1");
             try (ResultSet rs = ps.executeQuery()) {
                 assertTrue(rs.next());
@@ -44,7 +45,7 @@ class PreparedStatementTest {
     @Order(2)
     @DisplayName("setInt 绑定整数参数")
     void testSetInt(Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM preparedstatement_test WHERE value = ?")) {
+        try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql("SELECT * FROM {{preparedstatement_test}} WHERE value = ?"))) {
             ps.setInt(1, 100);
             try (ResultSet rs = ps.executeQuery()) {
                 assertTrue(rs.next());
@@ -57,7 +58,7 @@ class PreparedStatementTest {
     @Order(3)
     @DisplayName("setLong 绑定长整型参数")
     void testSetLong(Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT COUNT(*) FROM preparedstatement_test WHERE value > ?")) {
+        try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql("SELECT COUNT(*) FROM {{preparedstatement_test}} WHERE value > ?"))) {
             ps.setLong(1, 150L);
             try (ResultSet rs = ps.executeQuery()) {
                 assertTrue(rs.next());
@@ -70,7 +71,7 @@ class PreparedStatementTest {
     @Order(4)
     @DisplayName("setDouble 绑定浮点数参数")
     void testSetDouble(Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM preparedstatement_test WHERE amount > ?")) {
+        try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql("SELECT * FROM {{preparedstatement_test}} WHERE amount > ?"))) {
             ps.setDouble(1, 150.0);
             try (ResultSet rs = ps.executeQuery()) {
                 assertTrue(rs.next());
@@ -83,7 +84,7 @@ class PreparedStatementTest {
     @Order(5)
     @DisplayName("setBoolean 绑定布尔参数")
     void testSetBoolean(Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM preparedstatement_test WHERE active = ?")) {
+        try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql("SELECT * FROM {{preparedstatement_test}} WHERE active = ?"))) {
             ps.setBoolean(1, true);
             try (ResultSet rs = ps.executeQuery()) {
                 assertTrue(rs.next());
@@ -96,7 +97,7 @@ class PreparedStatementTest {
     @Order(6)
     @DisplayName("setBigDecimal 绑定 BigDecimal 参数")
     void testSetBigDecimal(Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM preparedstatement_test WHERE amount > ?")) {
+        try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql("SELECT * FROM {{preparedstatement_test}} WHERE amount > ?"))) {
             ps.setBigDecimal(1, new BigDecimal("100.00"));
             try (ResultSet rs = ps.executeQuery()) {
                 assertTrue(rs.next());
@@ -109,7 +110,7 @@ class PreparedStatementTest {
     @DisplayName("setNull 绑定 NULL 参数")
     void testSetNull(Connection conn) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(
-                "INSERT INTO preparedstatement_test (name, value, amount, active, description) VALUES (?, ?, ?, ?, ?)")) {
+                JdbcContext.sql("INSERT INTO {{preparedstatement_test}} (name, value, amount, active, description) VALUES (?, ?, ?, ?, ?)"))) {
             ps.setString(1, "NULL测试");
             ps.setNull(2, Types.INTEGER);
             ps.setNull(3, Types.DECIMAL);
@@ -125,7 +126,7 @@ class PreparedStatementTest {
     @Order(8)
     @DisplayName("setDate 绑定 Date 参数")
     void testSetDate(Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM preparedstatement_test WHERE updated_at = ?")) {
+        try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql("SELECT * FROM {{preparedstatement_test}} WHERE updated_at = ?"))) {
             ps.setDate(1, Date.valueOf("2024-01-01"));
             try (ResultSet rs = ps.executeQuery()) {
                 assertTrue(rs.next());
@@ -138,7 +139,7 @@ class PreparedStatementTest {
     @Order(9)
     @DisplayName("setTimestamp 绑定 Timestamp 参数")
     void testSetTimestamp(Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM preparedstatement_test WHERE created_at > ?")) {
+        try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql("SELECT * FROM {{preparedstatement_test}} WHERE created_at > ?"))) {
             ps.setTimestamp(1, Timestamp.valueOf("2024-01-15 00:00:00"));
             try (ResultSet rs = ps.executeQuery()) {
                 assertTrue(rs.next());
@@ -150,7 +151,7 @@ class PreparedStatementTest {
     @Order(10)
     @DisplayName("setObject 绑定通用对象")
     void testSetObject(Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM preparedstatement_test WHERE name = ?")) {
+        try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql("SELECT * FROM {{preparedstatement_test}} WHERE name = ?"))) {
             ps.setObject(1, "测试1", Types.VARCHAR);
             try (ResultSet rs = ps.executeQuery()) {
                 assertTrue(rs.next());
@@ -163,7 +164,7 @@ class PreparedStatementTest {
     @DisplayName("executeQuery 预编译查询")
     void testExecuteQuery(Connection conn) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT id, name, value, amount, active FROM preparedstatement_test WHERE value < ? ORDER BY id")) {
+                JdbcContext.sql("SELECT id, name, value, amount, active FROM {{preparedstatement_test}} WHERE value < ? ORDER BY id"))) {
             ps.setInt(1, 250);
             try (ResultSet rs = ps.executeQuery()) {
                 assertNotNull(rs);
@@ -182,7 +183,7 @@ class PreparedStatementTest {
     @DisplayName("executeUpdate 预编译更新")
     void testExecuteUpdate(Connection conn) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(
-                "UPDATE preparedstatement_test SET value = ? WHERE name = ?")) {
+                JdbcContext.sql("UPDATE {{preparedstatement_test}} SET value = ? WHERE name = ?"))) {
             ps.setInt(1, 999);
             ps.setString(2, "测试1");
             int count = ps.executeUpdate();
@@ -194,7 +195,7 @@ class PreparedStatementTest {
     @Order(13)
     @DisplayName("execute 预编译执行")
     void testExecute(Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM preparedstatement_test WHERE id = ?")) {
+        try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql("SELECT * FROM {{preparedstatement_test}} WHERE id = ?"))) {
             ps.setInt(1, 1);
             boolean hasResultSet = ps.execute();
             assertTrue(hasResultSet);
@@ -206,7 +207,7 @@ class PreparedStatementTest {
     @DisplayName("批处理 addBatch / executeBatch")
     void testBatch(Connection conn) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(
-                "INSERT INTO preparedstatement_test (name, value, amount, active) VALUES (?, ?, ?, ?)")) {
+                JdbcContext.sql("INSERT INTO {{preparedstatement_test}} (name, value, amount, active) VALUES (?, ?, ?, ?)"))) {
             ps.setString(1, "批处理P1");
             ps.setInt(2, 111);
             ps.setBigDecimal(3, new BigDecimal("11.11"));
@@ -232,7 +233,7 @@ class PreparedStatementTest {
     @DisplayName("getMetaData 获取结果集元数据")
     void testGetMetaData(Connection conn) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT id, name, value, amount, active, created_at FROM preparedstatement_test")) {
+                JdbcContext.sql("SELECT id, name, value, amount, active, created_at FROM {{preparedstatement_test}}"))) {
             ResultSetMetaData meta = ps.getMetaData();
             assertNotNull(meta);
             assertEquals(6, meta.getColumnCount(), "应有 6 列");
@@ -245,7 +246,7 @@ class PreparedStatementTest {
     @DisplayName("getParameterMetaData 获取参数元数据")
     void testGetParameterMetaData(Connection conn) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT * FROM preparedstatement_test WHERE name = ? AND value = ?")) {
+                JdbcContext.sql("SELECT * FROM {{preparedstatement_test}} WHERE name = ? AND value = ?"))) {
             ParameterMetaData meta = ps.getParameterMetaData();
             assertNotNull(meta);
             assertTrue(meta.getParameterCount() >= 2, "应有至少 2 个参数");
@@ -256,7 +257,7 @@ class PreparedStatementTest {
     @Order(17)
     @DisplayName("clearParameters 清除参数绑定")
     void testClearParameters(Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM preparedstatement_test WHERE name = ?")) {
+        try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql("SELECT * FROM {{preparedstatement_test}} WHERE name = ?"))) {
             ps.setString(1, "测试1");
             ps.clearParameters();
             // 清除后重新绑定再执行
@@ -274,7 +275,7 @@ class PreparedStatementTest {
     @DisplayName("getGeneratedKeys 获取自增主键")
     void testGetGeneratedKeys(Connection conn) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(
-                "INSERT INTO preparedstatement_test (name, value) VALUES (?, ?)",
+                JdbcContext.sql("INSERT INTO {{preparedstatement_test}} (name, value) VALUES (?, ?)"),
                 Statement.RETURN_GENERATED_KEYS)) {
             ps.setString(1, "主键测试PS");
             ps.setInt(2, 777);
@@ -298,12 +299,12 @@ class PreparedStatementTest {
     void testBinaryParameterRoundTrip(Connection conn) throws SQLException {
         byte[] expected = {0, 1, 2, 127, -1};
         try (PreparedStatement update = conn.prepareStatement(
-                "UPDATE preparedstatement_test SET data = ? WHERE id = 1")) {
+                JdbcContext.sql("UPDATE {{preparedstatement_test}} SET data = ? WHERE id = 1"))) {
             update.setBytes(1, expected);
             assertEquals(1, update.executeUpdate());
         }
         try (PreparedStatement query = conn.prepareStatement(
-                "SELECT data FROM preparedstatement_test WHERE id = 1");
+                JdbcContext.sql("SELECT data FROM {{preparedstatement_test}} WHERE id = 1"));
              ResultSet rs = query.executeQuery()) {
             assertTrue(rs.next());
             assertArrayEquals(expected, rs.getBytes(1));
@@ -317,12 +318,12 @@ class PreparedStatementTest {
     void testJavaTimeObjectMapping(Connection conn) throws SQLException {
         LocalDate expected = LocalDate.of(2024, 6, 15);
         try (PreparedStatement update = conn.prepareStatement(
-                "UPDATE preparedstatement_test SET updated_at = ? WHERE id = 1")) {
+                JdbcContext.sql("UPDATE {{preparedstatement_test}} SET updated_at = ? WHERE id = 1"))) {
             update.setObject(1, expected);
             assertEquals(1, update.executeUpdate());
         }
         try (PreparedStatement query = conn.prepareStatement(
-                "SELECT updated_at FROM preparedstatement_test WHERE id = 1");
+                JdbcContext.sql("SELECT updated_at FROM {{preparedstatement_test}} WHERE id = 1"));
              ResultSet rs = query.executeQuery()) {
             assertTrue(rs.next());
             assertEquals(expected, rs.getObject(1, LocalDate.class));
@@ -336,7 +337,7 @@ class PreparedStatementTest {
         boolean autoCommit = conn.getAutoCommit();
         conn.setAutoCommit(false);
         try (PreparedStatement ps = conn.prepareStatement(
-                "INSERT INTO preparedstatement_test (id, name, value) VALUES (?, ?, ?)")) {
+                JdbcContext.sql("INSERT INTO {{preparedstatement_test}} (id, name, value) VALUES (?, ?, ?)"))) {
             ps.setInt(1, 1); // ID 1 is seeded by every adapter's SQL asset.
             ps.setString(2, "duplicate-key");
             ps.setInt(3, 1);

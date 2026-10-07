@@ -1,5 +1,6 @@
 package com.jdbctest.blobclob;
 
+import com.jdbctest.extension.JdbcContext;
 import com.jdbctest.extension.JdbcTestExtension;
 import com.jdbctest.extension.RequiresFeature;
 import com.jdbctest.extension.UseSqlScripts;
@@ -25,7 +26,7 @@ class BlobClobTest {
     @Order(1)
     @DisplayName("getBytes 读取 BYTEA 二进制数据")
     void testGetBytes(Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT binary_data FROM blobclob_test WHERE id = 1");
+        try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql("SELECT binary_data FROM {{blobclob_test}} WHERE id = 1"));
              ResultSet rs = ps.executeQuery()) {
             assertTrue(rs.next());
             byte[] bytes = rs.getBytes("binary_data");
@@ -41,14 +42,14 @@ class BlobClobTest {
     void testSetBytes(Connection conn) throws SQLException {
         byte[] testData = "Hello World 二进制测试".getBytes(StandardCharsets.UTF_8);
         try (PreparedStatement ps = conn.prepareStatement(
-                "INSERT INTO blobclob_test (name, binary_data) VALUES (?, ?)")) {
+                JdbcContext.sql("INSERT INTO {{blobclob_test}} (name, binary_data) VALUES (?, ?)"))) {
             ps.setString(1, "setBytes测试");
             ps.setBytes(2, testData);
             assertEquals(1, ps.executeUpdate());
         }
 
         try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT binary_data FROM blobclob_test WHERE name = 'setBytes测试'");
+                JdbcContext.sql("SELECT binary_data FROM {{blobclob_test}} WHERE name = 'setBytes测试'"));
              ResultSet rs = ps.executeQuery()) {
             assertTrue(rs.next());
             assertArrayEquals(testData, rs.getBytes("binary_data"));
@@ -59,7 +60,7 @@ class BlobClobTest {
     @Order(3)
     @DisplayName("getString 读取 TEXT 文本数据")
     void testGetString(Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT text_data FROM blobclob_test WHERE id = 1");
+        try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql("SELECT text_data FROM {{blobclob_test}} WHERE id = 1"));
              ResultSet rs = ps.executeQuery()) {
             assertTrue(rs.next());
             String text = rs.getString("text_data");
@@ -74,7 +75,7 @@ class BlobClobTest {
     void testSetString(Connection conn) throws SQLException {
         String testText = "这是一段测试文本内容";
         try (PreparedStatement ps = conn.prepareStatement(
-                "INSERT INTO blobclob_test (name, text_data) VALUES (?, ?)")) {
+                JdbcContext.sql("INSERT INTO {{blobclob_test}} (name, text_data) VALUES (?, ?)"))) {
             ps.setString(1, "setString测试");
             ps.setString(2, testText);
             assertEquals(1, ps.executeUpdate());
@@ -87,14 +88,14 @@ class BlobClobTest {
     void testBinaryStream(Connection conn) throws SQLException, IOException {
         byte[] data = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
         try (PreparedStatement ps = conn.prepareStatement(
-                "INSERT INTO blobclob_test (name, binary_data) VALUES (?, ?)")) {
+                JdbcContext.sql("INSERT INTO {{blobclob_test}} (name, binary_data) VALUES (?, ?)"))) {
             ps.setString(1, "流测试");
             ps.setBinaryStream(2, new ByteArrayInputStream(data), data.length);
             assertEquals(1, ps.executeUpdate());
         }
 
         try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT binary_data FROM blobclob_test WHERE name = '流测试'");
+                JdbcContext.sql("SELECT binary_data FROM {{blobclob_test}} WHERE name = '流测试'"));
              ResultSet rs = ps.executeQuery()) {
             assertTrue(rs.next());
             try (InputStream is = rs.getBinaryStream("binary_data")) {
@@ -111,14 +112,14 @@ class BlobClobTest {
     void testCharacterStream(Connection conn) throws SQLException, IOException {
         String text = "字符流测试内容\n第二行";
         try (PreparedStatement ps = conn.prepareStatement(
-                "INSERT INTO blobclob_test (name, text_data) VALUES (?, ?)")) {
+                JdbcContext.sql("INSERT INTO {{blobclob_test}} (name, text_data) VALUES (?, ?)"))) {
             ps.setString(1, "字符流");
             ps.setCharacterStream(2, new StringReader(text), text.length());
             assertEquals(1, ps.executeUpdate());
         }
 
         try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT text_data FROM blobclob_test WHERE name = '字符流'");
+                JdbcContext.sql("SELECT text_data FROM {{blobclob_test}} WHERE name = '字符流'"));
              ResultSet rs = ps.executeQuery()) {
             assertTrue(rs.next());
             try (Reader reader = rs.getCharacterStream("text_data");
@@ -132,7 +133,7 @@ class BlobClobTest {
     @Order(7)
     @DisplayName("BYTEA 数据长度检查")
     void testByteaLength(Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT binary_data FROM blobclob_test WHERE id = 1");
+        try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql("SELECT binary_data FROM {{blobclob_test}} WHERE id = 1"));
              ResultSet rs = ps.executeQuery()) {
             assertTrue(rs.next());
             byte[] bytes = rs.getBytes("binary_data");
@@ -144,7 +145,7 @@ class BlobClobTest {
     @Order(8)
     @DisplayName("TEXT 数据长度检查")
     void testTextLength(Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT text_data FROM blobclob_test WHERE id = 1");
+        try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql("SELECT text_data FROM {{blobclob_test}} WHERE id = 1"));
              ResultSet rs = ps.executeQuery()) {
             assertTrue(rs.next());
             String text = rs.getString("text_data");
@@ -156,7 +157,7 @@ class BlobClobTest {
     @Order(9)
     @DisplayName("大文本数据的读写")
     void testLargeText(Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT text_data FROM blobclob_test WHERE id = 2");
+        try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql("SELECT text_data FROM {{blobclob_test}} WHERE id = 2"));
              ResultSet rs = ps.executeQuery()) {
             assertTrue(rs.next());
             String text = rs.getString("text_data");
@@ -169,7 +170,7 @@ class BlobClobTest {
     @Order(10)
     @DisplayName("NULL 二进制数据的处理")
     void testNullBinary(Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT binary_data FROM blobclob_test WHERE id = 2");
+        try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql("SELECT binary_data FROM {{blobclob_test}} WHERE id = 2"));
              ResultSet rs = ps.executeQuery()) {
             assertTrue(rs.next());
             byte[] bytes = rs.getBytes("binary_data");
@@ -183,7 +184,7 @@ class BlobClobTest {
     @DisplayName("setNull 写入 NULL 二进制")
     void testSetNullBinary(Connection conn) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(
-                "INSERT INTO blobclob_test (name, binary_data, text_data) VALUES (?, ?, ?)")) {
+                JdbcContext.sql("INSERT INTO {{blobclob_test}} (name, binary_data, text_data) VALUES (?, ?, ?)"))) {
             ps.setString(1, "null测试");
             ps.setNull(2, Types.BINARY);
             ps.setString(3, "文本不为空");

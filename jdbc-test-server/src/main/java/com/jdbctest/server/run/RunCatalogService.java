@@ -30,6 +30,8 @@ final class RunCatalogService {
             var response = worker.run("--describe-catalog", Map.of(), Duration.ofSeconds(30));
             if (response.timedOut() || response.exitCode() != 0) throw unavailable();
             JsonNode event = response.lines().stream().map(this::read).filter(node -> node != null && "CATALOG_DESCRIBED".equals(node.path("type").asString())).findFirst().orElseThrow(this::unavailable);
+            if (event.path("protocolVersion").asInt(0) != 2) throw new RunException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "WORKER_PROTOCOL_MISMATCH", "Worker must support execution protocol v2");
             List<Profile> profiles = new ArrayList<>(); for (JsonNode node : event.path("profiles")) profiles.add(new Profile(node.path("id").asString(), node.path("name").asString(), node.path("scenarioCount").asInt()));
             List<Module> modules = new ArrayList<>(); for (JsonNode node : event.path("modules")) modules.add(new Module(node.path("id").asString(), node.path("name").asString(), node.path("description").asString(null), node.path("scenarioCount").asInt(), node.path("coreScenarioCount").asInt()));
             List<Scenario> scenarios = new ArrayList<>(); for (JsonNode node : event.path("scenarios")) scenarios.add(new Scenario(node.path("id").asString(), node.path("moduleId").asString(), node.path("displayName").asString(), node.path("profile").asString()));

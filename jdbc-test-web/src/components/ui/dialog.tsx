@@ -27,10 +27,10 @@ export function Dialog({
             className,
           )}
         >
-          <Primitive.Title className="pr-8 text-xl font-semibold">
+          <Primitive.Title className="break-words pr-8 text-xl font-semibold">
             {title}
           </Primitive.Title>
-          <Primitive.Description className="mt-2 text-sm text-muted-foreground">
+          <Primitive.Description className="mt-2 break-words text-sm text-muted-foreground">
             {description}
           </Primitive.Description>
           <div className="mt-6">{children}</div>

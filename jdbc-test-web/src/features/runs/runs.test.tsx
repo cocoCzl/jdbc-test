@@ -18,11 +18,11 @@ async function chooseConnectionAndDriver(
   user: ReturnType<typeof userEvent.setup>,
 ) {
   await user.click(
-    await screen.findByRole("button", { name: new RegExp(connection.name) }),
+    await screen.findByRole("radio", { name: connection.name }),
   );
-  await user.click(screen.getByRole("button", { name: "Continue" }));
-  await screen.findByLabelText("Driver package");
-  await user.click(screen.getByRole("button", { name: "Continue" }));
+  await user.click(screen.getByRole("button", { name: /^Next:/ }));
+  await screen.findByRole("group", { name: "Driver package" });
+  await user.click(screen.getByRole("button", { name: /^Next:/ }));
 }
 describe("New Run wizard", () => {
   it.each([
@@ -71,7 +71,7 @@ describe("New Run wizard", () => {
       screen.getByRole("checkbox", { name: "Statement 23 scenarios" }),
     );
     expect(screen.getByText("23 scenarios selected")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(screen.getByRole("button", { name: /^Next:/ }));
     expect(
       screen.getByRole("button", { name: "Start test run" }),
     ).toBeDisabled();
@@ -105,7 +105,7 @@ describe("New Run wizard", () => {
     await user.click(screen.getByRole("button", { name: "Select all" }));
     expect(screen.getByText("40 scenarios selected")).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Clear all" }));
-    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^Next:/ })).toBeDisabled();
   });
   it("keeps temporary passwords out of URL, storage and query/mutation variables", async () => {
     const user = userEvent.setup();
@@ -117,14 +117,14 @@ describe("New Run wizard", () => {
     });
     const { router, client } = renderPage("/runs/new");
     await user.click(
-      await screen.findByRole("button", { name: new RegExp(connection.name) }),
+      await screen.findByRole("radio", { name: connection.name }),
     );
-    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(screen.getByRole("button", { name: /^Next:/ }));
     const password = await screen.findByLabelText("Password for this run");
     expect(password).toHaveAttribute("type", "password");
     await user.type(password, "one-run-secret");
-    await user.click(screen.getByRole("button", { name: "Continue" }));
-    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await user.click(screen.getByRole("button", { name: /^Next:/ }));
+    await user.click(screen.getByRole("button", { name: /^Next:/ }));
     await user.click(screen.getByRole("checkbox", { name: /I understand/ }));
     await user.click(screen.getByRole("button", { name: "Start test run" }));
     await waitFor(() =>
@@ -201,7 +201,7 @@ describe("Run detail / results / report", () => {
         }),
       ).toBe(true),
     );
-    expect(screen.getByText("1 records · Page 1 of 1")).toBeVisible();
+    expect(screen.getByText("1 record · Page 1 of 1")).toBeVisible();
   });
   it.each(["PASSED", "FAILED", "SKIPPED", "ABORTED"] as const)(
     "preserves result status %s",
@@ -243,7 +243,7 @@ describe("Run detail / results / report", () => {
           : undefined,
       );
       renderPage("/runs/run-1");
-      expect(await screen.findByText("Immutable run snapshot")).toBeVisible();
+      expect(await screen.findByText("Run configuration")).toBeVisible();
       expect(
         screen
           .getAllByText(runPresentation[status].label, { exact: true })
@@ -259,7 +259,7 @@ describe("Run detail / results / report", () => {
       url.pathname === "/api/runs/run-1" ? json(run) : undefined,
     );
     renderPage("/runs/run-1");
-    await screen.findByText("Immutable run snapshot");
+    await screen.findByText("Run configuration");
     const source = TestEventSource.instances[0];
     act(() =>
       source.emit("run.progress", {
@@ -387,5 +387,17 @@ describe("Run detail / results / report", () => {
     ).toBe(false);
     await user.click(screen.getByRole("button", { name: "View raw JSON" }));
     expect(await screen.findByText(/"passed": 23/)).toBeVisible();
+  });
+});
+
+describe("Execution evidence accounting", () => {
+  it("shows not run and incomplete without filling terminal progress", async () => {
+    const interrupted = { ...finishedRun, status: "FAILED", totalCases: 4, completedCases: 1,
+      accounting: { selected: 4, started: 2, completed: 1, passed: 1, failed: 0, skipped: 0, aborted: 0, pending: 0, running: 0, notRun: 2, incomplete: 1, scenarios: [] } };
+    mockApi((url) => url.pathname === `/api/runs/${finishedRun.id}` ? json(interrupted) : undefined);
+    renderPage(`/runs/${finishedRun.id}`);
+    expect(await screen.findByText("Not run")).toBeVisible();
+    expect(screen.getByText("Incomplete")).toBeVisible();
+    expect(screen.getByRole("progressbar")).toHaveAttribute("value", "1");
   });
 });

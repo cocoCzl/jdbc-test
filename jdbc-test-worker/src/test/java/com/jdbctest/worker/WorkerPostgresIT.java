@@ -27,14 +27,22 @@ class WorkerPostgresIT {
             Path artifact = Path.of("target", "jdbc-test-worker-1.2.1-SNAPSHOT-all.jar").toAbsolutePath();
             Path workspace = Files.createTempDirectory("jdbc-worker-e2e-");
             String password = database.getPassword();
+            try (var admin = java.sql.DriverManager.getConnection(database.getJdbcUrl(), database.getUsername(), password);
+                 var sql = admin.createStatement()) { sql.execute("CREATE SCHEMA qa_worker"); }
+            var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            String safety = mapper.writeValueAsString(java.util.Map.of(
+                    "scope", java.util.Map.of("database", database.getDatabaseName(), "schema", "qa_worker"),
+                    "objectPrefix", "j01234567890123456789", "destructiveConsent", true,
+                    "capabilities", com.jdbctest.catalog.AdapterExecutionConfig.load("postgresql").capabilities()));
             String request = "{"
-                    + "\"runId\":\"e2e\","
+                    + "\"protocolVersion\":2,\"runId\":\"e2e\", "
                     + "\"driver\":{\"driverClass\":\"org.postgresql.Driver\",\"artifacts\":[\""
                     + Path.of(org.postgresql.Driver.class.getProtectionDomain().getCodeSource().getLocation().toURI()) + "\"]},"
                     + "\"connection\":{\"jdbcUrl\":\"" + database.getJdbcUrl() + "\",\"username\":\"" + database.getUsername()
                     + "\",\"password\":\"" + password + "\",\"properties\":{},\"adapterId\":\"postgresql\"},"
                     + "\"selection\":{\"profile\":\"CORE\",\"modules\":[\"connection\",\"statement\"],\"includeScenarios\":[\"connection.get_auto_commit\",\"statement.execute_select\"],\"excludeScenarios\":[]},"
                     + "\"workspace\":\"" + workspace + "\",\"timeoutMs\":120000}";
+            request = request.substring(0, request.length()-1) + "," + safety.substring(1);
             Process process = new ProcessBuilder("java", "-jar", artifact.toString()).directory(workspace.toFile()).start();
             process.getOutputStream().write(request.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             process.getOutputStream().close();

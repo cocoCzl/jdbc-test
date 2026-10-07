@@ -1,5 +1,7 @@
 # JDBC Driver Compatibility Test Framework
 
+运行测试前必须配置明确授权的 database/schema。对象归属、清理边界与执行统计规则见 [Execution safety](docs/execution-safety.md)。
+
 [English](README.en.md) | 中文
 
 这是一个面向数据库厂商和 JDBC 驱动维护者的 JDBC 4.3 兼容性与回归测试框架。它连接使用者提供的数据库实例，在专用测试命名空间中运行版本化测试集，并生成脱敏、可比较的 JSON/Markdown/HTML 报告。

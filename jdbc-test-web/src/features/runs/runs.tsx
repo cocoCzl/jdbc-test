@@ -1,3 +1,4 @@
+import { Plus } from "lucide-react";
 import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -27,7 +28,8 @@ export default function Runs() {
     <>
       <PageHeader
         title="Run history"
-        description="Every execution is a reproducible snapshot of the connection, driver and selection."
+        action={<Button asChild><Link to="/runs/new"><Plus />New run</Link></Button>}
+        description="Open a run to view its test results, progress and report."
       />
       <div className="mb-5 flex flex-wrap gap-4">
         <label className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -84,7 +86,7 @@ export default function Runs() {
                     : "Start your first compatibility run and build a history of evidence."
                 }
                 action={
-                  <Button asChild>
+                  <Button asChild variant="outline">
                     <Link to="/runs/new">Create a test run</Link>
                   </Button>
                 }

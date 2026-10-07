@@ -102,9 +102,12 @@ class ConnectionRestIT {
 
     @Test
     void customRunUsesWorkerExternalDriverPersistsResultAndReport() throws Exception {
+        try (var admin = java.sql.DriverManager.getConnection(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword()); var statement = admin.createStatement()) {
+            statement.execute("CREATE SCHEMA qa_single");
+        }
         MockMvc mvc = MockMvcBuilders.webAppContextSetup(context).build();
         String driverId = createAndValidatePostgresDriver(mvc);
-        String connection = mvc.perform(post("/api/connections").contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"run target\",\"databaseType\":\"postgresql\",\"adapterId\":\"postgresql\",\"jdbcUrl\":\"" + POSTGRES.getJdbcUrl() + "\",\"username\":\"" + POSTGRES.getUsername() + "\",\"password\":\"" + POSTGRES.getPassword() + "\",\"savePassword\":true,\"defaultDriverId\":\"" + driverId + "\"}"))
+        String connection = mvc.perform(post("/api/connections").contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"run target\",\"executionDatabase\":\"" + POSTGRES.getDatabaseName() + "\",\"executionSchema\":\"qa_single\",\"databaseType\":\"postgresql\",\"adapterId\":\"postgresql\",\"jdbcUrl\":\"" + POSTGRES.getJdbcUrl() + "\",\"username\":\"" + POSTGRES.getUsername() + "\",\"password\":\"" + POSTGRES.getPassword() + "\",\"savePassword\":true,\"defaultDriverId\":\"" + driverId + "\"}"))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         String connectionId = id(connection);
         String body = mvc.perform(post("/api/runs").contentType(MediaType.APPLICATION_JSON).content("{\"connectionId\":\"" + connectionId + "\",\"profile\":\"CUSTOM\",\"modules\":[\"connection\"],\"includeScenarios\":[\"connection.get_auto_commit\"],\"destructiveConsent\":true}"))

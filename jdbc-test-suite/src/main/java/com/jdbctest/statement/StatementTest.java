@@ -1,5 +1,6 @@
 package com.jdbctest.statement;
 
+import com.jdbctest.extension.JdbcContext;
 import com.jdbctest.config.ConfigLoader;
 import com.jdbctest.extension.JdbcTestExtension;
 import com.jdbctest.extension.UseSqlScripts;
@@ -27,7 +28,7 @@ class StatementTest {
     @DisplayName("execute 执行 SELECT 查询")
     void testExecuteSelect(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement()) {
-            boolean hasResultSet = stmt.execute("SELECT * FROM statement_test WHERE value > 15");
+            boolean hasResultSet = stmt.execute(JdbcContext.sql("SELECT * FROM {{statement_test}} WHERE value > 15"));
             assertTrue(hasResultSet, "SELECT 应返回 ResultSet");
         }
     }
@@ -38,7 +39,7 @@ class StatementTest {
     void testExecuteInsert(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement()) {
             String activeVal = isOracle() ? "1" : "true";
-            boolean hasResultSet = stmt.execute("INSERT INTO statement_test (name, value, active) VALUES ('execute测试', 99, " + activeVal + ")");
+            boolean hasResultSet = stmt.execute(JdbcContext.sql("INSERT INTO {{statement_test}} (name, value, active) VALUES ('execute测试', 99, ") + activeVal + ")");
             assertFalse(hasResultSet, "INSERT 不应返回 ResultSet");
             assertEquals(1, stmt.getUpdateCount(), "INSERT 应影响 1 行");
         }
@@ -49,7 +50,7 @@ class StatementTest {
     @DisplayName("execute 执行 UPDATE 语句")
     void testExecuteUpdate(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement()) {
-            boolean hasResultSet = stmt.execute("UPDATE statement_test SET value = 999 WHERE name = 'execute测试'");
+            boolean hasResultSet = stmt.execute(JdbcContext.sql("UPDATE {{statement_test}} SET value = 999 WHERE name = 'execute测试'"));
             assertFalse(hasResultSet);
             assertEquals(1, stmt.getUpdateCount(), "UPDATE 应影响 1 行");
         }
@@ -60,7 +61,7 @@ class StatementTest {
     @DisplayName("execute 执行 DELETE 语句")
     void testExecuteDelete(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement()) {
-            boolean hasResultSet = stmt.execute("DELETE FROM statement_test WHERE name = 'execute测试'");
+            boolean hasResultSet = stmt.execute(JdbcContext.sql("DELETE FROM {{statement_test}} WHERE name = 'execute测试'"));
             assertFalse(hasResultSet);
             assertEquals(1, stmt.getUpdateCount(), "DELETE 应影响 1 行");
         }
@@ -71,7 +72,7 @@ class StatementTest {
     @DisplayName("executeQuery 执行查询")
     void testExecuteQuery(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT id, name, value, active FROM statement_test ORDER BY id")) {
+             ResultSet rs = stmt.executeQuery(JdbcContext.sql("SELECT id, name, value, active FROM {{statement_test}} ORDER BY id"))) {
             assertNotNull(rs, "executeQuery 应返回 ResultSet");
             assertTrue(rs.next(), "应有数据行");
             assertEquals("批量1", rs.getString("name"));
@@ -83,7 +84,7 @@ class StatementTest {
     @DisplayName("executeUpdate 返回影响行数")
     void testExecuteUpdateRowCount(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement()) {
-            int count = stmt.executeUpdate("UPDATE statement_test SET value = 55 WHERE name = '批量1'");
+            int count = stmt.executeUpdate(JdbcContext.sql("UPDATE {{statement_test}} SET value = 55 WHERE name = '批量1'"));
             assertEquals(1, count, "executeUpdate 应返回影响行数");
         }
     }
@@ -95,9 +96,9 @@ class StatementTest {
         try (Statement stmt = conn.createStatement()) {
             String t = isOracle() ? "1" : "true";
             String f = isOracle() ? "0" : "false";
-            stmt.addBatch("INSERT INTO statement_test (name, value, active) VALUES ('批处理A', 1, " + t + ")");
-            stmt.addBatch("INSERT INTO statement_test (name, value, active) VALUES ('批处理B', 2, " + f + ")");
-            stmt.addBatch("INSERT INTO statement_test (name, value, active) VALUES ('批处理C', 3, " + t + ")");
+            stmt.addBatch(JdbcContext.sql("INSERT INTO {{statement_test}} (name, value, active) VALUES ('批处理A', 1, ") + t + ")");
+            stmt.addBatch(JdbcContext.sql("INSERT INTO {{statement_test}} (name, value, active) VALUES ('批处理B', 2, ") + f + ")");
+            stmt.addBatch(JdbcContext.sql("INSERT INTO {{statement_test}} (name, value, active) VALUES ('批处理C', 3, ") + t + ")");
 
             int[] results = stmt.executeBatch();
             assertEquals(3, results.length, "应执行 3 条批处理语句");
@@ -112,7 +113,7 @@ class StatementTest {
     @DisplayName("clearBatch 清空批处理")
     void testClearBatch(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement()) {
-            stmt.addBatch("INSERT INTO statement_test (name, value) VALUES ('清空测试', 50)");
+            stmt.addBatch(JdbcContext.sql("INSERT INTO {{statement_test}} (name, value) VALUES ('清空测试', 50)"));
             stmt.clearBatch();
             int[] results = stmt.executeBatch();
             assertEquals(0, results.length, "clearBatch 后 executeBatch 应无语句执行");
@@ -124,7 +125,7 @@ class StatementTest {
     @DisplayName("getResultSet 获取执行结果")
     void testGetResultSet(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement()) {
-            stmt.execute("SELECT COUNT(*) FROM statement_test");
+            stmt.execute(JdbcContext.sql("SELECT COUNT(*) FROM {{statement_test}}"));
             try (ResultSet rs = stmt.getResultSet()) {
                 assertNotNull(rs, "getResultSet 应返回非空");
                 rs.next();
@@ -138,7 +139,7 @@ class StatementTest {
     @DisplayName("getUpdateCount 获取更新计数")
     void testGetUpdateCount(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement()) {
-            stmt.execute("INSERT INTO statement_test (name, value) VALUES ('updateCount测试', 100)");
+            stmt.execute(JdbcContext.sql("INSERT INTO {{statement_test}} (name, value) VALUES ('updateCount测试', 100)"));
             assertEquals(1, stmt.getUpdateCount());
         }
     }
@@ -165,7 +166,7 @@ class StatementTest {
             stmt.setMaxRows(2);
             assertEquals(2, stmt.getMaxRows(), "getMaxRows 应返回 2");
 
-            try (ResultSet rs = stmt.executeQuery("SELECT * FROM statement_test")) {
+            try (ResultSet rs = stmt.executeQuery(JdbcContext.sql("SELECT * FROM {{statement_test}}"))) {
                 int count = 0;
                 while (rs.next()) count++;
                 assertTrue(count <= 2, "行数不应超过 MaxRows");
@@ -194,7 +195,7 @@ class StatementTest {
     @DisplayName("getGeneratedKeys 获取自增主键")
     void testGetGeneratedKeys(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement()) {
-            stmt.executeUpdate("INSERT INTO statement_test (name, value) VALUES ('主键测试', 88)",
+            stmt.executeUpdate(JdbcContext.sql("INSERT INTO {{statement_test}} (name, value) VALUES ('主键测试', 88)"),
                     Statement.RETURN_GENERATED_KEYS);
 
             try (ResultSet keys = stmt.getGeneratedKeys()) {
@@ -257,23 +258,9 @@ class StatementTest {
     @DisplayName("executeUpdate 执行 DDL（返回0行）")
     void testExecuteUpdateDDL(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement()) {
-            // cleanup: DROP with Oracle-compatible syntax
-            try {
-                if (isOracle()) {
-                    stmt.execute("DROP TABLE temp_test_ddl CASCADE CONSTRAINTS PURGE");
-                } else {
-                    stmt.execute("DROP TABLE IF EXISTS temp_test_ddl");
-                }
-            } catch (SQLException ignored) {
-                // table may not exist
-            }
-            int count = stmt.executeUpdate("CREATE TABLE temp_test_ddl (id INT)");
+            int count = JdbcContext.objects().create(stmt, "CREATE TABLE {{temp_test_ddl}} (id INT)");
             assertEquals(0, count, "DDL 语句应返回 0");
-            if (isOracle()) {
-                stmt.execute("DROP TABLE temp_test_ddl CASCADE CONSTRAINTS PURGE");
-            } else {
-                stmt.execute("DROP TABLE IF EXISTS temp_test_ddl");
-            }
+            JdbcContext.objects().drop(conn, "temp_test_ddl");
         }
     }
 
@@ -311,7 +298,7 @@ class StatementTest {
     void testExecuteLargeUpdate(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement()) {
             long count = stmt.executeLargeUpdate(
-                    "UPDATE statement_test SET value = value WHERE name = '批量1'");
+                    JdbcContext.sql("UPDATE {{statement_test}} SET value = value WHERE name = '批量1'"));
             assertEquals(1L, count, "executeLargeUpdate 应返回影响行数");
             assertEquals(1L, stmt.getLargeUpdateCount(), "getLargeUpdateCount 应返回最近影响行数");
         }
@@ -323,8 +310,8 @@ class StatementTest {
     void testExecuteLargeBatch(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement()) {
             String t = isOracle() ? "1" : "true";
-            stmt.addBatch("INSERT INTO statement_test (name, value, active) VALUES ('大批处理A', 11, " + t + ")");
-            stmt.addBatch("INSERT INTO statement_test (name, value, active) VALUES ('大批处理B', 12, " + t + ")");
+            stmt.addBatch(JdbcContext.sql("INSERT INTO {{statement_test}} (name, value, active) VALUES ('大批处理A', 11, ") + t + ")");
+            stmt.addBatch(JdbcContext.sql("INSERT INTO {{statement_test}} (name, value, active) VALUES ('大批处理B', 12, ") + t + ")");
 
             long[] results = stmt.executeLargeBatch();
             assertEquals(2, results.length, "应执行 2 条批处理语句");

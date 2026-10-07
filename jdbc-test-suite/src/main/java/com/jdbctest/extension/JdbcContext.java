@@ -25,10 +25,13 @@ public final class JdbcContext {
     private static volatile String currentAdapterId;
     private static volatile Config.NamespaceConfig namespace;
     private static volatile Driver isolatedDriver;
+    private static volatile TestObjects objects;
 
     private JdbcContext() {}
 
     public static void init(Config config) {
+        FeatureProfile.load(config.adapter == null ? null : config.adapter.capabilities);
+        objects = new TestObjects(config);
         currentAdapterId = config.db.adapterId;
         namespace = config.namespace;
         DataSource replacement = config.db.isDriverManagerMode()
@@ -41,7 +44,8 @@ public final class JdbcContext {
         closeDataSource(dataSource);
         dataSource = replacement;
         provisionNamespace(config);
-        runPrivilegeChecks(config);
+        dataSource = new ScopedDataSource(dataSource, config);
+        // Mutating privilege probes are unnecessary: owned CREATE operations report precise failures.
         publishAndValidateMetadata(config);
     }
 
@@ -87,34 +91,15 @@ public final class JdbcContext {
             if (name.isEmpty() || namespace.createSql == null || namespace.createSql.isBlank()) {
                 throw new IllegalStateException("自动测试命名空间缺少 name/create_sql");
             }
+            objects.recordNamespaceProvisioning("CREATING");
             try {
                 executeRaw(expand(namespace.createSql, config));
+                objects.recordNamespaceProvisioning("CREATED_RETAINED");
             } catch (RuntimeException e) {
+                objects.recordNamespaceProvisioning("UNKNOWN");
                 String privilege = config.preflight == null ? "" : config.preflight.namespaceCreatePrivilege;
                 throw missingPrivilege(privilege == null || privilege.isBlank()
                         ? "CREATE TEST NAMESPACE" : privilege, e);
-            }
-        }
-    }
-
-    private static void runPrivilegeChecks(Config config) {
-        if (config.preflight == null || config.preflight.privilegeChecks == null) return;
-        for (Config.PrivilegeCheck check : config.preflight.privilegeChecks) {
-            if (check.sql == null || check.sql.isBlank()) continue;
-            boolean attempted = false;
-            try (Connection connection = getConnection(); Statement statement = connection.createStatement()) {
-                attempted = true;
-                statement.execute(expand(check.sql, config));
-            } catch (SQLException | RuntimeException e) {
-                throw missingPrivilege(check.privilege, e);
-            } finally {
-                if (attempted && check.cleanupSql != null && !check.cleanupSql.isBlank()) {
-                    try (Connection connection = getConnection(); Statement statement = connection.createStatement()) {
-                        statement.execute(expand(check.cleanupSql, config));
-                    } catch (Exception ignored) {
-                        // Best-effort cleanup for a preflight probe.
-                    }
-                }
             }
         }
     }
@@ -202,29 +187,16 @@ public final class JdbcContext {
         return value instanceof Number number ? number.intValue() : defaultValue;
     }
 
+    public static TestObjects objects() { if (objects == null) throw new IllegalStateException("Execution scope not initialized"); return objects; }
+    public static String sql(String template) { return objects().sql(template); }
+    public static String objectName(String logical) { return objects().name(logical); }
+
     public static DataSource getDataSource() { return dataSource; }
 
     public static Connection getConnection() throws SQLException {
         if (dataSource == null) throw new IllegalStateException("数据源未初始化");
         Connection connection = dataSource.getConnection();
-        applyNamespace(connection);
         return connection;
-    }
-
-    private static void applyNamespace(Connection connection) throws SQLException {
-        if (namespace == null || namespace.name == null || namespace.name.isBlank()) return;
-        switch (namespace.selection == null ? "none" : namespace.selection.toLowerCase()) {
-            case "schema" -> connection.setSchema(namespace.name);
-            case "catalog" -> connection.setCatalog(namespace.name);
-            case "sql" -> {
-                if (namespace.selectSql != null && !namespace.selectSql.isBlank()) {
-                    try (Statement statement = connection.createStatement()) {
-                        statement.execute(expand(namespace.selectSql, null));
-                    }
-                }
-            }
-            default -> { }
-        }
     }
 
     private static void executeRaw(String sql) {
@@ -246,15 +218,9 @@ public final class JdbcContext {
 
     public static void shutdown() {
         if (dataSource == null) return;
-        if (namespace != null && namespace.dropOnExit && namespace.destructiveConsent
-                && namespace.dropSql != null && !namespace.dropSql.isBlank()) {
-            try {
-                executeRaw(expand(namespace.dropSql, null));
-            } catch (RuntimeException e) {
-                String message = e.getCause() == null ? e.getMessage() : e.getCause().getMessage();
-                System.err.println("[JDBC_CLEANUP_ISSUE] {\"asset_type\":\"namespace\",\"asset_name\":\""
-                        + json(namespace.name) + "\",\"message\":\"" + json(message) + "\"}");
-            }
+        if (objects != null) {
+            try (Connection connection = getConnection()) { objects.cleanup(connection); }
+            catch (SQLException exception) { System.err.println("[JDBC_CLEANUP_ISSUE] cleanup connection unavailable; consult object ledger"); }
         }
         closeDataSource(dataSource);
         dataSource = null;

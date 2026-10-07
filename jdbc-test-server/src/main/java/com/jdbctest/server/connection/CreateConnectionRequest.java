@@ -14,4 +14,6 @@ public record CreateConnectionRequest(
         @Size(max = 2000) String password,
         @NotNull Boolean savePassword,
         @NotNull UUID defaultDriverId,
-        @Size(max = 1000) String description) { }
+        @Size(max = 1000) String description,
+        @Size(max = 63) String executionDatabase,
+        @Size(max = 63) String executionSchema) { }

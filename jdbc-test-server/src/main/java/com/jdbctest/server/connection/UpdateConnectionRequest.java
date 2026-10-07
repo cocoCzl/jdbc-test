@@ -15,4 +15,6 @@ public record UpdateConnectionRequest(
         Boolean savePassword,
         Boolean clearSavedPassword,
         @NotNull UUID defaultDriverId,
-        @Size(max = 1000) String description) { }
+        @Size(max = 1000) String description,
+        @Size(max = 63) String executionDatabase,
+        @Size(max = 63) String executionSchema) { }

@@ -23,15 +23,28 @@ describe("ECharts lifecycle", () => {
         series: [
           expect.objectContaining({
             data: [
-              { name: "Passed", value: 3 },
-              { name: "Failed", value: 2 },
-              { name: "Skipped", value: 1 },
-              { name: "Aborted", value: 4 },
+              expect.objectContaining({ name: "Passed", value: 3 }),
+              expect.objectContaining({ name: "Failed", value: 2 }),
+              expect.objectContaining({ name: "Skipped", value: 1 }),
+              expect.objectContaining({ name: "Aborted", value: 4 }),
             ],
           }),
         ],
       }),
     );
+  });
+  it("keeps explicit skip color when Passed is zero, and displays unknown values honestly", () => {
+    document.documentElement.style.setProperty("--neutral", "#5b6c83");
+    render(<OutcomeChart passed={0} failed={null} skipped={4} aborted={null} />);
+    expect(screen.getByRole("img")).toHaveAccessibleName("Outcomes: 0 passed, unknown failed, 4 skipped, unknown aborted");
+    expect(screen.getByText("Known outcomes")).toBeInTheDocument();
+    expect(screen.getAllByText("—")).toHaveLength(2);
+    expect(chart.setOption).toHaveBeenLastCalledWith(expect.objectContaining({series: [expect.objectContaining({data: [expect.objectContaining({name: "Skipped", value: 4, itemStyle: {color: "#5b6c83"}})]})]}));
+  });
+  it("does not replace an entirely unknown distribution with zero", () => {
+    render(<OutcomeChart passed={null} failed={null} skipped={null} aborted={null} />);
+    expect(screen.getAllByText("—")).toHaveLength(5);
+    expect(screen.queryByText("0")).not.toBeInTheDocument();
   });
   it("resizes and disposes the chart and disconnects its observer on unmount", () => {
     let resize: (() => void) | undefined;

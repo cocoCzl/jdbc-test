@@ -4,6 +4,7 @@ import {
   useReactTable,
   type ColumnDef,
 } from "@tanstack/react-table";
+import { plural } from "@/lib/format";
 import { Button } from "./ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 export function DataTable<T>({
@@ -22,7 +23,7 @@ export function DataTable<T>({
   });
   if (!rows.length) return <>{empty}</>;
   return (
-    <div className="overflow-x-auto">
+    <div className="max-w-full overflow-x-auto">
       <table className="w-full text-left text-sm">
         <thead className="border-b bg-muted/50 text-xs text-muted-foreground">
           {table.getHeaderGroups().map((group) => (
@@ -31,7 +32,7 @@ export function DataTable<T>({
                 <th
                   key={header.id}
                   scope="col"
-                  className="whitespace-nowrap px-5 py-4 font-medium"
+                  className="whitespace-nowrap px-4 py-3 font-medium"
                 >
                   {flexRender(
                     header.column.columnDef.header,
@@ -46,7 +47,7 @@ export function DataTable<T>({
           {table.getRowModel().rows.map((row) => (
             <tr key={row.id} className="hover:bg-muted/40">
               {row.getVisibleCells().map((cell) => (
-                <td key={cell.id} className="px-5 py-4">
+                <td key={cell.id} className="px-4 py-3 [overflow-wrap:anywhere]">
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
                 </td>
               ))}
@@ -69,11 +70,11 @@ export function Pagination({
   onPage: (page: number) => void;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-t px-5 py-4 text-xs text-muted-foreground">
+    <div className="flex items-center justify-between gap-4 border-t px-4 py-3 text-xs text-muted-foreground">
       <span>
-        {totalElements} records · Page {page + 1} of {Math.max(1, totalPages)}
+        {plural(totalElements, "record")} · Page {page + 1} of {Math.max(1, totalPages)}
       </span>
-      <div className="flex gap-2">
+      {totalPages > 1 ? <div className="flex gap-2">
         <Button
           variant="outline"
           size="sm"
@@ -94,7 +95,7 @@ export function Pagination({
           Next
           <ChevronRight />
         </Button>
-      </div>
+      </div> : null}
     </div>
   );
 }

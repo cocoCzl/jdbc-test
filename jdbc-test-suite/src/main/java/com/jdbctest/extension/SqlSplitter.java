@@ -5,6 +5,31 @@ import java.util.List;
 
 class SqlSplitter {
 
+    /** Inspect only the statement prefix; never rewrite literals or procedural bodies. */
+    static String withoutLeadingComments(String sql) {
+        int i = 0;
+        while (i < sql.length()) {
+            if (Character.isWhitespace(sql.charAt(i))) { i++; continue; }
+            if (sql.startsWith("--", i)) {
+                while (i < sql.length() && sql.charAt(i) != '\n' && sql.charAt(i) != '\r') i++;
+                continue;
+            }
+            if (sql.startsWith("/*", i)) {
+                if (sql.startsWith("/*!", i)) throw new IllegalArgumentException("Executable SQL comments are not permitted in fixture headers");
+                int depth = 1; i += 2;
+                while (i < sql.length() && depth > 0) {
+                    if (sql.startsWith("/*", i)) { depth++; i += 2; }
+                    else if (sql.startsWith("*/", i)) { depth--; i += 2; }
+                    else i++;
+                }
+                if (depth != 0) throw new IllegalArgumentException("Unterminated SQL header comment");
+                continue;
+            }
+            break;
+        }
+        return sql.substring(i);
+    }
+
     static class State {
         boolean inString;
         boolean inLineComment;
@@ -32,23 +57,14 @@ class SqlSplitter {
             char next = i + 1 < len ? content.charAt(i + 1) : 0;
 
             if (ctx.inDollarQuote) {
-                current.append(c);
-                if (c == '$' && ctx.dollarTag != null) {
-                    int tagStart = i - ctx.dollarTag.length();
-                    if (tagStart >= 0) {
-                        boolean match = true;
-                        for (int j = 0; j < ctx.dollarTag.length(); j++) {
-                            if (content.charAt(tagStart + j) != ctx.dollarTag.charAt(j)) {
-                                match = false;
-                                break;
-                            }
-                        }
-                        if (match) {
-                            ctx.inDollarQuote = false;
-                            ctx.dollarTag = null;
-                        }
-                    }
-                }
+                String delimiter = "$" + ctx.dollarTag + "$";
+                if (c == '$' && i + delimiter.length() <= len
+                        && content.subSequence(i, i + delimiter.length()).toString().equals(delimiter)) {
+                    current.append(delimiter);
+                    i += delimiter.length() - 1;
+                    ctx.inDollarQuote = false;
+                    ctx.dollarTag = null;
+                } else current.append(c);
                 continue;
             }
 
@@ -83,6 +99,9 @@ class SqlSplitter {
                 int end = indexOf(content, '$', i + 1);
                 if (end > i) {
                     String tag = content.subSequence(i + 1, end).toString();
+                    if (!tag.isEmpty() && !tag.matches("[A-Za-z_][A-Za-z0-9_]*")) {
+                        current.append(c); lastWord.setLength(0); continue;
+                    }
                     ctx.dollarTag = tag;
                     ctx.inDollarQuote = true;
                     current.append(c).append(tag).append('$');

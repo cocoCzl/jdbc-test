@@ -8,13 +8,12 @@ public class FeatureProfile {
     private static volatile Map<String, Boolean> features = Collections.emptyMap();
 
     public static void load(Map<String, Boolean> declarations) {
-        features = declarations == null ? Collections.emptyMap() : Collections.unmodifiableMap(declarations);
+        features = com.jdbctest.catalog.AdapterExecutionConfig.validateCapabilities(declarations);
     }
 
     public static boolean supports(String feature) {
         if (!features.containsKey(feature)) {
-            System.err.println("[WARN] 未知的能力标记: " + feature + "，已禁用以确保安全");
-            return false;
+            throw new IllegalStateException("ADAPTER_CAPABILITY_MISSING: " + feature);
         }
         return features.get(feature);
     }

@@ -52,6 +52,7 @@ final class ConnectionService {
         return transactions.execute(status -> {
             JdbcDriverPackageEntity driver = requiredValidatedDriver(values.driverId());
             DatabaseConnectionProfileEntity entity = new DatabaseConnectionProfileEntity(values.name(), values.databaseType(), values.adapterId(), values.jdbcUrl(), values.username());
+            entity.setExecutionScope(optional(request.executionDatabase()), optional(request.executionSchema()));
             entity.setDescription(values.description()); entity.setDefaultDriver(driver);
             if (Boolean.TRUE.equals(request.savePassword())) entity.setEncryptedPassword(encryption.encrypt(request.password()));
             return response(connections.save(entity));
@@ -79,6 +80,8 @@ final class ConnectionService {
         return transactions.execute(status -> {
             DatabaseConnectionProfileEntity entity = requiredConnection(id);
             JdbcDriverPackageEntity driver = requiredValidatedDriver(values.driverId());
+            entity.setExecutionScope(request.executionDatabase() == null ? entity.getExecutionDatabase() : optional(request.executionDatabase()),
+                    request.executionSchema() == null ? entity.getExecutionSchema() : optional(request.executionSchema()));
             entity.update(values.name(), values.databaseType(), values.adapterId(), values.jdbcUrl(), values.username(), values.description(), driver);
             if (Boolean.TRUE.equals(request.clearSavedPassword())) entity.setEncryptedPassword(null);
             else if (request.password() != null) entity.setEncryptedPassword(encryption.encrypt(request.password()));
@@ -160,7 +163,7 @@ final class ConnectionService {
     private ConnectionResponse response(DatabaseConnectionProfileEntity entity) {
         JdbcDriverPackageEntity driver = entity.getDefaultDriver();
         DriverSummaryResponse summary = new DriverSummaryResponse(driver.getId(), driver.getName(), driver.getVendor(), driver.getVersion(), driver.getStatus());
-        return new ConnectionResponse(entity.getId(), entity.getName(), entity.getDatabaseType(), entity.getAdapterId(), entity.getJdbcUrl(), entity.getUsername(), entity.getEncryptedPassword() != null, summary, entity.getDescription(), entity.getLastConnectionTestAt(), entity.getLastConnectionTestStatus(), entity.getCreatedAt(), entity.getUpdatedAt());
+        return new ConnectionResponse(entity.getId(), entity.getName(), entity.getDatabaseType(), entity.getAdapterId(), entity.getJdbcUrl(), entity.getUsername(), entity.getEncryptedPassword() != null, summary, entity.getDescription(), entity.getLastConnectionTestAt(), entity.getLastConnectionTestStatus(), entity.getCreatedAt(), entity.getUpdatedAt(), entity.getExecutionDatabase(), entity.getExecutionSchema());
     }
     private ConnectionException invalid(String message) { return new ConnectionException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", message); }
     private static String required(String value, String name) { String result = optional(value); if (result == null) throw new ConnectionException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", name + " is required"); return result; }

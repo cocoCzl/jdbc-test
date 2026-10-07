@@ -2,6 +2,7 @@ import { lazy, Suspense, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { runsApi, runsKeys } from "@/api/runs";
 import type { CaseResult, Run } from "@/types/api";
+import { abortedCount } from "@/lib/outcomes";
 import { isTerminal } from "@/lib/status";
 import { formatDateTime, formatDuration } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -35,12 +36,16 @@ export default function Report({ run }: { run: Run }) {
       <ErrorState error={query.error} retry={() => void query.refetch()} />
     );
   const summary = query.data.summary;
-  const aborted = Math.max(
-    0,
-    summary.completedCases - summary.passed - summary.failed - summary.skipped,
-  );
+  const aborted = abortedCount(summary);
   return (
     <>
+      {summary.accounting ? <p className="mb-4 text-sm">
+        {summary.accounting.notRun} not run · {summary.accounting.incomplete} started but incomplete.
+        {summary.accounting.started === 0 ? " No scenario execution was verified; skipped cases do not establish compatibility." : ""}
+      </p> : null}
+      {summary.executionIssues?.length ? <div className="panel mb-4"><h2>Execution issues</h2>
+        {summary.executionIssues.map((issue, index) => <p key={index} className="break-words">{String(issue.level)}: {String(issue.message ?? issue.status)}</p>)}
+      </div> : null}
       <div className="mb-6 grid gap-6 xl:grid-cols-[340px_1fr]">
         <section className="panel">
           <h2 className="text-lg font-semibold">Test outcomes</h2>
@@ -60,8 +65,8 @@ export default function Report({ run }: { run: Run }) {
             />
           )}
           <p className="mt-3 text-center text-sm text-muted-foreground">
-            {summary.passed} passed · {summary.failed} failed ·{" "}
-            {summary.skipped} skipped · {aborted} aborted
+            {summary.passed ?? "—"} passed · {summary.failed ?? "—"} failed ·{" "}
+            {summary.skipped ?? "—"} skipped · {aborted ?? "—"} aborted
           </p>
         </section>
         <section className="panel">
@@ -112,8 +117,8 @@ export default function Report({ run }: { run: Run }) {
                 key={item.id}
                 className="flex items-center justify-between gap-3 py-4"
               >
-                <div>
-                  <p className="text-sm font-medium">{item.displayName}</p>
+                <div className="min-w-0">
+                  <p className="break-words text-sm font-medium">{item.displayName}</p>
                   <p className="mt-1 font-mono text-xs text-muted-foreground">
                     {item.scenarioId} · {item.status}
                   </p>

@@ -106,6 +106,72 @@ class DeterministicOrchestrationTest {
         assertFalse(Files.exists(DATA.resolve("concurrency-violation")), "Overlapping Worker processes detected");
     }
 
+    @Test void incompatibleWorkerIsRejectedBeforeExecutionEvenAfterCatalogWasCached() throws Exception {
+        catalog.catalog();
+        UUID id = run("NORMAL", 1);
+        worker.setExecutable(FakeWorkerJar.create(Files.createTempDirectory("legacy-worker-"), 1));
+        scheduler.enqueue(id);
+        done(id, TestRunStatus.FAILED, "WORKER_PROTOCOL_MISMATCH");
+        assertFalse(Files.exists(workspace(id).resolve("started")));
+        assertFalse(Files.exists(workspace(id).resolve("input-evidence.json")));
+        assertEquals(0, service.get(id).accounting().started());
+        assertEquals(1, service.get(id).accounting().notRun());
+        var freshCatalog = new RunCatalogService(new com.jdbctest.server.driver.WorkerProcessRunner(worker,
+                new tools.jackson.databind.ObjectMapper()), worker, new tools.jackson.databind.ObjectMapper());
+        assertThrows(RunException.class, freshCatalog::catalog);
+    }
+
+    @Test void setupFailureKeepsNotRunAndOriginalContainerIssue() throws Exception {
+        UUID id = run("SETUP_FAILURE", 2); scheduler.enqueue(id); started(id);
+        done(id, TestRunStatus.FAILED, "WORKER_EXECUTION_FAILED");
+        var accounting = service.get(id).accounting();
+        assertEquals(0, accounting.failed()); assertEquals(0, accounting.started()); assertEquals(2, accounting.notRun());
+        assertEquals(1, service.get(id).executionIssues().size());
+        mvc.perform(get("/api/runs/{id}/report.json", id)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.terminationReason").value("CONTAINER_FAILURE"))
+                .andExpect(jsonPath("$.notRun.length()").value(2)).andExpect(jsonPath("$.summary.failed").value(0));
+    }
+    @Test void partialWorkerExitRetainsRealSuccessAndNotRun() throws Exception {
+        UUID id = run("PARTIAL_EXIT", 3); scheduler.enqueue(id); started(id);
+        done(id, TestRunStatus.FAILED, "WORKER_EXITED_UNEXPECTEDLY");
+        var accounting = service.get(id).accounting();
+        assertEquals(1, accounting.passed()); assertEquals(1, accounting.completed()); assertEquals(2, accounting.notRun());
+        assertEquals(0, accounting.failed()); assertEquals(0, accounting.incomplete());
+    }
+    @Test void startedWithoutFinishIsIncompleteRatherThanFailedOrNotRun() throws Exception {
+        UUID id = run("START_NO_FINISH", 2); scheduler.enqueue(id); started(id);
+        done(id, TestRunStatus.FAILED, "WORKER_EXITED_UNEXPECTEDLY");
+        var accounting = service.get(id).accounting();
+        assertEquals(1, accounting.started()); assertEquals(1, accounting.incomplete()); assertEquals(1, accounting.notRun());
+        assertEquals(0, accounting.completed()); assertEquals(0, accounting.failed());
+    }
+    @Test void explicitAllSkipDoesNotProduceSuccessfulCompatibilityRun() throws Exception {
+        UUID id = run("ALL_SKIP", 2); scheduler.enqueue(id); started(id);
+        done(id, TestRunStatus.FAILED, "WORKER_EXECUTION_FAILED");
+        var accounting = service.get(id).accounting();
+        assertEquals(2, accounting.skipped()); assertEquals(0, accounting.started()); assertEquals(0, accounting.notRun());
+    }
+    @Test void queuedRunUsesFrozenUrlUserAndScopeAfterConnectionEdit() throws Exception {
+        UUID id = run("NORMAL", 1);
+        transactions.executeWithoutResult(tx -> {
+            var connection = runs.findById(id).orElseThrow().getConnection();
+            connection.update("changed", "postgresql", "postgresql", "jdbc:postgresql://changed/other", "EXIT_NON_ZERO", null, connection.getDefaultDriver());
+            connection.setExecutionScope("other", "other_scope");
+        });
+        scheduler.enqueue(id); started(id); done(id, TestRunStatus.SUCCEEDED, null);
+        var input = new tools.jackson.databind.ObjectMapper().readTree(Files.readString(workspace(id).resolve("input-evidence.json")));
+        assertEquals("jdbc:postgresql://host/db", input.path("jdbcUrl").asString());
+        assertEquals("NORMAL", input.path("username").asString());
+        assertEquals("qa_test", input.path("scope").path("schema").asString());
+    }
+
+    @Test void missingWriteScopeRejectsRunWithoutWorker() {
+        var connection = resource("NORMAL");
+        transactions.executeWithoutResult(tx -> connections.findById(connection.getId()).orElseThrow().setExecutionScope(null, null));
+        var failure = assertThrows(RunException.class, () -> service.create(new CreateTestRunRequest(connection.getId(), null, "CUSTOM", List.of("connection"), List.of(), List.of(), null, true)));
+        assertTrue(failure.getMessage().contains("scope") || failure.getMessage().contains("database"));
+    }
+
     @Test void fifoAndConcurrencyOne() throws Exception {
         UUID first = run("BLOCK", 1);
         UUID second = run("BLOCK", 1);
@@ -126,7 +192,7 @@ class DeterministicOrchestrationTest {
     }
 
     @Test void shutdownInterruptsRunningAndQueuedWorkAndReapsWorker() throws Exception {
-        var dispatcher = new TestRunScheduler(execution, executor, runs, credentials, transactions, events);
+        var dispatcher = new TestRunScheduler(execution, executor, runs, credentials, transactions, events, selections);
         UUID running = run("BLOCK_STUBBORN", 1);
         UUID queued = run("PASS", 1);
         try {
@@ -144,7 +210,7 @@ class DeterministicOrchestrationTest {
     }
 
     @Test void completionWinningShutdownRaceRemainsSucceeded() throws Exception {
-        var dispatcher = new TestRunScheduler(execution, executor, runs, credentials, transactions, events);
+        var dispatcher = new TestRunScheduler(execution, executor, runs, credentials, transactions, events, selections);
         UUID runId = run("BLOCK", 1);
         dispatcher.enqueue(runId);
         started(runId);
@@ -390,7 +456,13 @@ class DeterministicOrchestrationTest {
             var persistent = connections.findById(connection.getId()).orElseThrow();
             var driver = persistent.getDefaultDriver();
             var run = new TestRunEntity(persistent, driver, "CUSTOM", "A", "postgresql", "postgresql", "jdbc:postgresql://host/db", "D1", "Vendor", "V1", "org.external.Driver", "F1");
-            run.setTotalCases(count); runs.save(run);
+            run.setTotalCases(count);
+            run.freezeExecutionInput(new tools.jackson.databind.ObjectMapper().writeValueAsString(Map.of(
+                    "jdbcUrl", "jdbc:postgresql://host/db", "username", mode,
+                    "scope", Map.of("database", "db", "schema", "qa_test"),
+                    "objectPrefix", "j01234567890123456789", "destructiveConsent", true,
+                    "capabilities", com.jdbctest.catalog.AdapterExecutionConfig.load("postgresql").capabilities())));
+            runs.save(run);
             catalog.catalog().scenarios().stream().filter(item -> item.moduleId().equals("connection")).sorted(java.util.Comparator.comparing(RunCatalogService.Scenario::id)).limit(count).forEach(item -> selections.save(new TestRunSelectedScenarioEntity(run, item.id(), item.moduleId())));
             credentials.save(new TestRunCredentialEntity(run.getId(), encryption.encrypt("fake-secret")));
             return run.getId();
@@ -403,7 +475,7 @@ class DeterministicOrchestrationTest {
             var driver = new JdbcDriverPackageEntity("D1", "Vendor", "V1", "org.external.Driver", DriverSourceType.UPLOAD);
             driver.setStatus(DriverPackageStatus.VALIDATED); driver.setPackageFingerprint("F1"); driver = drivers.save(driver);
             var connection = new DatabaseConnectionProfileEntity("A", "postgresql", "postgresql", "jdbc:postgresql://host/db", mode);
-            connection.setDefaultDriver(driver); connection.setEncryptedPassword(encryption.encrypt("fake-secret"));
+            connection.setExecutionScope("db", "qa_test"); connection.setDefaultDriver(driver); connection.setEncryptedPassword(encryption.encrypt("fake-secret"));
             return connections.save(connection);
         });
     }

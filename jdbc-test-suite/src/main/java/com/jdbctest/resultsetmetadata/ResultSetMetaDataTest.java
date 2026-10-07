@@ -1,5 +1,6 @@
 package com.jdbctest.resultsetmetadata;
 
+import com.jdbctest.extension.JdbcContext;
 import com.jdbctest.config.ConfigLoader;
 import com.jdbctest.extension.JdbcTestExtension;
 import com.jdbctest.extension.UseSqlScripts;
@@ -27,7 +28,7 @@ class ResultSetMetaDataTest {
     @DisplayName("getColumnCount 获取列数")
     void testGetColumnCount(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT id, name, value, amount, active FROM resultset_test")) {
+             ResultSet rs = stmt.executeQuery(JdbcContext.sql("SELECT id, name, value, amount, active FROM {{resultset_test}}"))) {
             ResultSetMetaData meta = rs.getMetaData();
             assertEquals(5, meta.getColumnCount(), "应返回 5 列");
         }
@@ -38,7 +39,7 @@ class ResultSetMetaDataTest {
     @DisplayName("getColumnName 获取列名")
     void testGetColumnName(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT id, name, value FROM resultset_test")) {
+             ResultSet rs = stmt.executeQuery(JdbcContext.sql("SELECT id, name, value FROM {{resultset_test}}"))) {
             ResultSetMetaData meta = rs.getMetaData();
             if (isOracle()) {
                 // Oracle returns uppercase column names by default
@@ -58,7 +59,7 @@ class ResultSetMetaDataTest {
     @DisplayName("getColumnLabel 获取列标签")
     void testGetColumnLabel(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT name AS 姓名 FROM resultset_test")) {
+             ResultSet rs = stmt.executeQuery(JdbcContext.sql("SELECT name AS 姓名 FROM {{resultset_test}}"))) {
             ResultSetMetaData meta = rs.getMetaData();
             assertEquals("姓名", meta.getColumnLabel(1));
         }
@@ -69,7 +70,7 @@ class ResultSetMetaDataTest {
     @DisplayName("getColumnType 获取列 SQL 类型")
     void testGetColumnType(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT id, name, value FROM resultset_test")) {
+             ResultSet rs = stmt.executeQuery(JdbcContext.sql("SELECT id, name, value FROM {{resultset_test}}"))) {
             ResultSetMetaData meta = rs.getMetaData();
             // Oracle maps NUMBER to NUMERIC(2), others to INTEGER(4)
             int idType = meta.getColumnType(1);
@@ -87,7 +88,7 @@ class ResultSetMetaDataTest {
     @DisplayName("getColumnTypeName 获取列类型名称")
     void testGetColumnTypeName(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT id, name FROM resultset_test")) {
+             ResultSet rs = stmt.executeQuery(JdbcContext.sql("SELECT id, name FROM {{resultset_test}}"))) {
             ResultSetMetaData meta = rs.getMetaData();
             assertNotNull(meta.getColumnTypeName(1));
             String typeName = meta.getColumnTypeName(1).toLowerCase();
@@ -102,7 +103,7 @@ class ResultSetMetaDataTest {
     @DisplayName("getColumnDisplaySize 获取列显示大小")
     void testGetColumnDisplaySize(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT id, name FROM resultset_test")) {
+             ResultSet rs = stmt.executeQuery(JdbcContext.sql("SELECT id, name FROM {{resultset_test}}"))) {
             ResultSetMetaData meta = rs.getMetaData();
             assertTrue(meta.getColumnDisplaySize(1) > 0, "id 的 display size 应大于 0");
             assertTrue(meta.getColumnDisplaySize(2) > 0, "name 的 display size 应大于 0");
@@ -114,7 +115,7 @@ class ResultSetMetaDataTest {
     @DisplayName("getPrecision 和 getScale")
     void testPrecisionAndScale(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT id, amount FROM resultset_test")) {
+             ResultSet rs = stmt.executeQuery(JdbcContext.sql("SELECT id, amount FROM {{resultset_test}}"))) {
             ResultSetMetaData meta = rs.getMetaData();
             // Oracle NUMBER without precision may return 0 or -127
             if (!isOracle()) {
@@ -136,7 +137,7 @@ class ResultSetMetaDataTest {
     @DisplayName("isNullable 检查是否可为 NULL")
     void testIsNullable(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT id, name, description FROM resultset_test")) {
+             ResultSet rs = stmt.executeQuery(JdbcContext.sql("SELECT id, name, description FROM {{resultset_test}}"))) {
             ResultSetMetaData meta = rs.getMetaData();
             assertEquals(ResultSetMetaData.columnNoNulls, meta.isNullable(1), "id 不应为 NULL");
             assertEquals(ResultSetMetaData.columnNullable, meta.isNullable(3), "description 可为 NULL");
@@ -148,7 +149,7 @@ class ResultSetMetaDataTest {
     @DisplayName("isAutoIncrement 检查自增")
     void testIsAutoIncrement(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT id, name FROM resultset_test")) {
+             ResultSet rs = stmt.executeQuery(JdbcContext.sql("SELECT id, name FROM {{resultset_test}}"))) {
             ResultSetMetaData meta = rs.getMetaData();
             if (isOracle()) {
                 assertDoesNotThrow(() -> meta.isAutoIncrement(1), "isAutoIncrement 调用应正常完成");
@@ -164,7 +165,7 @@ class ResultSetMetaDataTest {
     @DisplayName("isCaseSensitive / isCurrency / isSigned / isReadOnly 等属性")
     void testColumnProperties(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT name, value, big_num FROM resultset_test")) {
+             ResultSet rs = stmt.executeQuery(JdbcContext.sql("SELECT name, value, big_num FROM {{resultset_test}}"))) {
             ResultSetMetaData meta = rs.getMetaData();
             // Oracle may report NUMBER as currency
             if (!isOracle()) {
@@ -180,7 +181,7 @@ class ResultSetMetaDataTest {
     @DisplayName("isWritable / isDefinitelyWritable / isSearchable")
     void testWritableSearchable(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT name, value FROM resultset_test")) {
+             ResultSet rs = stmt.executeQuery(JdbcContext.sql("SELECT name, value FROM {{resultset_test}}"))) {
             ResultSetMetaData meta = rs.getMetaData();
             assertTrue(meta.isSearchable(1), "name 应可搜索");
         }
@@ -191,12 +192,12 @@ class ResultSetMetaDataTest {
     @DisplayName("getSchemaName / getTableName / getCatalogName")
     void testSchemaTableCatalog(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT id FROM resultset_test")) {
+             ResultSet rs = stmt.executeQuery(JdbcContext.sql("SELECT id FROM {{resultset_test}}"))) {
             ResultSetMetaData meta = rs.getMetaData();
             String tableName = meta.getTableName(1);
             // Oracle may return empty table name for certain queries
             if (!isOracle() || !tableName.isEmpty()) {
-                assertEquals("resultset_test", tableName.toLowerCase(java.util.Locale.ENGLISH));
+                assertEquals(JdbcContext.objectName("resultset_test").toLowerCase(java.util.Locale.ROOT), tableName.toLowerCase(java.util.Locale.ROOT));
             }
         }
     }
@@ -206,7 +207,7 @@ class ResultSetMetaDataTest {
     @DisplayName("getColumnClassName 获取列的 Java 类名")
     void testGetColumnClassName(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT id, name, amount FROM resultset_test")) {
+             ResultSet rs = stmt.executeQuery(JdbcContext.sql("SELECT id, name, amount FROM {{resultset_test}}"))) {
             ResultSetMetaData meta = rs.getMetaData();
             assertNotNull(meta.getColumnClassName(1));
             assertEquals("java.lang.String", meta.getColumnClassName(2));

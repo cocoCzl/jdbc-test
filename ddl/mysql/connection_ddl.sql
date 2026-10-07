@@ -1,6 +1,5 @@
-DROP TABLE IF EXISTS connection_test;
 
-CREATE TABLE connection_test (
+CREATE TABLE {{connection_test}} (
     id INT AUTO_INCREMENT PRIMARY KEY COMMENT '主键',
     name VARCHAR(100) NOT NULL COMMENT '名称',
     value INT DEFAULT 0 COMMENT '数值',

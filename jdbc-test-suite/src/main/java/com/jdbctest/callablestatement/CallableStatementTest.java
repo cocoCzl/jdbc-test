@@ -1,5 +1,6 @@
 package com.jdbctest.callablestatement;
 
+import com.jdbctest.extension.JdbcContext;
 import com.jdbctest.config.ConfigLoader;
 import com.jdbctest.extension.JdbcTestExtension;
 import com.jdbctest.extension.RequiresFeature;
@@ -27,7 +28,7 @@ class CallableStatementTest {
     }
 
     private static String fn(String name) {
-        return isOracle() ? "jt_" + name : name;
+        return JdbcContext.objects().qualified(isOracle() ? "jt_" + name : name);
     }
 
     // For Oracle, use SELECT func() FROM DUAL instead of CallableStatement

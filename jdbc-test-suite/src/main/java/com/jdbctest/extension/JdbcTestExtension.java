@@ -14,18 +14,12 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, AfterEachCallback,
         ParameterResolver, ExecutionCondition {
 
     private static final ExtensionContext.Namespace ROOT_NAMESPACE =
             ExtensionContext.Namespace.create(JdbcTestExtension.class);
-    private static final Pattern CREATE_TABLE_PATTERN =
-            Pattern.compile("CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?(\\S+)",
-                    Pattern.CASE_INSENSITIVE);
-    private static final int SQL_ERROR_TRUNCATE_LENGTH = 200;
     private static volatile boolean initialized = false;
     private static volatile String initializedConfigKey;
 
@@ -41,12 +35,10 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
         }
 
         String adapterId = config.db.assetId;
-        List<String> createdTables = new ArrayList<>();
 
         for (String ddlFile : annotation.ddl()) {
             Path path = resolvePath(config.ddl.basePath, adapterId, ddlFile);
-            List<String> tables = executeSqlFile(context, path);
-            createdTables.addAll(tables);
+            executeSqlFile(context, path);
         }
 
         for (String dmlFile : annotation.dml()) {
@@ -54,72 +46,13 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
             executeSqlFile(context, path);
         }
 
-        context.getStore(ExtensionContext.Namespace.create(testClass))
-                .put("createdTables", createdTables);
     }
 
     @Override
     public void afterAll(ExtensionContext context) throws Exception {
-        Config config = ensureInitialized();
-        Class<?> testClass = context.getRequiredTestClass();
-        UseSqlScripts annotation = testClass.getAnnotation(UseSqlScripts.class);
-        if (annotation != null) {
-            for (String cleanupFile : annotation.cleanup()) {
-                Path path = resolvePath(config.ddl.basePath, config.db.assetId, cleanupFile);
-                executeSqlFile(context, path);
-            }
+        if (JdbcContext.getDataSource() != null) {
+            try (Connection connection = JdbcContext.getConnection()) { JdbcContext.objects().cleanup(connection); }
         }
-
-        @SuppressWarnings("unchecked")
-        List<String> tables = (List<String>) context.getStore(
-            ExtensionContext.Namespace.create(testClass)).get("createdTables");
-
-        if (tables == null || tables.isEmpty()) {
-            return;
-        }
-
-        String quote = config.db.getIdentifierQuote();
-
-        try (Connection conn = JdbcContext.getConnection();
-             Statement stmt = conn.createStatement()) {
-            for (int i = tables.size() - 1; i >= 0; i--) {
-                String table = tables.get(i);
-                String quoted = quote + table.replace(quote, quote + quote) + quote;
-                try {
-                    if (config.db.isDialect("oracle")) {
-                        stmt.execute("DROP TABLE " + table.toUpperCase(Locale.ENGLISH)
-                                + " CASCADE CONSTRAINTS PURGE");
-                    } else {
-                        stmt.execute("DROP TABLE IF EXISTS " + quoted);
-                    }
-                } catch (SQLException e) {
-                    System.err.println("[WARN] 清理表 " + table + " 失败: " + e.getMessage());
-                    System.err.println("[JDBC_CLEANUP_ISSUE] " + cleanupIssueJson(testClass.getName(), table, e));
-                }
-            }
-        }
-    }
-
-    private String cleanupIssueJson(String className, String table, SQLException e) {
-        return "{"
-                + "\"source_class\":\"" + jsonEscape(className) + "\","
-                + "\"asset_type\":\"table\","
-                + "\"asset_name\":\"" + jsonEscape(table) + "\","
-                + "\"message\":\"" + jsonEscape(e.getMessage()) + "\","
-                + "\"sql_state\":\"" + jsonEscape(e.getSQLState()) + "\","
-                + "\"error_code\":" + e.getErrorCode()
-                + "}";
-    }
-
-    private String jsonEscape(String value) {
-        if (value == null) {
-            return "";
-        }
-        return value
-                .replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r");
     }
 
     @Override
@@ -152,7 +85,7 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
             }
         }
         if (!missing.isEmpty()) {
-            String reason = String.format("数据库不支持: %s",
+            String reason = String.format("Adapter explicitly declares capability disabled: %s",
                     String.join(", ", missing));
             return ConditionEvaluationResult.disabled(reason);
         }
@@ -183,7 +116,7 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
                 config.db.getJdbcUrl(),
                 config.db.getDriverClass(),
                 config.db.username,
-                config.pool.profileDir);
+                config.pool.profileDir, java.util.Objects.toString(config.namespace.objectPrefix, ""));
     }
 
     private void registerShutdownHook(ExtensionContext context) {
@@ -236,7 +169,7 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
         return base.resolve(dbType).resolve(fileName);
     }
 
-    private List<String> executeSqlFile(ExtensionContext context, Path path) throws IOException {
+    private void executeSqlFile(ExtensionContext context, Path path) throws IOException {
         String content;
         if (Files.exists(path)) {
             content = Files.readString(path);
@@ -258,8 +191,6 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
         String[] statements = hasGoBatches ? splitByGo(content)
                 : hasSlashBatches ? splitBySlash(content)
                 : splitBySemicolon(content);
-        List<String> tables = new ArrayList<>();
-        List<String> errors = new ArrayList<>();
 
         try (Connection conn = JdbcContext.getConnection();
              Statement stmt = conn.createStatement()) {
@@ -269,60 +200,28 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
                 if (trimmed.isEmpty()) continue;
 
                 try {
-                    stmt.execute(trimmed);
+                    executeManagedStatement(stmt, JdbcContext.objects(), trimmed);
 
-                    Matcher m = CREATE_TABLE_PATTERN.matcher(trimmed);
-                    if (m.find()) {
-                        String tableName = m.group(1);
-                        tableName = tableName.replaceAll("[\"'`]", "");
-                        if (tableName.contains(".")) {
-                            tableName = tableName.substring(tableName.lastIndexOf('.') + 1);
-                        }
-                        tables.add(tableName);
-                    }
                 } catch (SQLException e) {
-                    if (isSoftError(e, trimmed)) {
-                        String testName = context.getRequiredTestClass().getSimpleName();
-                        String snippet = trimmed.substring(0, Math.min(SQL_ERROR_TRUNCATE_LENGTH, trimmed.length()));
-                        System.err.printf("[%s] 忽略可恢复错误: %s%n  SQL: %s%n", testName, e.getMessage(), snippet);
-                    } else {
-                        String testName = context.getRequiredTestClass().getSimpleName();
-                        String snippet = trimmed.substring(0, Math.min(SQL_ERROR_TRUNCATE_LENGTH, trimmed.length()));
-                        String msg = String.format("[%s] SQL 执行异常: %s%n  SQL: %s", testName, e.getMessage(), snippet);
-                        System.err.println(msg);
-                        errors.add(msg);
-                    }
+                    throw new RuntimeException("SQL initialization failed: " + path.getFileName(), e);
                 }
             }
         } catch (SQLException e) {
             throw new RuntimeException("执行 SQL 文件时连接异常: " + path, e);
         }
 
-        if (!errors.isEmpty()) {
-            throw new RuntimeException(String.format(
-                    "SQL 文件 %s 执行失败 (%d 条语句出错)", path.getFileName(), errors.size()));
-        }
-
-        return tables;
     }
 
-    private boolean isSoftError(SQLException e, String sql) {
-        String upper = sql.trim().toUpperCase();
-        boolean isDrop = upper.startsWith("DROP") && !upper.startsWith("DROP DATABASE");
-        boolean isCreateOrReplace = upper.startsWith("CREATE OR REPLACE");
-        int code = e.getErrorCode();
-
-        if (isDrop) {
-            return code == 942   // Oracle: ORA-00942 表或视图不存在
-                || code == 1051  // MySQL: Table doesn't exist
-                || code == 1418  // Oracle: ORA-01418 指定的索引不存在
-                || code == 4043  // Oracle: ORA-04043 object does not exist
-                || code == 1305; // MySQL: FUNCTION does not exist
+    static void executeManagedStatement(Statement statement, TestObjects objects, String sql) throws SQLException {
+        String executable = SqlSplitter.withoutLeadingComments(sql);
+        if (executable.isBlank()) return;
+        if (executable.matches("(?is)^CREATE\\s+.*")) {
+            objects.create(statement, executable);
+        } else if (executable.matches("(?is)^DROP\\s+.*")) {
+            throw new IllegalStateException("Unowned resource DROP is forbidden");
+        } else {
+            statement.execute(objects.sql(sql));
         }
-        if (isCreateOrReplace) {
-            return code == 955;  // Oracle: ORA-00955 名称已由现有对象使用（同名不同类对象冲突）
-        }
-        return false;
     }
 
     static String[] splitBySemicolon(String content) {
@@ -361,7 +260,7 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
 
         });
         for (int i = 0; i < raw.length; i++) {
-            String trimmed = raw[i].trim().toUpperCase(Locale.ENGLISH);
+            String trimmed = SqlSplitter.withoutLeadingComments(raw[i]).trim().toUpperCase(Locale.ENGLISH);
             // Preserve trailing ; for PL/SQL blocks and function/procedure/package/trigger definitions
             if (!trimmed.startsWith("BEGIN") && !trimmed.startsWith("DECLARE")
                     && !trimmed.startsWith("CREATE OR REPLACE FUNCTION")

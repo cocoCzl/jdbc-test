@@ -165,6 +165,9 @@ class RunPostgresIT {
 
     @ParameterizedTest @CsvSource({"connection,17", "statement,23"})
     void externalPostgresModulesThroughRestQueueWorkerSsePersistenceAndReports(String module, int count) throws Exception {
+        try (var admin = java.sql.DriverManager.getConnection(TARGET.getJdbcUrl(), TARGET.getUsername(), TARGET.getPassword()); var statement = admin.createStatement()) {
+            statement.execute("CREATE SCHEMA qa_" + module);
+        }
         Path postgres = Path.of(org.postgresql.Driver.class.getProtectionDomain().getCodeSource().getLocation().toURI());
         String driver = mvc.perform(multipart("/api/drivers")
                 .part(new MockPart("metadata", null, json.writeValueAsBytes(java.util.Map.of("name", "External PostgreSQL identity", "vendor", "PostgreSQL", "version", "external", "driverClass", ExternalIdentityPostgresDriver.class.getName())), MediaType.APPLICATION_JSON))
@@ -174,7 +177,7 @@ class RunPostgresIT {
         UUID driverId = UUID.fromString(json.readTree(driver).path("id").asString());
         mvc.perform(post("/api/drivers/{id}/validate", driverId)).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("VALIDATED"));
         String connection = mvc.perform(post("/api/connections").contentType(MediaType.APPLICATION_JSON)
-                .content(json.writeValueAsString(java.util.Map.of("name", "Target " + module, "databaseType", "postgresql", "adapterId", "postgresql", "jdbcUrl", TARGET.getJdbcUrl(), "username", TARGET.getUsername(), "password", TARGET.getPassword(), "savePassword", true, "defaultDriverId", driverId))))
+                .content(json.writeValueAsString(java.util.Map.of("executionDatabase", TARGET.getDatabaseName(), "executionSchema", "qa_" + module, "name", "Target " + module, "databaseType", "postgresql", "adapterId", "postgresql", "jdbcUrl", TARGET.getJdbcUrl(), "username", TARGET.getUsername(), "password", TARGET.getPassword(), "savePassword", true, "defaultDriverId", driverId))))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         String connectionId = json.readTree(connection).path("id").asString();
         try (HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build()) {
@@ -204,6 +207,11 @@ class RunPostgresIT {
             for (var row : result.path("items")) assertEquals(module, row.path("moduleId").asString());
             get(client, "/api/runs/" + id + "/report");
             var report = json.readTree(get(client, "/api/runs/" + id + "/report.json"));
+            Path evidenceDirectory = Path.of("target", "acceptance-evidence"); Files.createDirectories(evidenceDirectory);
+            Files.writeString(evidenceDirectory.resolve("postgresql-" + module + "-report.json"), report.toString());
+            Files.writeString(evidenceDirectory.resolve("postgresql-" + module + "-detail.json"), detail.toString());
+            Files.writeString(evidenceDirectory.resolve("postgresql-" + module + "-results.json"), result.toString());
+            Files.writeString(evidenceDirectory.resolve("postgresql-" + module + "-sse.txt"), sse);
             assertEquals(count, report.path("summary").path("total").asInt());
             assertEquals(count, report.path("scenario_results").size());
             var artifact = artifacts.findByDriver_Id(driverId).stream().filter(item -> item.getFileName().equals("postgresql-external.jar")).findFirst().orElseThrow();

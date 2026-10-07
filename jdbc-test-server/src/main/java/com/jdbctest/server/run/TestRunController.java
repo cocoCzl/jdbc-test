@@ -27,6 +27,15 @@ final class TestRunController {
               @RequestParam(value = "status", required = false) TestCaseResultStatus status, @RequestParam(value = "moduleId", required = false) String moduleId) { return service.results(id, page, size, sort, status, moduleId); }
     @GetMapping("/{id}/report") RunReportResponse report(@PathVariable("id") UUID id) { return service.report(id); }
     @GetMapping(value = "/{id}/report.json", produces = MediaType.APPLICATION_JSON_VALUE) ResponseEntity<byte[]> reportJson(@PathVariable("id") UUID id) throws java.io.IOException {
+        var evidence = service.evidenceReport(id);
+        if (evidence != null) {
+            Path ledger = storage.getDataDirectory().toAbsolutePath().normalize().resolve("runs").resolve(id.toString()).resolve("object-ledger.yaml");
+            if (Files.isRegularFile(ledger, java.nio.file.LinkOption.NOFOLLOW_LINKS) && Files.size(ledger) <= 4 * 1024 * 1024) {
+                try { evidence.put("objectLedger", new org.yaml.snakeyaml.Yaml(new org.yaml.snakeyaml.constructor.SafeConstructor(new org.yaml.snakeyaml.LoaderOptions())).load(Files.readString(ledger))); }
+                catch (RuntimeException exception) { evidence.put("cleanupState", "UNKNOWN_LEDGER_UNREADABLE"); }
+            } else evidence.put("cleanupState", "UNKNOWN_OR_NO_CREATE_INTENT_RECORDED");
+            return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(new tools.jackson.databind.ObjectMapper().writeValueAsBytes(evidence));
+        }
         service.report(id); Path path = storage.getDataDirectory().toAbsolutePath().normalize().resolve("runs").resolve(id.toString()).resolve("report/report.json").normalize();
         if (!path.startsWith(storage.getDataDirectory().toAbsolutePath().normalize()) || !Files.isRegularFile(path)) throw new RunException(org.springframework.http.HttpStatus.NOT_FOUND, "REPORT_NOT_FOUND", "Report artifact was not found");
         try { return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(com.jdbctest.server.security.JdbcUrlSanitizer.sanitizeJson(Files.readString(path)).getBytes(java.nio.charset.StandardCharsets.UTF_8)); }

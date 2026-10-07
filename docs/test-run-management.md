@@ -1,5 +1,7 @@
 # Test Run Management
 
+Current execution scope, ownership and protocol v2 accounting: [Execution safety](execution-safety.md). New runs require explicit scope; older protocol examples below describe the baseline.
+
 ## Lifecycle
 
 `POST /api/runs` creates a `QUEUED` resource and returns `201 Created`. The local FIFO dispatcher runs no more than `jdbc-test.execution.max-concurrent-runs` Workers. Normal states are `QUEUED → PREPARING → RUNNING → GENERATING_REPORT → SUCCEEDED`; failures, cancellation and startup recovery end in `FAILED`, `CANCELLED` or `INTERRUPTED`.

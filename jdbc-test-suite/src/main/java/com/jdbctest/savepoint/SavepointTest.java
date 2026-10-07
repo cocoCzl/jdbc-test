@@ -1,5 +1,6 @@
 package com.jdbctest.savepoint;
 
+import com.jdbctest.extension.JdbcContext;
 import com.jdbctest.config.ConfigLoader;
 import com.jdbctest.extension.JdbcTestExtension;
 import com.jdbctest.extension.RequiresFeature;
@@ -81,18 +82,18 @@ class SavepointTest {
         conn.setAutoCommit(false);
         try (Statement stmt = conn.createStatement()) {
             // 删除所有数据
-            stmt.execute("DELETE FROM savepoint_test");
+            stmt.execute(JdbcContext.sql("DELETE FROM {{savepoint_test}}"));
 
             Savepoint sp = conn.setSavepoint("after_delete");
             assertNotNull(sp);
 
             // 插入新数据
-            stmt.execute("INSERT INTO savepoint_test (name, value) VALUES ('插入测试', 999)");
+            stmt.execute(JdbcContext.sql("INSERT INTO {{savepoint_test}} (name, value) VALUES ('插入测试', 999)"));
 
             // 回滚到保存点，插入应被撤销
             conn.rollback(sp);
 
-            try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM savepoint_test")) {
+            try (ResultSet rs = stmt.executeQuery(JdbcContext.sql("SELECT COUNT(*) FROM {{savepoint_test}}"))) {
                 rs.next();
                 assertEquals(0, rs.getInt(1), "回滚后表应无数据");
             }
@@ -108,17 +109,17 @@ class SavepointTest {
     void testMultipleSavepoints(Connection conn) throws SQLException {
         conn.setAutoCommit(false);
         try (Statement stmt = conn.createStatement()) {
-            stmt.execute("DELETE FROM savepoint_test WHERE name LIKE '多保存点%'");
+            stmt.execute(JdbcContext.sql("DELETE FROM {{savepoint_test}} WHERE name LIKE '多保存点%'"));
 
             Savepoint sp1 = conn.setSavepoint("sp1");
-            stmt.execute("INSERT INTO savepoint_test (name, value) VALUES ('多保存点A', 111)");
+            stmt.execute(JdbcContext.sql("INSERT INTO {{savepoint_test}} (name, value) VALUES ('多保存点A', 111)"));
 
             Savepoint sp2 = conn.setSavepoint("sp2");
-            stmt.execute("INSERT INTO savepoint_test (name, value) VALUES ('多保存点B', 222)");
+            stmt.execute(JdbcContext.sql("INSERT INTO {{savepoint_test}} (name, value) VALUES ('多保存点B', 222)"));
 
             conn.rollback(sp2); // 只回滚 B 的插入
 
-            try (ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM savepoint_test WHERE name = '多保存点A'")) {
+            try (ResultSet rs = stmt.executeQuery(JdbcContext.sql("SELECT COUNT(*) FROM {{savepoint_test}} WHERE name = '多保存点A'"))) {
                 rs.next();
                 assertEquals(1, rs.getInt(1), "回滚到 sp2 后 A 应还在");
             }

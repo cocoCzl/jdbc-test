@@ -86,9 +86,10 @@ public final class WorkerMain {
         try { Files.createDirectories(workspace); Files.createDirectories(workspace.resolve("temp")); }
         catch (Exception exception) { return fail(request.runId(), INTERNAL_FAILURE, "WORKSPACE_FAILURE", exception); }
 
-        events.write("RUN_STARTED", request.runId(), Map.of("scenarioCount", selected.size()));
+        events.write("RUN_STARTED", request.runId(), Map.of("scenarioCount", selected.size(), "protocolVersion", 2));
         Path configFile = workspace.resolve("temp").resolve("config.json");
         DriverLoader.LoadedDriver loaded = null;
+        boolean timedOut = false;
         PrintStream originalOutput = System.out;
         PrintStream driverOutput = new PrintStream(new BoundedDiagnosticOutputStream(), true, StandardCharsets.UTF_8);
         try {
@@ -97,14 +98,16 @@ public final class WorkerMain {
             JdbcContext.setIsolatedDriver(loaded.driver());
             writeConfig(configFile, request);
             System.setProperty("config.yaml", configFile.toString());
-            List<Map<String, Object>> results = execute(request, selected);
-            WorkerReportWriter.write(workspace, request.runId(), results);
-            boolean failed = results.stream().anyMatch(row -> "FAILED".equals(row.get("status")) || "ABORTED".equals(row.get("status")));
-            events.write("RUN_FINISHED", request.runId(), Map.of("status", failed ? "FAILED" : "PASSED", "scenarioCount", selected.size()));
+            WorkerExecutionEvidence evidence = execute(request, selected);
+            JdbcContext.shutdown();
+            WorkerReportWriter.write(workspace, request, selected, evidence);
+            boolean failed = !"COMPLETED".equals(evidence.terminationReason());
+            events.write("RUN_FINISHED", request.runId(), Map.of("status", failed ? "FAILED" : "PASSED", "scenarioCount", selected.size(), "terminationReason", evidence.terminationReason()));
             return failed ? EXECUTION_FAILURE : SUCCESS;
         } catch (TimeoutException exception) {
+            timedOut = true;
             System.err.println("[worker] run timeout after " + request.timeoutMs() + " ms");
-            events.write("RUN_FAILED", request.runId(), Map.of("errorType", "TIMEOUT", "message", "Run timeout"));
+            events.write("RUN_FAILED", request.runId(), Map.of("errorType", "TIMEOUT", "message", "Run timeout", "cleanupState", "UNKNOWN_PENDING_PROCESS_EXIT"));
             return EXECUTION_FAILURE;
         } catch (Exception exception) {
             int code = loaded == null ? DRIVER_FAILURE : EXECUTION_FAILURE;
@@ -112,11 +115,13 @@ public final class WorkerMain {
         } finally {
             System.setOut(originalOutput);
             driverOutput.close();
-            JdbcContext.shutdown();
+            // An interrupted JDBC call can still be running. Do not race cleanup against that thread.
+            // Main exits the process; the persisted ownership journal is the residual evidence.
+            if (!timedOut) JdbcContext.shutdown();
             System.clearProperty("config.yaml");
             try { Files.deleteIfExists(configFile); }
             catch (IOException exception) { System.err.println("[worker] cleanup failed: " + CredentialSanitizer.sanitize(exception.getMessage())); }
-            if (loaded != null) try { loaded.close(); } catch (Exception exception) {
+            if (loaded != null && !timedOut) try { loaded.close(); } catch (Exception exception) {
                 System.err.println("[worker] driver classloader cleanup failed: " + CredentialSanitizer.sanitize(exception.getMessage()));
             }
         }
@@ -240,7 +245,7 @@ public final class WorkerMain {
             List<Map<String, Object>> scenarios = catalog.testCases().stream().map(item -> Map.<String, Object>of(
                     "id", item.scenarioId(), "moduleId", item.module().id(), "displayName", item.contract(), "profile", item.profile().name())).toList();
             events.write("CATALOG_DESCRIBED", "catalog", Map.of("profiles", profiles, "modules", modules,
-                    "scenarios", scenarios, "totalScenarioCount", catalog.testCases().size()));
+                    "protocolVersion", 2, "scenarios", scenarios, "totalScenarioCount", catalog.testCases().size()));
             return SUCCESS;
         } catch (Exception exception) {
             System.err.println("[worker] catalog describe failed: " + CredentialSanitizer.sanitize(exception.getMessage()));
@@ -248,7 +253,7 @@ public final class WorkerMain {
         }
     }
 
-    private List<Map<String, Object>> execute(WorkerRunRequest request, List<TestCaseDescriptor> selected) throws Exception {
+    private WorkerExecutionEvidence execute(WorkerRunRequest request, List<TestCaseDescriptor> selected) throws Exception {
         Map<String, TestCaseDescriptor> descriptors = new HashMap<>();
         for (TestCaseDescriptor descriptor : selected) descriptors.put(key(descriptor.sourceClass(), descriptor.sourceMethod()), descriptor);
         LauncherDiscoveryRequestBuilder builder = LauncherDiscoveryRequestBuilder.request();
@@ -279,50 +284,9 @@ public final class WorkerMain {
             }
             return FilterResult.included("container");
         });
+        builder.configurationParameter("junit.jupiter.execution.parallel.enabled", "false");
         LauncherDiscoveryRequest discovery = builder.build();
-        List<Map<String, Object>> results = java.util.Collections.synchronizedList(new ArrayList<>());
-        selected.stream().map(item -> item.module().id()).distinct().forEach(module -> events.write("MODULE_STARTED", request.runId(), Map.of("moduleId", module)));
-        TestExecutionListener listener = new TestExecutionListener() {
-            private final Map<String, Long> started = new HashMap<>();
-            @Override public void executionStarted(TestIdentifier id) {
-                id.getSource().filter(source -> source instanceof org.junit.platform.engine.support.descriptor.MethodSource)
-                        .map(source -> (org.junit.platform.engine.support.descriptor.MethodSource) source)
-                        .ifPresent(source -> {
-                            TestCaseDescriptor descriptor = descriptors.get(key(source.getClassName(), source.getMethodName()));
-                            if (descriptor == null) return;
-                            started.put(id.getUniqueId(), System.nanoTime());
-                            events.write("CASE_STARTED", request.runId(), caseFields(descriptor));
-                        });
-            }
-            @Override public void executionFinished(TestIdentifier id, TestExecutionResult result) {
-                id.getSource().filter(source -> source instanceof org.junit.platform.engine.support.descriptor.MethodSource)
-                        .map(source -> (org.junit.platform.engine.support.descriptor.MethodSource) source)
-                        .ifPresent(source -> {
-                            TestCaseDescriptor descriptor = descriptors.get(key(source.getClassName(), source.getMethodName()));
-                            if (descriptor == null) return;
-                            String status = result.getStatus().name();
-                            String normalized = "SUCCESSFUL".equals(status) ? "PASSED" : "ABORTED".equals(status) ? "ABORTED" : "FAILED";
-                            long duration = started.containsKey(id.getUniqueId()) ? (System.nanoTime() - started.get(id.getUniqueId())) / 1_000_000 : 0;
-                            Map<String, Object> row = new LinkedHashMap<>(caseFields(descriptor));
-                            row.put("status", normalized); row.put("durationMs", duration);
-                            result.getThrowable().ifPresent(error -> { row.put("errorType", error.getClass().getName()); row.put("message", CredentialSanitizer.sanitize(error.getMessage())); });
-                            results.add(row);
-                            events.write("CASE_FINISHED", request.runId(), row);
-                        });
-            }
-            @Override public void executionSkipped(TestIdentifier id, String reason) {
-                id.getSource().filter(source -> source instanceof org.junit.platform.engine.support.descriptor.MethodSource)
-                        .map(source -> (org.junit.platform.engine.support.descriptor.MethodSource) source)
-                        .ifPresent(source -> {
-                            TestCaseDescriptor descriptor = descriptors.get(key(source.getClassName(), source.getMethodName()));
-                            if (descriptor == null) return;
-                            Map<String, Object> row = new LinkedHashMap<>(caseFields(descriptor));
-                            row.put("status", "SKIPPED"); row.put("durationMs", 0); row.put("message", CredentialSanitizer.sanitize(reason));
-                            results.add(row);
-                            events.write("CASE_FINISHED", request.runId(), row);
-                        });
-            }
-        };
+        WorkerExecutionEvidence listener = new WorkerExecutionEvidence(request.runId(), selected, events);
         var executor = Executors.newSingleThreadExecutor(runnable -> { Thread thread = new Thread(runnable, "jdbc-test-worker"); thread.setDaemon(true); return thread; });
         try {
             Future<?> future = executor.submit(() -> {
@@ -333,17 +297,7 @@ public final class WorkerMain {
             try { future.get(timeoutMillis(request), TimeUnit.MILLISECONDS); }
             catch (TimeoutException timeout) { future.cancel(true); throw timeout; }
         } finally { executor.shutdownNow(); }
-        Set<String> completed = results.stream().map(row -> String.valueOf(row.get("scenarioId"))).collect(java.util.stream.Collectors.toSet());
-        for (TestCaseDescriptor descriptor : selected) {
-            if (!completed.contains(descriptor.scenarioId())) {
-                Map<String, Object> row = new LinkedHashMap<>(caseFields(descriptor));
-                row.put("status", "FAILED"); row.put("durationMs", 0); row.put("message", "JUnit Platform did not execute the selected scenario");
-                results.add(row);
-                events.write("CASE_FINISHED", request.runId(), row);
-            }
-        }
-        selected.stream().map(item -> item.module().id()).distinct().forEach(module -> events.write("MODULE_FINISHED", request.runId(), Map.of("moduleId", module)));
-        return results;
+        return listener;
     }
 
     private Map<String, Object> caseFields(TestCaseDescriptor descriptor) {
@@ -362,7 +316,16 @@ public final class WorkerMain {
         db.put("driver_class", request.driver().driverClass()); db.put("connection_mode", "driver_manager"); db.put("properties", request.connection().properties() == null ? Map.of() : request.connection().properties());
         Map<String, Object> config = new LinkedHashMap<>(); config.put("db", db);
         config.put("ddl", Map.of("base_path", "classpath:ddl")); config.put("dml", Map.of("base_path", "classpath:dml")); config.put("pool", Map.of("profile_dir", "classpath:pool"));
-        config.put("namespace", Map.of("mode", "existing", "selection", "none")); config.put("adapter", Map.of("id", adapterId, "capabilities", Map.of()));
+        var adapter = com.jdbctest.catalog.AdapterExecutionConfig.load(adapterId);
+        db.put("identifier_quote", adapter.identifierQuote());
+        Map<String, Object> namespace = new LinkedHashMap<>();
+        namespace.put("mode", "existing"); namespace.put("selection", "mysql".equals(adapterId) ? "catalog" : "schema");
+        namespace.put("name", request.scope().namespace(adapterId));
+        if (!"oracle".equals(adapterId)) namespace.put("database", request.scope().database());
+        namespace.put("object_prefix", request.objectPrefix()); namespace.put("destructive_consent", request.destructiveConsent());
+        namespace.put("ledger_path", Path.of(request.workspace()).resolve("object-ledger.yaml").toString());
+        config.put("namespace", namespace);
+        config.put("adapter", Map.of("id", adapterId, "capabilities", com.jdbctest.catalog.AdapterExecutionConfig.validateCapabilities(request.capabilities())));
         config.put("test_filter", Map.of("timeout_ms", timeoutMillis(request)));
         Files.writeString(path, mapper.writeValueAsString(config), StandardCharsets.UTF_8);
         try { Files.setPosixFilePermissions(path, Set.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE)); } catch (UnsupportedOperationException ignored) { }
@@ -375,7 +338,12 @@ public final class WorkerMain {
     }
 
     private static void validate(WorkerRunRequest request) {
-        if (request == null || blank(request.runId()) || request.driver() == null || request.connection() == null || blank(request.workspace())) throw new IllegalArgumentException("runId, driver, connection and workspace are required");
+        if (request == null || !Integer.valueOf(2).equals(request.protocolVersion())) throw new IllegalArgumentException("WORKER_PROTOCOL_MISMATCH: expected protocolVersion 2");
+        if (blank(request.runId()) || request.driver() == null || request.connection() == null || blank(request.workspace())) throw new IllegalArgumentException("runId, driver, connection and workspace are required");
+        if (request.scope() == null || !Boolean.TRUE.equals(request.destructiveConsent()) || request.objectPrefix() == null
+                || !request.objectPrefix().matches("j[0-9a-f]{20}")) throw new IllegalArgumentException("EXECUTION_SCOPE_REQUIRED");
+        request.scope().validate(request.connection().adapterId());
+        com.jdbctest.catalog.AdapterExecutionConfig.validateCapabilities(request.capabilities());
         if (blank(request.connection().jdbcUrl())) throw new IllegalArgumentException("connection.jdbcUrl is required");
         if (request.timeoutMs() != null && request.timeoutMs() <= 0) throw new IllegalArgumentException("timeoutMs must be positive");
     }

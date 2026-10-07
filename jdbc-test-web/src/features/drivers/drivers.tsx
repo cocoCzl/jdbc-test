@@ -141,7 +141,7 @@ export default function Drivers() {
           </Button>
         }
       />
-      <div className="mb-5 flex justify-end">
+      <div className="mb-3 flex justify-end">
         <label className="flex items-center gap-3 text-sm text-muted-foreground">
           Sort by
           <select
@@ -174,7 +174,7 @@ export default function Drivers() {
                 title="No JDBC drivers yet"
                 description="Upload a driver package to get started."
                 action={
-                  <Button asChild>
+                  <Button asChild variant="outline">
                     <Link to="/drivers/new">Upload your first driver</Link>
                   </Button>
                 }

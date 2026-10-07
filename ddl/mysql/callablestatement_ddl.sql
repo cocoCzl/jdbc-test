@@ -1,26 +1,17 @@
-DROP TABLE IF EXISTS callablestatement_test;
 
-CREATE TABLE callablestatement_test (
+CREATE TABLE {{callablestatement_test}} (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     value INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
-DROP FUNCTION IF EXISTS add_numbers;
-CREATE FUNCTION add_numbers(a INT, b INT) RETURNS INT DETERMINISTIC
+CREATE FUNCTION {{add_numbers}}(a INT, b INT) RETURNS INT DETERMINISTIC
 RETURN a + b;
-
-DROP FUNCTION IF EXISTS get_name_by_id;
-CREATE FUNCTION get_name_by_id(p_id INT) RETURNS VARCHAR(100) DETERMINISTIC
+CREATE FUNCTION {{get_name_by_id}}(p_id INT) RETURNS VARCHAR(100) DETERMINISTIC
 READS SQL DATA
-RETURN (SELECT name FROM callablestatement_test WHERE id = p_id);
-
-DROP FUNCTION IF EXISTS multiply_numbers;
-CREATE FUNCTION multiply_numbers(a INT, b INT) RETURNS INT DETERMINISTIC
+RETURN (SELECT name FROM {{callablestatement_test}} WHERE id = p_id);
+CREATE FUNCTION {{multiply_numbers}}(a INT, b INT) RETURNS INT DETERMINISTIC
 RETURN a * b;
-
-DROP FUNCTION IF EXISTS get_count;
-CREATE FUNCTION get_count() RETURNS INT DETERMINISTIC
+CREATE FUNCTION {{get_count}}() RETURNS INT DETERMINISTIC
 READS SQL DATA
-RETURN (SELECT COUNT(*) FROM callablestatement_test);
+RETURN (SELECT COUNT(*) FROM {{callablestatement_test}});

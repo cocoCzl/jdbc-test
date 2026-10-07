@@ -55,6 +55,8 @@ export interface DriverValidation {
   jdbcCompliant: boolean;
 }
 export interface Connection {
+  executionDatabase?: string | null;
+  executionSchema?: string | null;
   id: string;
   name: string;
   databaseType: string;
@@ -70,6 +72,8 @@ export interface Connection {
   updatedAt: string;
 }
 export interface ConnectionInput {
+  executionDatabase?: string;
+  executionSchema?: string;
   name: string;
   databaseType: string;
   adapterId: string;
@@ -121,7 +125,15 @@ export interface Catalog {
   }[];
   totalScenarioCount: number;
 }
+export interface ExecutionAccounting {
+  selected: number; started: number; completed: number; passed: number; failed: number;
+  skipped: number; aborted: number; pending: number; running: number; notRun: number; incomplete: number;
+  scenarios: { scenarioId: string; moduleId: string; state: string; startedAt: string | null; finishedAt: string | null }[];
+}
 export interface Run {
+  accounting?: ExecutionAccounting | null;
+  executionScope?: { database?: string | null; schema?: string | null } | null;
+  executionIssues?: Record<string, unknown>[];
   id: string;
   status: RunStatus;
   profile: string;

@@ -17,11 +17,12 @@ import org.springframework.transaction.support.TransactionTemplate;
 final class TestRunScheduler {
     private final ExecutorService queue; private final TestRunExecutor executor; private final TestRunRepository runs;
     private final TestRunCredentialRepository credentials; private final TransactionTemplate transactions; private final RunEventPublisher events;
+    private final TestRunSelectedScenarioRepository selected;
     private volatile boolean accepting = true;
-    TestRunScheduler(ExecutionProperties properties, TestRunExecutor executor, TestRunRepository runs, TestRunCredentialRepository credentials, TransactionTemplate transactions, RunEventPublisher events) {
+    TestRunScheduler(ExecutionProperties properties, TestRunExecutor executor, TestRunRepository runs, TestRunCredentialRepository credentials, TransactionTemplate transactions, RunEventPublisher events, TestRunSelectedScenarioRepository selected) {
         if (properties.getMaxConcurrentRuns() < 1) throw new IllegalArgumentException("maxConcurrentRuns must be positive");
         this.queue = Executors.newFixedThreadPool(properties.getMaxConcurrentRuns(), Thread.ofVirtual().name("jdbc-test-run-", 0).factory());
-        this.executor = executor; this.runs = runs; this.credentials = credentials; this.transactions = transactions; this.events = events;
+        this.executor = executor; this.runs = runs; this.credentials = credentials; this.transactions = transactions; this.events = events; this.selected = selected;
     }
     synchronized void enqueue(UUID runId) { if (!accepting) throw new RunException(HttpStatus.SERVICE_UNAVAILABLE, "SERVER_SHUTTING_DOWN", "Server is shutting down"); queue.submit(() -> executor.execute(runId)); }
     void cancel(UUID runId) {
@@ -29,9 +30,17 @@ final class TestRunScheduler {
             TestRunEntity run = runs.findForUpdate(runId).orElseThrow(() -> new RunException(HttpStatus.NOT_FOUND, "RUN_NOT_FOUND", "Test run was not found"));
             if (TestRunStateTransitions.terminal(run.getStatus())) throw new RunException(HttpStatus.CONFLICT, "RUN_ALREADY_FINISHED", "Run has already finished");
             run.setStatus(TestRunStatus.CANCELLED); run.markFinished(); runs.save(run); credentials.deleteById(runId);
-            events.publish(runId, "run.cancelled", Map.of("runId", runId, "status", "CANCELLED")); events.complete(runId);
+            events.publish(runId, "run.cancelled", terminalPayload(run)); events.complete(runId);
         });
         executor.cancel(runId);
+    }
+    private Map<String,Object> terminalPayload(TestRunEntity run) {
+        var payload = new java.util.LinkedHashMap<String,Object>();
+        payload.put("runId", run.getId()); payload.put("status", run.getStatus().name());
+        if (run.getFailureReason() != null) payload.put("reason", run.getFailureReason());
+        var accounting = ExecutionAccounting.of(run, selected.findByRun_IdOrderByScenarioId(run.getId()));
+        if (accounting != null) payload.put("accounting", accounting);
+        return payload;
     }
     @EventListener(ContextClosedEvent.class)
     synchronized void shutdown() {
@@ -48,7 +57,7 @@ final class TestRunScheduler {
                         return run.getId();
                     }).filter(java.util.Objects::nonNull).toList());
             if (interrupted != null) for (UUID id : interrupted) {
-                events.publish(id, "run.status", Map.of("runId", id, "status", "INTERRUPTED"));
+                events.publish(id, "run.status", transactions.execute(tx -> terminalPayload(runs.findById(id).orElseThrow())));
                 events.complete(id);
             }
         } finally {

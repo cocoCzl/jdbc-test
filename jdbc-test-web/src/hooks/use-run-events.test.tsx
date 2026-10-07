@@ -19,6 +19,13 @@ function setup() {
   return { ...hook, client, source: TestEventSource.instances[0] };
 }
 describe("EventSource lifecycle", () => {
+  it("keeps pending and incomplete evidence from SSE without fabricating completed results", () => {
+    const { source, client } = setup();
+    act(() => source.emit("run.progress", {runId: run.id, accounting: {pending: 3, running: 1, notRun: 0, incomplete: 0}, completedCases: 1}));
+    expect(client.getQueryData(runsKeys.detail(run.id))).toMatchObject({completedCases: 1, accounting: {pending: 3, running: 1, notRun: 0}});
+    act(() => source.emit("run.failed", {runId: run.id, accounting: {pending: 0, running: 0, notRun: 3, incomplete: 1}, reason: "WORKER_EXITED_UNEXPECTEDLY"}));
+    expect(client.getQueryData(runsKeys.detail(run.id))).toMatchObject({completedCases: 1, accounting: {notRun: 3, incomplete: 1}, status: "FAILED"});
+  });
   it("uses the events endpoint and restores a run.snapshot", () => {
     const { source, client } = setup();
     expect(source.url).toBe("/api/runs/run-1/events");

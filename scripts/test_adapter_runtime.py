@@ -99,7 +99,7 @@ class AdapterRuntimeTest(unittest.TestCase):
                 "properties": {"vendor.app.name": "jdbc-test"},
                 "property_env": {"vendor.token": "VENDOR_TOKEN"},
             },
-            "namespace": {"mode": "existing", "destructive_consent": True},
+            "namespace": {"mode": "existing", "name": "QA_TEST", "destructive_consent": True},
         }
         with patch.dict(os.environ, {"TEST_DB_PASSWORD": "secret", "VENDOR_TOKEN": "token-value"}):
             runtime = build_runtime_config(PROJECT_ROOT, user, adapter, {"sha256": "abc", "path": "/tmp/driver.jar"})

@@ -30,6 +30,8 @@ function Editor({ connection }: { connection?: Connection }) {
   const client = useQueryClient();
   const [form, setForm] = useState({
     name: connection?.name ?? "",
+    executionDatabase: connection?.executionDatabase ?? "",
+    executionSchema: connection?.executionSchema ?? "",
     databaseType: connection?.databaseType ?? "",
     adapterId: connection?.adapterId ?? "",
     jdbcUrl: connection?.jdbcUrl ?? "",
@@ -213,6 +215,12 @@ function Editor({ connection }: { connection?: Connection }) {
                 value={form.username}
                 onChange={(event) => change("username", event.target.value)}
               />
+              <Field id="execution-database" label="Authorized test database" maxLength={63}
+                value={form.executionDatabase} onChange={(event) => change("executionDatabase", event.target.value)}
+                hint="Required for MySQL and PostgreSQL test runs. A connection probe does not require a write scope." />
+              <Field id="execution-schema" label="Authorized test schema" maxLength={63}
+                value={form.executionSchema} onChange={(event) => change("executionSchema", event.target.value)}
+                hint="Required for schema-based adapters. Use only an explicitly authorized test scope; the run freezes this selection." />
               <Field
                 id="password"
                 label={

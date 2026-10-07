@@ -1,3 +1,5 @@
+import { Plus } from "lucide-react";
+import { JdbcUrl } from "@/components/jdbc-url";
 import { useState } from "react";
 import {
   keepPreviousData,
@@ -78,9 +80,9 @@ export default function Connections() {
       header: "Database / adapter",
       cell: ({ row }) => (
         <div>
-          {row.original.databaseType}
+          Database: {row.original.databaseType}
           <span className="mt-1 block text-xs text-muted-foreground">
-            {row.original.adapterId}
+            Adapter: {row.original.adapterId}
           </span>
         </div>
       ),
@@ -88,16 +90,9 @@ export default function Connections() {
     {
       header: "JDBC URL",
       cell: ({ row }) => (
-        <div className="max-w-64">
-          <p
-            className="truncate font-mono text-xs"
-            title={row.original.jdbcUrl}
-          >
-            {row.original.jdbcUrl}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {row.original.username}
-          </p>
+        <div className="min-w-48 max-w-72">
+          <JdbcUrl value={row.original.jdbcUrl} />
+          <p className="mt-1 text-xs text-muted-foreground">User: {row.original.username}</p>
         </div>
       ),
     },
@@ -133,7 +128,7 @@ export default function Connections() {
     {
       header: "Actions",
       cell: ({ row }) => (
-        <div className="flex gap-1">
+        <div className="flex flex-wrap gap-1">
           <Button
             size="sm"
             variant="ghost"
@@ -166,9 +161,10 @@ export default function Connections() {
     <>
       <PageHeader
         title="Connections"
+        action={<Button asChild><Link to="/connections/new"><Plus />Add connection</Link></Button>}
         description="Your target databases, separate from the platform database."
       />
-      <div className="mb-5 flex justify-end">
+      <div className="mb-3 flex justify-end">
         <label className="flex items-center gap-3 text-sm text-muted-foreground">
           Sort by
           <select
@@ -201,7 +197,7 @@ export default function Connections() {
                 title="No database connections yet"
                 description="Add a target connection to start testing your JDBC drivers."
                 action={
-                  <Button asChild>
+                  <Button asChild variant="outline">
                     <Link to="/connections/new">Add connection</Link>
                   </Button>
                 }

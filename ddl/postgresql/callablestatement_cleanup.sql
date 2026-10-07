@@ -1,5 +1,1 @@
-DROP FUNCTION IF EXISTS add_numbers(INTEGER, INTEGER);
-DROP FUNCTION IF EXISTS get_name_by_id(INTEGER);
-DROP FUNCTION IF EXISTS update_name_by_id(INTEGER, VARCHAR);
-DROP FUNCTION IF EXISTS multiply_numbers(INTEGER, INTEGER);
-DROP FUNCTION IF EXISTS get_count();
+-- Cleanup is performed by the run ownership journal, only after confirmed CREATE.

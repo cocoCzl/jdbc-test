@@ -1,13 +1,15 @@
-const dateTime = new Intl.DateTimeFormat(undefined, {
-  dateStyle: "medium",
-  timeStyle: "short",
+const dateTime = new Intl.DateTimeFormat("en-CA", {
+  year: "numeric", month: "2-digit", day: "2-digit",
+  hour: "2-digit", minute: "2-digit", hourCycle: "h23",
 });
 const number = new Intl.NumberFormat();
 export function formatDateTime(value: string | null | undefined) {
-  return value ? dateTime.format(new Date(value)) : "—";
+  if (!value) return "—";
+  const parts = Object.fromEntries(dateTime.formatToParts(new Date(value)).map(({type, value}) => [type, value]));
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
 }
-export function formatNumber(value: number) {
-  return number.format(value);
+export function formatNumber(value: number | null | undefined) {
+  return value == null ? "—" : number.format(value);
 }
 export function formatDuration(value: number | null | undefined) {
   if (value == null) return "—";
@@ -26,4 +28,8 @@ export function formatBytes(value: number) {
 }
 export function shortId(value: string | null) {
   return value ? `${value.slice(0, 10)}…` : "—";
+}
+
+export function plural(count: number, singular: string, pluralForm = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : pluralForm}`;
 }

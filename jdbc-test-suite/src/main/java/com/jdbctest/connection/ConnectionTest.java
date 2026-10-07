@@ -1,5 +1,6 @@
 package com.jdbctest.connection;
 
+import com.jdbctest.extension.JdbcContext;
 import com.jdbctest.config.ConfigLoader;
 import com.jdbctest.extension.JdbcTestExtension;
 import com.jdbctest.extension.UseSqlScripts;
@@ -51,12 +52,12 @@ class ConnectionTest {
     void testCommit(Connection conn) throws SQLException {
         conn.setAutoCommit(false);
         try (Statement stmt = conn.createStatement()) {
-            stmt.execute("DELETE FROM connection_test WHERE name = 'commit_test'");
+            stmt.execute(JdbcContext.sql("DELETE FROM {{connection_test}} WHERE name = 'commit_test'"));
         }
         conn.commit();
 
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM connection_test WHERE name = 'commit_test'")) {
+             ResultSet rs = stmt.executeQuery(JdbcContext.sql("SELECT COUNT(*) FROM {{connection_test}} WHERE name = 'commit_test'"))) {
             rs.next();
             assertEquals(0, rs.getInt(1), "提交后删除操作应生效");
         } finally {
@@ -70,12 +71,12 @@ class ConnectionTest {
     void testRollback(Connection conn) throws SQLException {
         conn.setAutoCommit(false);
         try (Statement stmt = conn.createStatement()) {
-            stmt.execute("DELETE FROM connection_test WHERE id > 0");
+            stmt.execute(JdbcContext.sql("DELETE FROM {{connection_test}} WHERE id > 0"));
         }
         conn.rollback();
 
         try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM connection_test")) {
+             ResultSet rs = stmt.executeQuery(JdbcContext.sql("SELECT COUNT(*) FROM {{connection_test}}"))) {
             rs.next();
             assertTrue(rs.getInt(1) > 0, "回滚后数据应恢复");
         } finally {
@@ -128,7 +129,7 @@ class ConnectionTest {
     @Order(8)
     @DisplayName("创建 PreparedStatement")
     void testPrepareStatement(Connection conn) throws SQLException {
-        try (PreparedStatement ps = conn.prepareStatement("SELECT * FROM connection_test WHERE id = ?")) {
+        try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql("SELECT * FROM {{connection_test}} WHERE id = ?"))) {
             assertNotNull(ps, "prepareStatement 不应返回 null");
             ps.setInt(1, 1);
             try (ResultSet rs = ps.executeQuery()) {

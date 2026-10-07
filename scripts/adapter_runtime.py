@@ -199,10 +199,8 @@ def build_runtime_config(
     if not namespace_name:
         if namespace_mode == "auto":
             namespace_name = f"jdbc_test_{secrets.token_hex(6)}"
-        elif namespace_spec.get("name_from") == "username":
-            namespace_name = db.get("username", "")
         else:
-            namespace_name = namespace_spec.get("name", "")
+            raise ValueError("Explicit namespace.name is required for existing execution scope")
 
     assets = manifest["assets"]
     ddl_root = _asset_root(project_root, adapter.root, assets["ddl"])
@@ -216,6 +214,7 @@ def build_runtime_config(
     test_filter.setdefault("exclude_tests", [])
     test_filter.setdefault("timeout_ms", 60_000)
 
+    object_prefix = "j" + secrets.token_hex(10)
     runtime = {
         "schema_version": "1.0.0",
         "db": {
@@ -239,8 +238,11 @@ def build_runtime_config(
         },
         "namespace": {
             "mode": namespace_mode,
+            "database": namespace_user.get("database", ""),
             "name": namespace_name,
             "selection": namespace_spec.get("selection", "none"),
+            "object_prefix": object_prefix,
+            "ledger_path": str(project_root / "report" / (object_prefix + "-objects.yaml")),
             "create_sql": namespace_spec.get("create_sql", ""),
             "drop_sql": namespace_spec.get("drop_sql", ""),
             "select_sql": namespace_spec.get("select_sql", ""),

@@ -14,7 +14,7 @@ describe("App routing / Dashboard", () => {
     renderPage("/");
     expect(await screen.findByText("126")).toBeVisible();
     expect(screen.getByText("No test runs yet")).toBeVisible();
-    expect(screen.getByText(/not global statistics/)).toBeVisible();
+    expect(screen.getAllByText("Latest 0 loaded runs").every(item => item.textContent === "Latest 0 loaded runs")).toBe(true);
   });
   it("navigates from sidebar to resource pages with an active route", async () => {
     const user = userEvent.setup();

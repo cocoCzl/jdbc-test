@@ -116,6 +116,9 @@ public class ConfigLoader {
         config.namespace = new Config.NamespaceConfig();
         Map<String, Object> namespace = (Map<String, Object>) raw.get("namespace");
         if (namespace != null) {
+            config.namespace.database = str(namespace.get("database"));
+            config.namespace.objectPrefix = str(namespace.get("object_prefix"));
+            config.namespace.ledgerPath = str(namespace.get("ledger_path"));
             config.namespace.mode = nonBlank(str(namespace.get("mode")), "existing");
             config.namespace.name = str(namespace.get("name"));
             config.namespace.selection = nonBlank(str(namespace.get("selection")), "none");

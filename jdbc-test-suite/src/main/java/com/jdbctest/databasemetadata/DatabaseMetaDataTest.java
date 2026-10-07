@@ -1,5 +1,6 @@
 package com.jdbctest.databasemetadata;
 
+import com.jdbctest.extension.JdbcContext;
 import com.jdbctest.config.ConfigLoader;
 import com.jdbctest.extension.JdbcTestExtension;
 import com.jdbctest.extension.UseSqlScripts;
@@ -20,14 +21,13 @@ class DatabaseMetaDataTest {
     }
 
     private String getSchema(Connection conn) throws SQLException {
-        if (isOracle()) {
-            return conn.getSchema();
-        }
-        return null;
+        return conn.getSchema();
     }
 
-    private String metadataTablePattern() {
-        return isOracle() ? "METADATA_TEST" : "metadata_test";
+    private String metadataTablePattern(Connection connection) throws SQLException {
+        String escape = connection.getMetaData().getSearchStringEscape();
+        String name = JdbcContext.objectName("metadata_test");
+        return escape == null || escape.isEmpty() ? name : name.replace("_", escape + "_");
     }
 
     @Test
@@ -94,16 +94,16 @@ class DatabaseMetaDataTest {
         if (isOracle()) {
             try (Statement stmt = conn.createStatement();
                  ResultSet rs = stmt.executeQuery(
-                         "SELECT table_name FROM user_tables WHERE table_name = 'METADATA_TEST'")) {
+                         JdbcContext.sql("SELECT table_name FROM all_tables WHERE owner = SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA') AND table_name = '{{name:metadata_test}}'"))) {
                 assertTrue(rs.next(), "metadata_test 表应在 user_tables 中");
             }
         }
         String schema = getSchema(conn);
-        try (ResultSet tables = meta.getTables(null, schema, metadataTablePattern(), new String[]{"TABLE"})) {
+        try (ResultSet tables = meta.getTables(conn.getCatalog(), schema, metadataTablePattern(conn), new String[]{"TABLE"})) {
             assertNotNull(tables, "getTables 结果不应为 null");
             boolean found = false;
             while (tables.next()) {
-                if ("metadata_test".equalsIgnoreCase(tables.getString("TABLE_NAME"))) {
+                if (JdbcContext.objectName("metadata_test").equalsIgnoreCase(tables.getString("TABLE_NAME"))) {
                     found = true;
                     break;
                 }
@@ -121,13 +121,13 @@ class DatabaseMetaDataTest {
         if (isOracle()) {
             try (Statement stmt = conn.createStatement();
                  ResultSet rs = stmt.executeQuery(
-                         "SELECT count(*) FROM user_tab_columns WHERE table_name = 'METADATA_TEST'")) {
+                         JdbcContext.sql("SELECT count(*) FROM all_tab_columns WHERE owner = SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA') AND table_name = '{{name:metadata_test}}'"))) {
                 assertTrue(rs.next());
                 assertTrue(rs.getInt(1) >= 3, "metadata_test 至少应有 3 列");
             }
         }
         String schema = getSchema(conn);
-        try (ResultSet columns = meta.getColumns(null, schema, metadataTablePattern(), "%")) {
+        try (ResultSet columns = meta.getColumns(conn.getCatalog(), schema, metadataTablePattern(conn), "%")) {
             assertNotNull(columns, "getColumns 结果不应为 null");
             boolean idFound = false;
             boolean nameFound = false;
@@ -153,15 +153,15 @@ class DatabaseMetaDataTest {
         if (isOracle()) {
             try (Statement stmt = conn.createStatement();
                  ResultSet rs = stmt.executeQuery(
-                         "SELECT column_name FROM user_cons_columns cc "
-                         + "JOIN user_constraints c ON cc.constraint_name = c.constraint_name "
-                         + "WHERE c.table_name = 'METADATA_TEST' AND c.constraint_type = 'P'")) {
+                         JdbcContext.sql("SELECT column_name FROM all_cons_columns cc "
+                         + "JOIN all_constraints c ON cc.owner = c.owner AND cc.constraint_name = c.constraint_name "
+                         + "WHERE c.owner = SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA') AND c.table_name = '{{name:metadata_test}}' AND c.constraint_type = 'P'"))) {
                 assertTrue(rs.next(), "metadata_test 应有主键");
                 assertTrue(rs.getString(1).equalsIgnoreCase("id"));
             }
         }
         String schema = getSchema(conn);
-        try (ResultSet keys = meta.getPrimaryKeys(null, schema, metadataTablePattern())) {
+        try (ResultSet keys = meta.getPrimaryKeys(conn.getCatalog(), schema, JdbcContext.objectName("metadata_test"))) {
             assertNotNull(keys, "getPrimaryKeys 结果不应为 null");
             boolean found = false;
             while (keys.next()) {
