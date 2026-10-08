@@ -6,14 +6,16 @@ import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
 public record CreateConnectionRequest(
-        @NotBlank @Size(max = 200) String name,
-        @NotBlank @Size(max = 80) String databaseType,
-        @NotBlank @Size(max = 100) String adapterId,
-        @NotBlank @Size(max = 2000) String jdbcUrl,
-        @Size(max = 200) String username,
-        @Size(max = 2000) String password,
-        @NotNull Boolean savePassword,
-        @NotNull UUID defaultDriverId,
-        @Size(max = 1000) String description,
-        @Size(max = 63) String executionDatabase,
-        @Size(max = 63) String executionSchema) { }
+    @NotBlank @Size(max = 200) String name,
+    @NotBlank @Size(max = 80) String databaseType,
+    @NotBlank @Size(max = 100) String adapterId,
+    @NotBlank @Size(max = 2000) String jdbcUrl,
+    @Size(max = 200) String username,
+    @Size(max = 2000) String password,
+    @NotNull Boolean savePassword,
+    @NotNull UUID defaultDriverId,
+    @Size(max = 1000) String description,
+    @Size(max = 63) String executionDatabase,
+    @Size(max = 63) String executionSchema) {
+
+}

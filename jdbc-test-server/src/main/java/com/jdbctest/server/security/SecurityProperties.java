@@ -7,4 +7,5 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "jdbc-test.security")
 public record SecurityProperties(@NotBlank String masterKey) {
+
 }

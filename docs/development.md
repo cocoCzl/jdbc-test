@@ -25,6 +25,40 @@ React / Vite → REST + SSE → Spring Boot Server
 
 Server depends on Core and does not load Suite or uploaded driver classes. The Worker fat JAR bundles Core, Suite, JUnit and SQL resources, with target drivers supplied externally. CLI retains its Maven/JUnit execution path; Web uses Server-scheduled Workers. Both share scenarios and execution safety rules. Platform PostgreSQL is separate from the target database.
 
+## Java formatting
+
+The unchanged source is [intellij-java-google-style.xml](../code-style/intellij-java-google-style.xml)
+(SHA-256 `1f3578c03470362b9ad7c11cf9748308d3d362bcacbff4e04edd3b216565383f`).
+[java.xml](../code-style/java.xml) projects its Java settings into an IDEA scheme; other languages
+are excluded. It adds explicit reading rules: expand nonempty methods, blocks, lambdas and simple classes,
+put declaration annotations on separate lines, use continuation indentation for record components,
+wrap long resource lists/enum constants and local declaration annotations, and preserve
+blank-line whitespace in text blocks.
+Use 2-space indentation, 4-space continuation, no tabs and a 100-column target. Keep long
+SQL/URL/literal exceptions intact. The source's forced control braces are retained. Imports use
+static imports first, a blank line, then ordinary imports. Naming, exceptions, logging and security
+continue to follow project conventions and the Alibaba guidelines.
+
+In IDEA, import `code-style/java.xml` through Settings → Editor → Code Style → Java →
+Scheme → Import Scheme → IntelliJ IDEA code style XML, then select `JdbcTestGoogleJava`.
+Reformat only the four modules' Java source roots; use Optimize Imports separately with this scheme.
+The Java-only `.editorconfig` mirrors indentation and margin settings.
+
+Save edits and exit IDEA normally before using its native command-line formatter:
+
+```sh
+scripts/format_java.sh apply
+scripts/format_java.sh check
+# Optional: set IDEA_HOME to the installation containing bin/format.sh (macOS: app/Contents).
+# Both commands also accept individual module/src/main/java/...java or src/test/java/...java paths.
+```
+
+Both commands use the same IDEA engine/XML; `check` is its non-writing `-d` mode.
+Validated with IDEA 2026.2.3, build IU-262.10968.63. Its formatter does not optimize imports;
+the current import blocks were separately reordered using Java compiler source positions without
+adding/removing imports. Existing wildcard imports are retained. Do not substitute another engine,
+bypass a running IDE's instance lock, or automatically rewrite sources during Maven builds.
+
 ## Local startup
 
 Requirements: JDK 21, Maven >=3.9 (Wrapper 3.9.15), Node >=22.12.0 and npm; Python >=3.9 for CLI tools. Prepare Platform PostgreSQL, a persistent 32-byte Base64 master key and a writable data directory.

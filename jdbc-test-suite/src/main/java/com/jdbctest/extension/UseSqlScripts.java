@@ -8,7 +8,10 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 public @interface UseSqlScripts {
-    String[] ddl() default {};
-    String[] dml() default {};
-    String[] cleanup() default {};
+
+  String[] ddl() default {};
+
+  String[] dml() default {};
+
+  String[] cleanup() default {};
 }

@@ -25,6 +25,36 @@ React / Vite → REST + SSE → Spring Boot Server
 
 Server 依赖 Core，不加载 Suite 或上传的驱动类。Worker fat JAR 打包 Core、Suite、JUnit 和 SQL 资源，目标驱动由外部提供。CLI 保留 Maven/JUnit 执行链路，Web 使用 Server 调度的 Worker；两者共享场景与执行安全规则。平台 PostgreSQL 与目标数据库相互独立。
 
+## Java 格式
+
+原始来源为未改动的 [intellij-java-google-style.xml](../code-style/intellij-java-google-style.xml)，
+SHA-256 为 `1f3578c03470362b9ad7c11cf9748308d3d362bcacbff4e04edd3b216565383f`。
+[java.xml](../code-style/java.xml) 仅提取其中 Java 设置，并明确补充阅读约定：
+展开非空方法、代码块、lambda 和简单类，声明注解分行，record 参数采用续行缩进，
+长资源列表及枚举常量换行，本地变量注解分行，保留 text block 空行中的空白。
+基本缩进 2 空格、续行 4 空格、不使用 Tab，100 列为目标；长 SQL、URL 和字面量保留例外。
+保留来源 XML 的控制语句强制大括号规则。import 按静态导入、空行、普通导入分组。
+命名、异常、日志和安全继续遵守项目约定及阿里巴巴开发规范。
+
+IDEA 中通过 Settings → Editor → Code Style → Java → Scheme → Import Scheme →
+IntelliJ IDEA code style XML 导入 `code-style/java.xml`，选择 `JdbcTestGoogleJava`。
+仅对四个 module 的 Java 源码目录执行 Reformat Code；Optimize Imports 单独执行，使用同一方案。
+`.editorconfig` 仅为 Java 同步缩进和列宽基础设置。
+
+命令行使用前先保存编辑并正常退出 IDEA：
+
+```sh
+scripts/format_java.sh apply
+scripts/format_java.sh check
+# 可设置 IDEA_HOME 指向包含 bin/format.sh 的安装目录（macOS 为 app/Contents）。
+# 两个命令也支持指定 module/src/main/java/...java 或 src/test/java/...java 文件。
+```
+
+apply/check 使用同一 IDEA 原生引擎和 XML；check 使用不写文件的 `-d`。
+已在 IDEA 2026.2.3（IU-262.10968.63）验证。原生命令不会 Optimize Imports；
+当前 import 块另外通过 Java 编译器源码位置重排，未增删导入，已有通配导入保留。
+不替换格式引擎、不绕过正在运行的 IDE 实例锁，普通 Maven 构建不会自动改写源码。
+
 ## 本地启动
 
 需要 JDK 21、Maven >=3.9（Wrapper 3.9.15）、Node >=22.12.0 和 npm；CLI 工具需要 Python >=3.9。先准备平台 PostgreSQL、持久保存的 32 字节 Base64 master key 和可写数据目录。

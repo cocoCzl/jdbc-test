@@ -4,4 +4,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = false)
-public record DriverValidationRequest(String driverClass, List<String> artifacts) { }
+public record DriverValidationRequest(String driverClass, List<String> artifacts) {
+
+}

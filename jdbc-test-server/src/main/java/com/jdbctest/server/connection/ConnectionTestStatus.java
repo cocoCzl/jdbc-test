@@ -1,3 +1,3 @@
 package com.jdbctest.server.connection;
 
-public enum ConnectionTestStatus { SUCCEEDED, FAILED }
+public enum ConnectionTestStatus {SUCCEEDED, FAILED}

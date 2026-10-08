@@ -5,16 +5,16 @@ import java.util.Map;
 
 public class FeatureProfile {
 
-    private static volatile Map<String, Boolean> features = Collections.emptyMap();
+  private static volatile Map<String, Boolean> features = Collections.emptyMap();
 
-    public static void load(Map<String, Boolean> declarations) {
-        features = com.jdbctest.catalog.AdapterExecutionConfig.validateCapabilities(declarations);
-    }
+  public static void load(Map<String, Boolean> declarations) {
+    features = com.jdbctest.catalog.AdapterExecutionConfig.validateCapabilities(declarations);
+  }
 
-    public static boolean supports(String feature) {
-        if (!features.containsKey(feature)) {
-            throw new IllegalStateException("ADAPTER_CAPABILITY_MISSING: " + feature);
-        }
-        return features.get(feature);
+  public static boolean supports(String feature) {
+    if (!features.containsKey(feature)) {
+      throw new IllegalStateException("ADAPTER_CAPABILITY_MISSING: " + feature);
     }
+    return features.get(feature);
+  }
 }

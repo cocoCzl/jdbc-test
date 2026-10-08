@@ -9,5 +9,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/adapters")
 final class AdapterController {
-    @GetMapping List<AdapterCatalog.AdapterMetadata> list() { return AdapterCatalog.list(); }
+
+  @GetMapping
+  List<AdapterCatalog.AdapterMetadata> list() {
+    return AdapterCatalog.list();
+  }
 }
