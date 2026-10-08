@@ -14,7 +14,7 @@ INCLUDED_PATHS = (
     ".gitignore",
     "Dockerfile.cli",
     "LICENSE",
-    "README.en.md",
+    "README.zh-CN.md",
     "README.md",
     "adapters",
     "compatibility",

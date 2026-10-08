@@ -1,12 +1,12 @@
-# JDBC regression testing examples
+# JDBC 回归测试使用示例
 
-English | [中文](README.md)
+[English](README.md) | 简体中文
 
-All addresses, driver classes, accounts, and properties below are anonymous examples. Generated configuration belongs in `configs/`, and private drivers belong in `local-drivers/`; both directories are excluded from Git. Run all commands from the project root.
+本文档中的地址、驱动类、账号和属性均为匿名示例。生成的配置位于 `configs/`，私有驱动位于 `local-drivers/`；两个目录都不会提交到 Git。所有命令从项目根目录执行。
 
-## Common databases
+## 常见数据库
 
-Bundled adapters use Hikari by default. Give each target its own password environment variable and local config so several targets can coexist.
+内置适配包默认使用 Hikari 连接池。每次使用独立的密码环境变量和本地配置，便于同时保存多个目标。
 
 ### PostgreSQL
 
@@ -40,13 +40,14 @@ python3 scripts/runner.py run configs/mysql.local.json
 
 ### Oracle
 
-Oracle uses the account's existing schema. Always use a dedicated test account rather than a business account.
+Oracle 使用账号现有 schema，请使用专用测试账号，不要使用业务账号。
 
 ```bash
 python3 scripts/runner.py init \
   --adapter oracle \
   --url 'jdbc:oracle:thin:@localhost:1521/FREEPDB1' \
   --username jdbc_test_user \
+  --namespace JDBC_TEST_USER \
   --password-env ORACLE_TEST_PASSWORD \
   --consent \
   --output configs/oracle.local.json
@@ -55,13 +56,13 @@ export ORACLE_TEST_PASSWORD='your-password'
 python3 scripts/runner.py run configs/oracle.local.json
 ```
 
-PostgreSQL and MySQL create and clean a random dedicated namespace. Oracle creates and cleans test objects in the dedicated account's schema.
+PostgreSQL 和 MySQL 创建随机专用测试命名空间，仅清理确认归属的对象；命名空间保留供操作人员检查。Oracle 使用明确授权的已有 schema。运行前阅读[执行安全](../docs/execution-safety.zh-CN.md)。
 
-## Private databases and drivers
+## 自研数据库与私有驱动
 
-Private databases do not need project source changes. Put the driver in `local-drivers/`, then select the compatible `oracle`, `mysql`, or `postgresql` dialect. The generated local adapter reuses that dialect's DDL/DML assets.
+自研数据库不需要写入项目源码。将驱动放入 `local-drivers/`，然后根据实际兼容方言选择 `oracle`、`mysql` 或 `postgresql`。生成的本地适配包会复用所选方言的 DDL/DML。
 
-### Oracle-compatible dialect
+### Oracle 兼容方言
 
 ```bash
 python3 scripts/runner.py init-custom \
@@ -71,6 +72,7 @@ python3 scripts/runner.py init-custom \
   --driver-dir local-drivers/database-a-driver.jar \
   --url 'jdbc:vendor-a://localhost:9001/test' \
   --username jdbc_tester \
+  --namespace JDBC_TESTER \
   --password-env DATABASE_A_PASSWORD \
   --consent
 
@@ -78,7 +80,7 @@ export DATABASE_A_PASSWORD='your-password'
 python3 scripts/runner.py run configs/database-a.local.json
 ```
 
-### MySQL-compatible dialect
+### MySQL 兼容方言
 
 ```bash
 python3 scripts/runner.py init-custom \
@@ -95,7 +97,7 @@ export DATABASE_B_PASSWORD='your-password'
 python3 scripts/runner.py run configs/database-b.local.json
 ```
 
-### PostgreSQL-compatible dialect
+### PostgreSQL 兼容方言
 
 ```bash
 python3 scripts/runner.py init-custom \
@@ -112,13 +114,13 @@ export DATABASE_C_PASSWORD='your-password'
 python3 scripts/runner.py run configs/database-c.local.json
 ```
 
-Local adapters start with permissive metadata identity ranges. After the first run, tighten the product name, driver name, and version ranges in `configs/custom-adapters/<id>/adapter.json`. A local adapter always has `formal_eligible=False`.
+本地适配包首次使用宽松的元数据身份范围。首跑后可在 `configs/custom-adapters/<id>/adapter.json` 中收紧产品名、驱动名和版本范围。它始终标记为 `local`，所以 `formal_eligible=False` 是正常结果。
 
-## Connection modes
+## 连接方式
 
-### Hikari pool
+### Hikari 连接池
 
-Bundled adapters use Hikari by default. A private database may select it explicitly:
+内置适配包默认使用 Hikari。自研数据库也可显式选择：
 
 ```bash
 python3 scripts/runner.py init-custom \
@@ -133,9 +135,9 @@ python3 scripts/runner.py init-custom \
   --consent
 ```
 
-### Direct DriverManager
+### DriverManager 直连
 
-`init-custom` defaults to DriverManager, or it can be selected explicitly. The framework loads the driver class and invokes `DriverManager.getConnection(url, properties)`:
+`init-custom` 默认使用 DriverManager，也可显式声明。框架会加载驱动类，然后调用 `DriverManager.getConnection(url, properties)`：
 
 ```bash
 python3 scripts/runner.py init-custom \
@@ -146,20 +148,21 @@ python3 scripts/runner.py init-custom \
   --driver-dir local-drivers/database-direct.jar \
   --url 'jdbc:vendor://localhost:9000/test' \
   --username jdbc_tester \
+  --namespace JDBC_TESTER \
   --password-env DATABASE_PASSWORD \
   --consent
 ```
 
-## JDBC properties and URL parameters
+## JDBC Properties 与 URL 参数
 
-Repeat `--property` for ordinary vendor properties:
+普通厂商属性可重复使用 `--property`：
 
 ```bash
 --property vendor.app.name=jdbc-test \
 --property vendor.mode=compatibility
 ```
 
-Use environment variables for tokens and other sensitive values:
+令牌、密钥等敏感值使用环境变量，不写入本地 JSON：
 
 ```bash
 export VENDOR_ACCESS_TOKEN='your-token'
@@ -177,21 +180,21 @@ python3 scripts/runner.py init-custom \
   --consent
 ```
 
-`user` and `password` are reserved and must be supplied through `--username` and `--password-env`. JDBC URLs are passed through unchanged, including driver-specific parameters:
+`user` 和 `password` 是保留属性，必须分别通过 `--username` 和 `--password-env` 配置。JDBC URL 会原样交给驱动，因此也可以使用驱动定义的 URL 参数：
 
 ```bash
 --url 'jdbc:vendor://localhost:9000/test?ssl=true&applicationName=jdbc-test'
 ```
 
-## Single- and multi-JAR drivers
+## 单 JAR 与多 JAR 驱动
 
-For one driver JAR:
+单个驱动 JAR：
 
 ```bash
 --driver-dir local-drivers/vendor-driver.jar
 ```
 
-For a driver with dependencies, place every JAR in one directory:
+驱动包含多个依赖时，将所有 JAR 放入同一目录：
 
 ```text
 local-drivers/database-a/
@@ -200,21 +203,21 @@ local-drivers/database-a/
 └── dependency-b.jar
 ```
 
-Then configure the directory:
+然后配置目录：
 
 ```bash
 --driver-dir local-drivers/database-a
 ```
 
-The framework adds every `*.jar` in stable order to the test classpath.
+框架会按稳定顺序将目录中的全部 `*.jar` 加入测试 classpath。
 
-## Repeated runs and reports
+## 日常重复运行与报告
 
-After generating a config, subsequent runs only need the environment variable and `run` command:
+配置生成后无需再次执行 `init`，只需设置环境变量并运行：
 
 ```bash
 export DATABASE_PASSWORD='your-password'
 python3 scripts/runner.py run configs/database-a.local.json
 ```
 
-Reports are written to `report/<adapter>_timestamp/`. Compatibility failures, execution errors, and preflight failures return a non-zero exit code, but reports are still generated. `diagnostics.log` can contain local troubleshooting details and should be reviewed before sharing.
+报告位于 `report/<adapter>_时间戳/`。兼容性失败、执行错误或预检失败会返回非零退出码，但报告仍会生成。`diagnostics.log` 可能包含本地排障信息，分享前应人工检查。
