@@ -1,3 +1,4 @@
+import i18n from "@/i18n";
 import { act, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -19,7 +20,7 @@ describe("ECharts lifecycle", () => {
     );
     expect(chart.setOption).toHaveBeenCalledWith(
       expect.objectContaining({
-        tooltip: { trigger: "item", renderMode: "richText" },
+        tooltip: expect.objectContaining({ trigger: "item", renderMode: "richText" }),
         series: [
           expect.objectContaining({
             data: [
@@ -45,6 +46,20 @@ describe("ECharts lifecycle", () => {
     render(<OutcomeChart passed={null} failed={null} skipped={null} aborted={null} />);
     expect(screen.getAllByText("—")).toHaveLength(5);
     expect(screen.queryByText("0")).not.toBeInTheDocument();
+  });
+  it("updates localized legends, tooltip and center text without recreating the chart", async () => {
+    render(<OutcomeChart passed={1234} failed={2} skipped={1} aborted={4} />);
+    const creations = init.mock.calls.length;
+    await act(async () => { await i18n.changeLanguage("zh-CN"); });
+    expect(init.mock.calls).toHaveLength(creations);
+    expect(screen.getByText("通过")).toBeVisible();
+    expect(screen.getByText("已记录结果")).toBeVisible();
+    const option = chart.setOption.mock.calls.at(-1)![0];
+    expect(option.animationDurationUpdate).toBe(0);
+    expect(option.series[0].data.map((item: {id: string}) => item.id)).toEqual(["passed", "failed", "skipped", "aborted"]);
+    expect(option.series[0].data.map((item: {name: string}) => item.name)).toEqual(["通过", "失败", "已跳过", "已中止"]);
+    expect(option.tooltip.formatter({name: "通过", value: 1234})).toBe("通过: 1,234");
+    expect(option.series[0].data.map((item: {value: number}) => item.value)).toEqual([1234, 2, 1, 4]);
   });
   it("resizes and disposes the chart and disconnects its observer on unmount", () => {
     let resize: (() => void) | undefined;

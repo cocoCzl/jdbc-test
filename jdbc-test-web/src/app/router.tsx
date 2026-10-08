@@ -1,7 +1,8 @@
+import { NotFound } from "@/components/not-found";
 import { lazy, Suspense } from "react";
-import { createBrowserRouter, Link, Outlet } from "react-router-dom";
+import { createBrowserRouter, Outlet } from "react-router-dom";
 import { AppShell } from "@/components/layout/app-shell";
-import { EmptyState, Loading } from "@/components/common";
+import { Loading } from "@/components/common";
 const Dashboard = lazy(() => import("@/features/dashboard/dashboard"));
 const Drivers = lazy(() => import("@/features/drivers/drivers"));
 const DriverForm = lazy(() => import("@/features/drivers/driver-form"));
@@ -36,17 +37,7 @@ export const routes = [
           { path: "runs/:id", element: <RunDetail /> },
           {
             path: "*",
-            element: (
-              <EmptyState
-                title="Page not found"
-                description="This page is not part of your workspace."
-                action={
-                  <Link to="/" className="subtle-link">
-                    Back to Dashboard
-                  </Link>
-                }
-              />
-            ),
+            element: <NotFound />,
           },
         ],
       },

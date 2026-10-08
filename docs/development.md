@@ -62,6 +62,12 @@ Run detail loads REST first, then opens native `EventSource` for active runs. SS
 
 Dashboard outcomes describe only the eight loaded recent runs; catalog totals describe inventory. There are no global trend, module-aggregate or safe diagnostics endpoints. Run lists filter by status. Results support status or module filtering, with status taking precedence. The UI does not invent unavailable statistics or a Logs tab.
 
+### Language and metric cards
+
+The top-right menu switches between bundled English (`en`) and Simplified Chinese (`zh-CN`) without reloading. A valid `jdbc-test.locale` preference takes precedence over supported browser languages; otherwise English is the fallback. Blocked storage is tolerated. Dates retain browser-local timezone semantics. Stable IDs, API values, cached data and raw reports remain untranslated.
+
+Metric cards share CSS tone tokens and pale gradients; outcome colors retain their existing meanings. Completed includes explicit skips and is not a compatibility pass rate. Results exposes skipped `message` details as original sanitized evidence; the current DTO has no separate structured skip-source/capability fields. Technical scenario names and unknown module names remain backend-provided.
+
 ## Platform database
 
 Flyway V1–V5 owns schema; Hibernate uses `ddl-auto=validate`. UUIDs identify records and UTC `Instant` values use `timestamp with time zone`. References protect historical runs from deletion of used drivers/connections.
@@ -184,3 +190,5 @@ npm run test:e2e:real
 ```
 
 The real project requires running Server/Worker, a clean platform database/artifact store and a separate authorized target PostgreSQL. Missing inputs fail rather than fall back to mocks. It creates persistent test data; use fresh acceptance storage on rerun and never use shared/business databases. Trace collection is disabled. `PLAYWRIGHT_CHANNEL=chrome` can use installed Chrome. Production-mode checks are described in [Deployment](deployment.md).
+
+For browser checks against the freshly built assets, use `JDBC_TEST_E2E_PREVIEW=true PLAYWRIGHT_CHANNEL=chrome npm --prefix jdbc-test-web run test:e2e` after building. This runs the mocked project only, captures explicitly labelled fixture screenshots, and verifies the loaded bundle SHA-256 against `dist`. It does not start QA or execute target database operations.

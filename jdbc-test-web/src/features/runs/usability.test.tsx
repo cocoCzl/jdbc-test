@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { connection, finishedRun, page } from "@/test/fixtures";
 import { json, mockApi, renderPage } from "@/test/harness";
-import { redactJdbcUrl } from "@/components/jdbc-url";
+import { redactJdbcUrl } from "@/lib/jdbc-url";
 import { formatDateTime, plural } from "@/lib/format";
 
 describe("Usability without changing execution semantics", () => {
@@ -64,7 +64,7 @@ describe("Usability without changing execution semantics", () => {
   });
   it("uses one date style in local time and correct singular/plural labels", () => {
     const date = new Date(2026, 9, 7, 8, 9);
-    expect(formatDateTime(date.toISOString())).toBe("2026-10-07 08:09");
+    expect(formatDateTime(date.toISOString())).toBe(new Intl.DateTimeFormat("en", {year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).format(date));
     expect(formatDateTime(null)).toBe("—");
     expect(plural(1, "record")).toBe("1 record");
     expect(plural(2, "loaded run")).toBe("2 loaded runs");

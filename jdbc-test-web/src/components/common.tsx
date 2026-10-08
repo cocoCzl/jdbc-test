@@ -1,3 +1,7 @@
+import i18n from "@/i18n";
+import { formatNumber } from "@/lib/format";
+import { t } from "i18next";
+import { useTranslation } from "react-i18next";
 import { Check, Copy, Inbox, LoaderCircle, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
@@ -27,7 +31,8 @@ export function PageHeader({
     </div>
   );
 }
-export function Loading({ label = "Loading workspace…" }: { label?: string }) {
+export function Loading({ label = t("ui.loadingWorkspace") }: { label?: string }) {
+  useTranslation();
   return (
     <div
       role="status"
@@ -45,18 +50,18 @@ export function ErrorState({
   error: unknown;
   retry?: () => void;
 }) {
+  useTranslation();
   return (
     <div role="alert" className="panel flex items-start gap-3">
       <TriangleAlert className="mt-1 size-5 shrink-0 text-destructive" />
       <div className="min-w-0 break-words">
-        <h2 className="font-semibold">Unable to load this resource</h2>
+        <h2 className="font-semibold">{t("ui.unableToLoadThisResource")}</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           {errorMessage(error)}
         </p>
         {retry ? (
           <Button variant="outline" size="sm" className="mt-4" onClick={retry}>
-            Try again
-          </Button>
+            {t("ui.tryAgain")}</Button>
         ) : null}
       </div>
     </div>
@@ -121,26 +126,28 @@ export function Field({
     </div>
   );
 }
-export function FormError({ message }: { message: string | null }) {
+export function FormError({ message }: { message: string | Error | null }) {
+  useTranslation();
   return message ? (
     <p
       role="alert"
       className="break-words rounded-xl bg-destructive/5 p-3 text-sm text-destructive"
     >
-      {message}
+      {message instanceof Error ? errorMessage(message) : i18n.exists(message) ? t(message) : message}
     </p>
   ) : null;
 }
 export function CopyButton({ value, label }: { value: string; label: string }) {
+  useTranslation();
   return (
     <Button
       variant="ghost"
       size="icon"
-      aria-label={`Copy ${label}`}
+      aria-label={t("common.copy", { label })}
       onClick={() => {
         void navigator.clipboard.writeText(value).then(
-          () => toast.success(`${label} copied`),
-          () => toast.error("Clipboard unavailable"),
+          () => toast.success(t("common.copied", { label })),
+          () => toast.error(t("ui.clipboardUnavailable")),
         );
       }}
     >
@@ -160,18 +167,18 @@ export function Metric({
   value: ReactNode;
   note?: string;
   icon?: ReactNode;
-  tone?: Tone | "highlight";
+  tone?: Tone | "highlight" | "cyan";
   subdued?: boolean;
 }) {
   return (
     <div className={`panel metric tone-${tone}${subdued ? " metric-subdued" : ""}`} data-metric={label}>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-sm text-muted-foreground">{label}</p>
+        <p className="min-w-0 break-words text-sm text-muted-foreground">{label}</p>
         {icon ? (
           <span className="metric-icon rounded-lg p-2">{icon}</span>
         ) : null}
       </div>
-      <p className="mt-2 text-3xl font-semibold tracking-tight">{value}</p>
+      <p className="mt-2 text-3xl font-semibold tracking-tight">{typeof value === "number" ? formatNumber(value) : value}</p>
       {note ? (
         <p className="mt-2 text-xs text-muted-foreground">{note}</p>
       ) : null}
@@ -183,6 +190,7 @@ export function ProbeResult({
 }: {
   result: import("@/types/api").Probe;
 }) {
+  useTranslation();
   return (
     <div
       role="status"
@@ -190,23 +198,22 @@ export function ProbeResult({
     >
       <h3 className="flex items-center gap-2 font-semibold text-success">
         <Check className="size-4" />
-        Connected
-      </h3>
+        {t("ui.connected")}</h3>
       <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
         <div>
-          <dt className="text-muted-foreground">Database</dt>
+          <dt className="text-muted-foreground">{t("ui.database")}</dt>
           <dd>
             {result.databaseProductName ?? "—"} {result.databaseProductVersion}
           </dd>
         </div>
         <div>
-          <dt className="text-muted-foreground">Driver</dt>
+          <dt className="text-muted-foreground">{t("ui.driver")}</dt>
           <dd>
             {result.driverName ?? "—"} {result.driverVersion}
           </dd>
         </div>
         <div>
-          <dt className="text-muted-foreground">JDBC version</dt>
+          <dt className="text-muted-foreground">{t("ui.jdbcVersion")}</dt>
           <dd>
             {result.jdbcMajorVersion != null
               ? `${result.jdbcMajorVersion}.${result.jdbcMinorVersion ?? 0}`

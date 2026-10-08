@@ -62,3 +62,4 @@ coverage/
 
 # Local documentation backups and development history
 /.local/docs-history/
+/.local/history-view-qa/

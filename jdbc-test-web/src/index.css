@@ -42,6 +42,9 @@
   --warning: #b45309;
   --neutral: #5b6c83;
   --highlight: #7c3aed;
+  --cyan: #0284c7;
+  --metric-radius: 1rem;
+  --metric-shadow: 0 5px 18px -12px #223c6030;
 }
 @layer base {
   * {
@@ -117,14 +120,39 @@
   .tone-warning { --tone: var(--warning); }
   .tone-neutral { --tone: var(--neutral); }
   .tone-highlight { --tone: var(--highlight); }
+  .tone-cyan { --tone: var(--cyan); }
   .status-badge { color: var(--tone); background: color-mix(in srgb, var(--tone) 8%, white); }
-  .metric { border-top: 3px solid var(--tone, var(--primary)); }
-  .metric-icon { color: var(--tone, var(--primary)); background: color-mix(in srgb, var(--tone, var(--primary)) 9%, white); }
+  .metric {
+    position: relative;
+    min-width: 0;
+    overflow: hidden;
+    border-radius: var(--metric-radius);
+    border-color: color-mix(in srgb, var(--tone, var(--primary)) 16%, white);
+    background: linear-gradient(145deg,
+      color-mix(in srgb, var(--tone, var(--primary)) 11%, white) 0%,
+      color-mix(in srgb, var(--tone, var(--primary)) 4%, white) 42%, white 78%);
+    box-shadow: var(--metric-shadow);
+  }
+  .metric::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto;
+    height: 2px;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--tone) 35%, white), transparent 85%);
+  }
+  .metric-icon {
+    flex-shrink: 0;
+    color: var(--tone, var(--primary));
+    border: 1px solid #ffffffb3;
+    background: linear-gradient(145deg, color-mix(in srgb, var(--tone) 17%, white), color-mix(in srgb, var(--tone) 8%, white));
+    box-shadow: 0 3px 8px -4px color-mix(in srgb, var(--tone) 28%, transparent);
+  }
   .run-progress { appearance: none; display: block; background: var(--color-secondary); }
   .run-progress::-webkit-progress-bar { background: var(--color-secondary); border-radius: 999px; }
   .run-progress::-webkit-progress-value { background: var(--tone, var(--primary)); border-radius: 999px; }
   .run-progress::-moz-progress-bar { background: var(--tone, var(--primary)); border-radius: 999px; }
-  .metric-subdued { border-top-color: var(--color-border); }
+  .metric-subdued { --tone: var(--neutral); border-color: var(--color-border); background: linear-gradient(145deg, #f5f7fa, white 65%); }
+  .metric-subdued::before { opacity: 0.3; }
   .metric-subdued .metric-icon { color: var(--color-muted-foreground); background: var(--color-muted); }
   .metric-subdued > p { color: var(--color-muted-foreground); }
   .step-card:has(input:checked) { border-color: var(--primary); background: var(--color-accent); }

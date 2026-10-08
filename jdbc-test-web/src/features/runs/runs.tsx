@@ -1,3 +1,5 @@
+import { t } from "i18next";
+import { useTranslation } from "react-i18next";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
@@ -13,8 +15,9 @@ import {
   Loading,
   PageHeader,
 } from "@/components/common";
-import { runColumns } from "./run-columns";
+import { getRunColumns } from "./run-columns";
 export default function Runs() {
+  useTranslation();
   const [page, setPage] = useState(0);
   const [status, setStatus] = useState<RunStatus | "">("");
   const [sort, setSort] = useState("createdAt,desc");
@@ -27,15 +30,14 @@ export default function Runs() {
   return (
     <>
       <PageHeader
-        title="Run history"
-        action={<Button asChild><Link to="/runs/new"><Plus />New run</Link></Button>}
-        description="Open a run to view its test results, progress and report."
+        title={t("ui.runHistory")}
+        action={<Button asChild><Link to="/runs/new"><Plus />{t("ui.newRun")}</Link></Button>}
+        description={t("ui.openARunToViewItsTest")}
       />
       <div className="mb-5 flex flex-wrap gap-4">
         <label className="flex items-center gap-3 text-sm text-muted-foreground">
-          Status
-          <select
-            aria-label="Filter run status"
+          {t("ui.status")}<select
+            aria-label={t("ui.filterRunStatus")}
             className="select w-48"
             value={status}
             onChange={(event) => {
@@ -43,7 +45,7 @@ export default function Runs() {
               setPage(0);
             }}
           >
-            <option value="">All statuses</option>
+            <option value="">{t("ui.allStatuses")}</option>
             {Object.entries(runPresentation).map(([value, presentation]) => (
               <option key={value} value={value}>
                 {presentation.label}
@@ -52,9 +54,8 @@ export default function Runs() {
           </select>
         </label>
         <label className="flex items-center gap-3 text-sm text-muted-foreground">
-          Sort
-          <select
-            aria-label="Sort runs"
+          {t("ui.sort")}<select
+            aria-label={t("ui.sortRuns")}
             className="select w-48"
             value={sort}
             onChange={(event) => {
@@ -62,9 +63,9 @@ export default function Runs() {
               setPage(0);
             }}
           >
-            <option value="createdAt,desc">Newest first</option>
-            <option value="startedAt,desc">Started recently</option>
-            <option value="finishedAt,desc">Finished recently</option>
+            <option value="createdAt,desc">{t("ui.newestFirst")}</option>
+            <option value="startedAt,desc">{t("ui.startedRecently")}</option>
+            <option value="finishedAt,desc">{t("ui.finishedRecently")}</option>
           </select>
         </label>
       </div>
@@ -76,18 +77,18 @@ export default function Runs() {
         <div className="panel overflow-hidden p-0" aria-busy={query.isFetching}>
           <DataTable
             rows={query.data.items}
-            columns={runColumns}
+            columns={getRunColumns()}
             empty={
               <EmptyState
-                title="No test runs yet"
+                title={t("ui.noTestRunsYet")}
                 description={
                   status
-                    ? "No runs match this status."
-                    : "Start your first compatibility run and build a history of evidence."
+                    ? t("ui.noRunsMatchThisStatus")
+                    : t("ui.startYourFirstCompatibilityRunAndBuild")
                 }
                 action={
                   <Button asChild variant="outline">
-                    <Link to="/runs/new">Create a test run</Link>
+                    <Link to="/runs/new">{t("ui.createATestRun")}</Link>
                   </Button>
                 }
               />

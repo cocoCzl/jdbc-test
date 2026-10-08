@@ -1,3 +1,5 @@
+import { t } from "i18next";
+import { useTranslation } from "react-i18next";
 import { Dialog as Primitive } from "radix-ui";
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
@@ -17,6 +19,7 @@ export function Dialog({
   children: ReactNode;
   className?: string;
 }) {
+  useTranslation();
   return (
     <Primitive.Root open={open} onOpenChange={onOpenChange}>
       <Primitive.Portal>
@@ -36,7 +39,7 @@ export function Dialog({
           <div className="mt-6">{children}</div>
           <Primitive.Close className="absolute right-5 top-5 rounded-lg p-1 text-muted-foreground hover:bg-muted">
             <X className="size-5" />
-            <span className="sr-only">Close dialog</span>
+            <span className="sr-only">{t("ui.closeDialog")}</span>
           </Primitive.Close>
         </Primitive.Content>
       </Primitive.Portal>

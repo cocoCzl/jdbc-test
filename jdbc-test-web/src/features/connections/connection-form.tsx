@@ -1,10 +1,12 @@
+import { adapterStatus } from "@/lib/presentation";
+import { t } from "i18next";
+import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { adaptersApi, adapterKeys } from "@/api/adapters";
 import { connectionsApi, connectionsKeys } from "@/api/connections";
-import { errorMessage } from "@/api/client";
 import type {
   Connection,
   ConnectionInput,
@@ -26,6 +28,7 @@ import {
 import { connectionPresentation } from "@/lib/status";
 import { formatDateTime } from "@/lib/format";
 function Editor({ connection }: { connection?: Connection }) {
+  useTranslation();
   const navigate = useNavigate();
   const client = useQueryClient();
   const [form, setForm] = useState({
@@ -45,7 +48,7 @@ function Editor({ connection }: { connection?: Connection }) {
   const [savePassword, setSavePassword] = useState(false);
   const [clearSavedPassword, setClearSavedPassword] = useState(false);
   const [probe, setProbe] = useState<Probe | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | Error | null>(null);
   const [deleting, setDeleting] = useState(false);
   const adapters = useQuery({
     queryKey: adapterKeys.all,
@@ -68,11 +71,11 @@ function Editor({ connection }: { connection?: Connection }) {
         : connectionsApi.create(input);
     },
     onSuccess: (result) => {
-      toast.success(connection ? "Connection updated" : "Connection created");
+      toast.success(connection ? t("ui.connectionUpdated") : t("ui.connectionCreated"));
       void client.invalidateQueries({ queryKey: connectionsKeys.all });
       navigate(`/connections/${result.id}`);
     },
-    onError: (failure) => setError(errorMessage(failure)),
+    onError: (failure) => setError(failure instanceof Error ? failure : new Error()),
     onSettled: () => setPassword(""),
   });
   const test = useMutation({
@@ -86,26 +89,26 @@ function Editor({ connection }: { connection?: Connection }) {
           }),
     onSuccess: (result) => {
       setProbe(result);
-      toast.success("Connection established");
+      toast.success(t("ui.connectionEstablished"));
       void client.invalidateQueries({ queryKey: connectionsKeys.all });
     },
-    onError: (failure) => setError(errorMessage(failure)),
+    onError: (failure) => setError(failure instanceof Error ? failure : new Error()),
     onSettled: () => setPassword(""),
   });
   const remove = useMutation({
     mutationFn: () => connectionsApi.delete(connection!.id),
     onSuccess: () => {
-      toast.success("Connection deleted");
+      toast.success(t("ui.connectionDeleted"));
       void client.invalidateQueries({ queryKey: connectionsKeys.all });
       navigate("/connections");
     },
     onError: (failure) => {
       setDeleting(false);
-      setError(errorMessage(failure));
+      setError(failure instanceof Error ? failure : new Error());
     },
   });
   const busy = save.isPending || test.isPending;
-  if (adapters.isPending) return <Loading label="Loading adapters…" />;
+  if (adapters.isPending) return <Loading label={t("ui.loadingAdapters")} />;
   if (adapters.isError)
     return (
       <ErrorState
@@ -116,14 +119,13 @@ function Editor({ connection }: { connection?: Connection }) {
   return (
     <>
       <PageHeader
-        title={connection ? connection.name : "Add a connection"}
-        description="Connection metadata stays on the platform. JDBC work happens in a separate Worker."
+        title={connection ? connection.name : t("ui.addAConnection")}
+        description={t("ui.connectionMetadataStaysOnThePlatformJDBC")}
         action={
           connection ? (
             <Button asChild>
               <Link to={`/runs/new?connectionId=${connection.id}`}>
-                Start run
-              </Link>
+                {t("ui.startRun")}</Link>
             </Button>
           ) : undefined
         }
@@ -133,11 +135,11 @@ function Editor({ connection }: { connection?: Connection }) {
         onSubmit={(event) => {
           event.preventDefault();
           if (!driver) {
-            setError("Select a validated driver.");
+            setError("ui.selectAValidatedDriverSentence");
             return;
           }
           if (savePassword && !password) {
-            setError("Enter a password to save, or uncheck Save password.");
+            setError("ui.enterAPasswordToSaveOrUncheck");
             return;
           }
           setError(null);
@@ -146,27 +148,27 @@ function Editor({ connection }: { connection?: Connection }) {
       >
         <div className="space-y-6">
           <section className="panel">
-            <h2 className="mb-5 text-lg font-semibold">Connection identity</h2>
+            <h2 className="mb-5 text-lg font-semibold">{t("ui.connectionIdentity")}</h2>
             <div className="grid gap-5 sm:grid-cols-2">
               <Field
                 id="connection-name"
-                label="Name"
+                label={t("ui.name")}
                 required
                 maxLength={200}
                 value={form.name}
                 onChange={(event) => change("name", event.target.value)}
-                placeholder="PostgreSQL test workspace"
+                placeholder={t("ui.postgresqlTestWorkspace")}
               />
               <Field
                 id="database-type"
-                label="Database type"
+                label={t("ui.databaseType")}
                 required
                 maxLength={80}
                 value={form.databaseType}
                 onChange={(event) => change("databaseType", event.target.value)}
-                hint="An open label, e.g. PostgreSQL, AcmeDB or VendorDB."
+                hint={t("ui.anOpenLabelEGPostgreSQLAcmeDB")}
               />
-              <Field id="adapter" label="Adapter">
+              <Field id="adapter" label={t("ui.adapter")}>
                 <select
                   id="adapter"
                   required
@@ -183,10 +185,10 @@ function Editor({ connection }: { connection?: Connection }) {
                       );
                   }}
                 >
-                  <option value="">Select an adapter</option>
+                  <option value="">{t("ui.selectAnAdapter")}</option>
                   {adapters.data.map((adapter) => (
                     <option key={adapter.id} value={adapter.id}>
-                      {adapter.name} · {adapter.status}
+                      {adapter.name} · {adapterStatus(adapter.status)}
                     </option>
                   ))}
                 </select>
@@ -199,34 +201,34 @@ function Editor({ connection }: { connection?: Connection }) {
               <div className="sm:col-span-2">
                 <Field
                   id="jdbc-url"
-                  label="JDBC URL"
+                  label={t("ui.jdbcURL")}
                   required
                   maxLength={2000}
                   value={form.jdbcUrl}
                   onChange={(event) => change("jdbcUrl", event.target.value)}
                   placeholder="jdbc:postgresql://localhost:5432/test"
-                  hint="Do not include passwords or tokens in the URL. Use the separate password field."
+                  hint={t("ui.doNotIncludePasswordsOrTokensIn")}
                 />
               </div>
               <Field
                 id="username"
-                label="Username"
+                label={t("ui.username")}
                 maxLength={200}
                 value={form.username}
                 onChange={(event) => change("username", event.target.value)}
               />
-              <Field id="execution-database" label="Authorized test database" maxLength={63}
+              <Field id="execution-database" label={t("ui.authorizedTestDatabase")} maxLength={63}
                 value={form.executionDatabase} onChange={(event) => change("executionDatabase", event.target.value)}
-                hint="Required for MySQL and PostgreSQL test runs. A connection probe does not require a write scope." />
-              <Field id="execution-schema" label="Authorized test schema" maxLength={63}
+                hint={t("ui.requiredForMySQLAndPostgreSQLTestRuns")} />
+              <Field id="execution-schema" label={t("ui.authorizedTestSchema")} maxLength={63}
                 value={form.executionSchema} onChange={(event) => change("executionSchema", event.target.value)}
-                hint="Required for schema-based adapters. Use only an explicitly authorized test scope; the run freezes this selection." />
+                hint={t("ui.requiredForSchemaBasedAdaptersUseOnly")} />
               <Field
                 id="password"
                 label={
                   connection
-                    ? "Password (leave blank to keep saved credential)"
-                    : "Password"
+                    ? t("ui.passwordLeaveBlankToKeepSavedCredential")
+                    : t("ui.password")
                 }
                 type="password"
                 autoComplete="new-password"
@@ -234,12 +236,12 @@ function Editor({ connection }: { connection?: Connection }) {
                 value={password}
                 disabled={clearSavedPassword}
                 onChange={(event) => setPassword(event.target.value)}
-                hint="Never returned by the API. Used in memory only."
+                hint={t("ui.neverReturnedByTheAPIUsedIn")}
               />
             </div>
             <div className="mt-5 space-y-3">
               {connection?.hasSavedPassword ? (
-                <p className="text-sm text-success">Saved password available</p>
+                <p className="text-sm text-success">{t("ui.savedPasswordAvailable")}</p>
               ) : null}
               <label className="flex items-center gap-2 text-sm">
                 <input
@@ -249,8 +251,7 @@ function Editor({ connection }: { connection?: Connection }) {
                   onChange={(event) => setSavePassword(event.target.checked)}
                   className="size-4 accent-primary"
                 />
-                Save password
-              </label>
+                {t("ui.savePassword")}</label>
               {connection?.hasSavedPassword ? (
                 <label className="flex items-center gap-2 text-sm">
                   <input
@@ -263,12 +264,11 @@ function Editor({ connection }: { connection?: Connection }) {
                     }}
                     className="size-4 accent-primary"
                   />
-                  Clear saved password
-                </label>
+                  {t("ui.clearSavedPassword")}</label>
               ) : null}
             </div>
             <div className="mt-5">
-              <Field id="description" label="Description (optional)">
+              <Field id="description" label={t("ui.descriptionOptional")}>
                 <textarea
                   id="description"
                   className="min-h-24 w-full rounded-xl border border-input p-3 text-sm"
@@ -284,11 +284,9 @@ function Editor({ connection }: { connection?: Connection }) {
           {probe ? <ProbeResult result={probe} /> : null}
           {connection ? (
             <section className="panel">
-              <h2 className="font-semibold">Saved connection</h2>
+              <h2 className="font-semibold">{t("ui.savedConnection")}</h2>
               <p className="my-3 text-sm text-muted-foreground">
-                Saved Test uses persisted settings. Save edited metadata first
-                to test those changes.
-              </p>
+                {t("ui.savedTestUsesPersistedSettingsSaveEdited")}</p>
               {connection.lastConnectionTestStatus ? (
                 <StatusBadge
                   {...connectionPresentation[
@@ -296,11 +294,10 @@ function Editor({ connection }: { connection?: Connection }) {
                   ]}
                 />
               ) : (
-                <p className="text-sm text-muted-foreground">Not tested yet</p>
+                <p className="text-sm text-muted-foreground">{t("ui.notTestedYet")}</p>
               )}
               <p className="mt-3 text-xs text-muted-foreground">
-                Last test {formatDateTime(connection.lastConnectionTestAt)} ·
-                Updated {formatDateTime(connection.updatedAt)}
+                {t("ui.lastTest")}{formatDateTime(connection.lastConnectionTestAt)} {t("ui.updatedInline")}{formatDateTime(connection.updatedAt)}
               </p>
               <Button
                 type="button"
@@ -308,20 +305,17 @@ function Editor({ connection }: { connection?: Connection }) {
                 className="mt-5"
                 onClick={() => setDeleting(true)}
               >
-                Delete connection
-              </Button>
+                {t("ui.deleteConnection")}</Button>
             </section>
           ) : null}
         </div>
         <aside className="panel h-fit space-y-5">
-          <p className="eyebrow">Connect with confidence</p>
+          <p className="eyebrow">{t("ui.connectWithConfidence")}</p>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Saving and testing are independent. You can save a connection even
-            when the target is offline.
-          </p>
+            {t("ui.savingAndTestingAreIndependentYouCan")}</p>
           <FormError message={error} />
           <Button className="w-full" disabled={busy}>
-            {save.isPending ? "Saving…" : "Save connection"}
+            {save.isPending ? t("ui.saving") : t("ui.saveConnection")}
           </Button>
           <Button
             type="button"
@@ -340,23 +334,21 @@ function Editor({ connection }: { connection?: Connection }) {
             }}
           >
             {test.isPending
-              ? "Testing connection…"
+              ? t("ui.testingConnection")
               : connection
-                ? "Test saved connection"
-                : "Test connection"}
+                ? t("ui.testSavedConnection")
+                : t("ui.testConnection")}
           </Button>
           <p className="text-xs leading-relaxed text-muted-foreground">
-            After a request completes, the password input is cleared. Re-enter
-            it if a later action needs an unsaved credential.
-          </p>
+            {t("ui.afterARequestCompletesThePasswordInput")}</p>
         </aside>
       </form>
       <ConfirmDialog
         open={deleting}
         onOpenChange={setDeleting}
-        title="Delete connection?"
-        description="Connections with historical test run references cannot be deleted. History is never cascade-deleted."
-        label="Delete connection"
+        title={t("ui.deleteConnectionQuestion")}
+        description={t("ui.connectionsWithHistoricalTestRunReferencesCannot")}
+        label={t("ui.deleteConnection")}
         pending={remove.isPending}
         onConfirm={() => remove.mutate()}
       />

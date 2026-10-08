@@ -1,3 +1,5 @@
+import { t } from "i18next";
+import { useTranslation } from "react-i18next";
 import {
   flexRender,
   getCoreRowModel,
@@ -69,31 +71,30 @@ export function Pagination({
   totalElements: number;
   onPage: (page: number) => void;
 }) {
+  useTranslation();
   return (
     <div className="flex items-center justify-between gap-4 border-t px-4 py-3 text-xs text-muted-foreground">
       <span>
-        {plural(totalElements, "record")} · Page {page + 1} of {Math.max(1, totalPages)}
+        {plural(totalElements, "record")} · {t("pagination.page", {page: page + 1, pages: Math.max(1, totalPages)})}
       </span>
       {totalPages > 1 ? <div className="flex gap-2">
         <Button
           variant="outline"
           size="sm"
-          aria-label="Previous page"
+          aria-label={t("ui.previousPage")}
           disabled={page === 0}
           onClick={() => onPage(page - 1)}
         >
           <ChevronLeft />
-          Previous
-        </Button>
+          {t("ui.previous")}</Button>
         <Button
           variant="outline"
           size="sm"
-          aria-label="Next page"
+          aria-label={t("ui.nextPage")}
           disabled={page + 1 >= totalPages}
           onClick={() => onPage(page + 1)}
         >
-          Next
-          <ChevronRight />
+          {t("ui.next")}<ChevronRight />
         </Button>
       </div> : null}
     </div>

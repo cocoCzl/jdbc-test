@@ -1,4 +1,7 @@
-import { Check, CircleDashed, ListChecks, Plus, X } from "lucide-react";
+import { moduleName, profileName } from "@/lib/presentation";
+import { t } from "i18next";
+import { useTranslation } from "react-i18next";
+import { Ban, Check, CircleDashed, Clock, ListChecks, LoaderCircle, Play, Plus, TriangleAlert, X } from "lucide-react";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
@@ -7,7 +10,7 @@ import { ApiError, errorMessage } from "@/api/client";
 import { runsApi, runsKeys } from "@/api/runs";
 import { useRunEvents } from "@/hooks/use-run-events";
 import { isTerminal, runPresentation } from "@/lib/status";
-import { formatDateTime, formatDuration, shortId } from "@/lib/format";
+import { formatDateTime, formatDuration, formatNumber, shortId } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -22,6 +25,7 @@ import {
 import Results from "./results";
 import Report from "./report";
 export default function RunDetail() {
+  useTranslation();
   const id = useParams().id!;
   const client = useQueryClient();
   const [cancelling, setCancelling] = useState(false);
@@ -36,14 +40,14 @@ export default function RunDetail() {
     mutationFn: () => runsApi.cancel(id),
     onSuccess: () => {
       setCancelling(false);
-      toast.success("Run cancelled");
+      toast.success(t("ui.runCancelled"));
       void client.invalidateQueries({ queryKey: runsKeys.all });
     },
     onError: (error) => {
       setCancelling(false);
       if (error instanceof ApiError && error.code === "RUN_ALREADY_FINISHED") {
         void query.refetch();
-        toast.info(error.message);
+        toast.info(errorMessage(error));
       } else toast.error(errorMessage(error));
     },
   });
@@ -57,98 +61,97 @@ export default function RunDetail() {
     ? Math.min(100, (run.completedCases / run.totalCases) * 100) : null;
   const terminal = isTerminal(run.status);
   const secondary = [
-    { label: "Started", value: run.accounting?.started },
-    { label: "Aborted", value: run.accounting?.aborted },
-    { label: terminal ? "Not run" : "Pending", value: terminal ? run.accounting?.notRun : run.accounting?.pending },
-    { label: terminal ? "Incomplete" : "Running", value: terminal ? run.accounting?.incomplete : run.accounting?.running },
+    { id: "started", icon: Play, get label() { return t("accounting.started"); }, value: run.accounting?.started },
+    { id: "aborted", icon: Ban, get label() { return t("ui.aborted"); }, value: run.accounting?.aborted },
+    { id: "notRun", icon: terminal ? CircleDashed : Clock, label: terminal ? t("ui.notRun") : t("ui.pending"), value: terminal ? run.accounting?.notRun : run.accounting?.pending },
+    { id: "incomplete", icon: terminal ? TriangleAlert : LoaderCircle, label: terminal ? t("ui.incomplete") : t("accounting.running"), value: terminal ? run.accounting?.incomplete : run.accounting?.running },
   ];
   return (
     <>
       <PageHeader
-        title={`${run.selectedModules.join(" + ") || run.profile} · ${run.connection.name}`}
-        description={`${run.connection.name} · ${run.driver.name} ${run.driver.version} · ${run.connection.adapterId} · ${run.profile}`}
+        title={`${run.selectedModules.map(id => moduleName(id)).join(" + ") || profileName(run.profile)} · ${run.connection.name}`}
+        description={`${run.connection.name} · ${run.driver.name} ${run.driver.version} · ${run.connection.adapterId} · ${profileName(run.profile)}`}
         action={
           <div className="flex items-center gap-3">
             <StatusBadge {...runPresentation[run.status]} />
             {!isTerminal(run.status) ? (
               <Button variant="destructive" onClick={() => setCancelling(true)}>
-                Cancel run
-              </Button>
-            ) : <Button asChild><Link to="/runs/new"><Plus />New run</Link></Button>}
+                {t("ui.cancelRun")}</Button>
+            ) : <Button asChild><Link to="/runs/new"><Plus />{t("ui.newRun")}</Link></Button>}
           </div>
         }
       />
       <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <code title={run.id}>{shortId(run.id)}</code>
-        <CopyButton value={run.id} label="Run ID" />
-        <span>Created {formatDateTime(run.createdAt)}</span>
-        <span>Started {formatDateTime(run.startedAt)}</span>
-        <span>Duration {formatDuration(run.durationMs)}</span>
+        <CopyButton value={run.id} label={t("ui.runID")} />
+        <span>{t("ui.created")} {formatDateTime(run.createdAt)}</span>
+        <span>{t("ui.started")} {formatDateTime(run.startedAt)}</span>
+        <span>{t("ui.duration")} {formatDuration(run.durationMs)}</span>
         <span className="ml-auto" role="status">
           {live === "live"
-            ? "Live updates connected"
+            ? t("ui.liveUpdatesConnected")
             : live === "reconnecting"
-              ? "Live updates reconnecting…"
+              ? t("ui.liveUpdatesReconnecting")
               : live === "connecting"
-                ? "Connecting live updates…"
-                : "Run complete"}
+                ? t("ui.connectingLiveUpdates")
+                : t("ui.runComplete")}
         </span>
       </div>
-      <section aria-label="Run outcome summary" className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Metric label="Total" value={run.totalCases ?? "—"} icon={<ListChecks className="size-4" />} />
-        <Metric label="Passed" tone="success" subdued={run.passed == null || run.passed === 0} value={run.passed ?? "—"} icon={<Check className="size-4" />} />
-        <Metric label="Failed" tone="danger" subdued={run.failed == null || run.failed === 0} value={run.failed ?? "—"} icon={<X className="size-4" />} />
-        <Metric label="Skipped" tone="neutral" subdued={run.skipped == null || run.skipped === 0} value={run.skipped ?? "—"} icon={<CircleDashed className="size-4" />} />
+      <section aria-label={t("ui.runOutcomeSummary")} className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <Metric label={t("ui.total")} value={run.totalCases ?? "—"} icon={<ListChecks className="size-4" />} />
+        <Metric label={t("ui.passed")} tone="success" subdued={run.passed == null || run.passed === 0} value={run.passed ?? "—"} icon={<Check className="size-4" />} />
+        <Metric label={t("ui.failed")} tone="danger" subdued={run.failed == null || run.failed === 0} value={run.failed ?? "—"} icon={<X className="size-4" />} />
+        <Metric label={t("ui.skipped")} tone="neutral" subdued={run.skipped == null || run.skipped === 0} value={run.skipped ?? "—"} icon={<CircleDashed className="size-4" />} />
       </section>
-      <section className="panel mb-4" aria-label="Execution accounting">
+      <section className="panel mb-4" aria-label={t("ui.executionAccounting")}>
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">
-          <p className="font-medium">Execution progress <span className="ml-2 font-normal text-muted-foreground">Completed</span></p>
-          <span className="font-mono text-sm">{run.completedCases ?? "—"} / {run.totalCases ?? "—"}</span>
+          <p className="font-medium">{t("ui.executionProgress")} <span className="ml-2 font-normal text-muted-foreground">{t("ui.completed")}</span></p>
+          <span className="font-mono text-sm">{formatNumber(run.completedCases)} / {formatNumber(run.totalCases)}</span>
         </div>
-        <progress aria-label="Execution progress"
+        <progress aria-label={t("ui.executionProgress")}
           className={`run-progress h-2 w-full overflow-hidden rounded-full tone-${run.status === "SUCCEEDED" && run.passed > 0 ? "success" : runPresentation[run.status].tone}`}
           max={run.totalCases || 1} value={run.completedCases ?? undefined} />
         <p className="mt-2 text-xs text-muted-foreground">
-          {progress == null ? "Progress unavailable" : `${Math.round(progress)}% complete`} · Duration {formatDuration(run.durationMs)}
+          {progress == null ? t("ui.progressUnavailable") : t("run.complete", {percent: Math.round(progress)})}  {t("ui.durationInline")} {formatDuration(run.durationMs)}
         </p>
-        <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-2 border-t pt-3 text-sm" aria-label="Execution counters">
-          {secondary.map(({label,value}, index) => <div key={label} data-stat={label}
+        <p className="mt-2 text-xs text-muted-foreground">{t("run.completedNote")}</p>
+        <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-2 border-t pt-3 text-sm" aria-label={t("ui.executionCounters")}>
+          {secondary.map(({id,icon: Icon,label,value}, index) => <div key={id} data-stat={label}
             className={`flex items-center gap-2 ${index > 0 && value != null && value > 0 ? terminal ? "font-semibold text-warning" : "font-semibold text-primary" : "text-muted-foreground"}`}>
-            <dt>{label}</dt><dd className="font-semibold tabular-nums">{value ?? "—"}</dd>
+            <dt className="flex items-center gap-1.5"><Icon className="size-3.5" aria-hidden="true" />{label}</dt><dd className="font-semibold tabular-nums">{formatNumber(value)}</dd>
           </div>)}
         </dl>
-        {!run.accounting ? <p className="mt-2 text-xs text-muted-foreground">Legacy run: execution start and interruption evidence is unavailable.</p> : null}
-        {run.accounting?.started === 0 && terminal ? <p className="mt-2 text-sm text-warning">No scenario execution was verified; skipped cases do not establish compatibility.</p> : null}
-        {run.executionScope ? <p className="mt-2 text-xs text-muted-foreground">Test scope saved for this run: {run.executionScope.database || "—"} / {run.executionScope.schema || "—"}</p> : null}
+        {!run.accounting ? <p className="mt-2 text-xs text-muted-foreground">{t("ui.legacyRunExecutionStartAndInterruptionEvidence")}</p> : null}
+        {run.accounting?.started === 0 && terminal ? <p className="mt-2 text-sm text-warning">{t("ui.noScenarioExecutionWasVerifiedSkippedCases")}</p> : null}
+        {run.executionScope ? <p className="mt-2 text-xs text-muted-foreground">{t("ui.testScopeSavedForThisRun")} {run.executionScope.database || "—"} / {run.executionScope.schema || "—"}</p> : null}
         {!terminal ? <div className="mt-3 grid gap-2 border-t pt-3 text-sm sm:grid-cols-2">
-          <p><span className="text-muted-foreground">Current module </span>{run.currentModule ?? "Waiting for worker"}</p>
-          <p className="break-all"><span className="text-muted-foreground">Current case </span>{run.currentTestCase ?? "—"}</p>
+          <p><span className="text-muted-foreground">{t("ui.currentModule")} </span>{run.currentModule ? moduleName(run.currentModule) : t("ui.waitingForWorker")}</p>
+          <p className="break-all"><span className="text-muted-foreground">{t("ui.currentCase")} </span>{run.currentTestCase ?? "—"}</p>
         </div> : null}
         {run.failureReason ? <p role="alert" className="mt-3 break-words rounded-lg bg-destructive/5 p-3 text-sm text-destructive">{run.failureReason}</p> : null}
       </section>
       <Tabs defaultValue="overview">
         <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="cases">Test cases</TabsTrigger>
-          <TabsTrigger value="report">Report</TabsTrigger>
+          <TabsTrigger value="overview">{t("ui.overview")}</TabsTrigger>
+          <TabsTrigger value="cases">{t("ui.testCases")}</TabsTrigger>
+          <TabsTrigger value="report">{t("ui.report")}</TabsTrigger>
         </TabsList>
         <TabsContent value="overview">
           <section className="panel">
             <h2 className="mb-3 text-lg font-semibold">
-              Run configuration
-            </h2>
-            <p className="mb-4 text-sm text-muted-foreground">Saved when the run was created; later connection edits do not change this run. Dates use your browser’s local time.</p>
+              {t("ui.runConfiguration")}</h2>
+            <p className="mb-4 text-sm text-muted-foreground">{t("ui.savedWhenTheRunWasCreatedLater")}</p>
             <dl className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-3">
               {Object.entries({
-                Connection: run.connection.name,
-                "Database type": run.connection.databaseType,
-                Adapter: run.connection.adapterId,
-                Driver: `${run.driver.name} · ${run.driver.version}`,
-                Vendor: run.driver.vendor,
-                Profile: run.profile,
-                Started: formatDateTime(run.startedAt),
-                Finished: formatDateTime(run.finishedAt),
-                Duration: formatDuration(run.durationMs),
+                [t("ui.connection")]: run.connection.name,
+                [t("ui.databaseType")]: run.connection.databaseType,
+                [t("ui.adapter")]: run.connection.adapterId,
+                [t("ui.driver")]: `${run.driver.name} · ${run.driver.version}`,
+                [t("ui.vendor")]: run.driver.vendor,
+                [t("ui.profile")]: profileName(run.profile),
+                [t("ui.started")]: formatDateTime(run.startedAt),
+                [t("ui.finished")]: formatDateTime(run.finishedAt),
+                [t("ui.duration")]: formatDuration(run.durationMs),
               }).map(([label, value]) => (
                 <div key={label}>
                   <dt className="mb-2 text-muted-foreground">{label}</dt>
@@ -158,9 +161,9 @@ export default function RunDetail() {
             </dl>
             <div className="mt-6 space-y-3 border-t pt-5 text-sm">
               <p>
-                Selected modules{" "}
+                {t("ui.selectedModules")}{" "}
                 <span className="text-muted-foreground">
-                  {run.selectedModules.join(", ")}
+                  {run.selectedModules.map(id => moduleName(id)).join(", ")}
                 </span>
               </p>
               <p className="break-all font-mono text-xs">
@@ -168,12 +171,12 @@ export default function RunDetail() {
               </p>
               <div className="flex items-center gap-2">
                 <code className="break-all text-xs">
-                  {run.driver.packageFingerprint ?? "No fingerprint"}
+                  {run.driver.packageFingerprint ?? t("ui.noFingerprint")}
                 </code>
                 {run.driver.packageFingerprint ? (
                   <CopyButton
                     value={run.driver.packageFingerprint}
-                    label="driver fingerprint"
+                    label={t("ui.driverFingerprint")}
                   />
                 ) : null}
               </div>
@@ -190,9 +193,9 @@ export default function RunDetail() {
       <ConfirmDialog
         open={cancelling}
         onOpenChange={setCancelling}
-        title="Cancel this run?"
-        description="The worker will be terminated. Completed results are retained, but remaining scenarios will not execute."
-        label="Cancel run"
+        title={t("ui.cancelThisRun")}
+        description={t("ui.theWorkerWillBeTerminatedCompletedResults")}
+        label={t("ui.cancelRun")}
         pending={cancel.isPending}
         onConfirm={() => cancel.mutate()}
       />

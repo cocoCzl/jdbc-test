@@ -1,8 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const preview = process.env.JDBC_TEST_E2E_PREVIEW === "true";
 const production = process.env.JDBC_TEST_E2E_MODE === "production";
 const baseURL = process.env.JDBC_TEST_E2E_BASE_URL ??
-  (production ? "http://127.0.0.1:8080" : "http://127.0.0.1:5173");
+  (production ? "http://127.0.0.1:8080" : preview ? "http://127.0.0.1:4173" : "http://127.0.0.1:5173");
 
 export default defineConfig({
   testDir: "./e2e",
@@ -25,12 +26,12 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   projects: [
-    { name: "mocked", testMatch: "**/smoke.spec.ts" },
+    { name: "mocked", testMatch: ["**/smoke.spec.ts", "**/bilingual.spec.ts"] },
     { name: "real", testMatch: "**/real.spec.ts", use: { trace: "off" } },
   ],
   webServer: production ? undefined : {
-    command: "npm run dev",
-    url: "http://127.0.0.1:5173",
+    command: preview ? "npm exec -- vite preview --host 127.0.0.1 --port 4173" : "npm run dev",
+    url: preview ? "http://127.0.0.1:4173" : "http://127.0.0.1:5173",
     reuseExistingServer: !process.env.CI,
   },
 });

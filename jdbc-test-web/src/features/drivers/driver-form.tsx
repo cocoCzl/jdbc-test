@@ -1,15 +1,18 @@
+import { t } from "i18next";
+import { useTranslation } from "react-i18next";
 import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { FileArchive, UploadCloud, X } from "lucide-react";
 import { toast } from "sonner";
 import { driversApi, driversKeys } from "@/api/drivers";
-import { ApiError, errorMessage } from "@/api/client";
+import { ApiError } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Field, FormError, PageHeader } from "@/components/common";
 import { formatBytes } from "@/lib/format";
 import { validateFiles } from "@/lib/driver-upload";
 export default function DriverForm() {
+  useTranslation();
   const navigate = useNavigate();
   const client = useQueryClient();
   const uploadInput = useRef<HTMLInputElement>(null);
@@ -21,7 +24,7 @@ export default function DriverForm() {
     urlPrefix: "",
   });
   const [files, setFiles] = useState<File[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | Error | null>(null);
   const [candidates, setCandidates] = useState<string[]>([]);
   const upload = useMutation({
     mutationFn: () =>
@@ -34,12 +37,12 @@ export default function DriverForm() {
         files,
       ),
     onSuccess: (driver) => {
-      toast.success("Driver package uploaded");
+      toast.success(t("ui.driverPackageUploaded"));
       void client.invalidateQueries({ queryKey: driversKeys.all });
       navigate(`/drivers/${driver.id}`);
     },
     onError: (failure) => {
-      setError(errorMessage(failure));
+      setError(failure instanceof Error ? failure : new Error());
       if (
         failure instanceof ApiError &&
         Array.isArray(failure.properties.candidates)
@@ -56,8 +59,8 @@ export default function DriverForm() {
   return (
     <>
       <PageHeader
-        title="Add a driver"
-        description="A versioned, immutable package of JDBC artifacts. No driver code executes in the server."
+        title={t("ui.addADriver")}
+        description={t("ui.aVersionedImmutablePackageOfJDBCArtifacts")}
       />
       <form
         className="grid max-w-5xl gap-6 xl:grid-cols-[1fr_320px]"
@@ -70,10 +73,10 @@ export default function DriverForm() {
       >
         <div className="space-y-6">
           <section className="panel">
-            <h2 className="mb-5 text-lg font-semibold">Package identity</h2>
+            <h2 className="mb-5 text-lg font-semibold">{t("ui.packageIdentity")}</h2>
             <div className="grid gap-5 sm:grid-cols-2">
               <Field
-                label="Name"
+                label={t("ui.name")}
                 id="driver-name"
                 required
                 maxLength={200}
@@ -82,7 +85,7 @@ export default function DriverForm() {
                 placeholder="PostgreSQL JDBC"
               />
               <Field
-                label="Vendor"
+                label={t("ui.vendor")}
                 id="driver-vendor"
                 required
                 maxLength={120}
@@ -91,16 +94,16 @@ export default function DriverForm() {
                 placeholder="PostgreSQL"
               />
               <Field
-                label="Version"
+                label={t("ui.version")}
                 id="driver-version"
                 required
                 maxLength={80}
                 value={form.version}
                 onChange={(event) => change("version", event.target.value)}
-                placeholder="Your driver version"
+                placeholder={t("ui.yourDriverVersion")}
               />
               <Field
-                label="JDBC URL prefix (optional)"
+                label={t("ui.jdbcURLPrefixOptional")}
                 id="driver-prefix"
                 maxLength={200}
                 value={form.urlPrefix}
@@ -109,14 +112,14 @@ export default function DriverForm() {
               />
               <div className="sm:col-span-2">
                 <Field
-                  label="Driver class (optional)"
+                  label={t("ui.driverClassOptional")}
                   id="driver-class"
                   maxLength={300}
                   value={form.driverClass}
                   onChange={(event) =>
                     change("driverClass", event.target.value)
                   }
-                  hint="Leave empty to discover the class from the JAR service metadata."
+                  hint={t("ui.leaveEmptyToDiscoverTheClassFrom")}
                   placeholder="org.postgresql.Driver"
                 />
               </div>
@@ -124,8 +127,7 @@ export default function DriverForm() {
             {candidates.length ? (
               <div className="mt-4">
                 <label htmlFor="candidate-class" className="text-sm">
-                  Classes returned by the server
-                </label>
+                  {t("ui.classesReturnedByTheServer")}</label>
                 <select
                   id="candidate-class"
                   className="select mt-2"
@@ -134,7 +136,7 @@ export default function DriverForm() {
                     change("driverClass", event.target.value)
                   }
                 >
-                  <option value="">Choose a driver class</option>
+                  <option value="">{t("ui.chooseADriverClass")}</option>
                   {candidates.map((value) => (
                     <option key={value}>{value}</option>
                   ))}
@@ -143,13 +145,13 @@ export default function DriverForm() {
             ) : null}
           </section>
           <section className="panel">
-            <h2 className="mb-5 text-lg font-semibold">Driver artifacts</h2>
+            <h2 className="mb-5 text-lg font-semibold">{t("ui.driverArtifacts")}</h2>
             <input
               ref={uploadInput}
               type="file"
               multiple
               accept=".jar"
-              aria-label="JAR files"
+              aria-label={t("ui.jarFiles")}
               className="sr-only"
               onChange={(event) => {
                 const selectedFiles = Array.from(event.target.files ?? []);
@@ -174,11 +176,9 @@ export default function DriverForm() {
             >
               <UploadCloud className="mb-3 size-7 text-primary" />
               <span className="text-sm font-medium">
-                Click to upload, or drop JAR files
-              </span>
+                {t("ui.clickToUploadOrDropJARFiles")}</span>
               <span className="mt-2 text-xs text-muted-foreground">
-                Up to 20 files · 100 MB per file · 250 MB per package
-              </span>
+                {t("ui.upTo20Files100MBPer")}</span>
             </button>
             <ul className="mt-4 divide-y divide-border">
               {files.map((file, index) => (
@@ -198,7 +198,7 @@ export default function DriverForm() {
                     size="icon"
                     variant="ghost"
                     disabled={upload.isPending}
-                    aria-label={`Remove ${file.name}`}
+                    aria-label={t("common.removeName", {name: file.name})}
                     onClick={() =>
                       setFiles((previous) =>
                         previous.filter((_, position) => position !== index),
@@ -213,21 +213,17 @@ export default function DriverForm() {
           </section>
         </div>
         <aside className="panel h-fit">
-          <p className="eyebrow">Ready to package</p>
+          <p className="eyebrow">{t("ui.readyToPackage")}</p>
           <p className="mt-5 text-2xl font-semibold">
-            {files.length} artifacts
-          </p>
+            {files.length} {t("ui.artifactsInline")}</p>
           <p className="mt-1 text-sm text-muted-foreground">
             {formatBytes(files.reduce((total, file) => total + file.size, 0))}{" "}
-            total
-          </p>
+            {t("ui.totalInline")}</p>
           <p className="my-6 text-sm leading-relaxed text-muted-foreground">
-            Artifacts cannot be replaced after upload. To test a different
-            binary, create a new package.
-          </p>
+            {t("ui.artifactsCannotBeReplacedAfterUploadTo")}</p>
           <FormError message={error} />
           <Button className="mt-4 w-full" disabled={upload.isPending}>
-            {upload.isPending ? "Uploading package…" : "Upload driver package"}
+            {upload.isPending ? t("ui.uploadingPackage") : t("ui.uploadDriverPackage")}
           </Button>
         </aside>
       </form>

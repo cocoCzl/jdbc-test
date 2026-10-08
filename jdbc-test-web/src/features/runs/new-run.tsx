@@ -1,3 +1,6 @@
+import { moduleName, profileName } from "@/lib/presentation";
+import { t } from "i18next";
+import { useTranslation } from "react-i18next";
 import { JdbcUrl } from "@/components/jdbc-url";
 import { useState } from "react";
 import {
@@ -13,7 +16,6 @@ import { connectionsApi, connectionsKeys } from "@/api/connections";
 import { driversApi, driversKeys } from "@/api/drivers";
 import { catalogApi, catalogKeys } from "@/api/catalog";
 import { runsApi, runsKeys } from "@/api/runs";
-import { errorMessage } from "@/api/client";
 import type { Connection, CreateRun, DriverSummary } from "@/types/api";
 import { DriverSelect } from "@/features/drivers/driver-select";
 import { Button } from "@/components/ui/button";
@@ -31,6 +33,7 @@ import { connectionPresentation } from "@/lib/status";
 import { formatDateTime, plural, shortId } from "@/lib/format";
 import { cn } from "@/lib/utils";
 export default function NewRun() {
+  useTranslation();
   const navigate = useNavigate();
   const client = useQueryClient();
   const [search] = useSearchParams();
@@ -44,7 +47,7 @@ export default function NewRun() {
   const [consent, setConsent] = useState(false);
   const [differentPassword, setDifferentPassword] = useState(false);
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | Error | null>(null);
   const params = { page, size: 12, sort: "name,asc" };
   const connections = useQuery({
     queryKey: connectionsKeys.list(params),
@@ -81,12 +84,12 @@ export default function NewRun() {
         ...(needsPassword ? { password } : {}),
       }),
     onSuccess: (run) => {
-      toast.success("Run queued");
+      toast.success(t("ui.runQueued"));
       void client.invalidateQueries({ queryKey: runsKeys.all });
       client.setQueryData(runsKeys.detail(run.id), run);
       navigate(`/runs/${run.id}`);
     },
-    onError: (failure) => setError(errorMessage(failure)),
+    onError: (failure) => setError(failure instanceof Error ? failure : new Error()),
     onSettled: () => setPassword(""),
   });
   if (
@@ -124,11 +127,11 @@ export default function NewRun() {
   return (
     <div className="mx-auto max-w-5xl">
       <PageHeader
-        title="New test run"
-        description="Choose a connection and driver, select tests, then review before starting."
+        title={t("ui.newTestRun")}
+        description={t("ui.chooseAConnectionAndDriverSelectTests")}
       />
       <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-4">
-        {["Connection", "Driver", "Test selection", "Review & confirm"].map(
+        {[t("ui.connection"), t("ui.driver"), t("ui.testSelection"), t("ui.reviewConfirm")].map(
           (label, index) => (
             <button
               key={label}
@@ -155,10 +158,10 @@ export default function NewRun() {
         )}
       </div>
       <section className="panel">
-        <p className="eyebrow mb-2">Step {step + 1} of 4</p>
+        <p className="eyebrow mb-2">{t("wizard.step", {step: step + 1})}</p>
         {step === 0 ? (
           <>
-            <h2 className="mb-3 text-xl font-semibold">Choose a connection</h2>
+            <h2 className="mb-3 text-xl font-semibold">{t("ui.chooseAConnection")}</h2>
             {connections.data.items.length ? (
               <div className="grid gap-4 md:grid-cols-2">
                 {connections.data.items.map((item) => (
@@ -171,7 +174,7 @@ export default function NewRun() {
                       <input type="radio" name="run-connection" aria-label={item.name}
                         className="size-4 accent-primary" checked={chosen?.id === item.id}
                         onChange={() => { setConnection(item); setDriver(null); setPassword(""); setDifferentPassword(false); }} />
-                      {chosen?.id === item.id ? "Selected" : "Select connection"}
+                      {chosen?.id === item.id ? t("ui.selected") : t("ui.selectConnection")}
                     </label>
                     <div className="flex items-center justify-between">
                       <h3 className="min-w-0 break-words font-semibold">{item.name}</h3>
@@ -180,7 +183,7 @@ export default function NewRun() {
                       ) : null}
                     </div>
                     <p className="my-2 text-xs text-muted-foreground">
-                      Database: {item.databaseType} · Adapter: {item.adapterId}
+                      {t("ui.databaseLabel")}{item.databaseType}  {t("ui.adapterInline")} {item.adapterId}
                     </p>
                     <div className="mb-3" onClick={(event) => event.stopPropagation()}>
                       <JdbcUrl value={item.jdbcUrl} />
@@ -193,20 +196,19 @@ export default function NewRun() {
                       />
                     ) : (
                       <span className="text-xs text-muted-foreground">
-                        Not tested
-                      </span>
+                        {t("ui.notTested")}</span>
                     )}
-                    <p className="mt-2 text-xs text-muted-foreground">Last test: {formatDateTime(item.lastConnectionTestAt)}</p>
+                    <p className="mt-2 text-xs text-muted-foreground">{t("ui.lastTestLabel")} {formatDateTime(item.lastConnectionTestAt)}</p>
                   </div>
                 ))}
               </div>
             ) : (
               <EmptyState
-                title="No connections yet"
-                description="Add a target database connection first."
+                title={t("ui.noConnectionsYet")}
+                description={t("ui.addATargetDatabaseConnectionFirst")}
                 action={
                   <Button asChild>
-                    <Link to="/connections/new">Add connection</Link>
+                    <Link to="/connections/new">{t("ui.addConnection")}</Link>
                   </Button>
                 }
               />
@@ -214,13 +216,13 @@ export default function NewRun() {
             <Pagination {...connections.data} onPage={setPage} />
             {chosen &&
             !connections.data.items.some((item) => item.id === chosen.id) ? (
-              <p className="mt-4 text-sm">Selected connection: {chosen.name}</p>
+              <p className="mt-4 text-sm">{t("ui.selectedConnection")} {chosen.name}</p>
             ) : null}
           </>
         ) : null}
         {step === 1 ? (
           <div className="max-w-xl space-y-4">
-            <h2 className="text-xl font-semibold">Choose a validated driver</h2>
+            <h2 className="text-xl font-semibold">{t("ui.chooseAValidatedDriver")}</h2>
             <DriverSelect
               presentation="cards"
               value={chosenDriver?.id ?? ""}
@@ -238,32 +240,29 @@ export default function NewRun() {
                     setPassword("");
                   }}
                 />
-                Use a different password for this run
-              </label>
+                {t("ui.useADifferentPasswordForThisRun")}</label>
             ) : null}
             {needsPassword ? (
               <Field
                 id="run-password"
-                label="Password for this run"
+                label={t("ui.passwordForThisRun")}
                 type="password"
                 autoComplete="new-password"
                 maxLength={2000}
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                hint="This password is used only for this run and will not be saved to the connection."
+                hint={t("ui.thisPasswordIsUsedOnlyForThis")}
               />
             ) : (
               <p className="text-sm text-muted-foreground">
-                The saved connection password will be used.
-              </p>
+                {t("ui.theSavedConnectionPasswordWillBeUsed")}</p>
             )}
           </div>
         ) : null}
         {step === 2 ? (
           <>
             <h2 className="mb-3 text-xl font-semibold">
-              Define your test selection
-            </h2>
+              {t("ui.defineYourTestSelection")}</h2>
             <div className="mb-6 grid gap-4 sm:grid-cols-3">
               {[
                 ...catalog.data.profiles.filter(
@@ -280,11 +279,11 @@ export default function NewRun() {
                   )}
                   onClick={() => setProfile(item.id as CreateRun["profile"])}
                 >
-                  <h3 className="font-semibold">{item.name}</h3>
+                  <h3 className="font-semibold">{profileName(item.id, item.name)}</h3>
                   <p className="mt-2 text-sm text-muted-foreground">
                     {item.scenarioCount != null
                       ? plural(item.scenarioCount, "scenario")
-                      : "Choose individual modules"}
+                      : t("ui.chooseIndividualModules")}
                   </p>
                 </button>
               ))}
@@ -293,7 +292,7 @@ export default function NewRun() {
               <>
                 <div className="mb-4 flex items-center justify-between">
                   <h3 className="font-medium">
-                    Modules{" "}
+                    {t("ui.modules")}{" "}
                     <span className="text-muted-foreground">
                       ({catalog.data.modules.length})
                     </span>
@@ -306,15 +305,13 @@ export default function NewRun() {
                         setModules(catalog.data.modules.map((item) => item.id))
                       }
                     >
-                      Select all
-                    </Button>
+                      {t("ui.selectAll")}</Button>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => setModules([])}
                     >
-                      Clear all
-                    </Button>
+                      {t("ui.clearAll")}</Button>
                   </div>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -329,7 +326,7 @@ export default function NewRun() {
                     >
                       <input
                         type="checkbox"
-                        aria-label={`${item.name} ${plural(item.scenarioCount, "scenario")}`}
+                        aria-label={`${moduleName(item.id, item.name)} ${plural(item.scenarioCount, "scenario")}`}
                         className="mt-1 size-4 accent-primary"
                         checked={modules.includes(item.id)}
                         onChange={(event) =>
@@ -341,7 +338,7 @@ export default function NewRun() {
                         }
                       />
                       <span>
-                        <span className="block font-medium">{item.name}</span>
+                        <span className="block font-medium">{moduleName(item.id, item.name)}</span>
                         <span className="mt-1 block text-xs text-muted-foreground">
                           {plural(item.scenarioCount, "scenario")}
                         </span>
@@ -352,64 +349,57 @@ export default function NewRun() {
               </>
             ) : (
               <p className="text-sm text-muted-foreground">
-                The {profile.toLowerCase()} selection uses the tests defined in the current catalog.
-              </p>
+                {t("wizard.selection", {profile: profileName(profile)})}</p>
             )}
             <p className="mt-5 text-sm font-semibold" aria-live="polite">
-              {selectionCount == null ? "— scenarios" : plural(selectionCount, "scenario")} selected
-            </p>
+              {t("wizard.selectedCount", {countText: selectionCount == null ? t("ui.scenariosInline") : plural(selectionCount, "scenario")})}</p>
           </>
         ) : null}
         {step === 3 ? (
           <>
             <h2 className="mb-3 text-xl font-semibold">
-              Review before you run
-            </h2>
+              {t("ui.reviewBeforeYouRun")}</h2>
             <div className="grid gap-6 md:grid-cols-3">
               <div>
-                <p className="eyebrow">Target connection</p>
+                <p className="eyebrow">{t("ui.targetConnection")}</p>
                 <p className="mt-3 break-words font-semibold">{chosen?.name}</p>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Database: {chosen?.databaseType} · Adapter: {chosen?.adapterId}
+                  {t("ui.databaseLabel")}{chosen?.databaseType}  {t("ui.adapterInline")} {chosen?.adapterId}
                 </p>
                 {chosen ? <div className="mt-2"><JdbcUrl value={chosen.jdbcUrl} /></div> : null}
-                <p className="mt-2 text-sm">Authorized test scope: {chosen?.executionDatabase || "—"} / {chosen?.executionSchema || "—"}</p>
+                <p className="mt-2 text-sm">{t("ui.authorizedTestScope")} {chosen?.executionDatabase || "—"} / {chosen?.executionSchema || "—"}</p>
               </div>
               <div>
-                <p className="eyebrow">Driver package</p>
+                <p className="eyebrow">{t("ui.driverPackage")}</p>
                 <p className="mt-3 break-words font-semibold">{chosenDriver?.name}</p>
                 <p className="mt-2 text-sm text-muted-foreground">
                   {chosenDriver?.vendor} · {chosenDriver?.version}
                 </p>
                 <p className="mt-2 font-mono text-xs">
-                  Fingerprint{" "}
+                  {t("ui.fingerprint")}{" "}
                   {shortId(driverDetail.data?.packageFingerprint ?? null)}
                 </p>
               </div>
               <div>
-                <p className="eyebrow">Selection</p>
+                <p className="eyebrow">{t("ui.selection")}</p>
                 <p className="mt-3 break-words font-semibold">
-                  {profile} · {selectionCount ?? "—"} scenarios
-                </p>
+                  {profileName(profile)} · {selectionCount == null ? t("ui.scenariosInline") : plural(selectionCount, "scenario")}</p>
                 <p className="mt-2 text-sm text-muted-foreground">
                   {profile === "CUSTOM"
                     ? catalog.data.modules
                         .filter((item) => modules.includes(item.id))
-                        .map((item) => item.name)
+                        .map((item) => moduleName(item.id, item.name))
                         .join(", ")
-                    : "All modules included by this profile"}
+                    : t("ui.allModulesIncludedByThisProfile")}
                 </p>
               </div>
             </div>
             <div className="mt-4 rounded-xl border border-warning/30 bg-warning/5 p-4">
               <h3 className="flex items-center gap-2 font-semibold text-warning">
                 <ShieldAlert className="size-5" />
-                Destructive test warning
-              </h3>
+                {t("ui.destructiveTestWarning")}</h3>
               <p className="mt-3 text-sm leading-relaxed">
-                Use a dedicated test database or namespace. These tests execute
-                JDBC operations that may modify database objects.
-              </p>
+                {t("ui.useADedicatedTestDatabaseOrNamespace")}</p>
               <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm">
                 <input
                   type="checkbox"
@@ -417,15 +407,11 @@ export default function NewRun() {
                   checked={consent}
                   onChange={(event) => setConsent(event.target.checked)}
                 />
-                I understand that these JDBC tests may execute DDL/DML and
-                modify objects in the configured test namespace.
-              </label>
+                {t("ui.iUnderstandThatTheseJDBCTestsMay")}</label>
             </div>
             {needsPassword && !password ? (
               <p role="alert" className="mt-4 text-sm text-destructive">
-                Re-enter the temporary password in the Driver step before
-                retrying.
-              </p>
+                {t("ui.reEnterTheTemporaryPasswordInThe")}</p>
             ) : null}
           </>
         ) : null}
@@ -437,18 +423,17 @@ export default function NewRun() {
           disabled={step === 0 || create.isPending}
           onClick={() => setStep((previous) => previous - 1)}
         >
-          Back
-        </Button>
+          {t("ui.back")}</Button>
         {step < 3 ? (
           <div className="flex flex-wrap items-center justify-end gap-3">
           {!continueAllowed ? <p id="continue-reason" className="text-sm text-muted-foreground">
-            {step === 0 ? "Select a connection to continue." : step === 1 ? chosenDriver?.status !== "VALIDATED" ? "Select a validated driver to continue." : "Enter the password for this run to continue." : "Select at least one module to continue."}
+            {step === 0 ? t("ui.selectAConnectionToContinue") : step === 1 ? chosenDriver?.status !== "VALIDATED" ? t("ui.selectAValidatedDriverToContinue") : t("ui.enterThePasswordForThisRunTo") : t("ui.selectAtLeastOneModuleToContinue")}
           </p> : null}
           <Button aria-describedby={!continueAllowed ? "continue-reason" : undefined}
             disabled={!continueAllowed}
             onClick={() => setStep((previous) => previous + 1)}
           >
-            {step === 0 ? "Next: Choose driver" : step === 1 ? "Next: Select tests" : "Next: Review run"}
+            {step === 0 ? t("ui.nextChooseDriver") : step === 1 ? t("ui.nextSelectTests") : t("ui.nextReviewRun")}
             <ChevronRight />
           </Button>
           </div>
@@ -465,7 +450,7 @@ export default function NewRun() {
               create.mutate();
             }}
           >
-            {create.isPending ? "Creating run…" : "Start test run"}
+            {create.isPending ? t("ui.creatingRun") : t("ui.startTestRun")}
           </Button>
         )}
       </div>

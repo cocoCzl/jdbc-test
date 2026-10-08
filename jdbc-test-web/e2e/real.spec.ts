@@ -204,7 +204,7 @@ test("REAL PostgreSQL browser flow: external Driver → Statement 23 → Connect
     ).toBe(true);
     await page.getByRole("tab", { name: "Report", exact: true }).click();
     await expect(page.getByText("Captured environment")).toBeVisible();
-    await page.getByRole("button", { name: "View raw JSON" }).click();
+    await page.getByRole("button", { name: "View report JSON" }).click();
     await expect(page.getByRole("dialog")).toContainText('"summary"');
     const rawResponse = await request.get(`/api/runs/${id}/report.json`);
     expect(rawResponse.status()).toBe(200);

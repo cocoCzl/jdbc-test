@@ -1,3 +1,4 @@
+import i18n from "@/i18n";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
@@ -98,7 +99,7 @@ describe("Driver UI", () => {
       "at most 20",
     ],
   ])("checks upload constraints %#", (files, message) => {
-    expect(validateFiles(files)).toContain(message);
+    expect(i18n.t(validateFiles(files) ?? "")).toContain(message);
   });
   it("checks single and total size without allocating large buffers", () => {
     const sized = (size: number) => {
@@ -106,13 +107,13 @@ describe("Driver UI", () => {
       Object.defineProperty(file, "size", { value: size });
       return file;
     };
-    expect(validateFiles([sized(101 * 1024 ** 2)])).toContain("100 MB");
+    expect(i18n.t(validateFiles([sized(101 * 1024 ** 2)]) ?? "")).toContain("100 MB");
     expect(
-      validateFiles([
+      i18n.t(validateFiles([
         sized(90 * 1024 ** 2),
         sized(90 * 1024 ** 2),
         sized(90 * 1024 ** 2),
-      ]),
+      ]) ?? ""),
     ).toContain("250 MB");
   });
   it("uploads multiple JARs, removes a file and navigates to detail", async () => {

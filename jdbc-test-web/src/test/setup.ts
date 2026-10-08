@@ -1,3 +1,5 @@
+import i18n from "@/i18n";
+import { beforeEach } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, vi } from "vitest";
 import { cleanup } from "@testing-library/react";
@@ -39,3 +41,5 @@ afterEach(() => {
   localStorage.clear();
   sessionStorage.clear();
 });
+
+beforeEach(() => { void i18n.changeLanguage("en"); localStorage.clear(); });

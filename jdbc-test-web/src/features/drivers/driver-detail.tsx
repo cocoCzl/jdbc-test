@@ -1,3 +1,5 @@
+import { t } from "i18next";
+import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
@@ -25,6 +27,7 @@ function MetadataForm({
   driver: Driver;
   close: () => void;
 }) {
+  useTranslation();
   const [form, setForm] = useState<DriverInput>({
     name: driver.name,
     vendor: driver.vendor,
@@ -32,16 +35,16 @@ function MetadataForm({
     driverClass: driver.driverClass,
     urlPrefix: driver.urlPrefix ?? "",
   });
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | Error | null>(null);
   const client = useQueryClient();
   const update = useMutation({
     mutationFn: () => driversApi.update(driver.id, form),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: driversKeys.all });
-      toast.success("Driver metadata updated");
+      toast.success(t("ui.driverMetadataUpdated"));
       close();
     },
-    onError: (failure) => setError(errorMessage(failure)),
+    onError: (failure) => setError(failure instanceof Error ? failure : new Error()),
   });
   return (
     <form
@@ -51,7 +54,7 @@ function MetadataForm({
         update.mutate();
       }}
     >
-      <h2 className="font-semibold">Edit metadata</h2>
+      <h2 className="font-semibold">{t("ui.editMetadata")}</h2>
       <div className="grid gap-4 sm:grid-cols-2">
         {(
           ["name", "vendor", "version", "driverClass", "urlPrefix"] as const
@@ -61,11 +64,11 @@ function MetadataForm({
             id={`edit-${key}`}
             label={
               {
-                name: "Name",
-                vendor: "Vendor",
-                version: "Version",
-                driverClass: "Driver class",
-                urlPrefix: "URL prefix",
+                name: t("ui.name"),
+                vendor: t("ui.vendor"),
+                version: t("ui.version"),
+                driverClass: t("ui.driverClass"),
+                urlPrefix: t("ui.urlPrefix"),
               }[key]
             }
             required={key !== "urlPrefix"}
@@ -82,16 +85,16 @@ function MetadataForm({
       <FormError message={error} />
       <div className="flex gap-2">
         <Button disabled={update.isPending}>
-          {update.isPending ? "Saving…" : "Save metadata"}
+          {update.isPending ? t("ui.saving") : t("ui.saveMetadata")}
         </Button>
         <Button type="button" variant="outline" onClick={close}>
-          Cancel edit
-        </Button>
+          {t("ui.cancelEdit")}</Button>
       </div>
     </form>
   );
 }
 export default function DriverDetail() {
+  useTranslation();
   const id = useParams().id!;
   const client = useQueryClient();
   const navigate = useNavigate();
@@ -104,7 +107,7 @@ export default function DriverDetail() {
   const validate = useMutation({
     mutationFn: () => driversApi.validate(id),
     onSuccess: () => {
-      toast.success("Driver validated");
+      toast.success(t("ui.driverValidated"));
       void client.invalidateQueries({ queryKey: driversKeys.all });
     },
     onError: (error) => toast.error(errorMessage(error)),
@@ -113,7 +116,7 @@ export default function DriverDetail() {
     mutationFn: () => driversApi.delete(id),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: driversKeys.all });
-      toast.success("Driver deleted");
+      toast.success(t("ui.driverDeleted"));
       navigate("/drivers");
     },
     onError: (error) => {
@@ -135,13 +138,12 @@ export default function DriverDetail() {
         action={
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setEditing(!editing)}>
-              Edit metadata
-            </Button>
+              {t("ui.editMetadata")}</Button>
             <Button
               disabled={validate.isPending}
               onClick={() => validate.mutate()}
             >
-              {validate.isPending ? "Validating…" : "Validate driver"}
+              {validate.isPending ? t("ui.validating") : t("ui.validateDriver")}
             </Button>
           </div>
         }
@@ -152,17 +154,17 @@ export default function DriverDetail() {
         ) : null}
         <section className="panel">
           <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Driver package</h2>
+            <h2 className="text-lg font-semibold">{t("ui.driverPackage")}</h2>
             <StatusBadge {...driverPresentation[driver.status]} />
           </div>
           <dl className="grid gap-6 text-sm md:grid-cols-3">
             {Object.entries({
-              "Driver class": driver.driverClass,
-              "JDBC URL prefix": driver.urlPrefix ?? "—",
+              [t("ui.driverClass")]: driver.driverClass,
+              [t("ui.jdbcURLPrefix")]: driver.urlPrefix ?? "—",
               Source: driver.sourceType,
-              Created: formatDateTime(driver.createdAt),
-              Updated: formatDateTime(driver.updatedAt),
-              Version: driver.version,
+              [t("ui.created")]: formatDateTime(driver.createdAt),
+              [t("ui.updated")]: formatDateTime(driver.updatedAt),
+              [t("ui.version")]: driver.version,
             }).map(([label, value]) => (
               <div key={label}>
                 <dt className="mb-2 text-muted-foreground">{label}</dt>
@@ -171,7 +173,7 @@ export default function DriverDetail() {
             ))}
           </dl>
           <div className="mt-6 border-t pt-5">
-            <p className="text-sm text-muted-foreground">Package fingerprint</p>
+            <p className="text-sm text-muted-foreground">{t("ui.packageFingerprint")}</p>
             <div className="flex items-center gap-2">
               <code className="break-all text-xs">
                 {driver.packageFingerprint ?? "—"}
@@ -179,7 +181,7 @@ export default function DriverDetail() {
               {driver.packageFingerprint ? (
                 <CopyButton
                   value={driver.packageFingerprint}
-                  label="fingerprint"
+                  label={t("ui.fingerprintInline")}
                 />
               ) : null}
             </div>
@@ -188,27 +190,24 @@ export default function DriverDetail() {
         {validate.data ? (
           <section role="status" className="panel border-emerald-100">
             <h2 className="font-semibold text-success">
-              Validated in an isolated Worker
-            </h2>
+              {t("ui.validatedInAnIsolatedWorker")}</h2>
             <p className="mt-2 text-sm">
-              {validate.data.driverClass} · Version {validate.data.majorVersion}
-              .{validate.data.minorVersion} · JDBC compliant:{" "}
-              {validate.data.jdbcCompliant ? "Yes" : "No"}
+              {validate.data.driverClass}  {t("ui.versionInline")} {validate.data.majorVersion}
+              .{validate.data.minorVersion}  {t("ui.jdbcCompliant")}{" "}
+              {validate.data.jdbcCompliant ? t("ui.yes") : t("ui.no")}
             </p>
             <p className="mt-2 text-xs text-muted-foreground">
-              Metadata from this validation response; not a permanently stored
-              probe.
-            </p>
+              {t("ui.metadataFromThisValidationResponseNotA")}</p>
           </section>
         ) : null}
         <section className="panel">
-          <h2 className="mb-5 text-lg font-semibold">Artifacts</h2>
+          <h2 className="mb-5 text-lg font-semibold">{t("ui.artifacts")}</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead className="border-b text-xs text-muted-foreground">
                 <tr>
-                  <th className="py-3">Filename</th>
-                  <th>Size</th>
+                  <th className="py-3">{t("ui.filename")}</th>
+                  <th>{t("ui.size")}</th>
                   <th>SHA-256</th>
                 </tr>
               </thead>
@@ -236,20 +235,17 @@ export default function DriverDetail() {
             </table>
           </div>
           <p className="mt-5 text-xs text-muted-foreground">
-            Binary artifacts are immutable. To replace a JAR, create a new
-            driver package.
-          </p>
+            {t("ui.binaryArtifactsAreImmutableToReplaceA")}</p>
         </section>
         <Button variant="destructive" onClick={() => setDeleting(true)}>
-          Delete driver package
-        </Button>
+          {t("ui.deleteDriverPackage")}</Button>
       </div>
       <ConfirmDialog
         open={deleting}
         onOpenChange={setDeleting}
-        title="Delete driver package?"
-        description="This deletes its artifacts. Referenced drivers cannot be deleted."
-        label="Delete driver"
+        title={t("ui.deleteDriverPackageQuestion")}
+        description={t("ui.thisDeletesItsArtifactsReferencedDriversCannot")}
+        label={t("ui.deleteDriver")}
         pending={remove.isPending}
         onConfirm={() => remove.mutate()}
       />

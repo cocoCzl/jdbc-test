@@ -166,7 +166,7 @@ test("API-mocked browser flow: upload → connection → Custom Statement → re
   await expect(page.getByText("23 / 23", { exact: true })).toBeVisible();
   await page.getByRole("tab", { name: "Report", exact: true }).click();
   await expect(page.getByText("Captured environment")).toBeVisible();
-  await page.getByRole("button", { name: "View raw JSON" }).click();
+  await page.getByRole("button", { name: "View report JSON" }).click();
   await expect(page.getByRole("dialog")).toContainText('"passed": 23');
 });
 

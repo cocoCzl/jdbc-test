@@ -1,3 +1,5 @@
+import { t } from "i18next";
+import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { driversApi, driversKeys } from "@/api/drivers";
@@ -15,6 +17,7 @@ export function DriverSelect({
   selected?: DriverSummary | null;
   onChange: (driver: DriverSummary) => void;
 }) {
+  useTranslation();
   const [page, setPage] = useState(0);
   const params = { page, size: 20, sort: "name,asc" };
   const query = useQuery({
@@ -22,7 +25,7 @@ export function DriverSelect({
     queryFn: ({ signal }) => driversApi.list(params, signal),
     placeholderData: keepPreviousData,
   });
-  if (query.isPending) return <Loading label="Loading drivers…" />;
+  if (query.isPending) return <Loading label={t("ui.loadingDrivers")} />;
   if (query.isError)
     return (
       <ErrorState error={query.error} retry={() => void query.refetch()} />
@@ -38,20 +41,20 @@ export function DriverSelect({
   return (
     <div>
       {presentation === "cards" ? <fieldset className="space-y-3">
-        <legend className="mb-3 text-sm font-medium">Driver package</legend>
+        <legend className="mb-3 text-sm font-medium">{t("ui.driverPackage")}</legend>
         {options.map((driver) => <label key={driver.id} className="step-card flex cursor-pointer items-start gap-3">
           <input type="radio" name="run-driver" aria-label={`${driver.name} · ${driver.version}`}
             className="mt-1 size-4 shrink-0 accent-primary" checked={value === driver.id} onChange={() => onChange(driver)} />
           <span className="min-w-0">
             <span className="block break-words font-semibold">{driver.name}</span>
             <span className="mt-1 block text-sm text-muted-foreground">{driver.vendor} · {driver.version}</span>
-            <span className="mt-2 block text-xs font-medium text-primary">{value === driver.id ? "Selected · Validated" : "Validated"}</span>
+            <span className="mt-2 block text-xs font-medium text-primary">{value === driver.id ? t("ui.selectedValidated") : t("ui.validated")}</span>
           </span>
         </label>)}
       </fieldset> : <Field
         id="default-driver"
-        label="Driver package"
-        hint="Only validated packages can be used. Browse pages to find another driver."
+        label={t("ui.driverPackage")}
+        hint={t("ui.onlyValidatedPackagesCanBeUsedBrowse")}
       >
         <select
           id="default-driver"
@@ -65,7 +68,7 @@ export function DriverSelect({
             if (driver) onChange(driver);
           }}
         >
-          <option value="">Select a validated driver</option>
+          <option value="">{t("ui.selectAValidatedDriver")}</option>
           {options.map((driver) => (
             <option key={driver.id} value={driver.id}>
               {driver.name} · {driver.vendor} · {driver.version}
@@ -75,9 +78,7 @@ export function DriverSelect({
       </Field>}
       {!options.length ? (
         <p className="mt-3 text-sm text-muted-foreground">
-          No validated drivers on this page. Validate a package in Drivers or
-          browse the next page.
-        </p>
+          {t("ui.noValidatedDriversOnThisPageValidate")}</p>
       ) : null}
       {query.data.totalPages > 1 ? (
         <Pagination {...query.data} onPage={setPage} />

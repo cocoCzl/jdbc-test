@@ -1,3 +1,5 @@
+import { t } from "i18next";
+import { useTranslation } from "react-i18next";
 import { AlertDialog } from "radix-ui";
 import { Button } from "./button";
 export function ConfirmDialog({
@@ -17,6 +19,7 @@ export function ConfirmDialog({
   pending: boolean;
   onConfirm: () => void;
 }) {
+  useTranslation();
   return (
     <AlertDialog.Root open={open} onOpenChange={onOpenChange}>
       <AlertDialog.Portal>
@@ -31,15 +34,14 @@ export function ConfirmDialog({
           <div className="mt-6 flex justify-end gap-2">
             <AlertDialog.Cancel asChild>
               <Button variant="outline" disabled={pending}>
-                Keep it
-              </Button>
+                {t("ui.keepIt")}</Button>
             </AlertDialog.Cancel>
             <Button
               variant="destructive"
               disabled={pending}
               onClick={onConfirm}
             >
-              {pending ? "Please wait…" : label}
+              {pending ? t("ui.pleaseWait") : label}
             </Button>
           </div>
         </AlertDialog.Content>

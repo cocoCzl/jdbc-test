@@ -1,3 +1,4 @@
+import i18n from "@/i18n";
 import type {
   ConnectionTestStatus,
   DriverStatus,
@@ -7,39 +8,39 @@ import type {
 export type Tone = "active" | "success" | "danger" | "neutral" | "warning";
 export const runPresentation: Record<RunStatus, { label: string; tone: Tone }> =
   {
-    QUEUED: { label: "Queued", tone: "neutral" },
-    PREPARING: { label: "Preparing", tone: "active" },
-    PROBING: { label: "Probing", tone: "active" },
-    RUNNING: { label: "Running", tone: "active" },
-    GENERATING_REPORT: { label: "Generating report", tone: "active" },
-    SUCCEEDED: { label: "Succeeded", tone: "success" },
-    FAILED: { label: "Failed", tone: "danger" },
-    CANCELLED: { label: "Cancelled", tone: "neutral" },
-    INTERRUPTED: { label: "Interrupted", tone: "warning" },
+    QUEUED: { get label() { return i18n.t("ui.queued"); }, tone: "neutral" },
+    PREPARING: { get label() { return i18n.t("ui.preparing"); }, tone: "active" },
+    PROBING: { get label() { return i18n.t("ui.probing"); }, tone: "active" },
+    RUNNING: { get label() { return i18n.t("ui.running"); }, tone: "active" },
+    GENERATING_REPORT: { get label() { return i18n.t("ui.generatingReport"); }, tone: "active" },
+    SUCCEEDED: { get label() { return i18n.t("run.succeeded"); }, tone: "success" },
+    FAILED: { get label() { return i18n.t("run.failed"); }, tone: "danger" },
+    CANCELLED: { get label() { return i18n.t("ui.cancelled"); }, tone: "neutral" },
+    INTERRUPTED: { get label() { return i18n.t("ui.interrupted"); }, tone: "warning" },
   };
 export const driverPresentation: Record<
   DriverStatus,
   { label: string; tone: Tone }
 > = {
-  PENDING_VALIDATION: { label: "Pending validation", tone: "warning" },
-  VALIDATED: { label: "Validated", tone: "success" },
-  INVALID: { label: "Invalid", tone: "danger" },
+  PENDING_VALIDATION: { get label() { return i18n.t("ui.pendingValidation"); }, tone: "warning" },
+  VALIDATED: { get label() { return i18n.t("ui.validated"); }, tone: "success" },
+  INVALID: { get label() { return i18n.t("ui.invalid"); }, tone: "danger" },
 };
 export const resultPresentation: Record<
   ResultStatus,
   { label: string; tone: Tone }
 > = {
-  PASSED: { label: "Passed", tone: "success" },
-  FAILED: { label: "Failed", tone: "danger" },
-  SKIPPED: { label: "Skipped", tone: "neutral" },
-  ABORTED: { label: "Aborted", tone: "warning" },
+  PASSED: { get label() { return i18n.t("ui.passed"); }, tone: "success" },
+  FAILED: { get label() { return i18n.t("ui.failed"); }, tone: "danger" },
+  SKIPPED: { get label() { return i18n.t("ui.skipped"); }, tone: "neutral" },
+  ABORTED: { get label() { return i18n.t("ui.aborted"); }, tone: "warning" },
 };
 export const connectionPresentation: Record<
   ConnectionTestStatus,
   { label: string; tone: Tone }
 > = {
-  SUCCEEDED: { label: "Last test succeeded", tone: "success" },
-  FAILED: { label: "Last test failed", tone: "danger" },
+  SUCCEEDED: { get label() { return i18n.t("ui.lastTestSucceeded"); }, tone: "success" },
+  FAILED: { get label() { return i18n.t("ui.lastTestFailed"); }, tone: "danger" },
 };
 export function isTerminal(status: RunStatus) {
   return ["SUCCEEDED", "FAILED", "CANCELLED", "INTERRUPTED"].includes(status);

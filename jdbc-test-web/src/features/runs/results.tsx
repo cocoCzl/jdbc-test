@@ -1,3 +1,6 @@
+import { moduleName } from "@/lib/presentation";
+import { t } from "i18next";
+import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -21,13 +24,14 @@ export function FailureDetail({
   result: CaseResult | null;
   close: () => void;
 }) {
+  useTranslation();
   return (
     <Dialog
       open={!!result}
       onOpenChange={(open) => {
         if (!open) close();
       }}
-      title={result?.displayName ?? "Case detail"}
+      title={result?.displayName ?? t("ui.caseDetail")}
       description={`${result?.scenarioId ?? ""} · ${result?.moduleId ?? ""}`}
     >
       <div className="space-y-4">
@@ -40,15 +44,16 @@ export function FailureDetail({
               </span>
             </div>
             <section>
-              <h3 className="mb-2 text-sm font-medium">Message</h3>
+              <h3 className="mb-2 text-sm font-medium">{result.status === "SKIPPED" ? t("skip.title") : t("ui.message")}</h3>
+              {result.status === "SKIPPED" ? <p className="mb-2 text-sm text-muted-foreground">{t("skip.note")}</p> : null}
               <pre className="whitespace-pre-wrap break-words rounded-xl bg-background p-4 font-mono text-xs">
-                {result.message ?? "No message provided."}
+                {result.message ?? t("ui.noMessageProvided")}
               </pre>
             </section>
             <section>
-              <h3 className="mb-2 text-sm font-medium">Stack trace</h3>
+              <h3 className="mb-2 text-sm font-medium">{t("ui.stackTrace")}</h3>
               <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-background p-4 font-mono text-xs">
-                {result.stackTrace ?? "No stack trace provided."}
+                {result.stackTrace ?? t("ui.noStackTraceProvided")}
               </pre>
             </section>
           </>
@@ -64,6 +69,7 @@ export default function Results({
   id: string;
   modules: string[];
 }) {
+  useTranslation();
   const [page, setPage] = useState(0);
   const [status, setStatus] = useState<ResultStatus | "">("");
   const [moduleId, setModule] = useState("");
@@ -83,34 +89,38 @@ export default function Results({
   });
   const columns: ColumnDef<CaseResult>[] = [
     {
-      header: "Status",
+      id: "ui.status",
+      get header() { return t("ui.status"); },
       cell: ({ row }) => (
         <StatusBadge {...resultPresentation[row.original.status]} />
       ),
     },
-    { header: "Module", accessorKey: "moduleId" },
     {
-      header: "Scenario",
+      id: "ui.module", get header() { return t("ui.module"); }, cell: ({ row }) => moduleName(row.original.moduleId) },
+    {
+      id: "ui.scenario",
+      get header() { return t("ui.scenario"); },
       cell: ({ row }) => (
         <code className="text-xs">{row.original.scenarioId}</code>
       ),
     },
-    { header: "Display name", accessorKey: "displayName" },
+    { get header() { return t("ui.displayName"); }, accessorKey: "displayName" },
     {
-      header: "Duration",
+      id: "ui.duration",
+      get header() { return t("ui.duration"); },
       cell: ({ row }) => formatDuration(row.original.durationMs),
     },
     {
-      header: "Detail",
+      id: "ui.detail",
+      get header() { return t("ui.detail"); },
       cell: ({ row }) =>
-        ["FAILED", "ABORTED"].includes(row.original.status) ? (
+        ["FAILED", "ABORTED", "SKIPPED"].includes(row.original.status) ? (
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setSelected(row.original)}
           >
-            Inspect failure
-          </Button>
+            {row.original.status === "SKIPPED" ? t("skip.title") : t("ui.inspectFailure")}</Button>
         ) : (
           "—"
         ),
@@ -120,9 +130,8 @@ export default function Results({
     <>
       <div className="mb-5 flex flex-wrap gap-3">
         <label className="text-xs text-muted-foreground">
-          Status
-          <select
-            aria-label="Filter result status"
+          {t("ui.status")}<select
+            aria-label={t("ui.filterResultStatus")}
             className="select mt-1 w-40"
             value={status}
             onChange={(event) => {
@@ -131,7 +140,7 @@ export default function Results({
               setModule("");
             }}
           >
-            <option value="">All results</option>
+            <option value="">{t("ui.allResults")}</option>
             {Object.entries(resultPresentation).map(([value, item]) => (
               <option value={value} key={value}>
                 {item.label}
@@ -140,9 +149,8 @@ export default function Results({
           </select>
         </label>
         <label className="text-xs text-muted-foreground">
-          Module
-          <select
-            aria-label="Filter result module"
+          {t("ui.module")}<select
+            aria-label={t("ui.filterResultModule")}
             className="select mt-1 w-48"
             value={moduleId}
             disabled={!!status}
@@ -151,16 +159,15 @@ export default function Results({
               setPage(0);
             }}
           >
-            <option value="">All modules</option>
+            <option value="">{t("ui.allModules")}</option>
             {modules.map((module) => (
-              <option key={module}>{module}</option>
+              <option key={module} value={module}>{moduleName(module)}</option>
             ))}
           </select>
         </label>
         <label className="text-xs text-muted-foreground">
-          Sort
-          <select
-            aria-label="Sort results"
+          {t("ui.sort")}<select
+            aria-label={t("ui.sortResults")}
             className="select mt-1 w-48"
             value={sort}
             onChange={(event) => {
@@ -168,16 +175,15 @@ export default function Results({
               setPage(0);
             }}
           >
-            <option value="scenarioId,asc">Scenario A–Z</option>
-            <option value="durationMs,desc">Longest first</option>
-            <option value="status,asc">Status</option>
+            <option value="scenarioId,asc">{t("ui.scenarioAZ")}</option>
+            <option value="durationMs,desc">{t("ui.longestFirst")}</option>
+            <option value="status,asc">{t("ui.status")}</option>
           </select>
         </label>
       </div>
       {status ? (
         <p className="mb-4 text-xs text-muted-foreground">
-          Clear the status filter to filter results by module.
-        </p>
+          {t("ui.clearTheStatusFilterToFilterResults")}</p>
       ) : null}
       {query.isPending ? (
         <Loading />
@@ -190,8 +196,8 @@ export default function Results({
             columns={columns}
             empty={
               <EmptyState
-                title="No case results yet"
-                description="Cases appear as the worker completes them. Try another filter if this run has finished."
+                title={t("ui.noCaseResultsYet")}
+                description={t("ui.casesAppearAsTheWorkerCompletesThem")}
               />
             }
           />

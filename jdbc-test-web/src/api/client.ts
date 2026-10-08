@@ -1,44 +1,13 @@
-const messages: Record<string, string> = {
-  DRIVER_NOT_FOUND: "This driver package no longer exists.",
-  DRIVER_IN_USE:
-    "This driver is referenced by a connection or historical run and cannot be deleted.",
-  DRIVER_CLASS_AMBIGUOUS:
-    "More than one driver class was found. Enter a driver class and upload again.",
-  DRIVER_VALIDATION_FAILED:
-    "The driver could not be validated. Check the class and package dependencies.",
-  CONNECTION_NOT_FOUND: "This connection no longer exists.",
-  CONNECTION_IN_USE:
-    "This connection has historical test runs and cannot be deleted.",
-  CONNECTION_PASSWORD_REQUIRED:
-    "Provide a password for this connection or run.",
-  CONNECTION_TIMEOUT: "The connection test timed out.",
-  CONNECTION_FAILED: "The connection test failed.",
-  DESTRUCTIVE_CONSENT_REQUIRED:
-    "Confirm that you understand these tests may modify database objects.",
-  INVALID_MODULE: "A selected module is unavailable. Refresh the test catalog.",
-  INVALID_SCENARIO: "A selected scenario is unavailable.",
-  RUN_TIMEOUT: "The run exceeded its time limit.",
-  WORKER_PROTOCOL_ERROR: "The worker returned an invalid event.",
-  RUN_ALREADY_FINISHED:
-    "This run has already finished. Its latest state has been refreshed.",
-  REPORT_INCONSISTENT:
-    "The worker report does not agree with the persisted results.",
-  RUN_NOT_FOUND: "This test run no longer exists.",
-  RUN_NOT_FINISHED: "The report is available when the run finishes.",
-  REPORT_NOT_FOUND: "No raw report was produced for this run.",
-  NETWORK_ERROR:
-    "Cannot reach the server. Check the backend and your connection.",
-  INTERNAL_ERROR: "The server could not complete the request.",
-};
+import i18n from "@/i18n";
 
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
     public readonly code: string,
-    detail?: string,
+    public readonly detail?: string,
     public readonly properties: Record<string, unknown> = {},
   ) {
-    super(messages[code] ?? detail ?? "The request could not be completed.");
+    super(detail ?? code);
     this.name = "ApiError";
   }
 }
@@ -46,10 +15,12 @@ function object(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 export function errorMessage(error: unknown): string {
-  return error instanceof ApiError
-    ? `${error.message} (${error.code})`
-    : "Something went wrong. Please try again.";
+  if (!(error instanceof ApiError)) return i18n.t("ui.somethingWentWrongPleaseTryAgain");
+  const key = `errors.${error.code}`;
+  const message = i18n.exists(key) ? i18n.t(key) : i18n.t("errors.unknown", { detail: error.detail ?? "" });
+  return `${message} (${error.code})`;
 }
+
 export function queryString(params: object): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params))

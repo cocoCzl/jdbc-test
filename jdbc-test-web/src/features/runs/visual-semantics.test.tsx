@@ -59,3 +59,17 @@ describe("Compact UI preserves execution semantics", () => {
     expect(api.mock.calls.some(([,opts])=>opts?.method === "POST")).toBe(false);
   });
 });
+
+it("keeps zero exceptions subdued and distinct interruption icons without changing counts", async () => {
+  const record = {...finishedRun, status: "INTERRUPTED", totalCases: 12, completedCases: 6, passed: 3, failed: 0, skipped: 2,
+    accounting: {...accounting, started: 6, passed: 3, failed: 0, pending: 0, running: 0}};
+  mockApi(url => url.pathname === "/api/runs/run-1" ? json(record) : undefined);
+  renderPage("/runs/run-1");
+  const metrics = await screen.findByRole("region", {name: "Run outcome summary"});
+  expect(metrics.querySelector('[data-metric="Failed"]')).toHaveClass("metric-subdued");
+  expect(metrics.querySelector('[data-metric="Skipped"]')).not.toHaveClass("metric-subdued");
+  const counters = screen.getByLabelText("Execution counters");
+  expect(counters.querySelector('[data-stat="Aborted"] .lucide-ban')).not.toBeNull();
+  expect(counters.querySelector('[data-stat="Incomplete"] .lucide-triangle-alert')).not.toBeNull();
+  expect(screen.getByText(/Includes explicit skips/)).toBeVisible();
+});

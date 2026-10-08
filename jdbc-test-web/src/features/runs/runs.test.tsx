@@ -318,7 +318,7 @@ describe("Run detail / results / report", () => {
     renderPage("/runs/run-1");
     await user.click(await screen.findByRole("button", { name: "Cancel run" }));
     await user.click(screen.getByRole("button", { name: "Cancel run" }));
-    expect(await screen.findByText("Succeeded", { exact: true })).toBeVisible();
+    expect(await screen.findByText("Run succeeded", { exact: true })).toBeVisible();
   });
   it("requests server pagination/filtering and displays failure text safely", async () => {
     const user = userEvent.setup();
@@ -385,7 +385,7 @@ describe("Run detail / results / report", () => {
     expect(
       api.mock.calls.some(([url]) => String(url).endsWith("/report.json")),
     ).toBe(false);
-    await user.click(screen.getByRole("button", { name: "View raw JSON" }));
+    await user.click(screen.getByRole("button", { name: "View report JSON" }));
     expect(await screen.findByText(/"passed": 23/)).toBeVisible();
   });
 });

@@ -1,3 +1,5 @@
+import { t } from "i18next";
+import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import {
   keepPreviousData,
@@ -23,8 +25,9 @@ import {
   StatusBadge,
 } from "@/components/common";
 import { driverPresentation } from "@/lib/status";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, plural } from "@/lib/format";
 export default function Drivers() {
+  useTranslation();
   const [page, setPage] = useState(0);
   const [sort, setSort] = useState("createdAt,desc");
   const [deleting, setDeleting] = useState<Driver | null>(null);
@@ -38,7 +41,7 @@ export default function Drivers() {
   const validate = useMutation({
     mutationFn: driversApi.validate,
     onSuccess: () => {
-      toast.success("Driver validated");
+      toast.success(t("ui.driverValidated"));
       void client.invalidateQueries({ queryKey: driversKeys.all });
     },
     onError: (error) => toast.error(errorMessage(error)),
@@ -47,7 +50,7 @@ export default function Drivers() {
     mutationFn: () => driversApi.delete(deleting!.id),
     onSuccess: () => {
       setDeleting(null);
-      toast.success("Driver deleted");
+      toast.success(t("ui.driverDeleted"));
       void client.invalidateQueries({ queryKey: driversKeys.all });
     },
     onError: (error) => {
@@ -57,7 +60,7 @@ export default function Drivers() {
   });
   const columns: ColumnDef<Driver>[] = [
     {
-      header: "Driver package",
+      get header() { return t("ui.driverPackage"); },
       accessorKey: "name",
       cell: ({ row }) => (
         <Link to={`/drivers/${row.original.id}`} className="subtle-link">
@@ -66,7 +69,8 @@ export default function Drivers() {
       ),
     },
     {
-      header: "Vendor / version",
+      id: "ui.vendorVersion",
+      get header() { return t("ui.vendorVersion"); },
       cell: ({ row }) => (
         <div>
           {row.original.vendor}
@@ -77,25 +81,28 @@ export default function Drivers() {
       ),
     },
     {
-      header: "Driver class",
+      get header() { return t("ui.driverClass"); },
       accessorKey: "driverClass",
       cell: ({ getValue }) => (
         <span className="font-mono text-xs">{getValue<string>()}</span>
       ),
     },
     {
-      header: "Status",
+      id: "ui.status",
+      get header() { return t("ui.status"); },
       cell: ({ row }) => (
         <StatusBadge {...driverPresentation[row.original.status]} />
       ),
     },
     {
-      header: "Artifacts",
+      id: "ui.artifacts",
+      get header() { return t("ui.artifacts"); },
       cell: ({ row }) =>
-        `${row.original.artifacts.length} JAR${row.original.artifacts.length === 1 ? "" : "s"}`,
+        plural(row.original.artifacts.length, "JAR"),
     },
     {
-      header: "Created",
+      id: "ui.created",
+      get header() { return t("ui.created"); },
       cell: ({ row }) => (
         <span className="whitespace-nowrap text-xs text-muted-foreground">
           {formatDateTime(row.original.createdAt)}
@@ -103,7 +110,8 @@ export default function Drivers() {
       ),
     },
     {
-      header: "Actions",
+      id: "ui.actions",
+      get header() { return t("ui.actions"); },
       cell: ({ row }) => (
         <div className="flex gap-1">
           <Button
@@ -113,12 +121,11 @@ export default function Drivers() {
             onClick={() => validate.mutate(row.original.id)}
           >
             <ShieldCheck />
-            Validate
-          </Button>
+            {t("ui.validate")}</Button>
           <Button
             size="sm"
             variant="ghost"
-            aria-label={`Delete ${row.original.name}`}
+            aria-label={t("common.deleteName", {name: row.original.name})}
             onClick={() => setDeleting(row.original)}
           >
             <Trash2 />
@@ -130,22 +137,20 @@ export default function Drivers() {
   return (
     <>
       <PageHeader
-        title="Driver packages"
-        description="Bring your own JDBC driver. Each package runs in an isolated worker."
+        title={t("ui.driverPackages")}
+        description={t("ui.bringYourOwnJDBCDriverEachPackage")}
         action={
           <Button asChild>
             <Link to="/drivers/new">
               <Plus />
-              Add driver
-            </Link>
+              {t("ui.addDriver")}</Link>
           </Button>
         }
       />
       <div className="mb-3 flex justify-end">
         <label className="flex items-center gap-3 text-sm text-muted-foreground">
-          Sort by
-          <select
-            aria-label="Sort drivers"
+          {t("ui.sortBy")}<select
+            aria-label={t("ui.sortDrivers")}
             className="select w-48"
             value={sort}
             onChange={(event) => {
@@ -153,10 +158,10 @@ export default function Drivers() {
               setPage(0);
             }}
           >
-            <option value="createdAt,desc">Newest first</option>
-            <option value="name,asc">Name A–Z</option>
-            <option value="vendor,asc">Vendor A–Z</option>
-            <option value="status,asc">Status</option>
+            <option value="createdAt,desc">{t("ui.newestFirst")}</option>
+            <option value="name,asc">{t("ui.nameAZ")}</option>
+            <option value="vendor,asc">{t("ui.vendorAZ")}</option>
+            <option value="status,asc">{t("ui.status")}</option>
           </select>
         </label>
       </div>
@@ -171,11 +176,11 @@ export default function Drivers() {
             columns={columns}
             empty={
               <EmptyState
-                title="No JDBC drivers yet"
-                description="Upload a driver package to get started."
+                title={t("ui.noJDBCDriversYet")}
+                description={t("ui.uploadADriverPackageToGetStarted")}
                 action={
                   <Button asChild variant="outline">
-                    <Link to="/drivers/new">Upload your first driver</Link>
+                    <Link to="/drivers/new">{t("ui.uploadYourFirstDriver")}</Link>
                   </Button>
                 }
               />
@@ -189,9 +194,9 @@ export default function Drivers() {
         onOpenChange={(open) => {
           if (!open) setDeleting(null);
         }}
-        title="Delete driver package?"
-        description={`Delete ${deleting?.name ?? "this driver"} and its artifacts. Drivers referenced by connections or historical runs cannot be deleted.`}
-        label="Delete driver"
+        title={t("ui.deleteDriverPackageQuestion")}
+        description={t("drivers.deleteDescription", {name: deleting?.name ?? t("ui.thisDriver")})}
+        label={t("ui.deleteDriver")}
         pending={remove.isPending}
         onConfirm={() => remove.mutate()}
       />
