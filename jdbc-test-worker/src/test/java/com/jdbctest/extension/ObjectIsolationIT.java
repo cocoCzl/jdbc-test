@@ -21,7 +21,7 @@ class ObjectIsolationIT {
 
   @Test
   void postgresqlScopesEveryCheckoutAndPreservesProtectionObjects() throws Exception {
-    try (var database = new PostgreSQLContainer<>("postgres:16-alpine").withPassword(
+    try (var database = new PostgreSQLContainer<>("postgres:16").withPassword(
         "temporary-fixture-password")) {
       database.start();
       try (var admin = DriverManager.getConnection(database.getJdbcUrl(), database.getUsername(),
@@ -55,7 +55,7 @@ class ObjectIsolationIT {
 
   @Test
   void hardStopRetainsConfirmedObjectInventoryWithoutPretendingFinallyRan() throws Exception {
-    try (var database = new PostgreSQLContainer<>("postgres:16-alpine").withPassword(
+    try (var database = new PostgreSQLContainer<>("postgres:16").withPassword(
         "temporary-hard-stop-fixture")) {
       database.start();
       try (var admin = DriverManager.getConnection(database.getJdbcUrl(), database.getUsername(),

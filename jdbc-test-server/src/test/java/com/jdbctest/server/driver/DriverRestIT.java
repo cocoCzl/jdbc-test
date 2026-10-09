@@ -34,7 +34,7 @@ import tools.jackson.databind.ObjectMapper;
 @SpringBootTest
 class DriverRestIT {
 
-  static PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
+  static PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");
   static final Path DATA = createDataDirectory();
 
   static {

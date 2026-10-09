@@ -15,7 +15,7 @@ class WorkerConnectionProbeIT {
 
   @Test
   void externalDriverConnectsAndReturnsMetadataWithoutLeakingPassword() throws Exception {
-    PostgreSQLContainer<?> database = new PostgreSQLContainer<>("postgres:16-alpine").withPassword(
+    PostgreSQLContainer<?> database = new PostgreSQLContainer<>("postgres:16").withPassword(
         "probe-secret-6f2d9a");
     try {
       database.start();

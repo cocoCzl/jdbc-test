@@ -22,7 +22,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 @SpringBootTest
 class PlatformPersistenceIT {
 
-  static PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
+  static PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16");
 
   static {
     try {

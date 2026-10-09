@@ -15,7 +15,7 @@ class WorkerPostgresIT {
 
   @Test
   void executableLoadsExternalPostgresDriverAndProducesNdjson() throws Exception {
-    PostgreSQLContainer<?> database = new PostgreSQLContainer<>("postgres:16-alpine")
+    PostgreSQLContainer<?> database = new PostgreSQLContainer<>("postgres:16")
         .withPassword("e2e-secret-6f2d9a");
     try {
       database.start();

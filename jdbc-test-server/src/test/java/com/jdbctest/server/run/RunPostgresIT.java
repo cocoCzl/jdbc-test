@@ -59,10 +59,10 @@ class RunPostgresIT {
 
   @Container
   static final PostgreSQLContainer<?> PLATFORM = new PostgreSQLContainer<>(
-      "postgres:16-alpine").withPassword("platform-run-secret");
+      "postgres:16").withPassword("platform-run-secret");
   @Container
   static final PostgreSQLContainer<?> TARGET = new PostgreSQLContainer<>(
-      "postgres:16-alpine").withPassword("target-run-secret");
+      "postgres:16").withPassword("target-run-secret");
   static final Path DATA = dataDirectory();
 
   @DynamicPropertySource

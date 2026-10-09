@@ -34,7 +34,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 @SpringBootTest
 class PlatformUpgradeIT {
 
-  static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
+  static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16");
   static final String KEY = Base64.getEncoder().encodeToString(new byte[32]);
   static final UUID DRIVER = UUID.randomUUID(), CONNECTION = UUID.randomUUID(), RUN = UUID.randomUUID();
   static final String LEGACY_REPORT = "{\"report_schema_version\":\"1.0.0\",\"summary\":{\"failed\":1},\"scenario_results\":{\"connection.auto_commit\":{\"status\":\"FAILED\"}}}";

@@ -35,7 +35,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 class ConnectionRestIT {
 
   static PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(
-      "postgres:16-alpine").withPassword("server-probe-secret");
+      "postgres:16").withPassword("server-probe-secret");
   static final Path DATA = dataDirectory();
 
   static {

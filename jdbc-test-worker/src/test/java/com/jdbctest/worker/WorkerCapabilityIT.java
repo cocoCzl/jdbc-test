@@ -20,7 +20,7 @@ class WorkerCapabilityIT {
 
   @Test
   void enabledDisabledAndMissingCapabilitiesReachProductionWorkerDistinctly() throws Exception {
-    try (var database = new PostgreSQLContainer<>("postgres:16-alpine").withPassword(
+    try (var database = new PostgreSQLContainer<>("postgres:16").withPassword(
         "temporary-capability-fixture")) {
       database.start();
       try (var admin = java.sql.DriverManager.getConnection(database.getJdbcUrl(),
