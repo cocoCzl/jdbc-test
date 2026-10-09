@@ -1,8 +1,9 @@
+import { Card } from "@/components/ui/card";
+import { Select } from "@/components/ui/select";
 import { t } from "i18next";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import {
-  keepPreviousData,
   useMutation,
   useQuery,
   useQueryClient,
@@ -21,11 +22,11 @@ import {
   EmptyState,
   ErrorState,
   Loading,
-  PageHeader,
   StatusBadge,
 } from "@/components/common";
 import { driverPresentation } from "@/lib/status";
-import { formatDateTime, plural } from "@/lib/format";
+import { formatDateTime, plural, shortId } from "@/lib/format";
+import "@/features/connections/resource-table.scss";
 export default function Drivers() {
   useTranslation();
   const [page, setPage] = useState(0);
@@ -36,7 +37,6 @@ export default function Drivers() {
   const query = useQuery({
     queryKey: driversKeys.list(params),
     queryFn: ({ signal }) => driversApi.list(params, signal),
-    placeholderData: keepPreviousData,
   });
   const validate = useMutation({
     mutationFn: driversApi.validate,
@@ -63,18 +63,21 @@ export default function Drivers() {
       get header() { return t("ui.driverPackage"); },
       accessorKey: "name",
       cell: ({ row }) => (
-        <Link to={`/drivers/${row.original.id}`} className="subtle-link">
-          {row.original.name}
-        </Link>
+        <div className="run-cell-stack">
+          <Link to={`/drivers/${row.original.id}`} className="resource-primary-link rounded-sm">
+            {row.original.name}
+          </Link>
+          <span className="run-cell-secondary" title={row.original.id}>{shortId(row.original.id)}</span>
+        </div>
       ),
     },
     {
       id: "ui.vendorVersion",
       get header() { return t("ui.vendorVersion"); },
       cell: ({ row }) => (
-        <div>
-          {row.original.vendor}
-          <span className="mt-1 block text-xs text-muted-foreground">
+        <div className="run-cell-stack">
+          <span className="resource-cell-text">{row.original.vendor}</span>
+          <span className="run-cell-secondary">
             {row.original.version}
           </span>
         </div>
@@ -84,7 +87,7 @@ export default function Drivers() {
       get header() { return t("ui.driverClass"); },
       accessorKey: "driverClass",
       cell: ({ getValue }) => (
-        <span className="font-mono text-xs">{getValue<string>()}</span>
+        <span className="resource-code font-mono">{getValue<string>()}</span>
       ),
     },
     {
@@ -98,13 +101,13 @@ export default function Drivers() {
       id: "ui.artifacts",
       get header() { return t("ui.artifacts"); },
       cell: ({ row }) =>
-        plural(row.original.artifacts.length, "JAR"),
+        <span className="run-cell-number">{plural(row.original.artifacts.length, "JAR")}</span>,
     },
     {
       id: "ui.created",
       get header() { return t("ui.created"); },
       cell: ({ row }) => (
-        <span className="whitespace-nowrap text-xs text-muted-foreground">
+        <span className="run-cell-secondary run-cell-date">
           {formatDateTime(row.original.createdAt)}
         </span>
       ),
@@ -113,7 +116,7 @@ export default function Drivers() {
       id: "ui.actions",
       get header() { return t("ui.actions"); },
       cell: ({ row }) => (
-        <div className="flex gap-1">
+        <div className="resource-actions">
           <Button
             size="sm"
             variant="ghost"
@@ -136,25 +139,21 @@ export default function Drivers() {
   ];
   return (
     <>
-      <PageHeader
-        title={t("ui.driverPackages")}
-        description={t("ui.bringYourOwnJDBCDriverEachPackage")}
-        action={
-          <Button asChild>
-            <Link to="/drivers/new">
-              <Plus />
-              {t("ui.addDriver")}</Link>
-          </Button>
-        }
-      />
-      <div className="mb-3 flex justify-end">
-        <label className="flex items-center gap-3 text-sm text-muted-foreground">
-          {t("ui.sortBy")}<select
+      <Card as="section" className="panel overflow-hidden p-0" aria-busy={query.isFetching}>
+        <div className="run-history-panel-header">
+          <div>
+            <h1 className="page-title">{t("ui.driverPackages")}</h1>
+            <p>{t("ui.bringYourOwnJDBCDriverEachPackage")}{query.data ? ` · ${plural(query.data.totalElements, "record")}` : ""}</p>
+          </div>
+          <Button asChild><Link to="/drivers/new"><Plus />{t("ui.addDriver")}</Link></Button>
+        </div>
+        <div className="run-history-toolbar">
+          <label>
+          {t("ui.sortBy")}<Select
             aria-label={t("ui.sortDrivers")}
-            className="select w-48"
             value={sort}
-            onChange={(event) => {
-              setSort(event.target.value);
+            onValueChange={(value) => {
+              setSort(value);
               setPage(0);
             }}
           >
@@ -162,18 +161,20 @@ export default function Drivers() {
             <option value="name,asc">{t("ui.nameAZ")}</option>
             <option value="vendor,asc">{t("ui.vendorAZ")}</option>
             <option value="status,asc">{t("ui.status")}</option>
-          </select>
-        </label>
-      </div>
-      {query.isPending ? (
-        <Loading />
-      ) : query.isError ? (
-        <ErrorState error={query.error} retry={() => void query.refetch()} />
-      ) : (
-        <div className="panel overflow-hidden p-0" aria-busy={query.isFetching}>
+          </Select>
+          </label>
+        </div>
+        {query.isError && query.data ? <ErrorState error={query.error} retry={() => void query.refetch()} /> : null}
+        {query.isPending ? (
+          <Loading />
+        ) : !query.data ? (
+          <ErrorState error={query.error} retry={() => void query.refetch()} />
+        ) : (
+          <>
           <DataTable
             rows={query.data.items}
             columns={columns}
+            className="run-table resource-table resource-table--drivers"
             empty={
               <EmptyState
                 title={t("ui.noJDBCDriversYet")}
@@ -187,8 +188,9 @@ export default function Drivers() {
             }
           />
           <Pagination {...query.data} onPage={setPage} />
-        </div>
-      )}
+          </>
+        )}
+      </Card>
       <ConfirmDialog
         open={!!deleting}
         onOpenChange={(open) => {

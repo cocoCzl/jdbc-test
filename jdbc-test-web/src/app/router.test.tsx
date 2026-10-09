@@ -16,7 +16,7 @@ describe("App routing / Dashboard", () => {
     expect(screen.getByText("No test runs yet")).toBeVisible();
     expect(screen.getAllByText("Latest 0 loaded runs").every(item => item.textContent === "Latest 0 loaded runs")).toBe(true);
   });
-  it("navigates from sidebar to resource pages with an active route", async () => {
+  it("navigates from toolbar to resource pages with an active route", async () => {
     const user = userEvent.setup();
     mockApi();
     const { router } = renderPage("/");

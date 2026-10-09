@@ -1,7 +1,8 @@
+import { Select } from "@/components/ui/select";
 import { t } from "i18next";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { driversApi, driversKeys } from "@/api/drivers";
 import { ErrorState, Field, Loading } from "@/components/common";
 import { Pagination } from "@/components/data-table";
@@ -23,10 +24,9 @@ export function DriverSelect({
   const query = useQuery({
     queryKey: driversKeys.list(params),
     queryFn: ({ signal }) => driversApi.list(params, signal),
-    placeholderData: keepPreviousData,
   });
   if (query.isPending) return <Loading label={t("ui.loadingDrivers")} />;
-  if (query.isError)
+  if (!query.data)
     return (
       <ErrorState error={query.error} retry={() => void query.refetch()} />
     );
@@ -40,6 +40,7 @@ export function DriverSelect({
     options.unshift(selected);
   return (
     <div>
+      {query.isError ? <ErrorState error={query.error} retry={() => void query.refetch()} /> : null}
       {presentation === "cards" ? <fieldset className="space-y-3">
         <legend className="mb-3 text-sm font-medium">{t("ui.driverPackage")}</legend>
         {options.map((driver) => <label key={driver.id} className="step-card flex cursor-pointer items-start gap-3">
@@ -56,14 +57,14 @@ export function DriverSelect({
         label={t("ui.driverPackage")}
         hint={t("ui.onlyValidatedPackagesCanBeUsedBrowse")}
       >
-        <select
+        <Select
           id="default-driver"
-          className="select"
+          className=""
           value={value}
           required
-          onChange={(event) => {
+          onValueChange={(value) => {
             const driver = options.find(
-              (item) => item.id === event.target.value,
+              (item) => item.id === value,
             );
             if (driver) onChange(driver);
           }}
@@ -74,7 +75,7 @@ export function DriverSelect({
               {driver.name} · {driver.vendor} · {driver.version}
             </option>
           ))}
-        </select>
+        </Select>
       </Field>}
       {!options.length ? (
         <p className="mt-3 text-sm text-muted-foreground">

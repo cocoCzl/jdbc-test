@@ -26,7 +26,8 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   projects: [
-    { name: "mocked", testMatch: ["**/smoke.spec.ts", "**/bilingual.spec.ts"] },
+    { name: "mocked", testMatch: ["**/smoke.spec.ts", "**/bilingual.spec.ts", "**/ui-migration.spec.ts"] },
+    { name: "primitives", testMatch: "**/primitives.spec.ts" },
     { name: "real", testMatch: "**/real.spec.ts", use: { trace: "off" } },
   ],
   webServer: production ? undefined : {

@@ -1,10 +1,11 @@
+import { Card } from "@/components/ui/card";
+import { Select } from "@/components/ui/select";
 import { t } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Plus } from "lucide-react";
 import { JdbcUrl } from "@/components/jdbc-url";
 import { useState } from "react";
 import {
-  keepPreviousData,
   useMutation,
   useQuery,
   useQueryClient,
@@ -25,12 +26,12 @@ import {
   Field,
   FormError,
   Loading,
-  PageHeader,
   ProbeResult,
   StatusBadge,
 } from "@/components/common";
 import { connectionPresentation } from "@/lib/status";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, plural, shortId } from "@/lib/format";
+import "./resource-table.scss";
 export default function Connections() {
   useTranslation();
   const [page, setPage] = useState(0);
@@ -45,7 +46,6 @@ export default function Connections() {
   const query = useQuery({
     queryKey: connectionsKeys.list(params),
     queryFn: ({ signal }) => connectionsApi.list(params, signal),
-    placeholderData: keepPreviousData,
   });
   const test = useMutation({
     mutationFn: () =>
@@ -75,19 +75,22 @@ export default function Connections() {
       id: "ui.connection",
       get header() { return t("ui.connection"); },
       cell: ({ row }) => (
-        <Link className="subtle-link" to={`/connections/${row.original.id}`}>
-          {row.original.name}
-        </Link>
+        <div className="run-cell-stack">
+          <Link className="resource-primary-link rounded-sm" to={`/connections/${row.original.id}`}>
+            {row.original.name}
+          </Link>
+          <span className="run-cell-secondary" title={row.original.id}>{shortId(row.original.id)}</span>
+        </div>
       ),
     },
     {
       id: "ui.databaseAdapter",
       get header() { return t("ui.databaseAdapter"); },
       cell: ({ row }) => (
-        <div>
-          {t("ui.databaseLabel")}{row.original.databaseType}
-          <span className="mt-1 block text-xs text-muted-foreground">
-            {t("ui.adapterLabel")}{row.original.adapterId}
+        <div className="run-cell-stack">
+          <span className="resource-cell-text">{t("ui.databaseLabel")} {row.original.databaseType}</span>
+          <span className="run-cell-secondary">
+            {t("ui.adapterLabel")} {row.original.adapterId}
           </span>
         </div>
       ),
@@ -96,32 +99,32 @@ export default function Connections() {
       id: "ui.jdbcURL",
       get header() { return t("ui.jdbcURL"); },
       cell: ({ row }) => (
-        <div className="min-w-48 max-w-72">
+        <div className="resource-url-line">
           <JdbcUrl value={row.original.jdbcUrl} />
-          <p className="mt-1 text-xs text-muted-foreground">{t("ui.user")} {row.original.username}</p>
+          <p className="run-cell-secondary resource-user">{t("ui.user")} {row.original.username}</p>
         </div>
       ),
     },
     {
       id: "ui.defaultDriver",
       get header() { return t("ui.defaultDriver"); },
-      cell: ({ row }) => row.original.defaultDriver?.name ?? "—",
+      cell: ({ row }) => <span className="resource-cell-text">{row.original.defaultDriver?.name ?? "—"}</span>,
     },
     {
       id: "ui.lastTest",
       get header() { return t("ui.lastTest"); },
       cell: ({ row }) => (
-        <div>
+        <div className="run-cell-stack">
           {row.original.lastConnectionTestStatus ? (
             <StatusBadge
               {...connectionPresentation[row.original.lastConnectionTestStatus]}
             />
           ) : (
-            <span className="text-muted-foreground">{t("ui.notTested")}</span>
+            <span className="run-cell-secondary">{t("ui.notTested")}</span>
           )}
-          <p className="mt-1 whitespace-nowrap text-xs text-muted-foreground">
+          <span className="run-cell-secondary run-cell-date">
             {formatDateTime(row.original.lastConnectionTestAt)}
-          </p>
+          </span>
         </div>
       ),
     },
@@ -129,7 +132,7 @@ export default function Connections() {
       id: "ui.updated",
       get header() { return t("ui.updated"); },
       cell: ({ row }) => (
-        <span className="whitespace-nowrap text-xs">
+        <span className="run-cell-secondary run-cell-date">
           {formatDateTime(row.original.updatedAt)}
         </span>
       ),
@@ -138,7 +141,7 @@ export default function Connections() {
       id: "ui.actions",
       get header() { return t("ui.actions"); },
       cell: ({ row }) => (
-        <div className="flex flex-wrap gap-1">
+        <div className="resource-actions">
           <Button
             size="sm"
             variant="ghost"
@@ -166,19 +169,21 @@ export default function Connections() {
   ];
   return (
     <>
-      <PageHeader
-        title={t("ui.connections")}
-        action={<Button asChild><Link to="/connections/new"><Plus />{t("ui.addConnection")}</Link></Button>}
-        description={t("ui.yourTargetDatabasesSeparateFromThePlatform")}
-      />
-      <div className="mb-3 flex justify-end">
-        <label className="flex items-center gap-3 text-sm text-muted-foreground">
-          {t("ui.sortBy")}<select
+      <Card as="section" className="panel overflow-hidden p-0" aria-busy={query.isFetching}>
+        <div className="run-history-panel-header">
+          <div>
+            <h1 className="page-title">{t("ui.connections")}</h1>
+            <p>{t("ui.yourTargetDatabasesSeparateFromThePlatform")}{query.data ? ` · ${plural(query.data.totalElements, "record")}` : ""}</p>
+          </div>
+          <Button asChild><Link to="/connections/new"><Plus />{t("ui.addConnection")}</Link></Button>
+        </div>
+        <div className="run-history-toolbar">
+          <label>
+          {t("ui.sortBy")}<Select
             aria-label={t("ui.sortConnections")}
-            className="select w-48"
             value={sort}
-            onChange={(event) => {
-              setSort(event.target.value);
+            onValueChange={(value) => {
+              setSort(value);
               setPage(0);
             }}
           >
@@ -186,18 +191,20 @@ export default function Connections() {
             <option value="name,asc">{t("ui.nameAZ")}</option>
             <option value="databaseType,asc">{t("ui.databaseType")}</option>
             <option value="lastConnectionTestAt,desc">{t("ui.lastTest")}</option>
-          </select>
-        </label>
-      </div>
-      {query.isPending ? (
-        <Loading />
-      ) : query.isError ? (
-        <ErrorState error={query.error} retry={() => void query.refetch()} />
-      ) : (
-        <div className="panel overflow-hidden p-0" aria-busy={query.isFetching}>
+          </Select>
+          </label>
+        </div>
+        {query.isError && query.data ? <ErrorState error={query.error} retry={() => void query.refetch()} /> : null}
+        {query.isPending ? (
+          <Loading />
+        ) : !query.data ? (
+          <ErrorState error={query.error} retry={() => void query.refetch()} />
+        ) : (
+          <>
           <DataTable
             rows={query.data.items}
             columns={columns}
+            className="run-table resource-table resource-table--connections"
             empty={
               <EmptyState
                 title={t("ui.noDatabaseConnectionsYet")}
@@ -211,8 +218,9 @@ export default function Connections() {
             }
           />
           <Pagination {...query.data} onPage={setPage} />
-        </div>
-      )}
+          </>
+        )}
+      </Card>
       <ConfirmDialog
         open={!!deleting}
         onOpenChange={(open) => {

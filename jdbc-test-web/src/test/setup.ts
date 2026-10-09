@@ -43,3 +43,9 @@ afterEach(() => {
 });
 
 beforeEach(() => { void i18n.changeLanguage("en"); localStorage.clear(); });
+
+// Radix pointer and scrolling APIs absent in jsdom; actual behavior also covered in Chrome.
+Element.prototype.hasPointerCapture = () => false;
+Element.prototype.setPointerCapture = () => {};
+Element.prototype.releasePointerCapture = () => {};
+Element.prototype.scrollIntoView = () => {};

@@ -1,28 +1,22 @@
 import { NotFound } from "@/components/not-found";
-import { lazy, Suspense } from "react";
 import { createBrowserRouter, Outlet } from "react-router-dom";
 import { AppShell } from "@/components/layout/app-shell";
-import { Loading } from "@/components/common";
-const Dashboard = lazy(() => import("@/features/dashboard/dashboard"));
-const Drivers = lazy(() => import("@/features/drivers/drivers"));
-const DriverForm = lazy(() => import("@/features/drivers/driver-form"));
-const DriverDetail = lazy(() => import("@/features/drivers/driver-detail"));
-const Connections = lazy(() => import("@/features/connections/connections"));
-const ConnectionForm = lazy(
-  () => import("@/features/connections/connection-form"),
-);
-const Runs = lazy(() => import("@/features/runs/runs"));
-const NewRun = lazy(() => import("@/features/runs/new-run"));
-const RunDetail = lazy(() => import("@/features/runs/run-detail"));
+import Dashboard from "@/features/dashboard/dashboard";
+import Drivers from "@/features/drivers/drivers";
+import DriverForm from "@/features/drivers/driver-form";
+import DriverDetail from "@/features/drivers/driver-detail";
+import Connections from "@/features/connections/connections";
+import ConnectionForm from "@/features/connections/connection-form";
+import Runs from "@/features/runs/runs";
+import NewRun from "@/features/runs/new-run";
+import RunDetail from "@/features/runs/run-detail";
 export const routes = [
   {
     element: <AppShell />,
     children: [
       {
         element: (
-          <Suspense fallback={<Loading />}>
-            <Outlet />
-          </Suspense>
+          <Outlet />
         ),
         children: [
           { index: true, element: <Dashboard /> },

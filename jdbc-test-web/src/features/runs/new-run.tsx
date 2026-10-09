@@ -1,10 +1,10 @@
+import { Card } from "@/components/ui/card";
 import { moduleName, profileName } from "@/lib/presentation";
 import { t } from "i18next";
 import { useTranslation } from "react-i18next";
 import { JdbcUrl } from "@/components/jdbc-url";
 import { useState } from "react";
 import {
-  keepPreviousData,
   useMutation,
   useQuery,
   useQueryClient,
@@ -27,6 +27,7 @@ import {
   FormError,
   Loading,
   PageHeader,
+  PendingPage,
   StatusBadge,
 } from "@/components/common";
 import { connectionPresentation } from "@/lib/status";
@@ -52,7 +53,6 @@ export default function NewRun() {
   const connections = useQuery({
     queryKey: connectionsKeys.list(params),
     queryFn: ({ signal }) => connectionsApi.list(params, signal),
-    placeholderData: keepPreviousData,
   });
   const preset = useQuery({
     queryKey: connectionsKeys.detail(presetId ?? ""),
@@ -93,15 +93,14 @@ export default function NewRun() {
     onSettled: () => setPassword(""),
   });
   if (
-    catalog.isPending ||
     connections.isPending ||
     (presetId && preset.isPending)
   )
-    return <Loading />;
-  if (catalog.isError || connections.isError || preset.isError)
+    return <PendingPage title={t("ui.newTestRun")} />;
+  if (!connections.data || (presetId && preset.isError && !preset.data))
     return (
-      <ErrorState
-        error={catalog.error ?? connections.error ?? preset.error}
+      <PendingPage title={t("ui.newTestRun")}
+        error={connections.error ?? preset.error}
         retry={() => {
           void catalog.refetch();
           void connections.refetch();
@@ -111,10 +110,10 @@ export default function NewRun() {
     );
   const selectionCount =
     profile === "CUSTOM"
-      ? catalog.data.modules
+      ? catalog.data?.modules
           .filter((module) => modules.includes(module.id))
           .reduce((total, module) => total + module.scenarioCount, 0)
-      : catalog.data.profiles.find((item) => item.id === profile)
+      : catalog.data?.profiles.find((item) => item.id === profile)
           ?.scenarioCount;
   const continueAllowed =
     step === 0
@@ -122,10 +121,12 @@ export default function NewRun() {
       : step === 1
         ? chosenDriver?.status === "VALIDATED" && (!needsPassword || !!password)
         : step === 2
-          ? profile !== "CUSTOM" || modules.length > 0
+          ? !!catalog.data && (profile !== "CUSTOM" || modules.length > 0)
           : false;
   return (
     <div className="mx-auto max-w-5xl">
+      {connections.isError && connections.data ? <ErrorState error={connections.error} retry={() => void connections.refetch()} /> : null}
+      {catalog.isError && catalog.data ? <ErrorState error={catalog.error} retry={() => void catalog.refetch()} /> : null}
       <PageHeader
         title={t("ui.newTestRun")}
         description={t("ui.chooseAConnectionAndDriverSelectTests")}
@@ -134,7 +135,7 @@ export default function NewRun() {
         {[t("ui.connection"), t("ui.driver"), t("ui.testSelection"), t("ui.reviewConfirm")].map(
           (label, index) => (
             <button
-              key={label}
+              key={index}
               disabled={index > step}
               onClick={() => setStep(index)}
               className={cn(
@@ -157,7 +158,7 @@ export default function NewRun() {
           ),
         )}
       </div>
-      <section className="panel">
+      <Card as="section" className="panel">
         <p className="eyebrow mb-2">{t("wizard.step", {step: step + 1})}</p>
         {step === 0 ? (
           <>
@@ -165,7 +166,7 @@ export default function NewRun() {
             {connections.data.items.length ? (
               <div className="grid gap-4 md:grid-cols-2">
                 {connections.data.items.map((item) => (
-                  <div key={item.id} className="step-card min-w-0 cursor-pointer"
+                  <div key={item.id} data-selected={chosen?.id === item.id} className="step-card min-w-0 cursor-pointer"
                     onClick={(event) => {
                       if ((event.target as HTMLElement).closest("button, input, label")) return;
                       setConnection(item); setDriver(null); setPassword(""); setDifferentPassword(false);
@@ -259,7 +260,8 @@ export default function NewRun() {
             )}
           </div>
         ) : null}
-        {step === 2 ? (
+        {step === 2 && !catalog.data ? (catalog.isError ? <ErrorState error={catalog.error} retry={() => void catalog.refetch()} /> : <Loading />) : null}
+        {step === 2 && catalog.data ? (
           <>
             <h2 className="mb-3 text-xl font-semibold">
               {t("ui.defineYourTestSelection")}</h2>
@@ -294,7 +296,7 @@ export default function NewRun() {
                   <h3 className="font-medium">
                     {t("ui.modules")}{" "}
                     <span className="text-muted-foreground">
-                      ({catalog.data.modules.length})
+                      ({catalog.data?.modules.length})
                     </span>
                   </h3>
                   <div className="flex gap-2">
@@ -302,7 +304,7 @@ export default function NewRun() {
                       variant="ghost"
                       size="sm"
                       onClick={() =>
-                        setModules(catalog.data.modules.map((item) => item.id))
+                        setModules(catalog.data!.modules.map((item) => item.id))
                       }
                     >
                       {t("ui.selectAll")}</Button>
@@ -315,7 +317,7 @@ export default function NewRun() {
                   </div>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  {catalog.data.modules.map((item) => (
+                  {catalog.data?.modules.map((item) => (
                     <label
                       key={item.id}
                       className={cn(
@@ -386,7 +388,7 @@ export default function NewRun() {
                   {profileName(profile)} · {selectionCount == null ? t("ui.scenariosInline") : plural(selectionCount, "scenario")}</p>
                 <p className="mt-2 text-sm text-muted-foreground">
                   {profile === "CUSTOM"
-                    ? catalog.data.modules
+                    ? catalog.data?.modules
                         .filter((item) => modules.includes(item.id))
                         .map((item) => moduleName(item.id, item.name))
                         .join(", ")
@@ -415,7 +417,7 @@ export default function NewRun() {
             ) : null}
           </>
         ) : null}
-      </section>
+      </Card>
       {error ? <div className="mt-3"><FormError message={error} /></div> : null}
       <div className="mt-4 flex items-center justify-between gap-4">
         <Button

@@ -1,10 +1,12 @@
+import { Card } from "@/components/ui/card";
 import i18n from "@/i18n";
 import { formatNumber } from "@/lib/format";
 import { t } from "i18next";
 import { useTranslation } from "react-i18next";
-import { Check, Copy, Inbox, LoaderCircle, TriangleAlert } from "lucide-react";
+import { Check, Copy, Inbox, TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
+import { Tooltip } from "./ui/tooltip";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { errorMessage } from "@/api/client";
@@ -20,28 +22,24 @@ export function PageHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+    <div className="jdbc-page-header flex flex-wrap items-start justify-between gap-4">
       <div className="min-w-0 flex-1">
-        <h1 className="page-title break-words">{title}</h1>
-        <p className="mt-2 break-words text-sm leading-relaxed text-muted-foreground">
-          {description}
-        </p>
+        <h1 title={title} className="page-title break-words">{title}</h1>
+        {description ? <p className="mt-2 break-words text-sm leading-relaxed text-muted-foreground">{description}</p> : null}
       </div>
       {action}
     </div>
   );
 }
-export function Loading({ label = t("ui.loadingWorkspace") }: { label?: string }) {
+export function Loading({ label = t("ui.loadingData") }: { label?: string }) {
   useTranslation();
-  return (
-    <div
-      role="status"
-      className="panel flex min-h-40 items-center justify-center gap-3 text-muted-foreground"
-    >
-      <LoaderCircle className="size-5 animate-spin" />
-      {label}
-    </div>
-  );
+  return <div role="status" aria-label={label} data-loading-region className="resource-skeleton">
+    <span className="sr-only">{label}</span>
+    {[0,1,2,3].map(row => <div className="skeleton-row" aria-hidden="true" key={row}><span /><span /><span /></div>)}
+  </div>;
+}
+export function PendingPage({ title, error, retry }: {title:string; error?:unknown; retry?:()=>void}) {
+  return <><PageHeader title={title} description="" />{error ? <ErrorState error={error} retry={retry} /> : <Loading />}</>;
 }
 export function ErrorState({
   error,
@@ -52,7 +50,7 @@ export function ErrorState({
 }) {
   useTranslation();
   return (
-    <div role="alert" className="panel flex items-start gap-3">
+    <Card role="alert" className="panel flex items-start gap-3">
       <TriangleAlert className="mt-1 size-5 shrink-0 text-destructive" />
       <div className="min-w-0 break-words">
         <h2 className="font-semibold">{t("ui.unableToLoadThisResource")}</h2>
@@ -64,7 +62,7 @@ export function ErrorState({
             {t("ui.tryAgain")}</Button>
         ) : null}
       </div>
-    </div>
+    </Card>
   );
 }
 export function EmptyState({
@@ -77,7 +75,7 @@ export function EmptyState({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex min-h-64 flex-col items-center justify-center p-8 text-center">
+    <div className="jdbc-empty flex min-h-52 flex-col items-center justify-center p-8 text-center">
       <div className="mb-4 rounded-2xl bg-accent p-4">
         <Inbox className="size-7 text-primary" />
       </div>
@@ -140,9 +138,10 @@ export function FormError({ message }: { message: string | Error | null }) {
 export function CopyButton({ value, label }: { value: string; label: string }) {
   useTranslation();
   return (
-    <Button
+    <Tooltip label={t("common.copy", { label })}><Button
+      type="button"
       variant="ghost"
-      size="icon"
+      size="icon-sm"
       aria-label={t("common.copy", { label })}
       onClick={() => {
         void navigator.clipboard.writeText(value).then(
@@ -152,7 +151,7 @@ export function CopyButton({ value, label }: { value: string; label: string }) {
       }}
     >
       <Copy />
-    </Button>
+    </Button></Tooltip>
   );
 }
 export function Metric({
@@ -171,18 +170,18 @@ export function Metric({
   subdued?: boolean;
 }) {
   return (
-    <div className={`panel metric tone-${tone}${subdued ? " metric-subdued" : ""}`} data-metric={label}>
-      <div className="flex items-center justify-between gap-2">
-        <p className="min-w-0 break-words text-sm text-muted-foreground">{label}</p>
+    <Card className={`panel metric tone-${tone}${subdued ? " metric-subdued" : ""}`} data-metric={label}>
+      <div className="metric-header">
+        <p className="metric-label">{label}</p>
         {icon ? (
-          <span className="metric-icon rounded-lg p-2">{icon}</span>
+          <span className="metric-icon">{icon}</span>
         ) : null}
       </div>
-      <p className="mt-2 text-3xl font-semibold tracking-tight">{typeof value === "number" ? formatNumber(value) : value}</p>
+      <p className="metric-value">{typeof value === "number" ? formatNumber(value) : value}</p>
       {note ? (
-        <p className="mt-2 text-xs text-muted-foreground">{note}</p>
+        <p className="metric-note">{note}</p>
       ) : null}
-    </div>
+    </Card>
   );
 }
 export function ProbeResult({

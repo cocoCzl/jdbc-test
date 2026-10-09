@@ -1,3 +1,5 @@
+import { Card } from "@/components/ui/card";
+import { Select } from "@/components/ui/select";
 import { t } from "i18next";
 import { useTranslation } from "react-i18next";
 import { useRef, useState } from "react";
@@ -63,7 +65,7 @@ export default function DriverForm() {
         description={t("ui.aVersionedImmutablePackageOfJDBCArtifacts")}
       />
       <form
-        className="grid max-w-5xl gap-6 xl:grid-cols-[1fr_320px]"
+        className="grid grid-cols-1 max-w-5xl gap-6 xl:grid-cols-[minmax(0,1fr)_320px]"
         onSubmit={(event) => {
           event.preventDefault();
           const failure = validateFiles(files);
@@ -72,7 +74,7 @@ export default function DriverForm() {
         }}
       >
         <div className="space-y-6">
-          <section className="panel">
+          <Card as="section" className="panel">
             <h2 className="mb-5 text-lg font-semibold">{t("ui.packageIdentity")}</h2>
             <div className="grid gap-5 sm:grid-cols-2">
               <Field
@@ -128,23 +130,23 @@ export default function DriverForm() {
               <div className="mt-4">
                 <label htmlFor="candidate-class" className="text-sm">
                   {t("ui.classesReturnedByTheServer")}</label>
-                <select
+                <Select
                   id="candidate-class"
-                  className="select mt-2"
+                  className=" mt-2"
                   value={form.driverClass}
-                  onChange={(event) =>
-                    change("driverClass", event.target.value)
+                  onValueChange={(value) =>
+                    change("driverClass", value)
                   }
                 >
                   <option value="">{t("ui.chooseADriverClass")}</option>
                   {candidates.map((value) => (
                     <option key={value}>{value}</option>
                   ))}
-                </select>
+                </Select>
               </div>
             ) : null}
-          </section>
-          <section className="panel">
+          </Card>
+          <Card as="section" className="panel">
             <h2 className="mb-5 text-lg font-semibold">{t("ui.driverArtifacts")}</h2>
             <input
               ref={uploadInput}
@@ -210,9 +212,9 @@ export default function DriverForm() {
                 </li>
               ))}
             </ul>
-          </section>
+          </Card>
         </div>
-        <aside className="panel h-fit">
+        <Card as="aside" className="panel h-fit">
           <p className="eyebrow">{t("ui.readyToPackage")}</p>
           <p className="mt-5 text-2xl font-semibold">
             {files.length} {t("ui.artifactsInline")}</p>
@@ -225,7 +227,7 @@ export default function DriverForm() {
           <Button className="mt-4 w-full" disabled={upload.isPending}>
             {upload.isPending ? t("ui.uploadingPackage") : t("ui.uploadDriverPackage")}
           </Button>
-        </aside>
+        </Card>
       </form>
     </>
   );

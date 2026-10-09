@@ -1,3 +1,4 @@
+import { chooseOption } from "./select";
 import { expect, test } from "@playwright/test";
 import {
   catalog,
@@ -51,11 +52,12 @@ test("TEST FIXTURE ONLY: long text, pagination, masked Oracle URL and execution 
     await noOverflow();
     await page.screenshot({path: `test-results/fixture-interrupted-${width}.png`, fullPage: true});
     await page.goto("/runs/new");
-    await page.getByRole("button", {name: "View / copy URL"}).click();
+    await page.getByRole("button", {name: "View URL"}).click();
     await expect(page.getByRole("dialog")).toContainText("SERVICE_NAME=fixture_service");
     await expect(page.getByRole("dialog")).not.toContainText("fixture-only");
     await noOverflow();
     await page.keyboard.press("Escape");
+    await expect(page.getByRole("button", {name:"View URL"})).toBeFocused();
     const radio = page.getByRole("radio", {name});
     await expect(radio).not.toBeChecked();
     await radio.focus(); await page.keyboard.press("Space");
@@ -141,10 +143,8 @@ test("API-mocked browser flow: upload → connection → Custom Statement → re
   await page.goto("/connections/new");
   await page.getByLabel("Name", { exact: true }).fill("Test database");
   await page.getByLabel("Database type", { exact: true }).fill("VendorDB");
-  await page.getByLabel("Adapter", { exact: true }).selectOption("postgresql");
-  await page
-    .getByLabel("Driver package", { exact: true })
-    .selectOption(driver.id);
+  await chooseOption(page, page.getByLabel("Adapter", { exact: true }), "postgresql");
+  await chooseOption(page, page.getByLabel("Driver package", { exact: true }), driver.id);
   await page.getByLabel("JDBC URL", { exact: true }).fill(connection.jdbcUrl);
   await page
     .getByRole("button", { name: "Test connection", exact: true })
@@ -182,7 +182,7 @@ test("API-mocked empty Dashboard and responsive navigation at 1280 / 1024 / tabl
           : paged([]),
       }),
   );
-  for (const width of [1280, 1024, 768]) {
+  for (const width of [1280, 1024, 768, 390]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/");
     await expect(page.getByText("No test runs yet")).toBeVisible();
@@ -191,14 +191,13 @@ test("API-mocked empty Dashboard and responsive navigation at 1280 / 1024 / tabl
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
-    if (width < 1024) {
+    if (width < 768) {
       await page.getByRole("button", { name: "Open navigation" }).click();
       await expect(
-        page.getByRole("link", { name: "Drivers", exact: true }),
+        page.getByRole("menuitem", { name: "Drivers", exact: true }),
       ).toBeInViewport();
-      await page
-        .getByRole("button", { name: "Close navigation", exact: true })
-        .click();
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("button", {name:"Open navigation"})).toBeFocused();
     } else
       await expect(
         page.getByRole("link", { name: "Drivers", exact: true }),

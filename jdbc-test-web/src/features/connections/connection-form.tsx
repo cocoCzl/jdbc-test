@@ -1,3 +1,6 @@
+import { Card } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { adapterStatus } from "@/lib/presentation";
 import { t } from "i18next";
 import { useTranslation } from "react-i18next";
@@ -20,7 +23,7 @@ import {
   ErrorState,
   Field,
   FormError,
-  Loading,
+  PendingPage,
   PageHeader,
   ProbeResult,
   StatusBadge,
@@ -108,8 +111,8 @@ function Editor({ connection }: { connection?: Connection }) {
     },
   });
   const busy = save.isPending || test.isPending;
-  if (adapters.isPending) return <Loading label={t("ui.loadingAdapters")} />;
-  if (adapters.isError)
+  if (adapters.isPending) return <PendingPage title={connection?.name ?? t("ui.addAConnection")} />;
+  if (!adapters.data)
     return (
       <ErrorState
         error={adapters.error}
@@ -131,7 +134,7 @@ function Editor({ connection }: { connection?: Connection }) {
         }
       />
       <form
-        className="grid max-w-6xl gap-6 xl:grid-cols-[1fr_320px]"
+        className="grid grid-cols-1 max-w-6xl gap-6 xl:grid-cols-[minmax(0,1fr)_320px]"
         onSubmit={(event) => {
           event.preventDefault();
           if (!driver) {
@@ -147,7 +150,7 @@ function Editor({ connection }: { connection?: Connection }) {
         }}
       >
         <div className="space-y-6">
-          <section className="panel">
+          <Card as="section" className="panel">
             <h2 className="mb-5 text-lg font-semibold">{t("ui.connectionIdentity")}</h2>
             <div className="grid gap-5 sm:grid-cols-2">
               <Field
@@ -169,18 +172,18 @@ function Editor({ connection }: { connection?: Connection }) {
                 hint={t("ui.anOpenLabelEGPostgreSQLAcmeDB")}
               />
               <Field id="adapter" label={t("ui.adapter")}>
-                <select
+                <Select
                   id="adapter"
                   required
-                  className="select"
+                  className=""
                   value={form.adapterId}
-                  onChange={(event) => {
-                    change("adapterId", event.target.value);
+                  onValueChange={(value) => {
+                    change("adapterId", value);
                     if (!form.databaseType)
                       change(
                         "databaseType",
                         adapters.data.find(
-                          (item) => item.id === event.target.value,
+                          (item) => item.id === value,
                         )?.name ?? "",
                       );
                   }}
@@ -191,7 +194,7 @@ function Editor({ connection }: { connection?: Connection }) {
                       {adapter.name} · {adapterStatus(adapter.status)}
                     </option>
                   ))}
-                </select>
+                </Select>
               </Field>
               <DriverSelect
                 value={driver?.id ?? ""}
@@ -269,9 +272,9 @@ function Editor({ connection }: { connection?: Connection }) {
             </div>
             <div className="mt-5">
               <Field id="description" label={t("ui.descriptionOptional")}>
-                <textarea
+                <Textarea
                   id="description"
-                  className="min-h-24 w-full rounded-xl border border-input p-3 text-sm"
+                  className="min-h-24"
                   maxLength={1000}
                   value={form.description}
                   onChange={(event) =>
@@ -280,10 +283,10 @@ function Editor({ connection }: { connection?: Connection }) {
                 />
               </Field>
             </div>
-          </section>
+          </Card>
           {probe ? <ProbeResult result={probe} /> : null}
           {connection ? (
-            <section className="panel">
+            <Card as="section" className="panel">
               <h2 className="font-semibold">{t("ui.savedConnection")}</h2>
               <p className="my-3 text-sm text-muted-foreground">
                 {t("ui.savedTestUsesPersistedSettingsSaveEdited")}</p>
@@ -306,10 +309,10 @@ function Editor({ connection }: { connection?: Connection }) {
                 onClick={() => setDeleting(true)}
               >
                 {t("ui.deleteConnection")}</Button>
-            </section>
+            </Card>
           ) : null}
         </div>
-        <aside className="panel h-fit space-y-5">
+        <Card as="aside" className="panel h-fit space-y-5">
           <p className="eyebrow">{t("ui.connectWithConfidence")}</p>
           <p className="text-sm leading-relaxed text-muted-foreground">
             {t("ui.savingAndTestingAreIndependentYouCan")}</p>
@@ -341,7 +344,7 @@ function Editor({ connection }: { connection?: Connection }) {
           </Button>
           <p className="text-xs leading-relaxed text-muted-foreground">
             {t("ui.afterARequestCompletesThePasswordInput")}</p>
-        </aside>
+        </Card>
       </form>
       <ConfirmDialog
         open={deleting}
@@ -363,8 +366,8 @@ export default function ConnectionForm() {
     enabled: !!id,
   });
   if (!id) return <Editor />;
-  if (query.isPending) return <Loading />;
-  if (query.isError)
+  if (query.isPending) return <PendingPage title={t("ui.connection")} />;
+  if (!query.data)
     return (
       <ErrorState error={query.error} retry={() => void query.refetch()} />
     );

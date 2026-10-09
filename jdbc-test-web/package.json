@@ -15,11 +15,9 @@
     "test:e2e:real": "playwright test --project=real"
   },
   "dependencies": {
-    "@fontsource/dm-sans": "^5.2.8",
     "@fontsource/ibm-plex-mono": "^5.2.7",
     "@tanstack/react-query": "^5.90.0",
     "@tanstack/react-table": "^8.21.3",
-    "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "echarts": "^6.0.0",
     "i18next": "26.4.2",
@@ -48,6 +46,7 @@
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
     "jsdom": "^27.0.0",
+    "sass": "1.99.0",
     "tailwindcss": "^4.1.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.48.0",

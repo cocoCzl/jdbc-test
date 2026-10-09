@@ -1,0 +1,189 @@
+// CPA Keeper UI adaptation (MIT, upstream 2c09d65). See public/third-party-notices.txt.
+// Adapted from CPA Keeper at 2c09d65; see public/third-party-notices.txt.
+@use './upstream/menu';
+@use './upstream/stat-cards';
+
+:root {
+  --background: #ffffff;
+  --foreground: #2d2a26;
+  --card: #fff;
+  --primary: #8b8680;
+  --success: #10b981;
+  --danger: #c65746;
+  --warning: #95600e;
+  --neutral: #706d68;
+  --highlight: #805abd;
+  --cyan: #27849d;
+  --surface-muted: #f6f6f6;
+  --surface-selected: #ecebea;
+  --ink-muted: #6d6760;
+  --line: #e5e5e5;
+  --control-radius: 8px;
+  --panel-radius: 24px;
+  --surface-shadow: 0 10px 18px -3px rgb(0 0 0 / 10%);
+  --floating-shadow: 0 12px 26px rgb(0 0 0 / 12%);
+  --metric-radius: var(--panel-radius);
+  --metric-shadow: var(--surface-shadow);
+  // Aliases required by the unmodified upstream menu mixins.
+  --bg-primary: var(--card);
+  --border-color: var(--line);
+  --shadow-lg: var(--surface-shadow);
+  --text-primary: var(--foreground);
+  --text-tertiary: #a29c95;
+  --text-secondary: #6d6760;
+  --keeper-card-radius: 24px;
+  --keeper-page-max-width: clamp(1245px, 86vw, 1600px);
+  --primary-color: var(--primary);
+  --keeper-menu-hover-bg: var(--surface-muted);
+  --keeper-menu-selected-bg: var(--surface-selected);
+}
+
+@layer components {
+
+.jdbc-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  flex-shrink: 0; min-height: 36px; padding: 0 14px;
+  border: 1px solid transparent; border-radius: var(--control-radius);
+  color: var(--foreground); font-size: 12px; font-weight: 600; line-height: 1;
+  white-space: nowrap; transition: background-color .15s ease, border-color .15s ease;
+  &[data-variant='default'] { background: var(--primary); color: white; }
+  &[data-variant='destructive'] { background: var(--danger); color: white; }
+  &[data-variant='outline'] { background: var(--card); border-color: var(--line); box-shadow: 0 1px 2px rgb(0 0 0 / 4%); }
+  &[data-variant='secondary'] { background: var(--surface-selected); }
+  &[data-variant='ghost'] { color: var(--ink-muted); }
+  &[data-variant='link'] { color: var(--primary); }
+  &:hover:not(:disabled) { filter: brightness(.97); }
+  &[data-variant='ghost']:hover:not(:disabled) { background: var(--surface-muted); color: var(--foreground); }
+  &[data-size='sm'], &[data-size='icon-sm'] { min-height: 32px; padding: 0 12px; font-size: 12px; }
+  &[data-size='xs'], &[data-size='icon-xs'] { min-height: 28px; padding: 0 8px; font-size: 12px; }
+  &[data-size='lg'] { min-height: 44px; padding-inline: 22px; }
+  &[data-size^='icon'] { width: 40px; padding: 0; }
+  &[data-size='icon-sm'] { width: 32px; }
+  &[data-size='icon-xs'] { width: 28px; }
+  &:disabled { cursor: not-allowed; opacity: .5; }
+  &[aria-invalid='true'] { border-color: var(--danger); }
+  svg { width: 16px; height: 16px; flex-shrink: 0; pointer-events: none; }
+}
+.jdbc-input, .jdbc-select {
+  width: 100%; min-width: 0; height: 36px; padding: 0 12px;
+  background: var(--card); color: var(--foreground); border: 1px solid var(--line);
+  border-radius: var(--control-radius); font-size: 12px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+  transition: border-color .15s, box-shadow .15s;
+  &:hover:not(:disabled) { border-color: #cecbc6; }
+  &:disabled { opacity: .6; cursor: not-allowed; background: var(--surface-muted); }
+  &[aria-invalid='true'] { border-color: var(--danger); }
+}
+.jdbc-textarea { height: auto; min-height: 100px; padding: 12px 14px; border-radius: 16px; }
+.jdbc-select { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; }
+.jdbc-select > span:first-child { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.jdbc-select[data-state='open'] { border-color: var(--primary); }
+.jdbc-menu { @include menu.surface; z-index: 2010; }
+.jdbc-menu-item {
+  @include menu.item;
+  justify-content: space-between; outline: none; gap: 20px;
+  &[data-highlighted] { background: var(--keeper-menu-hover-bg); }
+  &[data-state='checked'], &[aria-current='page'] { @include menu.selected; }
+  &[data-disabled] { opacity: .45; pointer-events: none; }
+  > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+}
+.jdbc-select-menu {
+  min-width: var(--radix-select-trigger-width);
+  max-width: calc(100vw - 16px);
+  max-height: min(320px, var(--radix-select-content-available-height));
+  overflow: hidden;
+}
+.jdbc-menu-scroll { display: flex; justify-content: center; height: 24px; color: var(--ink-muted); }
+.jdbc-overlay { position: fixed; inset: 0; z-index: 2000; background: rgb(0 0 0 / 35%); }
+.jdbc-dialog {
+  position: fixed; left: 50%; top: 50%; z-index: 2000;
+  transform: translate(-50%, -50%); width: calc(100% - 32px); max-width: 672px;
+  max-height: 85dvh; overflow-y: auto; overscroll-behavior: contain;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--panel-radius);
+  padding: 24px; box-shadow: var(--floating-shadow);
+}
+.jdbc-confirm { max-width: 448px; }
+.jdbc-tab-list { display: flex; gap: 4px; width: fit-content; max-width: 100%; overflow-x: auto; padding: 5px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-muted); margin-bottom: 20px; }
+.jdbc-tab { padding: 8px 18px; flex-shrink: 0; border-radius: 999px; font-size: 13px; color: var(--ink-muted); }
+.jdbc-tab[data-state='active'] { background: var(--card); color: var(--foreground); font-weight: 600; box-shadow: 0 1px 4px rgb(0 0 0 / 8%); }
+/* App.css outer frame + UsagePage standalone + DashboardHeader/Toolbar, 2c09d65. */
+.jdbc-app { padding:21px 24px 48px; }
+.jdbc-frame { width:min(var(--keeper-page-max-width),100%); margin:auto; display:flex; flex-direction:column; gap:12px; }
+.jdbc-header { position:relative; z-index:40; display:flex; align-items:center; justify-content:space-between; min-height:50px; gap:16px; margin-inline:5px; padding:0 3px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+.jdbc-brand { display:inline-flex; align-items:center; min-height:44px; padding:0; color:var(--foreground); font-size:18px; font-weight:800; letter-spacing:.1em; gap:11px; }
+.jdbc-brand-icon { display:grid; place-items:center; width:41px; height:31px; }
+.jdbc-brand-icon svg {width:29px;height:29px;}
+.jdbc-shell-body { min-width:0; }
+.jdbc-navigation { position:sticky; top:max(24px,env(safe-area-inset-top)); z-index:30; display:flex; align-items:center; gap:10px; width:100%; min-height:52px; max-width:100%; padding:4px 14px; margin:0 0 24px; border-radius:28px; background:transparent; box-shadow:0 8px 24px rgb(33 40 57 / 13%),0 1px 3px rgb(33 40 57 / 7%); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; line-height:1.5; }
+.jdbc-nav-link { position:relative; display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:44px; padding:9px 11px; border-radius:22px; font-size:12px; font-weight:550; color:var(--foreground); white-space:nowrap; isolation:isolate; }
+.jdbc-nav-link:hover { background:color-mix(in srgb,var(--surface-muted) 60%,transparent); }
+.jdbc-nav-link[aria-current='page'] { font-weight:650; }
+.jdbc-nav-link[aria-current='page']::before { content:'';position:absolute;inset:6px 0;z-index:-1;border:1px solid color-mix(in srgb,var(--foreground) 8%,transparent);border-radius:20px;background:var(--card);box-shadow:0 1px 2px rgb(0 0 0 / 8%),0 3px 8px rgb(0 0 0 / 6%); }
+.jdbc-language.jdbc-button {width:44px;height:44px;padding:0;border:0;border-radius:50%;background:transparent;box-shadow:none;font-size:13px;font-weight:600;}
+.jdbc-nav-desktop { position:relative; z-index:1; display: flex; align-items: center; gap: 4px; }
+.jdbc-nav-mobile {position:relative;z-index:1;display:none;}
+.jdbc-page-header { margin-bottom: 18px; padding: 0 2px; }
+.jdbc-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin-bottom: 20px; padding: 10px 14px; width: fit-content; max-width: 100%; border: 1px solid var(--line); border-radius: 24px; background: var(--card); box-shadow: var(--surface-shadow); }
+.jdbc-table {font-size:12px;line-height:1.5;}
+.jdbc-table thead { background: var(--card); }
+.jdbc-table th {font-size:10px;color:var(--text-tertiary);font-weight:600;padding:10px 12px;}
+.jdbc-table td {padding:10px 12px;}
+.jdbc-table tr:last-child { border-bottom: 0; }
+.jdbc-empty { margin: 20px; border: 1px dashed var(--line); border-radius: 18px; background: var(--background); }
+.jdbc-tooltip { z-index: 3010; max-width: min(320px, calc(100vw - 16px)); padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; color: var(--foreground); background: var(--card); box-shadow: var(--floating-shadow); font-size: 12px; }
+[data-sonner-toaster] { --border-radius: 18px; }
+@media (max-width: 767px) {
+  .jdbc-app {padding-inline:20px;}
+  .jdbc-header {padding:0;gap:8px;}
+  .jdbc-shell-body {padding:0;}
+  .jdbc-nav-desktop { position:relative; z-index:1; display: none; }
+  .jdbc-nav-mobile { display: flex; }
+  .jdbc-navigation { margin-bottom: 24px; }
+  .jdbc-brand {font-size:13px;gap:7px;}
+  .jdbc-header-caption { display: none; }
+  .jdbc-toolbar { width: 100%; border-radius: 20px; }
+  .jdbc-input { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .jdbc-button, .jdbc-input { transition: none; } }
+
+}
+
+/* Resource placeholders do not mask page navigation, titles, or actions. */
+html {scroll-padding-top:100px;}
+main :is(button,a,input,summary,[tabindex],section) {scroll-margin-top:100px;}
+.metric.tone-active {--accent:#3b82f6;--accent-soft:rgba(59,130,246,.18);--accent-border:rgba(59,130,246,.34);}
+.metric.tone-highlight {--accent:#8b5cf6;--accent-soft:rgba(139,92,246,.18);--accent-border:rgba(139,92,246,.35);}
+.metric.tone-success {--accent:#22c55e;--accent-soft:rgba(34,197,94,.18);--accent-border:rgba(34,197,94,.32);}
+.metric.tone-cyan {--accent:#14b8a6;--accent-soft:rgba(20,184,166,.18);--accent-border:rgba(20,184,166,.34);}
+.metric.tone-warning {--accent:#f59e0b;--accent-soft:rgba(245,158,11,.18);--accent-border:rgba(245,158,11,.32);}
+.metric.tone-danger {--accent:#c65746;--accent-soft:rgba(198,87,70,.18);--accent-border:rgba(198,87,70,.35);}
+.metric.tone-neutral,.metric.metric-subdued {--accent:#8b8680;--accent-soft:rgba(139,134,128,.08);--accent-border:rgba(139,134,128,.32);}
+.resource-skeleton {padding:20px;display:grid;gap:16px;border:1px solid var(--line);border-radius:24px;}
+.skeleton-row {display:grid;grid-template-columns:2fr 1fr 1fr;gap:20px;height:24px;}
+.skeleton-row span {background:var(--surface-muted);border-radius:8px;}
+.disclosure-open {display:none;}
+details[open] > summary .disclosure-open {display:inline;}
+details[open] > summary .disclosure-closed {display:none;}
+
+.jdbc-header,.jdbc-navigation {font-size:12px;line-height:18px;}
+.jdbc-brand {line-height:18px;}
+.jdbc-page-header > div > p {font-size:12px;line-height:1.5;}
+
+/* components.scss Modal: header/body padding and title typography. */
+.jdbc-dialog {padding:0;max-height:90vh;}
+.jdbc-dialog-header {min-height:64px;padding:16px 24px;border-bottom:1px solid var(--line);}
+.jdbc-dialog-header > h2 {font-size:18px;font-weight:700;line-height:1.2;}
+.jdbc-dialog-description {padding:16px 24px 0;}
+.jdbc-dialog-body {padding:24px;max-height:65vh;overflow:auto;overscroll-behavior:contain;}
+.jdbc-confirm {padding:24px;}
+.jdbc-button[data-variant='default'] {border-color:var(--primary);}
+.jdbc-button[data-variant='default']:hover:not(:disabled) {background:#7f7a74;border-color:#7f7a74;filter:none;}
+.jdbc-input:focus {border-color:var(--primary);box-shadow:0 0 0 3px rgba(139,134,128,.18);}
+.jdbc-table tbody tr:hover {background:var(--surface-muted);}
+
+/* Select.module.scss trigger, and components.scss modal shadow. */
+.jdbc-select {height:40px;font-size:13px;font-weight:500;line-height:1.5;box-shadow:0 1px 2px 0 rgb(0 0 0 / 8%);}
+.jdbc-select:focus,.jdbc-select[data-state='open'] {border-color:var(--primary);box-shadow:0 1px 2px 0 rgb(0 0 0 / 8%),0 0 0 3px rgba(139,134,128,.18);}
+.jdbc-table {line-height:normal;}
+.jdbc-dialog {box-shadow:0 10px 15px -3px rgba(0,0,0,.1);}
+.jdbc-dialog > button:last-child {top:12px;right:12px;border:1px solid var(--line);border-radius:50%;background:var(--card);}

@@ -1,3 +1,4 @@
+import { Card } from "@/components/ui/card";
 import { t } from "i18next";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
@@ -13,7 +14,7 @@ import {
   ErrorState,
   Field,
   FormError,
-  Loading,
+  PendingPage,
   PageHeader,
   StatusBadge,
 } from "@/components/common";
@@ -47,7 +48,7 @@ function MetadataForm({
     onError: (failure) => setError(failure instanceof Error ? failure : new Error()),
   });
   return (
-    <form
+    <Card as="form"
       className="panel space-y-4"
       onSubmit={(event) => {
         event.preventDefault();
@@ -90,7 +91,7 @@ function MetadataForm({
         <Button type="button" variant="outline" onClick={close}>
           {t("ui.cancelEdit")}</Button>
       </div>
-    </form>
+    </Card>
   );
 }
 export default function DriverDetail() {
@@ -124,14 +125,12 @@ export default function DriverDetail() {
       toast.error(errorMessage(error));
     },
   });
-  if (query.isPending) return <Loading />;
-  if (query.isError)
-    return (
-      <ErrorState error={query.error} retry={() => void query.refetch()} />
-    );
+  if (query.isPending) return <PendingPage title={t("ui.driverPackage")} />;
+  if (!query.data) return <PendingPage title={t("ui.driverPackage")} error={query.error} retry={() => void query.refetch()} />;
   const driver = query.data;
   return (
     <>
+      {query.isError ? <ErrorState error={query.error} retry={() => void query.refetch()} /> : null}
       <PageHeader
         title={driver.name}
         description={`${driver.vendor} · ${driver.version}`}
@@ -152,7 +151,7 @@ export default function DriverDetail() {
         {editing ? (
           <MetadataForm driver={driver} close={() => setEditing(false)} />
         ) : null}
-        <section className="panel">
+        <Card as="section" className="panel">
           <div className="mb-6 flex items-center justify-between">
             <h2 className="text-lg font-semibold">{t("ui.driverPackage")}</h2>
             <StatusBadge {...driverPresentation[driver.status]} />
@@ -161,7 +160,7 @@ export default function DriverDetail() {
             {Object.entries({
               [t("ui.driverClass")]: driver.driverClass,
               [t("ui.jdbcURLPrefix")]: driver.urlPrefix ?? "—",
-              Source: driver.sourceType,
+              [t("ui.source")]: t(`driverSource.${driver.sourceType}`),
               [t("ui.created")]: formatDateTime(driver.createdAt),
               [t("ui.updated")]: formatDateTime(driver.updatedAt),
               [t("ui.version")]: driver.version,
@@ -186,9 +185,9 @@ export default function DriverDetail() {
               ) : null}
             </div>
           </div>
-        </section>
+        </Card>
         {validate.data ? (
-          <section role="status" className="panel border-emerald-100">
+          <Card as="section" role="status" className="panel border-success/20">
             <h2 className="font-semibold text-success">
               {t("ui.validatedInAnIsolatedWorker")}</h2>
             <p className="mt-2 text-sm">
@@ -198,9 +197,9 @@ export default function DriverDetail() {
             </p>
             <p className="mt-2 text-xs text-muted-foreground">
               {t("ui.metadataFromThisValidationResponseNotA")}</p>
-          </section>
+          </Card>
         ) : null}
-        <section className="panel">
+        <Card as="section" className="panel">
           <h2 className="mb-5 text-lg font-semibold">{t("ui.artifacts")}</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -236,7 +235,7 @@ export default function DriverDetail() {
           </div>
           <p className="mt-5 text-xs text-muted-foreground">
             {t("ui.binaryArtifactsAreImmutableToReplaceA")}</p>
-        </section>
+        </Card>
         <Button variant="destructive" onClick={() => setDeleting(true)}>
           {t("ui.deleteDriverPackage")}</Button>
       </div>

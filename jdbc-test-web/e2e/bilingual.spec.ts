@@ -110,7 +110,7 @@ test("TEST FIXTURE ONLY: Chinese and long English/URL layouts at 1440, 768 and 3
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
         await expect(page.getByRole("button", {name: /^(Language|界面语言)$/})).toBeInViewport();
       }
-      await page.getByRole("button", {name: language === "en" ? "View / copy URL" : "查看 / 复制 URL"}).click();
+      await page.getByRole("button", {name: language === "en" ? "View URL" : "查看 URL"}).click();
       await expect(page.getByRole("dialog")).toContainText("LongServiceName");
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await page.keyboard.press("Escape");

@@ -86,7 +86,7 @@ npm run dev
 
 路由包含 Dashboard、`/drivers`、`/connections`、`/runs`、创建表单和 `/:id` 详情。使用流程：上传并验证驱动 → 保存并探测连接 → 核对场景选择与授权范围 → 同意并运行 → 查看实时结果与报告。
 
-TanStack Query 管理服务端状态；表单和传输状态留在组件内。`src/api/client.ts` 处理 fetch、JSON/multipart/204、取消和 RFC Problem Details。资源 DTO 不使用统一成功包装。表格采用 TanStack Table，UI 使用 Tailwind/shadcn/Radix，结果图使用 ECharts；生产代码没有模拟 API。
+TanStack Query 管理服务端状态；表单和传输状态留在组件内。`src/api/client.ts` 处理 fetch、JSON/multipart/204、取消和 RFC Problem Details。资源 DTO 不使用统一成功包装。表格采用 TanStack Table，共享 CPA 风格组件使用 Radix 交互、Sass 视觉 token 和 Tailwind 布局工具类，结果图使用 ECharts；生产代码没有模拟 API。
 
 任务详情先读取 REST，再为活动任务打开原生 `EventSource`。SSE 更新同一份 Query 缓存，终态事件关闭连接并刷新结果。重连不改变任务状态；10 秒 REST 轮询补偿丢失的终态事件。密码只保存在组件内存，请求后清除，不写入浏览器存储、URL 或查询缓存。诊断内容以文本显示。
 
@@ -222,3 +222,18 @@ npm run test:e2e:real
 真实项目需要运行中的 Server/Worker、干净的平台数据库与驱动存储，以及单独授权的目标 PostgreSQL。缺少输入会直接失败，不回退到模拟。测试会持久保存数据；重跑时使用新的验收存储，不要连接共享或业务数据库。真实测试关闭 trace 采集。`PLAYWRIGHT_CHANNEL=chrome` 可使用已安装的 Chrome。生产模式检查见[部署指南](deployment.zh-CN.md)。
 
 构建后执行 `JDBC_TEST_E2E_PREVIEW=true PLAYWRIGHT_CHANNEL=chrome npm --prefix jdbc-test-web run test:e2e`，可基于最新构建资源进行浏览器检查。仅运行模拟 API 项目，截图明确标注 fixture，并核对浏览器加载 bundle 与 `dist` 的 SHA-256。该检查不启动 QA，也不执行目标数据库操作。
+
+
+## 统一前端 UI
+
+CPA Keeper 白色 UI 基础层固定引用上游 [`2c09d65d6a90b1dc9802fe7b26704a1d95d0c909`](https://github.com/Willxup/cpa-usage-keeper/tree/2c09d65d6a90b1dc9802fe7b26704a1d95d0c909)，MIT © 2026 Will。完整许可、来源路径和适配说明随构建分发：`jdbc-test-web/public/third-party-notices.txt`。
+
+- 直接移植：`web/src/styles/menu.scss` → `src/styles/upstream/_menu.scss`。
+- 适配：白色主题 token、Button/Input/Card/Select/Modal/EmptyState 展示、顶栏和 DashboardToolbar 布局 → `src/styles/foundation.scss` 及共享组件。使用命名空间、统一蓝色主操作、现有 Radix 交互、语义表格与 React Router，替换上游业务依赖。
+- 本地补充：JDBC URL 查看/复制、稳定 ID 运行标题和快照分组、指标与执行语义、Radix Tooltip。未引入 CPA 账号/Token/成本/认证、Chart.js 或 Zustand。
+
+控件、卡片和弹窗统一使用 `components/ui`，指标/加载/空/错误态使用 `components/common`，表格分页使用 `components/data-table`。Select 保留选项原始值，展开后使用 portal Radix listbox；不新增原生 select 或页面专用菜单皮肤。Tailwind 负责布局，`foundation.scss` 统一视觉 token 和控件表面，`index.css` 将 token 映射到 Tailwind 并保留指标、选中态语义。Sass 固定为 1.99.0，中英文资源仍本地打包。
+
+使用 `npm run lint`、`npm run test`、`npm run build` 和 mocked `npm run test:e2e` 验证。原有 `real` E2E 仍需独立可写验收数据库。
+
+弹窗内菜单、tooltip/toast 的测试专用页面使用 `PLAYWRIGHT_CHANNEL=chrome npx playwright test --project=primitives`（Vite dev，非 preview），入口不进入生产路由或构建。

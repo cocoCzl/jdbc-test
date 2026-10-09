@@ -1,3 +1,4 @@
+import { chooseOption } from "@/test/select";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
@@ -7,8 +8,8 @@ import { json, mockApi, problem, renderPage } from "@/test/harness";
 async function fillDraft(user: ReturnType<typeof userEvent.setup>) {
   await user.type(await screen.findByLabelText("Name"), "Vendor workspace");
   await user.type(screen.getByLabelText("Database type"), "GaussDB-compatible");
-  await user.selectOptions(screen.getByLabelText("Adapter"), "postgresql");
-  await user.selectOptions(
+  await chooseOption(user, screen.getByLabelText("Adapter"), "postgresql");
+  await chooseOption(user,
     await screen.findByLabelText("Driver package"),
     driver.id,
   );
@@ -37,6 +38,7 @@ describe("Connection UI", () => {
     ).toBeVisible();
   });
   it("loads adapters dynamically and only offers validated drivers", async () => {
+    const user = userEvent.setup();
     mockApi((url) =>
       url.pathname === "/api/drivers"
         ? json(
@@ -53,9 +55,12 @@ describe("Connection UI", () => {
         : undefined,
     );
     renderPage("/connections/new");
+    await user.click(await screen.findByLabelText("Adapter"));
     expect(
       await screen.findByRole("option", { name: /VendorDB/ }),
     ).toBeVisible();
+    await user.keyboard("{Escape}");
+    await user.click(await screen.findByLabelText("Driver package"));
     await screen.findByRole("option", { name: /PostgreSQL JDBC/ });
     expect(
       screen.queryByRole("option", { name: /Invalid package/ }),

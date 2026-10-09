@@ -1,0 +1,56 @@
+@use '../runs/run-table';
+
+/* Driver and connection lists reuse the Run history panel and cell rules. */
+.resource-table {
+  min-width: 1120px;
+
+  .resource-primary-link {
+    color: var(--foreground);
+    font-size: 13px;
+    font-weight: 650;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+  .resource-primary-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .resource-cell-text { color: var(--foreground); font-size: 12.5px; line-height: 1.4; overflow-wrap: anywhere; }
+  .resource-code { font-size: 12px; font-weight: 400; line-height: 1.45; overflow-wrap: anywhere; }
+  .resource-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 4px; }
+  .resource-url-line { min-width: 0; }
+  .resource-url-line > div {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 5px 8px;
+  }
+  .resource-url-line > div > p {
+    flex: 1 1 135px;
+    min-width: 0;
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  .resource-url-line > div > div { flex: 0 0 auto; margin: 0; }
+  .resource-user { margin-top: 4px; }
+}
+
+.resource-table--drivers {
+  th:nth-child(1) { width: 20%; }
+  th:nth-child(2) { width: 13%; }
+  th:nth-child(3) { width: 22%; }
+  th:nth-child(4) { width: 11%; }
+  th:nth-child(5) { width: 7%; }
+  th:nth-child(6) { width: 14%; }
+  th:nth-child(7) { width: 13%; }
+  :is(th, td):nth-child(5), :is(th, td):nth-child(6), :is(th, td):nth-child(7) { text-align: right; }
+}
+
+.resource-table--connections {
+  th:nth-child(1) { width: 14%; }
+  th:nth-child(2) { width: 10%; }
+  th:nth-child(3) { width: 25%; }
+  th:nth-child(4) { width: 13%; }
+  th:nth-child(5) { width: 12%; }
+  th:nth-child(6) { width: 11%; }
+  th:nth-child(7) { width: 15%; }
+  :is(th, td):nth-child(6), :is(th, td):nth-child(7) { text-align: right; }
+}

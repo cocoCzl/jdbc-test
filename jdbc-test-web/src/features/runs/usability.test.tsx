@@ -12,21 +12,22 @@ describe("Usability without changing execution semantics", () => {
     const table = await screen.findByRole("table");
     const links = within(table).getAllByRole("link");
     expect(links).toHaveLength(1);
-    expect(links[0]).toHaveTextContent("Run run-1");
+    expect(links[0]).toHaveTextContent("Statement");
     expect(links[0]).toHaveAttribute("href", "/runs/run-1");
+    expect(within(table).getByText(/Run run-1…/)).toHaveAttribute("title", "run-1");
     expect(within(table).getByText(connection.name).closest("a")).toBeNull();
     expect(api.mock.calls.some(([url]) => /\/api\/runs\//.test(String(url)))).toBe(false);
-    expect(document.querySelector("header a")).toBeNull();
-    expect(within(table).getByText("Failed 0")).toHaveClass("text-muted-foreground");
+    expect(document.querySelector("header a")).toHaveAttribute("href", "/");
+    expect(within(table).getByText("Failed").closest(".run-result-metric")).not.toHaveClass("run-result-danger");
   });
   it("keeps nonzero unexecuted and incomplete cases visible in history", async () => {
     mockApi(url => url.pathname === "/api/runs" ? json(page([{...finishedRun, status: "INTERRUPTED", failed: 1, passed: 1, completedCases: 3, skipped: 0,
       accounting: {selected: 23, started: 4, completed: 3, passed: 1, failed: 1, skipped: 0, aborted: 1, pending: 0, running: 0, notRun: 19, incomplete: 1, scenarios: []}}])) : undefined);
     renderPage("/runs");
-    expect(await screen.findByText("Not run 19")).toHaveClass("text-warning");
-    expect(screen.getByText("Incomplete 1")).toBeVisible();
-    expect(screen.getByText("Aborted 1")).toHaveClass("text-warning");
-    expect(screen.getByText("Failed 1")).toHaveClass("text-destructive");
+    expect((await screen.findByText("Not run")).closest(".run-result-metric")).toHaveClass("run-result-warning");
+    expect(screen.getByText("Incomplete").closest(".run-result-metric")).toHaveTextContent("1");
+    expect(screen.getByText("Aborted").closest(".run-result-metric")).toHaveClass("run-result-warning");
+    expect(screen.getByText("Failed").closest(".run-result-metric")).toHaveClass("run-result-danger");
   });
   it("shows scoped statistics on demand and singular labels", async () => {
     const user = userEvent.setup(); mockApi(); renderPage("/");
@@ -42,12 +43,12 @@ describe("Usability without changing execution semantics", () => {
     const url = "jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS=(HOST=fixture.invalid)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=fixture_service)))?password=fixture-only";
     const api = mockApi(u => u.pathname === "/api/connections" ? json(page([{...connection, jdbcUrl: url}])) : undefined);
     renderPage("/runs/new");
-    await user.click(await screen.findByRole("button", {name: "View / copy URL"}));
+    await user.click(await screen.findByRole("button", {name: "View URL"}));
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveTextContent("SERVICE_NAME=fixture_service");
     expect(dialog).not.toHaveTextContent("fixture-only");
     expect(dialog).toHaveTextContent("[REDACTED]");
-    await user.click(within(dialog).getByRole("button", {name: "Copy sanitized JDBC URL"}));
+    await user.click(within(dialog).getByRole("button", {name: "Copy sanitized URL"}));
     expect(await navigator.clipboard.readText()).toBe(redactJdbcUrl(url));
     await user.keyboard("{Escape}");
     expect(screen.getByRole("radio", {name: connection.name})).not.toBeChecked();

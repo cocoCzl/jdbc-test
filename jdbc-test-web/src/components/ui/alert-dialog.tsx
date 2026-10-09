@@ -1,6 +1,7 @@
 import { t } from "i18next";
 import { useTranslation } from "react-i18next";
 import { AlertDialog } from "radix-ui";
+import { useRef } from "react";
 import { Button } from "./button";
 export function ConfirmDialog({
   open,
@@ -20,11 +21,21 @@ export function ConfirmDialog({
   onConfirm: () => void;
 }) {
   useTranslation();
+  const returnFocus = useRef<HTMLElement | null>(null);
   return (
     <AlertDialog.Root open={open} onOpenChange={onOpenChange}>
       <AlertDialog.Portal>
-        <AlertDialog.Overlay className="fixed inset-0 z-50 bg-slate-950/35 backdrop-blur-xs" />
-        <AlertDialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%_-_2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-3xl border bg-white p-6 shadow-xl">
+        <AlertDialog.Overlay className="jdbc-overlay" />
+        <AlertDialog.Content className="jdbc-dialog jdbc-confirm"
+          onOpenAutoFocus={() => {
+            returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          }}
+          onCloseAutoFocus={event => {
+            if (returnFocus.current?.isConnected) {
+              event.preventDefault();
+              returnFocus.current.focus({preventScroll: true});
+            }
+          }}>
           <AlertDialog.Title className="text-xl font-semibold">
             {title}
           </AlertDialog.Title>

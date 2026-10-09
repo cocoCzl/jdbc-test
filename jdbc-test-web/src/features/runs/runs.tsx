@@ -1,19 +1,21 @@
+import { Card } from "@/components/ui/card";
+import { Select } from "@/components/ui/select";
 import { t } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Plus } from "lucide-react";
 import { useState } from "react";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { runsApi, runsKeys } from "@/api/runs";
 import type { RunStatus } from "@/types/api";
 import { runPresentation } from "@/lib/status";
+import { plural } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { DataTable, Pagination } from "@/components/data-table";
 import {
   EmptyState,
   ErrorState,
   Loading,
-  PageHeader,
 } from "@/components/common";
 import { getRunColumns } from "./run-columns";
 export default function Runs() {
@@ -25,23 +27,23 @@ export default function Runs() {
   const query = useQuery({
     queryKey: runsKeys.list(params),
     queryFn: ({ signal }) => runsApi.list(params, signal),
-    placeholderData: keepPreviousData,
   });
   return (
-    <>
-      <PageHeader
-        title={t("ui.runHistory")}
-        action={<Button asChild><Link to="/runs/new"><Plus />{t("ui.newRun")}</Link></Button>}
-        description={t("ui.openARunToViewItsTest")}
-      />
-      <div className="mb-5 flex flex-wrap gap-4">
-        <label className="flex items-center gap-3 text-sm text-muted-foreground">
-          {t("ui.status")}<select
+    <Card as="section" className="panel overflow-hidden p-0" aria-busy={query.isFetching}>
+      <div className="run-history-panel-header">
+        <div>
+          <h1 className="page-title">{t("ui.runHistory")}</h1>
+          <p>{t("ui.openARunToViewItsTest")}{query.data ? ` · ${plural(query.data.totalElements, "record")}` : ""}</p>
+        </div>
+        <Button asChild><Link to="/runs/new"><Plus />{t("ui.newRun")}</Link></Button>
+      </div>
+      <div className="run-history-toolbar">
+        <label>
+          {t("ui.status")}<Select
             aria-label={t("ui.filterRunStatus")}
-            className="select w-48"
             value={status}
-            onChange={(event) => {
-              setStatus(event.target.value as RunStatus | "");
+            onValueChange={(value) => {
+              setStatus(value as RunStatus | "");
               setPage(0);
             }}
           >
@@ -51,33 +53,34 @@ export default function Runs() {
                 {presentation.label}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
-        <label className="flex items-center gap-3 text-sm text-muted-foreground">
-          {t("ui.sort")}<select
+        <label>
+          {t("ui.sort")}<Select
             aria-label={t("ui.sortRuns")}
-            className="select w-48"
             value={sort}
-            onChange={(event) => {
-              setSort(event.target.value);
+            onValueChange={(value) => {
+              setSort(value);
               setPage(0);
             }}
           >
             <option value="createdAt,desc">{t("ui.newestFirst")}</option>
             <option value="startedAt,desc">{t("ui.startedRecently")}</option>
             <option value="finishedAt,desc">{t("ui.finishedRecently")}</option>
-          </select>
+          </Select>
         </label>
       </div>
+      {query.isError && query.data ? <ErrorState error={query.error} retry={() => void query.refetch()} /> : null}
       {query.isPending ? (
         <Loading />
-      ) : query.isError ? (
+      ) : !query.data ? (
         <ErrorState error={query.error} retry={() => void query.refetch()} />
       ) : (
-        <div className="panel overflow-hidden p-0" aria-busy={query.isFetching}>
+        <>
           <DataTable
             rows={query.data.items}
             columns={getRunColumns()}
+            className="run-table run-table--history"
             empty={
               <EmptyState
                 title={t("ui.noTestRunsYet")}
@@ -95,8 +98,8 @@ export default function Runs() {
             }
           />
           <Pagination {...query.data} onPage={setPage} />
-        </div>
+        </>
       )}
-    </>
+    </Card>
   );
 }

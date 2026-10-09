@@ -8,12 +8,16 @@ import { json, problem } from "@/test/harness";
 describe("API client", () => {
   it("parses a resource directly and passes AbortSignal", async () => {
     const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(json(driver));
-    const signal = new AbortController().signal;
+    const controller = new AbortController();
+    const signal = controller.signal;
     expect(await driversApi.get(driver.id, signal)).toEqual(driver);
     expect(fetch).toHaveBeenCalledWith(
       "/api/drivers/driver-1",
-      expect.objectContaining({ signal }),
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
+    const forwarded = fetch.mock.calls[0][1]?.signal;
+    controller.abort();
+    expect(forwarded?.aborted).toBe(true);
   });
   it("handles HTTP 204 without attempting JSON", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(

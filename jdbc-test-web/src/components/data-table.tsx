@@ -13,10 +13,12 @@ export function DataTable<T>({
   rows,
   columns,
   empty,
+  className,
 }: {
   rows: T[];
   columns: ColumnDef<T>[];
   empty: React.ReactNode;
+  className?: string;
 }) {
   const table = useReactTable({
     data: rows,
@@ -26,15 +28,15 @@ export function DataTable<T>({
   if (!rows.length) return <>{empty}</>;
   return (
     <div className="max-w-full overflow-x-auto">
-      <table className="w-full text-left text-sm">
-        <thead className="border-b bg-muted/50 text-xs text-muted-foreground">
+      <table className={`jdbc-table w-full text-left ${className ?? ""}`}>
+        <thead className="border-b">
           {table.getHeaderGroups().map((group) => (
             <tr key={group.id}>
               {group.headers.map((header) => (
                 <th
                   key={header.id}
                   scope="col"
-                  className="whitespace-nowrap px-4 py-3 font-medium"
+                  className="whitespace-nowrap"
                 >
                   {flexRender(
                     header.column.columnDef.header,
@@ -47,9 +49,9 @@ export function DataTable<T>({
         </thead>
         <tbody className="divide-y divide-border">
           {table.getRowModel().rows.map((row) => (
-            <tr key={row.id} className="hover:bg-muted/40">
+            <tr key={row.id} className="">
               {row.getVisibleCells().map((cell) => (
-                <td key={cell.id} className="px-4 py-3 [overflow-wrap:anywhere]">
+                <td key={cell.id} className="[overflow-wrap:anywhere]">
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}
                 </td>
               ))}

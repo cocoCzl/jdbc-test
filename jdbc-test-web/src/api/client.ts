@@ -31,12 +31,15 @@ export async function request<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
+  const timeout = (!options.method || options.method === "GET") ? AbortSignal.timeout(20_000) : undefined;
+  const signal = timeout ? (options.signal ? AbortSignal.any([options.signal, timeout]) : timeout) : options.signal;
   let response: Response;
   try {
     response = await fetch(
       `${import.meta.env.VITE_API_BASE_URL ?? "/api"}${path}`,
       {
         ...options,
+        signal,
         headers: {
           Accept: "application/json",
           ...(options.body && !(options.body instanceof FormData)
@@ -47,6 +50,7 @@ export async function request<T>(
       },
     );
   } catch (error) {
+    if (timeout?.aborted) throw new ApiError(0, "REQUEST_TIMEOUT");
     if (object(error) && error.name === "AbortError") throw error;
     throw new ApiError(0, "NETWORK_ERROR");
   }
@@ -54,7 +58,9 @@ export async function request<T>(
   let body: unknown;
   try {
     body = await response.json();
-  } catch {
+  } catch (error) {
+    if (timeout?.aborted) throw new ApiError(0, "REQUEST_TIMEOUT");
+    if (options.signal?.aborted) throw error;
     throw new ApiError(
       response.status,
       response.ok ? "INVALID_RESPONSE" : "HTTP_ERROR",

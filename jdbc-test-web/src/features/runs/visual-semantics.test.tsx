@@ -71,5 +71,7 @@ it("keeps zero exceptions subdued and distinct interruption icons without changi
   const counters = screen.getByLabelText("Execution counters");
   expect(counters.querySelector('[data-stat="Aborted"] .lucide-ban')).not.toBeNull();
   expect(counters.querySelector('[data-stat="Incomplete"] .lucide-triangle-alert')).not.toBeNull();
+  expect(screen.getByText(/Includes explicit skips/)).not.toBeVisible();
+  await userEvent.setup().click(screen.getByText("About these statistics"));
   expect(screen.getByText(/Includes explicit skips/)).toBeVisible();
 });

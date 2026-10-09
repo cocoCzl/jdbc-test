@@ -1,3 +1,4 @@
+import { chooseOption } from "@/test/select";
 import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
@@ -161,7 +162,7 @@ describe("Run detail / results / report", () => {
     const user = userEvent.setup();
     const api = mockApi();
     renderPage("/runs");
-    await user.selectOptions(
+    await chooseOption(user,
       await screen.findByLabelText("Filter run status"),
       "FAILED",
     );
@@ -192,7 +193,7 @@ describe("Run detail / results / report", () => {
     await waitFor(() =>
       expect(api.mock.calls.some(([url]) => String(url).includes("page=1"))).toBe(true),
     );
-    await user.selectOptions(screen.getByLabelText("Filter run status"), "FAILED");
+    await chooseOption(user, screen.getByLabelText("Filter run status"), "FAILED");
     await waitFor(() =>
       expect(
         api.mock.calls.some(([input]) => {
@@ -243,7 +244,7 @@ describe("Run detail / results / report", () => {
           : undefined,
       );
       renderPage("/runs/run-1");
-      expect(await screen.findByText("Run configuration")).toBeVisible();
+      expect(await screen.findByText("Environment & driver")).toBeVisible();
       expect(
         screen
           .getAllByText(runPresentation[status].label, { exact: true })
@@ -259,7 +260,7 @@ describe("Run detail / results / report", () => {
       url.pathname === "/api/runs/run-1" ? json(run) : undefined,
     );
     renderPage("/runs/run-1");
-    await screen.findByText("Run configuration");
+    await screen.findByText("Environment & driver");
     const source = TestEventSource.instances[0];
     act(() =>
       source.emit("run.progress", {
@@ -342,7 +343,7 @@ describe("Run detail / results / report", () => {
         api.mock.calls.some(([url]) => String(url).includes("page=1")),
       ).toBe(true),
     );
-    await user.selectOptions(
+    await chooseOption(user,
       screen.getByLabelText("Filter result status"),
       "ABORTED",
     );
@@ -352,8 +353,8 @@ describe("Run detail / results / report", () => {
       ).toBe(true),
     );
     expect(screen.getByLabelText("Filter result module")).toBeDisabled();
-    await user.selectOptions(screen.getByLabelText("Filter result status"), "");
-    await user.selectOptions(
+    await chooseOption(user, screen.getByLabelText("Filter result status"), "");
+    await chooseOption(user,
       screen.getByLabelText("Filter result module"),
       "statement",
     );

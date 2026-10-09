@@ -1,3 +1,4 @@
+import { Card } from "@/components/ui/card";
 import { t } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Plus } from "lucide-react";
@@ -32,7 +33,7 @@ export default function Dashboard() {
     queryFn: ({ signal }) => catalogApi.get(signal),
     staleTime: 300_000,
   });
-  const runColumns = getRunColumns();
+  const runColumns = getRunColumns({ compact: true });
   const recent = runs.data?.items ?? [];
   const outcomes = {
     passed: knownSum(recent.map((run) => run.passed)),
@@ -93,7 +94,7 @@ export default function Dashboard() {
         </div>
       ) : null}
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
-      <section className="panel min-w-0 overflow-hidden p-0">
+      <Card as="section" className="panel min-w-0 overflow-hidden p-0">
         <div className="flex items-center justify-between px-4 py-4">
           <div>
             <h2 className="text-lg font-semibold">{t("ui.recentRuns")}</h2>
@@ -104,14 +105,16 @@ export default function Dashboard() {
           <Link className="subtle-link text-sm" to="/runs">
             {t("ui.viewHistory")}</Link>
         </div>
+        {runs.isError && runs.data ? <ErrorState error={runs.error} retry={() => void runs.refetch()} /> : null}
         {runs.isPending ? (
           <Loading />
-        ) : runs.isError ? (
+        ) : !runs.data ? (
           <ErrorState error={runs.error} retry={() => void runs.refetch()} />
         ) : (
           <DataTable
             rows={recent}
-            columns={[runColumns[0], runColumns[1], runColumns[4], runColumns[5]]}
+            columns={runColumns}
+            className="run-table run-table--recent"
             empty={
               <EmptyState
                 title={t("ui.noTestRunsYet")}
@@ -125,8 +128,8 @@ export default function Dashboard() {
             }
           />
         )}
-      </section>
-      {recent.length > 0 ? <section className="panel min-w-0">
+      </Card>
+      {recent.length > 0 ? <Card as="section" className="panel min-w-0">
         <h2 className="font-semibold">{t("ui.recentTestOutcomes")}</h2>
         <p className="mt-1 text-xs text-muted-foreground">{plural(recent.length, "loaded run")}  {t("ui.recordedResults")}</p>
         <Suspense fallback={<Loading label={t("ui.loadingChart")} />}><OutcomeChart {...outcomes} /></Suspense>
@@ -134,7 +137,7 @@ export default function Dashboard() {
           <summary className="cursor-pointer rounded-sm font-medium">{t("ui.aboutTheseStatistics")}</summary>
           <p className="mt-2 leading-relaxed">{t("dashboard.scope", {countText: plural(recent.length, "loaded run")})}</p>
         </details>
-      </section> : null}
+      </Card> : null}
       </div>
     </>
   );

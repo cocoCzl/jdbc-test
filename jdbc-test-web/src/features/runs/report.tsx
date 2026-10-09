@@ -1,3 +1,5 @@
+import { JdbcUrl } from "@/components/jdbc-url";
+import { Card } from "@/components/ui/card";
 import { moduleName, profileName } from "@/lib/presentation";
 import { t } from "i18next";
 import { useTranslation } from "react-i18next";
@@ -29,6 +31,7 @@ export default function Report({ run }: { run: Run }) {
   });
   const databaseEvidence = typeof raw.data === "object" && raw.data !== null &&
     "source" in raw.data && raw.data.source === "PERSISTED_WORKER_EVENTS";
+  const preservedHistoryCopy = document.querySelector('meta[name="jdbc-environment"]')?.getAttribute("content") === "history-copy";
   if (!isTerminal(run.status))
     return (
       <EmptyState
@@ -37,7 +40,7 @@ export default function Report({ run }: { run: Run }) {
       />
     );
   if (query.isPending) return <Loading />;
-  if (query.isError)
+  if (!query.data)
     return (
       <ErrorState error={query.error} retry={() => void query.refetch()} />
     );
@@ -45,14 +48,15 @@ export default function Report({ run }: { run: Run }) {
   const aborted = abortedCount(summary);
   return (
     <>
+      {query.isError ? <ErrorState error={query.error} retry={() => void query.refetch()} /> : null}
       {summary.accounting ? <p className="mb-4 text-sm">
         {t("report.accounting", {notRun: summary.accounting.notRun, incomplete: summary.accounting.incomplete})}{summary.accounting.started === 0 ? t("ui.noScenarioExecutionWasVerifiedSkippedCases") : ""}
       </p> : null}
-      {summary.executionIssues?.length ? <div className="panel mb-4"><h2>{t("ui.executionIssues")}</h2>
+      {summary.executionIssues?.length ? <Card className="panel mb-4"><h2>{t("ui.executionIssues")}</h2>
         {summary.executionIssues.map((issue, index) => <p key={index} className="break-words">{String(issue.level)}: {String(issue.message ?? issue.status)}</p>)}
-      </div> : null}
+      </Card> : null}
       <div className="mb-6 grid gap-6 xl:grid-cols-[340px_1fr]">
-        <section className="panel">
+        <Card as="section" className="panel">
           <h2 className="text-lg font-semibold">{t("ui.testOutcomes")}</h2>
           {summary.completedCases ? (
             <Suspense fallback={<Loading />}>
@@ -71,8 +75,8 @@ export default function Report({ run }: { run: Run }) {
           )}
           <p className="mt-3 text-center text-sm text-muted-foreground">
             {t("report.outcomes", {passed: formatNumber(summary.passed), failed: formatNumber(summary.failed), skipped: formatNumber(summary.skipped), aborted: formatNumber(aborted)})}</p>
-        </section>
-        <section className="panel">
+        </Card>
+        <Card as="section" className="panel">
           <h2 className="mb-5 text-lg font-semibold">{t("ui.capturedEnvironment")}</h2>
           <dl className="grid gap-5 text-sm sm:grid-cols-2">
             {Object.entries({
@@ -92,9 +96,7 @@ export default function Report({ run }: { run: Run }) {
               </div>
             ))}
           </dl>
-          <p className="mt-5 break-all font-mono text-xs text-muted-foreground">
-            {summary.connection.jdbcUrl}
-          </p>
+          <div className="mt-5"><JdbcUrl value={summary.connection.jdbcUrl} /></div>
           <div className="mt-5 border-t pt-4">
             <h3 className="text-sm font-medium">{t("ui.selectedModules")}</h3>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -103,9 +105,9 @@ export default function Report({ run }: { run: Run }) {
             <p className="mt-3 text-xs text-muted-foreground">
                   {t("ui.selectionCapturedWhenThisRunWasCreated")}</p>
           </div>
-        </section>
+        </Card>
       </div>
-      <section className="panel">
+      <Card as="section" className="panel">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold">{t("ui.failuresAbortedCases")}</h2>
           <Button variant="outline" onClick={() => setRawOpen(true)}>
@@ -137,13 +139,15 @@ export default function Report({ run }: { run: Run }) {
           <p className="mt-5 text-sm text-muted-foreground">
             {t("ui.noFailedOrAbortedCasesWereRecorded")}</p>
         )}
-      </section>
+      </Card>
       <FailureDetail result={failure} close={() => setFailure(null)} />
       <Dialog
         open={rawOpen}
         onOpenChange={setRawOpen}
         title={t(databaseEvidence ? "report.databaseEvidenceJSON" : "report.reportJSON")}
-        description={t(databaseEvidence ? "report.databaseEvidenceDescription" : "report.jsonDescription")}
+        description={databaseEvidence
+          ? `${t("report.databaseEvidenceDescription")}${preservedHistoryCopy ? ` ${t("history.report")}` : ""}`
+          : t("report.jsonDescription")}
       >
         {raw.isPending ? (
           <Loading />

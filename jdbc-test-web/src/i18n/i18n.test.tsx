@@ -1,3 +1,4 @@
+import { chooseOption } from "@/test/select";
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -128,8 +129,8 @@ describe("Switching language preserves the workspace", () => {
     const fetch = mockApi(url => url.pathname === "/api/runs" ? json(page([finishedRun], {totalPages: 3, totalElements: 45, page: Number(url.searchParams.get("page") ?? 0)})) : undefined);
     const view = renderPage("/runs");
     await screen.findByRole("heading", {name: "Run history"});
-    await user.selectOptions(screen.getByLabelText("Filter run status"), "SUCCEEDED");
-    await user.selectOptions(screen.getByLabelText("Sort runs"), "finishedAt,desc");
+    await chooseOption(user, screen.getByLabelText("Filter run status"), "SUCCEEDED");
+    await chooseOption(user, screen.getByLabelText("Sort runs"), "finishedAt,desc");
     await user.click(await screen.findByRole("button", {name: "Next page"}));
     await waitFor(() => expect(screen.getByText(/Page 2 of 3/)).toBeVisible());
     const button = screen.getByRole("button", {name: "Language"}); button.focus();
@@ -138,8 +139,8 @@ describe("Switching language preserves the workspace", () => {
     await user.keyboard("{Home}{Enter}");
     await screen.findByRole("heading", {name: "运行历史"});
     expect(screen.getByRole("columnheader", {name: "连接"})).toBeVisible();
-    expect(screen.getByLabelText("筛选运行状态")).toHaveValue("SUCCEEDED");
-    expect(screen.getByLabelText("运行排序")).toHaveValue("finishedAt,desc");
+    expect(screen.getByLabelText("筛选运行状态")).toHaveAttribute("data-value", "SUCCEEDED");
+    expect(screen.getByLabelText("运行排序")).toHaveAttribute("data-value", "finishedAt,desc");
     expect(screen.getByText(/第 2 页，共 3 页/)).toBeVisible();
     expect(view.router.state.location.pathname).toBe("/runs");
     expect(fetch.mock.calls.filter(([,options]) => options?.method && options.method !== "GET")).toHaveLength(0);
@@ -147,16 +148,16 @@ describe("Switching language preserves the workspace", () => {
   it("retains unsaved connection input and translates an existing validation error without probe/save", async () => {
     const user = userEvent.setup(); const fetch = mockApi(); renderPage("/connections/new");
     await user.type(await screen.findByLabelText("Name"), "My untouched name");
-    await user.selectOptions(screen.getByLabelText("Adapter"), "postgresql");
+    await chooseOption(user, screen.getByLabelText("Adapter"), "postgresql");
     await user.type(screen.getByLabelText("Database type"), "CustomDB");
     await user.type(screen.getByLabelText("JDBC URL"), "jdbc:custom://fixture.invalid/mydb");
-    await user.selectOptions(screen.getByLabelText("Driver package"), driver.id);
+    await chooseOption(user, screen.getByLabelText("Driver package"), driver.id);
     await user.click(screen.getByRole("checkbox", {name: "Save password"}));
     await user.click(screen.getByRole("button", {name: "Save connection"}));
     await chooseChinese(user);
     expect(screen.getByLabelText("名称")).toHaveValue("My untouched name");
     expect(screen.getByLabelText("JDBC URL")).toHaveValue("jdbc:custom://fixture.invalid/mydb");
-    expect(screen.getByLabelText("适配包")).toHaveValue("postgresql");
+    expect(screen.getByLabelText("适配包")).toHaveAttribute("data-value", "postgresql");
     expect(screen.getByRole("alert")).toHaveTextContent("请输入需要保存的密码");
     expect(fetch.mock.calls.filter(([,options]) => options?.method === "POST")).toHaveLength(0);
   });
@@ -205,14 +206,14 @@ describe("Switching language preserves the workspace", () => {
     mockApi(url => url.pathname.endsWith("/results") ? json(page([{...result, status: "SKIPPED", message: "capability arrays=false; skipSource=adapter"}])) : url.pathname.endsWith("/report.json") ? json(raw) : undefined);
     const view = renderPage("/runs/run-1");
     await user.click(await screen.findByRole("tab", {name: "Test cases"}));
-    await user.selectOptions(screen.getByLabelText("Filter result status"), "SKIPPED");
+    await chooseOption(user, screen.getByLabelText("Filter result status"), "SKIPPED");
     await user.click(await screen.findByRole("button", {name: "Skip reason"}));
     await change("zh-CN");
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByText("capability arrays=false; skipSource=adapter")).toBeVisible();
     expect(within(dialog).getByText(/能力禁用属于配置/)).toBeVisible();
     await user.click(within(dialog).getByRole("button", {name: "关闭弹窗"}));
-    expect(screen.getByLabelText("筛选结果状态")).toHaveValue("SKIPPED");
+    expect(screen.getByLabelText("筛选结果状态")).toHaveAttribute("data-value", "SKIPPED");
     await user.click(screen.getByRole("tab", {name: "报告"}));
     await user.click(await screen.findByRole("button", {name: "查看报告 JSON"}));
     await waitFor(() => expect(screen.getByRole("dialog").querySelector("pre")).toHaveTextContent("capability_disabled"));
@@ -241,7 +242,7 @@ describe("Switching language preserves the workspace", () => {
     await screen.findByRole("heading", {name: english});
     await change("zh-CN");
     expect(await screen.findByRole("heading", {name: chinese})).toBeVisible();
-    expect(screen.getByRole("button", {name: "界面语言"})).toHaveTextContent("简体中文");
+    expect(screen.getByRole("button", {name: "界面语言"})).toHaveTextContent("中");
     expect(catalog.modules[0].id).toBe("connection");
     expect(driver.driverClass).toBe("org.postgresql.Driver");
   });

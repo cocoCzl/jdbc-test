@@ -1,3 +1,4 @@
+import { chooseOption } from "./select";
 import { expect, test } from "@playwright/test";
 import type { Driver, Run } from "../src/types/api";
 
@@ -95,10 +96,8 @@ test("REAL PostgreSQL browser flow: external Driver → Statement 23 → Connect
   const connectionName = `PostgreSQL UI target ${Date.now()}`;
   await page.getByLabel("Name", { exact: true }).fill(connectionName);
   await page.getByLabel("Database type", { exact: true }).fill("PostgreSQL");
-  await page.getByLabel("Adapter", { exact: true }).selectOption("postgresql");
-  await page
-    .getByLabel("Driver package", { exact: true })
-    .selectOption(driver.id);
+  await chooseOption(page, page.getByLabel("Adapter", { exact: true }), "postgresql");
+  await chooseOption(page, page.getByLabel("Driver package", { exact: true }), driver.id);
   await page
     .getByLabel("JDBC URL", { exact: true })
     .fill(
@@ -222,7 +221,7 @@ test("REAL PostgreSQL browser flow: external Driver → Statement 23 → Connect
           response.url().includes("/api/runs") &&
           response.url().includes("status=SUCCEEDED"),
       );
-      await page.getByLabel("Filter run status").selectOption("SUCCEEDED");
+      await chooseOption(page, page.getByLabel("Filter run status"), "SUCCEEDED");
       const filteredResponse = await filteredRuns;
       expect(filteredResponse.status()).toBe(200);
       const filteredPage = await filteredResponse.json() as {

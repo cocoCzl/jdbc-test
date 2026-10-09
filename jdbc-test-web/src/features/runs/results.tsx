@@ -1,8 +1,10 @@
+import { Card } from "@/components/ui/card";
+import { Select } from "@/components/ui/select";
 import { moduleName } from "@/lib/presentation";
 import { t } from "i18next";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { runsApi, runsKeys } from "@/api/runs";
 import type { CaseResult, ResultStatus } from "@/types/api";
@@ -85,7 +87,6 @@ export default function Results({
   const query = useQuery({
     queryKey: [...runsKeys.results(id), params],
     queryFn: ({ signal }) => runsApi.results(id, params, signal),
-    placeholderData: keepPreviousData,
   });
   const columns: ColumnDef<CaseResult>[] = [
     {
@@ -128,14 +129,14 @@ export default function Results({
   ];
   return (
     <>
-      <div className="mb-5 flex flex-wrap gap-3">
+      <div className="jdbc-toolbar">
         <label className="text-xs text-muted-foreground">
-          {t("ui.status")}<select
+          {t("ui.status")}<Select
             aria-label={t("ui.filterResultStatus")}
-            className="select mt-1 w-40"
+            className=" mt-1 w-40"
             value={status}
-            onChange={(event) => {
-              setStatus(event.target.value as ResultStatus | "");
+            onValueChange={(value) => {
+              setStatus(value as ResultStatus | "");
               setPage(0);
               setModule("");
             }}
@@ -146,16 +147,16 @@ export default function Results({
                 {item.label}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         <label className="text-xs text-muted-foreground">
-          {t("ui.module")}<select
+          {t("ui.module")}<Select
             aria-label={t("ui.filterResultModule")}
-            className="select mt-1 w-48"
+            className=" mt-1 w-48"
             value={moduleId}
             disabled={!!status}
-            onChange={(event) => {
-              setModule(event.target.value);
+            onValueChange={(value) => {
+              setModule(value);
               setPage(0);
             }}
           >
@@ -163,34 +164,35 @@ export default function Results({
             {modules.map((module) => (
               <option key={module} value={module}>{moduleName(module)}</option>
             ))}
-          </select>
+          </Select>
         </label>
         <label className="text-xs text-muted-foreground">
-          {t("ui.sort")}<select
+          {t("ui.sort")}<Select
             aria-label={t("ui.sortResults")}
-            className="select mt-1 w-48"
+            className=" mt-1 w-48"
             value={sort}
-            onChange={(event) => {
-              setSort(event.target.value);
+            onValueChange={(value) => {
+              setSort(value);
               setPage(0);
             }}
           >
             <option value="scenarioId,asc">{t("ui.scenarioAZ")}</option>
             <option value="durationMs,desc">{t("ui.longestFirst")}</option>
             <option value="status,asc">{t("ui.status")}</option>
-          </select>
+          </Select>
         </label>
       </div>
       {status ? (
         <p className="mb-4 text-xs text-muted-foreground">
           {t("ui.clearTheStatusFilterToFilterResults")}</p>
       ) : null}
+      {query.isError && query.data ? <ErrorState error={query.error} retry={() => void query.refetch()} /> : null}
       {query.isPending ? (
         <Loading />
-      ) : query.isError ? (
+      ) : !query.data ? (
         <ErrorState error={query.error} retry={() => void query.refetch()} />
       ) : (
-        <div className="panel overflow-hidden p-0" aria-busy={query.isFetching}>
+        <Card className="panel overflow-hidden p-0" aria-busy={query.isFetching}>
           <DataTable
             rows={query.data.items}
             columns={columns}
@@ -202,7 +204,7 @@ export default function Results({
             }
           />
           <Pagination {...query.data} onPage={setPage} />
-        </div>
+        </Card>
       )}
       <FailureDetail result={selected} close={() => setSelected(null)} />
     </>

@@ -90,7 +90,7 @@ Open `http://localhost:5173`. Vite proxies `/api` to Server `:8080` without SSE 
 
 Routes cover Dashboard, `/drivers`, `/connections`, `/runs`, creation forms and `/:id` details. The workflow is upload/validate driver → save/probe connection → review selection and authorized scope → consent/start → live results/report.
 
-TanStack Query owns server state; forms and transport state remain local. `src/api/client.ts` handles fetch, JSON/multipart/204, cancellation and RFC Problem Details. Resource DTOs have no universal success envelope. TanStack Table handles tables; Tailwind/shadcn/Radix handle UI; ECharts renders outcomes. There is no production mock API.
+TanStack Query owns server state; forms and transport state remain local. `src/api/client.ts` handles fetch, JSON/multipart/204, cancellation and RFC Problem Details. Resource DTOs have no universal success envelope. TanStack Table handles tables; shared CPA-style components use Radix interactions, Sass visual tokens and Tailwind layout utilities; ECharts renders outcomes. There is no production mock API.
 
 Run detail loads REST first, then opens native `EventSource` for active runs. SSE updates the same Query cache; terminal events close the stream and refresh final results. Reconnects do not change Run status; a 10-second REST fallback covers missed terminal events. Passwords stay in component memory, clear after requests, and never enter browser storage, URLs or query caches. Diagnostics render as text.
 
@@ -226,3 +226,18 @@ npm run test:e2e:real
 The real project requires running Server/Worker, a clean platform database/artifact store and a separate authorized target PostgreSQL. Missing inputs fail rather than fall back to mocks. It creates persistent test data; use fresh acceptance storage on rerun and never use shared/business databases. Trace collection is disabled. `PLAYWRIGHT_CHANNEL=chrome` can use installed Chrome. Production-mode checks are described in [Deployment](deployment.md).
 
 For browser checks against the freshly built assets, use `JDBC_TEST_E2E_PREVIEW=true PLAYWRIGHT_CHANNEL=chrome npm --prefix jdbc-test-web run test:e2e` after building. This runs the mocked project only, captures explicitly labelled fixture screenshots, and verifies the loaded bundle SHA-256 against `dist`. It does not start QA or execute target database operations.
+
+
+## Shared frontend UI
+
+The white CPA Keeper UI foundation is pinned to upstream [`2c09d65d6a90b1dc9802fe7b26704a1d95d0c909`](https://github.com/Willxup/cpa-usage-keeper/tree/2c09d65d6a90b1dc9802fe7b26704a1d95d0c909), MIT © 2026 Will. The full notice and source/adaptation list are shipped in `jdbc-test-web/public/third-party-notices.txt`.
+
+- Direct port: `web/src/styles/menu.scss` → `src/styles/upstream/_menu.scss`.
+- Adaptations: upstream white-theme tokens, Button/Input/Card/Select/Modal/EmptyState presentation, header and DashboardToolbar geometry → `src/styles/foundation.scss` and existing shared components. Namespaced styles, blue primary actions, existing Radix interactions, semantic tables and React Router navigation replace upstream-specific interactions and business dependencies.
+- Local additions: JDBC URL view/copy, stable-ID Run titles and grouped snapshots, Metric and execution semantics, Tooltip using Radix. No CPA account/token/cost/auth state, Chart.js or Zustand is imported.
+
+Use `components/ui` for controls, Card and dialogs, `components/common` for metrics/loading/empty/errors, and `components/data-table` for tables/pagination. Select consumes option values but renders a portalled Radix listbox; do not introduce native selects or page-specific menu skins. Tailwind handles layout; `foundation.scss` is the authority for visual tokens/control surfaces, with `index.css` mapping those tokens to Tailwind and defining metric/selection semantics. Sass is pinned to 1.99.0. Both language resources remain bundled locally.
+
+`npm run lint`, `npm run test`, `npm run build` and the mocked `npm run test:e2e` verify UI behavior. The `real` E2E still requires a separate writable acceptance database.
+
+The test-only nested-menu/tooltip/toast fixture runs with `PLAYWRIGHT_CHANNEL=chrome npx playwright test --project=primitives` (Vite dev, not preview); its HTML entry is outside the production router/build.

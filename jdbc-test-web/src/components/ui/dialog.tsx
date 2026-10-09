@@ -1,9 +1,11 @@
+// CPA Keeper UI adaptation (MIT, upstream 2c09d65). See public/third-party-notices.txt.
 import { t } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Dialog as Primitive } from "radix-ui";
 import { X } from "lucide-react";
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { LanguageSelector } from "@/components/layout/language-selector";
 export function Dialog({
   open,
   onOpenChange,
@@ -20,24 +22,37 @@ export function Dialog({
   className?: string;
 }) {
   useTranslation();
+  const returnFocus = useRef<HTMLElement | null>(null);
   return (
     <Primitive.Root open={open} onOpenChange={onOpenChange}>
       <Primitive.Portal>
-        <Primitive.Overlay className="fixed inset-0 z-50 bg-slate-950/35 backdrop-blur-xs" />
+        <Primitive.Overlay className="jdbc-overlay" />
         <Primitive.Content
+          onOpenAutoFocus={() => {
+            returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          }}
+          onCloseAutoFocus={event => {
+            if (returnFocus.current?.isConnected) {
+              event.preventDefault();
+              returnFocus.current.focus({preventScroll: true});
+            }
+          }}
           className={cn(
-            "fixed left-1/2 top-1/2 z-50 max-h-[85vh] w-[calc(100%_-_2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-3xl border bg-white p-6 shadow-xl",
+            "jdbc-dialog",
             className,
           )}
         >
-          <Primitive.Title className="break-words pr-8 text-xl font-semibold">
-            {title}
-          </Primitive.Title>
-          <Primitive.Description className="mt-2 break-words text-sm text-muted-foreground">
+          <div className="jdbc-dialog-header flex flex-wrap items-center justify-between gap-3 pr-9">
+            <Primitive.Title className="min-w-0 flex-1 break-words text-lg font-bold">
+              {title}
+            </Primitive.Title>
+            <LanguageSelector />
+          </div>
+          <Primitive.Description className="jdbc-dialog-description break-words text-xs text-muted-foreground">
             {description}
           </Primitive.Description>
-          <div className="mt-6">{children}</div>
-          <Primitive.Close className="absolute right-5 top-5 rounded-lg p-1 text-muted-foreground hover:bg-muted">
+          <div className="jdbc-dialog-body">{children}</div>
+          <Primitive.Close data-size="icon-sm" data-variant="ghost" className="jdbc-button absolute right-4 top-4 text-muted-foreground">
             <X className="size-5" />
             <span className="sr-only">{t("ui.closeDialog")}</span>
           </Primitive.Close>

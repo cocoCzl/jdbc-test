@@ -1,0 +1,26 @@
+import { expect, test } from "@playwright/test";
+test("TEST FIXTURE ONLY: nested menu scrolling, disabled, focus, tooltip, toast, errors", async ({page}) => {
+  await page.addInitScript(() => localStorage.setItem("jdbc-test.locale", "en"));
+  const api: string[]=[];
+  await page.route(url=>url.pathname.startsWith("/api/"),route=>{api.push(route.request().url()); return route.abort();});
+  for(const width of [1440,390]) {
+    await page.setViewportSize({width,height:800}); await page.goto("/e2e/fixtures/primitives.html");
+    const help=page.getByRole("button",{name:"Help fixture"}); await help.focus(); await expect(page.getByRole("tooltip")).toBeVisible(); await page.keyboard.press("Escape");
+    await expect(page.getByRole("button",{name:"Disabled fixture"})).toBeDisabled(); await expect(page.getByRole("button",{name:"Loading fixture"})).toHaveAttribute("aria-busy","true");
+    await page.getByRole("button",{name:"Show toast"}).click(); await expect(page.getByText("Fixture error toast")).toBeVisible();
+    const open=page.getByRole("button",{name:"Open modal"}); await open.click();
+    const select=page.getByRole("combobox",{name:"Nested selection"}); await select.focus(); await page.keyboard.press("ArrowDown");
+    await expect(page.getByRole("option",{name:"Disabled option"})).toHaveAttribute("aria-disabled","true");
+    await page.keyboard.press("End"); await expect(page.getByRole("option").last()).toBeFocused();
+    const box=await page.getByRole("listbox").boundingBox(); expect(box!.x).toBeGreaterThanOrEqual(0); expect(box!.x+box!.width).toBeLessThanOrEqual(width); expect(box!.y+box!.height).toBeLessThanOrEqual(800);
+    await page.screenshot({path:`test-results/fixture-modal-select-${width}.png`});
+    await page.keyboard.press("Enter"); await expect(select).toHaveAttribute("data-value","option-49");
+    await select.click(); await page.keyboard.press("Escape"); await expect(page.getByRole("dialog")).toBeVisible(); await expect(select).toBeFocused();
+    await page.getByRole("button",{name:"Language"}).click(); await page.getByRole("menuitemradio",{name:"简体中文"}).click(); await expect(select).toHaveAttribute("data-value","option-49");
+    await page.keyboard.press("Escape"); await expect(open).toBeFocused(); await expect(page.getByText("Submit count: 0")).toBeVisible();
+    await expect(page.getByRole("alert")).toContainText("发生错误，请重试。");
+    await expect(page.getByRole("alert")).not.toContainText("Fixture unavailable");
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  }
+  expect(api).toEqual([]);
+});

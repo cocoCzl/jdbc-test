@@ -1,3 +1,4 @@
+import { chooseOption } from "@/test/select";
 import i18n from "@/i18n";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -30,7 +31,7 @@ describe("Driver UI", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "DRIVER_CLASS_AMBIGUOUS",
     );
-    await user.selectOptions(
+    await chooseOption(user,
       screen.getByLabelText("Classes returned by the server"),
       "b.Driver",
     );
