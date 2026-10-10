@@ -52,6 +52,17 @@
             <dependency><groupId>org.junit.platform</groupId><artifactId>junit-platform-launcher</artifactId><version>${junit.platform.version}</version></dependency>
         </dependencies>
     </dependencyManagement>
+    <dependencies>
+        <!-- Surefire starts every test JVM with Mockito's agent below. Declare it
+             explicitly so clean CI Maven repositories resolve the agent before
+             the first module's tests run. -->
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>${mockito.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
     <build>
         <pluginManagement>
             <plugins>
