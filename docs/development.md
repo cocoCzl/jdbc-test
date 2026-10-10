@@ -238,6 +238,6 @@ The white CPA Keeper UI foundation is pinned to upstream [`2c09d65d6a90b1dc9802f
 
 Use `components/ui` for controls, Card and dialogs, `components/common` for metrics/loading/empty/errors, and `components/data-table` for tables/pagination. Select consumes option values but renders a portalled Radix listbox; do not introduce native selects or page-specific menu skins. Tailwind handles layout; `foundation.scss` is the authority for visual tokens/control surfaces, with `index.css` mapping those tokens to Tailwind and defining metric/selection semantics. Sass is pinned to 1.99.0. Both language resources remain bundled locally.
 
-`npm run lint`, `npm run test`, `npm run build` and the mocked `npm run test:e2e` verify UI behavior. The `real` E2E still requires a separate writable acceptance database.
+`npm run lint`, `npm run test`, `npm run build` and the mocked `npm run test:e2e` verify UI behavior. The explicitly selected `history-readonly` Playwright project only reads preserved history; it never creates runs or probes connections. It requires an already verified viewer backend, `JDBC_TEST_HISTORY_READONLY=true`, and the current built preview. Standard `real` E2E still requires a separate writable acceptance database and must not be run against historical QA.
 
 The test-only nested-menu/tooltip/toast fixture runs with `PLAYWRIGHT_CHANNEL=chrome npx playwright test --project=primitives` (Vite dev, not preview); its HTML entry is outside the production router/build.

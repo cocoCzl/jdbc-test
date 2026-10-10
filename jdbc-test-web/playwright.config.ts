@@ -28,6 +28,7 @@ export default defineConfig({
   projects: [
     { name: "mocked", testMatch: ["**/smoke.spec.ts", "**/bilingual.spec.ts", "**/ui-migration.spec.ts"] },
     { name: "primitives", testMatch: "**/primitives.spec.ts" },
+    { name: "history-readonly", testMatch: ["**/history-readonly.spec.ts", "**/history-report-readonly.spec.ts"], use: { trace: "off" } },
     { name: "real", testMatch: "**/real.spec.ts", use: { trace: "off" } },
   ],
   webServer: production ? undefined : {

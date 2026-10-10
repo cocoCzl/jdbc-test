@@ -22,8 +22,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Future;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.junit.platform.engine.FilterResult;
@@ -391,11 +392,10 @@ public final class WorkerMain {
     LauncherDiscoveryRequest discovery = builder.build();
     WorkerExecutionEvidence listener = new WorkerExecutionEvidence(request.runId(), selected,
         events);
-    var executor = Executors.newSingleThreadExecutor(runnable -> {
-      Thread thread = new Thread(runnable, "jdbc-test-worker");
-      thread.setDaemon(true);
-      return thread;
-    });
+    var executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
+        new ArrayBlockingQueue<>(1),
+        Thread.ofPlatform().daemon(true).name("jdbc-test-worker").factory(),
+        new ThreadPoolExecutor.AbortPolicy());
     try {
       Future<?> future = executor.submit(() -> {
         Launcher launcher = LauncherFactory.create();

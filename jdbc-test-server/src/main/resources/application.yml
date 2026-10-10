@@ -30,5 +30,6 @@ jdbc-test:
     master-key: ${JDBC_TEST_MASTER_KEY}
   execution:
     max-concurrent-runs: ${JDBC_TEST_MAX_CONCURRENT_RUNS:1}
+    queue-capacity: ${JDBC_TEST_RUN_QUEUE_CAPACITY:64}
     run-timeout: ${JDBC_TEST_RUN_TIMEOUT:30m}
     termination-grace-period: 2s

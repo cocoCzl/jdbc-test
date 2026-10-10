@@ -77,7 +77,7 @@ class ObjectIsolationIT {
             Path.of(System.getProperty("java.home"), "bin", "java").toString(), "-cp",
             System.getProperty("java.class.path"), HardStopFixture.class.getName())
             .redirectError(directory.resolve("hard-stop.log").toFile()).start();
-        try (var executor = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+        try {
           child.getOutputStream().write(
               new com.fasterxml.jackson.databind.ObjectMapper().setVisibility(
                       com.fasterxml.jackson.annotation.PropertyAccessor.GETTER,
@@ -86,8 +86,7 @@ class ObjectIsolationIT {
                       com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility.NONE)
                   .writeValueAsBytes(config));
           child.getOutputStream().close();
-          assertEquals("READY", executor.submit(() -> child.inputReader().readLine())
-              .get(15, java.util.concurrent.TimeUnit.SECONDS), () -> {
+          assertEquals("READY", ProcessReadiness.awaitLine(child, Duration.ofSeconds(15)), () -> {
             try {
               return java.nio.file.Files.readString(directory.resolve("hard-stop.log"));
             } catch (java.io.IOException error) {

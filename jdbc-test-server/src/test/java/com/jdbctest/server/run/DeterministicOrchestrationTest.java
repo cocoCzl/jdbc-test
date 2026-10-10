@@ -23,10 +23,11 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -264,6 +265,96 @@ class DeterministicOrchestrationTest {
   }
 
   @Test
+  void boundedQueueRejectsCommittedRunAndPreservesFifo() throws Exception {
+    var properties = new ExecutionProperties();
+    properties.setQueueCapacity(1);
+    var dispatcher = new TestRunScheduler(properties, executor, runs, credentials, transactions,
+        events, selections);
+    UUID running = run("BLOCK", 1);
+    UUID waiting = run("NORMAL", 1);
+    UUID rejected = run("NORMAL", 1);
+    try {
+      dispatcher.enqueue(running);
+      started(running);
+      dispatcher.enqueue(waiting);
+      var error = assertThrows(RunException.class, () -> dispatcher.enqueue(rejected));
+      assertEquals(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE, error.status());
+      assertEquals("RUN_QUEUE_FULL", error.code());
+      assertEquals(TestRunStatus.INTERRUPTED, state(rejected));
+      assertEquals("RUN_QUEUE_FULL", service.get(rejected).failureReason());
+      assertNotNull(service.get(rejected).finishedAt());
+      assertFalse(credentials.existsById(rejected));
+      assertFalse(Files.exists(workspace(rejected).resolve("started")));
+      assertTrue(eventNames.get(rejected).contains("run.status"));
+      assertEquals(0, completed.get(rejected).getCount());
+      assertEquals(TestRunStatus.QUEUED, state(waiting));
+      release(running);
+      done(running, TestRunStatus.SUCCEEDED, null);
+      started(waiting);
+      release(waiting);
+      done(waiting, TestRunStatus.SUCCEEDED, null);
+    } finally {
+      dispatcher.shutdown();
+    }
+  }
+
+  @Test
+  void cancellingQueuedRunImmediatelyFreesBoundedQueueSlot() throws Exception {
+    var properties = new ExecutionProperties();
+    properties.setQueueCapacity(1);
+    var dispatcher = new TestRunScheduler(properties, executor, runs, credentials, transactions,
+        events, selections);
+    UUID running = run("BLOCK", 1);
+    UUID cancelled = run("NORMAL", 1);
+    UUID replacement = run("NORMAL", 1);
+    try {
+      dispatcher.enqueue(running);
+      long pid = started(running);
+      dispatcher.enqueue(cancelled);
+      dispatcher.cancel(cancelled);
+      dispatcher.enqueue(replacement);
+      assertEquals(TestRunStatus.RUNNING, state(running));
+      assertTrue(ProcessHandle.of(pid).orElseThrow().isAlive());
+      assertEquals(TestRunStatus.QUEUED, state(replacement));
+      assertEquals(TestRunStatus.CANCELLED, state(cancelled));
+      assertFalse(credentials.existsById(cancelled));
+      release(running);
+      done(running, TestRunStatus.SUCCEEDED, null);
+      started(replacement);
+      release(replacement);
+      done(replacement, TestRunStatus.SUCCEEDED, null);
+      assertFalse(Files.exists(workspace(cancelled).resolve("started")));
+    } finally {
+      dispatcher.shutdown();
+    }
+  }
+
+  @Test
+  void enqueueAfterShutdownCleansRunCommittedAfterShutdownScan() {
+    var dispatcher = new TestRunScheduler(execution, executor, runs, credentials, transactions,
+        events, selections);
+    dispatcher.shutdown();
+    UUID id = run("NORMAL", 1);
+    var error = assertThrows(RunException.class, () -> dispatcher.enqueue(id));
+    assertEquals("SERVER_SHUTTING_DOWN", error.code());
+    assertEquals(TestRunStatus.INTERRUPTED, state(id));
+    assertEquals("SERVER_SHUTTING_DOWN", service.get(id).failureReason());
+    assertFalse(credentials.existsById(id));
+    assertNotNull(service.get(id).finishedAt());
+  }
+
+  @Test
+  void queueCapacityMustBePositive() {
+    var properties = new ExecutionProperties();
+    for (int capacity : new int[] {0, -1}) {
+      properties.setQueueCapacity(capacity);
+      assertThrows(IllegalArgumentException.class,
+          () -> new TestRunScheduler(properties, executor, runs, credentials, transactions,
+              events, selections));
+    }
+  }
+
+  @Test
   void shutdownInterruptsRunningAndQueuedWorkAndReapsWorker() throws Exception {
     var dispatcher = new TestRunScheduler(execution, executor, runs, credentials, transactions,
         events, selections);
@@ -400,7 +491,10 @@ class DeterministicOrchestrationTest {
       signal(id, "finish-emitted");
     }
     CountDownLatch barrier = new CountDownLatch(1);
-    try (var contenders = Executors.newFixedThreadPool(2)) {
+    try (var contenders = new ThreadPoolExecutor(2, 2, 0L, TimeUnit.MILLISECONDS,
+        new ArrayBlockingQueue<>(2),
+        Thread.ofPlatform().name("run-race-test-", 0).factory(),
+        new ThreadPoolExecutor.AbortPolicy())) {
       var completion = contenders.submit(() -> {
         barrier.await();
         Files.writeString(workspace(id).resolve("exit"), "go");

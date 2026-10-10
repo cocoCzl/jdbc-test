@@ -3,8 +3,10 @@ package com.jdbctest.server.run;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.springframework.context.event.ContextClosedEvent;
 import org.springframework.context.event.EventListener;
@@ -18,7 +20,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Component
 final class TestRunScheduler {
 
-  private final ExecutorService queue;
+  private final ThreadPoolExecutor queue;
   private final TestRunExecutor executor;
   private final TestRunRepository runs;
   private final TestRunCredentialRepository credentials;
@@ -33,8 +35,14 @@ final class TestRunScheduler {
     if (properties.getMaxConcurrentRuns() < 1) {
       throw new IllegalArgumentException("maxConcurrentRuns must be positive");
     }
-    this.queue = Executors.newFixedThreadPool(properties.getMaxConcurrentRuns(),
-        Thread.ofVirtual().name("jdbc-test-run-", 0).factory());
+    if (properties.getQueueCapacity() < 1) {
+      throw new IllegalArgumentException("queueCapacity must be positive");
+    }
+    this.queue = new ThreadPoolExecutor(properties.getMaxConcurrentRuns(),
+        properties.getMaxConcurrentRuns(), 0L, TimeUnit.MILLISECONDS,
+        new ArrayBlockingQueue<>(properties.getQueueCapacity()),
+        Thread.ofVirtual().name("jdbc-test-run-", 0).factory(),
+        new ThreadPoolExecutor.AbortPolicy());
     this.executor = executor;
     this.runs = runs;
     this.credentials = credentials;
@@ -45,10 +53,46 @@ final class TestRunScheduler {
 
   synchronized void enqueue(UUID runId) {
     if (!accepting) {
+      rejectQueuedRun(runId, "SERVER_SHUTTING_DOWN");
       throw new RunException(HttpStatus.SERVICE_UNAVAILABLE, "SERVER_SHUTTING_DOWN",
           "Server is shutting down");
     }
-    queue.submit(() -> executor.execute(runId));
+    try {
+      queue.execute(new QueuedRun(runId));
+    } catch (RejectedExecutionException exception) {
+      rejectQueuedRun(runId, "RUN_QUEUE_FULL");
+      throw new RunException(HttpStatus.SERVICE_UNAVAILABLE, "RUN_QUEUE_FULL",
+          "Run queue is full; the unstarted run was interrupted. Retry later");
+    }
+  }
+
+  // Creation commits before enqueue. Rejection must not strand that row or its credentials.
+  private void rejectQueuedRun(UUID runId, String reason) {
+    Map<String, Object> payload = transactions.execute(tx -> {
+      TestRunEntity run = runs.findForUpdate(runId).orElseThrow();
+      if (run.getStatus() != TestRunStatus.QUEUED) {
+        return null;
+      }
+      run.setStatus(TestRunStatus.INTERRUPTED);
+      run.markFinished();
+      run.setFailureReason(reason);
+      credentials.deleteById(runId);
+      return terminalPayload(run);
+    });
+    if (payload != null) {
+      events.publish(runId, "run.status", payload);
+      events.complete(runId);
+    }
+  }
+
+  private final class QueuedRun extends FutureTask<Void> {
+
+    private final UUID runId;
+
+    private QueuedRun(UUID runId) {
+      super(() -> executor.execute(runId), null);
+      this.runId = runId;
+    }
   }
 
   void cancel(UUID runId) {
@@ -66,6 +110,8 @@ final class TestRunScheduler {
       events.publish(runId, "run.cancelled", terminalPayload(run));
       events.complete(runId);
     });
+    queue.getQueue().removeIf(task -> task instanceof QueuedRun queued
+        && queued.runId.equals(runId));
     executor.cancel(runId);
   }
 

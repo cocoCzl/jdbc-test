@@ -234,6 +234,6 @@ CPA Keeper 白色 UI 基础层固定引用上游 [`2c09d65d6a90b1dc9802fe7b26704
 
 控件、卡片和弹窗统一使用 `components/ui`，指标/加载/空/错误态使用 `components/common`，表格分页使用 `components/data-table`。Select 保留选项原始值，展开后使用 portal Radix listbox；不新增原生 select 或页面专用菜单皮肤。Tailwind 负责布局，`foundation.scss` 统一视觉 token 和控件表面，`index.css` 将 token 映射到 Tailwind 并保留指标、选中态语义。Sass 固定为 1.99.0，中英文资源仍本地打包。
 
-使用 `npm run lint`、`npm run test`、`npm run build` 和 mocked `npm run test:e2e` 验证。原有 `real` E2E 仍需独立可写验收数据库。
+使用 `npm run lint`、`npm run test`、`npm run build` 和 mocked `npm run test:e2e` 验证。显式选择的 `history-readonly` Playwright 项目仅读取保全历史，不创建运行或测试连接；需已核验的历史副本后端、`JDBC_TEST_HISTORY_READONLY=true` 和当前构建 preview。原有 `real` E2E 仍需独立可写验收数据库，禁止用于历史 QA。
 
 弹窗内菜单、tooltip/toast 的测试专用页面使用 `PLAYWRIGHT_CHANNEL=chrome npx playwright test --project=primitives`（Vite dev，非 preview），入口不进入生产路由或构建。

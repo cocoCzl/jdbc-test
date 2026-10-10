@@ -26,8 +26,9 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
@@ -269,7 +270,10 @@ class RunPostgresIT {
       assertEquals(200, stream.statusCode());
       subscribed.countDown();
       String sse;
-      try (var reader = Executors.newSingleThreadExecutor(); var input = stream.body()) {
+      try (var reader = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
+          new ArrayBlockingQueue<>(1),
+          Thread.ofPlatform().name("run-postgres-it-sse-reader").factory(),
+          new ThreadPoolExecutor.AbortPolicy()); var input = stream.body()) {
         sse = reader.submit(() -> new String(input.readAllBytes(), StandardCharsets.UTF_8))
             .get(150, TimeUnit.SECONDS);
       }

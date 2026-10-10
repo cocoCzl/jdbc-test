@@ -7,6 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class ExecutionProperties {
 
   private int maxConcurrentRuns = 1;
+  private int queueCapacity = 64;
   private Duration runTimeout = Duration.ofMinutes(30);
   private Duration terminationGracePeriod = Duration.ofSeconds(2);
 
@@ -16,6 +17,14 @@ public class ExecutionProperties {
 
   public void setMaxConcurrentRuns(int value) {
     this.maxConcurrentRuns = value;
+  }
+
+  public int getQueueCapacity() {
+    return queueCapacity;
+  }
+
+  public void setQueueCapacity(int value) {
+    this.queueCapacity = value;
   }
 
   public Duration getRunTimeout() {

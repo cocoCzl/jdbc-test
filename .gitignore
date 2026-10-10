@@ -2,6 +2,10 @@
 target/
 dist/
 *.jar
+*.war
+*.zip
+*.tar
+*.tar.gz
 
 # IDE
 .idea/
@@ -31,6 +35,10 @@ report/
 baseline/
 compatibility-matrix.json
 vendor-extension-report.json
+coverage/
+playwright-report/
+test-results/
+blob-report/
 
 # OS
 .DS_Store
@@ -40,26 +48,38 @@ Thumbs.db
 configs/
 config*.yaml
 *.local.json
+*.local.yaml
+*.local.yml
 
 # Private JDBC drivers (including transitive dependency JARs)
 local-drivers/
 
 # Logs
 *.log
+*.out
+*.pid
+
+# Local runtime state and databases
+data/
+runtime/
+tmp/
+temp/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
 
 # Frontend
 node_modules/
-playwright-report/
-test-results/
 *.tsbuildinfo
+*.eslintcache
+/.vite/
 
 # Deployment secrets and runtime data
 .env
 .env.*
 !.env.example
-data/
-coverage/
 
-# Local documentation backups and development history
-/.local/docs-history/
-/.local/history-view-qa/
+# Local QA evidence, snapshots, backups, builds and development history
+/.local/
