@@ -1,0 +1,17 @@
+# Management PostgreSQL (not the database under test).
+# Create a dedicated database owned by this user before starting.
+spring.datasource.url=jdbc:postgresql://localhost:5432/jdbc_test
+spring.datasource.username=jdbc_test
+spring.datasource.password=
+# Required: openssl rand -base64 32. Preserve across restarts/restores.
+jdbc-test.security.master-key=
+
+# Java .properties syntax: do not quote values. $ and # within values are literal.
+# For a literal backslash write \\; use forward slashes in Windows paths.
+# Keep binding to localhost unless an access-controlled proxy/VPN is in place.
+server.address=127.0.0.1
+server.port=8080
+# Optional; paths are relative to the deployment directory.
+# jdbc-test.storage.data-directory=./data
+# jdbc-test.execution.max-concurrent-runs=1
+# jdbc-test.execution.run-timeout=30m

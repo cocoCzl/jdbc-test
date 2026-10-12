@@ -1,24 +1,12 @@
 services:
   jdbc-test:
-    build: .
-    init: true
-    restart: unless-stopped
-    stop_grace_period: 60s
-    ports:
-      - "${JDBC_TEST_BIND_ADDRESS:-127.0.0.1}:${JDBC_TEST_PORT:-8080}:8080"
+    extends:
+      file: docker-compose.app.yml
+      service: jdbc-test
     environment:
-      SPRING_PROFILES_ACTIVE: docker
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-jdbc_test}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-jdbc_test}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
-      JDBC_TEST_MASTER_KEY: ${JDBC_TEST_MASTER_KEY:?Set a persistent 32-byte Base64 JDBC_TEST_MASTER_KEY in .env}
-      JDBC_TEST_DATA_DIRECTORY: /data/jdbc-test
-      JDBC_TEST_WORKER_EXECUTABLE: /app/worker/jdbc-test-worker.jar
-      JDBC_TEST_MAX_CONCURRENT_RUNS: ${JDBC_TEST_MAX_CONCURRENT_RUNS:-1}
-      JDBC_TEST_RUN_TIMEOUT: ${JDBC_TEST_RUN_TIMEOUT:-30m}
-      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:-}
-    volumes:
-      - jdbc_test_data:/data/jdbc-test
     depends_on:
       postgres:
         condition: service_healthy

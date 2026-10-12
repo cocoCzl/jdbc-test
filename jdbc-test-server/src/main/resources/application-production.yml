@@ -1,0 +1,20 @@
+# Shared production behavior, imported by the docker and native profiles.
+server:
+  shutdown: graceful
+spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  flyway:
+    connect-retries: 10
+management:
+  health:
+    readinessstate:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      show-components: never

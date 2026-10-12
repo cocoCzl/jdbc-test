@@ -5,7 +5,7 @@ import sys
 import unittest
 
 
-MODULES = ("test_compatibility_v1", "test_adapter_runtime")
+MODULES = ("test_compatibility_v1", "test_adapter_runtime", "test_deployment")
 
 
 def main() -> int:

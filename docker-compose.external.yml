@@ -1,0 +1,12 @@
+# Start only the application, using an existing PostgreSQL database.
+services:
+  jdbc-test:
+    extends:
+      file: docker-compose.app.yml
+      service: jdbc-test
+    environment:
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:?Set SPRING_DATASOURCE_URL in .env}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:?Set SPRING_DATASOURCE_USERNAME in .env}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?Set SPRING_DATASOURCE_PASSWORD in .env}
+volumes:
+  jdbc_test_data:

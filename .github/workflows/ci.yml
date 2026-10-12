@@ -58,6 +58,21 @@ jobs:
         env:
           POSTGRES_PASSWORD: ci-validation-only
           JDBC_TEST_MASTER_KEY: ci-validation-only
-        run: docker compose config --quiet
+          SPRING_DATASOURCE_URL: jdbc:postgresql://example.invalid:5432/jdbc_test
+          SPRING_DATASOURCE_USERNAME: jdbc_test
+          SPRING_DATASOURCE_PASSWORD: ci-validation-only
+        run: |
+          docker compose config --quiet
+          docker compose -f docker-compose.external.yml config --quiet
+      - name: Package native server distribution
+        run: python3 scripts/build_distribution.py --skip-build --output dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-server
+          path: |
+            dist/jdbc-test-server-*.tar.gz*
+            dist/jdbc-test-server-*.zip*
       - name: Build production image without publishing
         run: docker build --build-arg REVISION=${{ github.sha }} -t jdbc-test:ci .
+      - name: Verify all three deployment modes
+        run: python3 scripts/test_deployment_runtime.py --image jdbc-test:ci

@@ -6,7 +6,17 @@ A JDBC 4.3 compatibility and regression framework for database vendors and drive
 
 Tests execute DDL/DML. Use a dedicated database/schema and review [Execution safety](docs/execution-safety.md) before running. This is not an official JDBC certification suite or a performance, migration, business-SQL or proprietary-API test tool.
 
-## Quick start: Docker
+## Choose a deployment method
+
+| Method | Configuration | Start |
+|---|---|---|
+| [Docker + bundled PG](docs/deployment.md#bundled-pg) | `.env.example` → `.env`; set password and key | `docker compose up -d --build --wait` |
+| [Docker + existing PG](docs/deployment.md#external-pg) | `.env.external.example` → `.env`; set PG URL/user/password and key | `docker compose -f docker-compose.external.yml up -d --build --wait` |
+| [Without Docker + existing PG](docs/deployment.md#native) | Server bundle's `config/application.properties` | `sh start.sh` or PowerShell `./start.ps1` |
+
+All three methods serve the same Web UI. The management database is separate from targets configured in the UI. Follow the linked preparation, startup and backup steps.
+
+## Quick start: Docker + bundled PG
 
 Use Docker Engine/Desktop with Compose v2; no host Java, Maven, Node or PostgreSQL installation is needed.
 
@@ -19,7 +29,7 @@ openssl rand -base64 32
 Edit `.env`: set a strong `POSTGRES_PASSWORD` and put the generated 32-byte Base64 key in `JDBC_TEST_MASTER_KEY`. Preserve that key after saving connection passwords; never commit `.env`.
 
 ```sh
-docker compose up -d --build
+docker compose up -d --build --wait
 docker compose ps
 ```
 
@@ -102,6 +112,14 @@ python3 scripts/build_release.py --output dist
 ```
 
 The source-only ZIP excludes third-party driver JARs and includes a SHA-256 file. Production Compose deployment uses the repository checkout.
+
+Build the native Web/Server distribution separately:
+
+```sh
+python3 scripts/build_distribution.py
+```
+
+Produces `dist/jdbc-test-server-<version>/`, `.tar.gz`, `.zip` and checksums containing Server, Worker, frontend and launchers. Building requires JDK 21, Python and Node/npm; running requires only Java 21 and existing PG. Follow [native deployment](docs/deployment.md#native) to configure and start.
 
 ## License
 

@@ -29,7 +29,25 @@ jobs:
             echo "Release archive contains forbidden runtime artifacts"
             exit 1
           fi
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: jdbc-test-web/package-lock.json
+      - name: Build ready-to-run server distribution
+        run: python scripts/build_distribution.py --output dist
+      - name: Verify server distribution checksums
+        working-directory: dist
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          shasum -a 256 -c "jdbc-test-server-${version}.tar.gz.sha256"
+          shasum -a 256 -c "jdbc-test-server-${version}.zip.sha256"
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${GITHUB_REF_NAME}" dist/* --generate-notes --title "JDBC Test ${GITHUB_REF_NAME}"
+        run: gh release create "${GITHUB_REF_NAME}" dist/*.zip dist/*.tar.gz dist/*.sha256 --generate-notes --title "JDBC Test ${GITHUB_REF_NAME}"

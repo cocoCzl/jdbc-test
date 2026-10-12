@@ -6,7 +6,17 @@
 
 测试会执行 DDL/DML。使用专用数据库/schema，运行前阅读[执行安全](docs/execution-safety.zh-CN.md)。本项目不是官方 JDBC 认证工具，也不用于性能压测、迁移、业务 SQL 或厂商专有 API 测试。
 
-## 快速开始：Docker
+## 选择部署方式
+
+| 方式 | 配置 | 启动 |
+|---|---|---|
+| [Docker + 自带 PG](docs/deployment.zh-CN.md#bundled-pg) | `.env.example` → `.env`，填写密码和密钥 | `docker compose up -d --build --wait` |
+| [Docker + 已有 PG](docs/deployment.zh-CN.md#external-pg) | `.env.external.example` → `.env`，填写 PG URL、账号、密码和密钥 | `docker compose -f docker-compose.external.yml up -d --build --wait` |
+| [非 Docker + 已有 PG](docs/deployment.zh-CN.md#native) | Server 部署包的 `config/application.properties` | `sh start.sh` 或 PowerShell `./start.ps1` |
+
+三种方式提供相同的 Web UI；管理数据库与页面中配置的目标数据库相互独立。详细准备、启动、备份步骤见表中的链接。
+
+## 快速开始：Docker + 自带 PG
 
 需要 Docker Engine/Desktop 和 Compose v2，主机无需安装 Java、Maven、Node 或 PostgreSQL。
 
@@ -19,7 +29,7 @@ openssl rand -base64 32
 编辑 `.env`：设置强密码 `POSTGRES_PASSWORD`，将生成的 32 字节 Base64 密钥填入 `JDBC_TEST_MASTER_KEY`。保存连接密码后必须保留同一密钥，不要提交 `.env`。
 
 ```sh
-docker compose up -d --build
+docker compose up -d --build --wait
 docker compose ps
 ```
 
@@ -102,6 +112,14 @@ python3 scripts/build_release.py --output dist
 ```
 
 仅包含源码的 ZIP 不含第三方驱动 JAR，并附带 SHA-256 文件。生产 Compose 部署使用仓库源码。
+
+非 Docker 的 Web/Server 部署包单独构建：
+
+```sh
+python3 scripts/build_distribution.py
+```
+
+生成 `dist/jdbc-test-server-<版本>/`、`.tar.gz`、`.zip` 和校验文件，包含 Server、Worker、前端和启动脚本。构建机器需要 JDK 21、Python、Node/npm，运行机器仅需 Java 21 和已有 PG；步骤见[非 Docker 部署](docs/deployment.zh-CN.md#native)。
 
 ## 许可证
 
