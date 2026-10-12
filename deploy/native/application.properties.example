@@ -1,17 +1,16 @@
-# Management PostgreSQL (not the database under test).
-# Create a dedicated database owned by this user before starting.
+# Compatibility reference for an EXISTING properties-based deployment only.
+# New installations use bundle-root .env.example -> .env -> ./jdbc-test start.
+# 仅供已有 properties 部署兼容参考；新装默认复制部署包 .env.example 为 .env。
+# Unified start preserves this existing file/Key; do not create a second secret source.
+# Java properties syntax, NOT Shell or dotenv. Never source/eval.
 spring.datasource.url=jdbc:postgresql://localhost:5432/jdbc_test
 spring.datasource.username=jdbc_test
 spring.datasource.password=
-# Required: openssl rand -base64 32. Preserve across restarts/restores.
-jdbc-test.security.master-key=
-
-# Java .properties syntax: do not quote values. $ and # within values are literal.
-# For a literal backslash write \\; use forward slashes in Windows paths.
-# Keep binding to localhost unless an access-controlled proxy/VPN is in place.
+# Restore the original persistent Base64 32-byte Key, never generate on restart.
+# Environment JDBC_TEST_MASTER_KEY overrides the file property.
+# jdbc-test.security.master-key=
 server.address=127.0.0.1
 server.port=8080
-# Optional; paths are relative to the deployment directory.
-# jdbc-test.storage.data-directory=./data
-# jdbc-test.execution.max-concurrent-runs=1
-# jdbc-test.execution.run-timeout=30m
+# Optional absolute paths; Windows use forward slashes:
+# jdbc-test.storage.data-directory=/protected/platform/data
+# jdbc-test.worker.executable=/installation/worker/jdbc-test-worker.jar

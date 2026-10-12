@@ -40,7 +40,7 @@ jobs:
           cache: npm
           cache-dependency-path: jdbc-test-web/package-lock.json
       - name: Build ready-to-run server distribution
-        run: python scripts/build_distribution.py --output dist
+        run: ./jdbc-test build --output dist
       - name: Verify server distribution checksums
         working-directory: dist
         run: |

@@ -2,354 +2,168 @@
 
 English | [简体中文](deployment.zh-CN.md)
 
-Choose one method and follow its steps. Do not combine the two Docker entry files.
+Editing/debugging source? Use [Development → local source startup](development.md#local-source-startup), with `./jdbc-test dev`. To run the website, choose **one** of the three modes below. Native means **non-Docker deployment bundle**, not IDEA source startup. Every mode uses the unified entry; Windows uses `./jdbc-test.ps1` instead of `./jdbc-test`.
 
-| Method | Use when | Runtime requirements | Configuration |
-|---|---|---|---|
-| [Docker + bundled PG](#bundled-pg) | You want a quick start without preparing a management database | Docker Engine/Desktop, Compose v2 | `.env.example` → `.env` |
-| [Docker + existing PG](#external-pg) | You have self-hosted or managed PostgreSQL | Docker Engine/Desktop, Compose v2, existing PG | `.env.external.example` → `.env` |
-| [Without Docker + existing PG](#native) | You want to run directly on a server | Java 21, existing PG | Bundle's `config/application.properties` |
+## Where does configuration go?
 
-The **management database** stores connection settings, encrypted credentials, runs and results. The **target database** is the database under test, configured in the Web UI. Keep them in separate databases/accounts. All URLs and credentials in this guide refer to the management database.
+| Mode | Actual configuration | Platform PG URL |
+|---|---|---|
+| Source development | Source-root `.env` | `SPRING_DATASOURCE_URL` |
+| Docker existing PG | Source-root `.env` | `SPRING_DATASOURCE_URL` |
+| Docker bundled PG | Source-root `.env`, generated `POSTGRES_*` | Compose decides `jdbc:postgresql://postgres:5432/${POSTGRES_DB:-jdbc_test}` |
+| Non-Docker bundle default | Extracted bundle-root `.env` | `SPRING_DATASOURCE_URL` |
+| Legacy Native file alternative | Bundle `config/application.properties` | `spring.datasource.url` |
+| Legacy environment alternative | Environment of the terminal/service launching Java | `SPRING_DATASOURCE_URL` |
 
-The management database uses PostgreSQL; builds and integration verification currently use PostgreSQL 16. Server includes its management PG driver; uploaded drivers are for targets. Flyway creates/migrates application tables automatically and Hibernate only validates the schema. No manual execution of project SQL is needed.
+A **platform database** stores website state/encrypted credentials. A **target database** is separately configured for JDBC tests; it is not needed to start the site. The **database password** authenticates PG; the independent **`JDBC_TEST_MASTER_KEY`** encrypts stored target credentials and must survive restarts/restores.
 
-<a id="bundled-pg"></a>
+Source development has exactly three steps: **source-root `.env.example` → `.env` (no overwrite), edit the three datasource fields in the actual `.env`, run `./jdbc-test dev`**. See [Development](development.md#local-source-startup). The same example now includes Docker network notes; duplicate `.env.external.example` is merged, with no template choice. Bundle users copy it in their bundle root. Bundled Docker must not copy this external-PG template; the unified Docker command generates its `POSTGRES_*` mode. One configuration per environment; do not mix modes.
+
+<a id="docker-bundled"></a>
 ## 1. Docker + bundled PG
 
-Host Java, Maven, Node and PostgreSQL are not required. The first build needs npm, Maven Central and image registries. Images support the host architecture, including arm64.
+**Prepare:** Docker Engine/Desktop + Compose v2, shell/PowerShell, free application port (default 8080), source checkout and network for image/dependency downloads. No host Java/Node/Maven/Python. For a new install, start without `.env`, old project volumes/containers or application data.
 
-### Step 1: Configure
-
-From the repository root:
+**Terminal commands — source root, Linux/macOS:**
 
 ```sh
-cp .env.example .env
-chmod 600 .env
-openssl rand -base64 32
+./jdbc-test docker --bundled-pg
+# After success open the printed website address (default http://127.0.0.1:8080).
+# Later starts reuse the original .env/Key/project:
+./jdbc-test docker --bundled-pg
+# Stop and keep PG/application volumes and configuration:
+./jdbc-test docker --bundled-pg --stop
 ```
 
-Edit `.env` and fill in the two required values:
+The first invocation builds the setup/application image and prompts to confirm a **new** platform. It checks actual Compose project/path/volumes and local data; do not confirm NEW for a recovery. The existing initializer automatically generates a **32-random-byte hex PG password** and a separate **32-random-byte Base64 Master Key**, saves both in source-root `.env`, and passes the same password to PG and Server. No secret copying. It validates configuration and runs Compose with health/readiness waiting; formal Server startup applies migrations.
 
-```dotenv
-POSTGRES_PASSWORD='replace-with-a-strong-password'
-JDBC_TEST_MASTER_KEY=paste-the-generated-key
-```
-
-Keep other defaults. `POSTGRES_DB`/`POSTGRES_USER` both default to `jdbc_test`. **No URL is needed**: Compose starts `postgres` and connects to `jdbc:postgresql://postgres:5432/jdbc_test`. Changing `POSTGRES_DB` also changes the database name in the URL. This method uses `POSTGRES_*`, not the external PG `SPRING_DATASOURCE_*` settings.
-
-### Step 2: Start
-
-```sh
-docker compose config --quiet
-docker compose up -d --build --wait
-docker compose ps
-curl --fail http://localhost:8080/actuator/health
-```
-
-When `jdbc-test` and `postgres` are healthy and health returns `UP`, open **http://localhost:8080**. No separate Worker/frontend process is needed.
-
-### Daily operations
-
-```sh
-docker compose logs --tail=100 jdbc-test
-docker compose restart jdbc-test
-docker compose stop
-docker compose start
-```
-
-`postgres_data` stores the management database; `jdbc_test_data` stores drivers, workspaces, reports and staging files. The PG port is not published. Editing `.env` does not change users/passwords in existing PG volumes; a database administrator must apply those changes.
-
-<a id="external-pg"></a>
-## 2. Docker + existing PG
-
-This method starts only `jdbc-test`, with no PG container, no `postgres_data` volume and no requirement for `POSTGRES_PASSWORD`.
-
-### Step 1: Prepare the database
-
-Ask your PG administrator for a dedicated database and a login account that owns it. For example, in an administrator's `psql` session:
-
-```sql
-CREATE ROLE jdbc_test LOGIN;
-\password jdbc_test
-CREATE DATABASE jdbc_test OWNER jdbc_test;
-```
-
-`\password` prompts for the password. Skip this step if you already have a suitable dedicated database/account. The application account needs permission to create/alter tables and indexes in its schema (default `public`) for Flyway migrations, without superuser privileges. The database must already exist: the application does not create databases. Avoid databases containing unrelated business tables.
-
-Allow application connections through the PG listener, `pg_hba.conf` and firewall. Add JDBC URL SSL parameters required by your managed PG provider.
-
-### Step 2: Configure
-
-From the repository root:
-
-```sh
-cp .env.external.example .env
-chmod 600 .env
-openssl rand -base64 32
-```
-
-Back up an existing `.env` before replacing it. Edit these four values:
-
-```dotenv
-SPRING_DATASOURCE_URL=jdbc:postgresql://your-pg-host:5432/jdbc_test
-SPRING_DATASOURCE_USERNAME=jdbc_test
-SPRING_DATASOURCE_PASSWORD='replace-with-the-database-password'
-JDBC_TEST_MASTER_KEY=paste-the-generated-key
-```
-
-Include the database name in the URL and keep username/password in separate fields. Compose `.env` single quotes preserve literal `$` and `#` in passwords. Escape single quotes according to Compose dotenv rules.
-
-**The address must be reachable from the container**:
-
-| PG location | Host in the URL |
-|---|---|
-| Remote server or managed PG | Actual IP/DNS, e.g. `pg.example.com` |
-| Docker Desktop host | `host.docker.internal`, not `localhost` |
-| Same Docker network | PG service name; attach the application to that network |
-
-On Linux, access host PG with `host.docker.internal` and the optional `docker-compose.host-gateway.yml` below.
-
-### Step 3: Start
-
-```sh
-docker compose -f docker-compose.external.yml config --quiet
-docker compose -f docker-compose.external.yml up -d --build --wait
-docker compose -f docker-compose.external.yml ps
-curl --fail http://localhost:8080/actuator/health
-```
-
-Open **http://localhost:8080** once health returns `UP`. Linux host PG uses:
-
-```sh
-docker compose -f docker-compose.external.yml -f docker-compose.host-gateway.yml up -d --build --wait
-```
-
-Keep the same `-f` arguments for subsequent operations when using an additional file. Do not add `-f docker-compose.yml`, which would mix in bundled PG settings.
-
-### Daily operations
-
-```sh
-docker compose -f docker-compose.external.yml logs --tail=100 jdbc-test
-docker compose -f docker-compose.external.yml restart jdbc-test
-docker compose -f docker-compose.external.yml stop
-docker compose -f docker-compose.external.yml start
-```
-
-Application files persist in `jdbc_test_data`; database persistence, backup and availability follow your existing PG operations.
-
-<a id="native"></a>
-## 3. Without Docker + existing PG
-
-The bundle contains Server JAR, Worker JAR and built frontend assets. Runtime requires only **Java 21**, without Maven, Node, Python or Vite. Shell launchers support Linux/macOS; a PowerShell launcher supports Windows.
-
-### Step 1: Get the bundle
-
-Choose `jdbc-test-server-<version>.tar.gz` (Linux/macOS) or `.zip` (Windows) from [GitHub Releases](https://github.com/cocoCzl/jdbc-test/releases). Historical releases may only contain source archives; the updated workflow provides Server bundles for future releases. `jdbc-test-<version>.zip` is the CLI source archive, a different artifact.
-
-Before a release is available, build once from the source repository root:
-
-```sh
-python3 scripts/build_distribution.py
-```
-
-**Only the build machine** needs JDK 21, Python >=3.9, Node >=22.12.0 and npm. Maven Wrapper supplies Maven; the first build needs network access. The command produces `dist/jdbc-test-server-<version>/`, both archives and SHA-256 files. Copy an archive to the runtime host.
-
-The builder refuses to overwrite an existing deployment directory to protect saved configuration/data. To rebuild, use `python3 scripts/build_distribution.py --output dist-new` or another new output directory.
-
-Linux/macOS extraction example (replace the version):
-
-```sh
-tar -xzf jdbc-test-server-1.2.1.tar.gz
-cd jdbc-test-server-1.2.1
-```
-
-On Windows, extract the ZIP and open PowerShell in its directory. Layout:
+**Actual new-install prompt / interactive input:**
 
 ```text
-jdbc-test-server-<version>/
-├── start.sh / start.ps1
-├── config/application.properties.example
-├── server/jdbc-test-server.jar
-├── worker/jdbc-test-worker.jar
-├── web/
-└── docs/
+For a confirmed NEW empty platform type NEW; for existing data/recovery press Enter: NEW
 ```
 
-### Step 2: Configure
+Defaults are database/user `jdbc_test`, internal PG host `postgres:5432`. The bundled connection URL comes from `docker-compose.yml`, not a user-supplied external URL. Preserve the real `.env`, project name and volumes for all later starts. Choose a distinct project explicitly with `--project NAME` when creating an independent installation.
 
-Prepare the dedicated database/account using the [existing PG step](#external-pg). From the deployment directory:
+<a id="docker-external"></a>
+## 2. Docker + existing PG
+
+**URL first:** `jdbc:postgresql://pg.example.com:5432/jdbc_test`. Replace host/port/database with actual values, **include database name, do not embed credentials**. For host PG use `host.docker.internal`; Docker Desktop supplies it, Linux also needs `--host-pg`. Container `localhost` is that container, not your host. The tool does not rewrite URLs.
+
+**Prepare:** Docker/Compose and a dedicated prepared platform PG database/login with migration permissions, reachable **from containers**. No `POSTGRES_PASSWORD`; customer supplies the existing full URL, username and password. Do not use shared QA/target databases.
+
+**Terminal commands — source root, Linux/macOS:**
 
 ```sh
-cp config/application.properties.example config/application.properties
-chmod 600 config/application.properties
-openssl rand -base64 32
+./jdbc-test docker --external-pg
+# URL/user/hidden-password prompts occur when .env is absent.
+# After success open the printed address; future starts:
+./jdbc-test docker --external-pg
+./jdbc-test docker --external-pg --stop
 ```
 
-Windows PowerShell equivalent:
+**Interactive input — actual prompts when `.env` is absent:**
+
+```text
+Full platform JDBC URL (database name required; no user/password in URL): jdbc:postgresql://pg.example.com:5432/jdbc_test
+Existing platform database username: jdbc_test
+Existing database password (hidden):
+```
+
+The unified entry asks for NEW confirmation before those fields; enter the raw URL, no `SPRING_DATASOURCE_URL=` prefix or shell quotes. Password is hidden. After read-only authentication/empty-state checks, it generates only a Master Key and saves source-root `.env`. Customer account/password is never changed. If you already have a private `.env` with these three fields and empty Key, the unified entry checks project state and database/data emptiness, then asks for NEW confirmation and fills only the Key. Existing state with missing Key stops and requires recovery.
+
+For Linux host PG, use **`./jdbc-test docker --external-pg --host-pg`** for both start and stop (append `--stop`). Formal startup applies migrations. The container's network URL can differ from a source dev URL; use separate environments, not automated rewriting.
+
+<a id="native"></a>
+## 3. Non-Docker deployment bundle + existing PG
+
+**Prepare:** Java 21 runtime, shell/PowerShell, free port8080, dedicated prepared platform PG database/login, and a complete bundle built from this revision ([build below](#build-bundle)). Runtime requires **no Node/npm/Maven/Python**. No unverified Release download is promised.
+
+**Terminal commands — extracted bundle root, Linux/macOS:**
+
+```sh
+umask 077
+cp -n .env.example .env
+# Edit the actual bundle-root .env: URL, username, existing password.
+./jdbc-test start
+# After readiness open the printed address. Ctrl+C stops and retains data.
+# Next time run ./jdbc-test start with the SAME configuration/Key.
+```
+
+Use `jdbc:postgresql://localhost:5432/jdbc_test` if PG is on the runtime host; replace actual host/port/database/user. This is **the extracted bundle's `.env`**, not the source file. The entry protects the local config, authenticates PG read-only, checks new-install state, and asks for `NEW` only when Key is missing. It saves an independent Key in the same file, checks artifacts/port, starts Server, waits for health/Catalog, and serves the production page. Formal startup migrates the platform DB. Default application files: bundle **`data/`**. Existing data requires its original Key; stop never deletes config/PG/data.
+
+### Windows commands, grouped alternatives
+
+Run these in the corresponding source/bundle-root **PowerShell** terminal; choose only your mode, not every line:
 
 ```powershell
-Copy-Item config/application.properties.example config/application.properties
-$keyBytes = New-Object byte[] 32
-$rng = [Security.Cryptography.RandomNumberGenerator]::Create()
-$rng.GetBytes($keyBytes)
-[Convert]::ToBase64String($keyBytes)
-$rng.Dispose()
+# Source development or build machine:
+./jdbc-test.ps1 dev
+./jdbc-test.ps1 build
+# Docker source root, choose ONE mode:
+./jdbc-test.ps1 docker --bundled-pg
+./jdbc-test.ps1 docker --bundled-pg --stop
+# Or existing PG (Linux-only --host-pg is unnecessary on Docker Desktop):
+./jdbc-test.ps1 docker --external-pg
+./jdbc-test.ps1 docker --external-pg --stop
+# Extracted bundle root: copy only if absent, edit .env, start:
+if (-not (Test-Path '.env')) { Copy-Item .env.example .env }
+./jdbc-test.ps1 start
 ```
 
-Edit the first four settings in `config/application.properties`:
+Stop on a failed command; never continue with incomplete configuration. A process-scoped execution-policy invocation can be used if required by your local policy; do not change machine-wide policy. Windows host ACL/process behavior still requires actual Windows validation.
 
-```properties
-spring.datasource.url=jdbc:postgresql://your-pg-host:5432/jdbc_test
-spring.datasource.username=jdbc_test
-spring.datasource.password=replace-with-the-database-password
-jdbc-test.security.master-key=paste-the-generated-key
-```
+<a id="build-bundle"></a>
+## Build machine vs runtime machine
 
-This is a Java `.properties` file: **do not quote values**. `$` and `#` within values are literal; write literal backslashes as `\\`. Prefer `/` in Windows paths and restrict configuration access through file permissions.
-
-Without Docker, `localhost` means the application host and can be used for PG on that host. The launcher loads this file automatically and **does not read the repository `.env`**. Keep the other defaults: localhost port `8080`, `./data`, and bundled Worker/frontend paths.
-
-### Step 3: Start
-
-Linux/macOS:
+**Terminal command — source root:**
 
 ```sh
-java -version
-sh start.sh
+./jdbc-test build
+# Alternative destination when the default output already exists:
+./jdbc-test build --output dist-next
 ```
 
-Windows PowerShell:
+Build requires **JDK21, Node >=22.12/npm, Python >=3.9** and dependency download access. Maven Wrapper supplies Maven. The entry builds Java/Worker, production web and packages the existing allowlisted distribution automatically. It does not need a PG configuration or copy actual `.env`, private config, data or logs. Output: `dist/jdbc-test-server-<version>/`, `.tar.gz`, `.zip` and checksums. Existing output installations are never overwritten. Transfer/checksum/extract the complete archive on the runtime host; `./jdbc-test start` uses Java21 only.
 
-```powershell
-java -version
-.\start.ps1
-```
+<a id="configuration-rules"></a>
+## Advanced: configuration rules and old entry compatibility
 
-If execution policy blocks the script, allow it only for this process with `powershell -NoProfile -ExecutionPolicy Bypass -File .\start.ps1`.
+Ordinary users copy/edit `.env` and use only `jdbc-test`. The unified entry reads local `.env` as the sole secret source, without merging inherited datasource/Key or old properties. If .env is absent, existing bundle properties/environment configurations are validated and started directly by this same entry. Historical bundle `start.sh/start.ps1` are **thin forwards only**; init/check wrappers are removed. Do not create another .env beside an existing legacy configuration without deliberately preserving its original Key.
 
-Keep the terminal open and visit **http://localhost:8080**. In another terminal, run `curl --fail http://localhost:8080/actuator/health` (`curl.exe` on Windows). `UP` means application/management database readiness. Server serves pages, REST and SSE from one origin and launches Workers automatically.
+The new `.env` format is **literal UTF-8 assignments**:
 
-### Stop, restart and service operation
+- Full-line `#` comments and blank lines are allowed; no inline comments, interpolation, `export` statements or multiline values.
+- Everything after `=` in an unquoted value is retained, including leading/trailing spaces, `$`, `#`, `=`, backslashes and `${NAME}`.
+- A value starting with `"` uses **JSON string escapes** (Jackson codec); starting with `'` uses one pair of literal single quotes. For quote-heavy passwords use JSON-encoded quoted strings instead of guessing escapes.
+- Empty fields are preparation state. NUL/control/tab/newline/Unicode line separators and invalid UTF-8/duplicate names are rejected; values are never silently trimmed.
+- Old tool-generated files identified by `# Compose dotenv only;` retain their old Compose encoding and are decoded once. The root Docker entry creates a protected temporary Compose encoding from the literal source and removes it after the operation. **Do not pass new literal `.env` directly to legacy Compose** for special-character passwords.
 
-Press `Ctrl+C` to stop gracefully; run the launcher again to restart. Configuration and `data/` persist. Launchers change to their own directory, so starting from another working directory uses correct resource paths.
+Never `source`/`eval` `.env` or Java `.properties`; they are not Shell scripts and have different rules. Examples contain empty secrets and are not a ready installation. Configuration and data are owner-protected, Git/context/archive exclusions keep secrets out of releases. The Key is generated only at runtime after empty-state/new-install confirmation, never baked into an image. Keep `.env` and data/PG backups private. Do not share actual `.env`, environment dumps, `docker inspect` or expanded Compose config.
 
-For Linux boot startup, optionally use systemd. Assuming `/opt/jdbc-test` and a service account named `jdbc-test`, create `/etc/systemd/system/jdbc-test.service`:
+### Existing properties/environment compatibility
 
-```ini
-[Unit]
-Description=JDBC Test Server
-After=network-online.target
-Wants=network-online.target
+For existing installations only: retain bundle `config/application.properties` with `spring.datasource.url/username/password` and `jdbc-test.security.master-key`, or inject all four `SPRING_DATASOURCE_URL/USERNAME/PASSWORD`, `JDBC_TEST_MASTER_KEY` from the original protected service environment. **Run the same `./jdbc-test start`**; do not execute separate init/check/start workflows. Spring preflight validates settings and the port before startup. Properties is Java syntax, not dotenv, and is not sourced by Shell.
 
-[Service]
-User=jdbc-test
-WorkingDirectory=/opt/jdbc-test
-ExecStart=/bin/sh /opt/jdbc-test/start.sh
-Restart=on-failure
-TimeoutStopSec=60
+With no `.env`, Spring datasource environment overrides file values, and `JDBC_TEST_MASTER_KEY` maps to `jdbc-test.security.master-key` with environment priority; empty template properties do not override a valid env Key. Bash export affects only descendants of that same terminal; PowerShell `$env:` is separate syntax. Manual Maven/IDEA do not load `.env`. New terminals/reboots need original environment reinjected; no Key regeneration. New users stay with the copy/edit `.env` path.
 
-[Install]
-WantedBy=multi-user.target
-```
+### Advanced Docker configuration
 
-Have an administrator create the account and ensure Java 21 is in the service's `PATH`. After placing the bundle at `/opt/jdbc-test`, set default data-directory and completed configuration permissions:
+The unified entry supports `--project`, `--port`, `--host-pg`, `--new-install` (explicit new-install confirmation only), and `--stop`.  CLI `--port` overrides an existing file for that invocation; edit the saved port in `.env` for a persistent change (new-install init saves its selected port).
 
-```sh
-sudo useradd --system --no-create-home jdbc-test
-sudo mkdir -p /opt/jdbc-test/data
-sudo chown jdbc-test:jdbc-test /opt/jdbc-test/data
-sudo chown root:jdbc-test /opt/jdbc-test/config/application.properties
-sudo chmod 640 /opt/jdbc-test/config/application.properties
-```
+It always selects the requested PG mode, rejects mode/project mismatches and never rewrites the URL. Saved custom networks/Compose storage definitions must be restored/reviewed with their original project/config; the default wrapper cannot infer a moved/renamed historical deployment. `JDBC_TEST_SETUP_NETWORK` selects an existing setup network; ensure actual Server uses the same network via a reviewed Compose override. `JDBC_TEST_SETUP_IMAGE` is an advanced locally built **current-revision** image override; it is not a promised public image or a standard-build verification.
 
-Skip `useradd` for an existing account; substitute paths for custom data directories. Allow that account to read/traverse the remaining bundle files/directories. Then:
+## Recovery, checks and operations
 
-```sh
-sudo systemctl daemon-reload
-sudo systemctl enable --now jdbc-test
-sudo journalctl -u jdbc-test -n 100
-```
+Read-only preflight authenticates PG and checks new-install emptiness; it does not migrate. Formal dev/start/Compose up performs migrations. Startup checks never run target tests. Missing `.env` is not proof of new installation: selected actual Compose project/path/volumes, effective data directory and supplied PG schema are checked. Existing state with missing Key means restore **original config/Key**, not generate a replacement. Secure-random failures stop immediately. Locked, private staged atomic writes prevent partial/concurrent replacements; on a stale lock first establish no initializer/launcher is running before manual recovery. No DROP, volume deletion, password reset or privilege elevation.
 
-Use `sudo systemctl stop jdbc-test`/`sudo systemctl restart jdbc-test` afterward; no open terminal is needed.
+Stop via Ctrl+C (dev/bundle) or matching Docker command with `--stop`. It retains all data/config. Back up **platform PG + application files + original Key/config** together, stopping Server for a consistent snapshot. Restore them as a set before starting. For upgrades replace source/bundle while preserving project/storage/config/Key; do not reinitialize or run two Servers against one platform. Historical migrations are unchanged.
 
-## Configuration and keys
+Invalid URLs/passwords/Key formats and occupied ports produce actionable errors. A valid 32-byte Key of the wrong value cannot be identified statically: retain the original Key to decrypt existing credentials. Do not fix startup failures by deleting state. UI has no authentication; keep loopback defaults or use controlled proxy/VPN and trusted drivers. See [Execution safety](execution-safety.md).
 
-| Purpose | Docker `.env` | Native `config/application.properties` |
-|---|---|---|
-| Existing PG URL | `SPRING_DATASOURCE_URL` | `spring.datasource.url` |
-| Existing PG username | `SPRING_DATASOURCE_USERNAME` | `spring.datasource.username` |
-| Existing PG password | `SPRING_DATASOURCE_PASSWORD` | `spring.datasource.password` |
-| Encryption key (required) | `JDBC_TEST_MASTER_KEY` | `jdbc-test.security.master-key` |
-| HTTP port, default `8080` | `JDBC_TEST_PORT` | `server.port` |
-| Bind address, default `127.0.0.1` | `JDBC_TEST_BIND_ADDRESS` (host publishing) | `server.address` |
-| Concurrent runs, default `1` | `JDBC_TEST_MAX_CONCURRENT_RUNS` | `jdbc-test.execution.max-concurrent-runs` |
-| Run timeout, default `30m` | `JDBC_TEST_RUN_TIMEOUT` | `jdbc-test.execution.run-timeout` |
-| JVM settings | `JAVA_TOOL_OPTIONS` | Set environment variable `JAVA_TOOL_OPTIONS` before starting |
+<a id="validation-limits"></a>
+## Validation limits
 
-Bundled PG also uses `POSTGRES_DB`/`POSTGRES_USER` (default `jdbc_test`) and required `POSTGRES_PASSWORD` to initialize PG and supply application datasource settings. Existing PG does not use them.
+This revision was tested on macOS/JDK21/Node24 against independent temporary platform PG: copying the example and editing its three fields, one-command source dev with backend/Vite/Catalog/proxy/page readiness, repeated dev with the original Key, Ctrl+C cleanup and retained data, unified build, bundle copy/edit/start, saved-credential decryption after restart and missing-Key recovery refusal. Historical start forwards also passed with existing properties and environment configurations. Both consolidated Docker entries passed real Compose/Spring/PG authentication using this build’s artifacts in an alternate local runtime image, including exact special UTF-8 passwords and matching generated PG/application passwords. Stop/restart retained original configuration/Key/volumes, and missing configuration with existing project state refused regeneration.
 
-The master key must decode to exactly **32 bytes**. Generate it once for a new installation, then preserve it across restarts, upgrades, migrations and restores; changing it makes saved passwords unreadable. Do not commit `.env`/actual configuration or share output containing secrets. After editing Docker `.env`, run the matching `up -d` to recreate containers; `restart` does not reload environment variables. Restart native applications after editing configuration.
-
-## Network and access security
-
-Targets must also be reachable from the application environment. Container `localhost` means the container itself; the same host selection rules apply. The application has **no authentication** and binds to localhost by default. Remote access needs a trusted internal network and an access-controlled proxy or VPN; do not expose it directly to the internet.
-
-Load only trusted drivers: Worker JVM isolation is not a sandbox; Server/Worker share filesystem, user and network access. Tests execute DDL/DML and require a dedicated authorized scope; see [Execution safety](execution-safety.md). Health checks cover the management database, not targets.
-
-## Persistence, backup and upgrades
-
-### Backup
-
-Back up the **management database, application files and same master key** together. A database dump alone cannot restore drivers/filesystem reports. Stop the application for a simple consistent backup:
-
-| Method | Stop application | Application files |
-|---|---|---|
-| Docker + bundled PG | `docker compose stop jdbc-test` | `jdbc_test_data` volume |
-| Docker + existing PG | `docker compose -f docker-compose.external.yml stop jdbc-test` | `jdbc_test_data` volume |
-| Without Docker + existing PG | `Ctrl+C` or `systemctl stop` | Bundle's `data/` or configured directory |
-
-For bundled PG, from the repository root:
-
-```sh
-docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > platform.dump
-```
-
-For existing PG, use its backup service or have an administrator run this on a machine with PG clients (enter the password when prompted):
-
-```sh
-pg_dump -h your-pg-host -p 5432 -U jdbc_test -d jdbc_test -Fc -f platform.dump
-```
-
-Archive matching application files, preserve ownership, and store key/configuration securely. Start after backup. Restore the database using PG administration tools, then matching application files and original key, before starting.
-
-### Upgrade and migrate
-
-Docker: back up, check out the new revision and run the matching `up -d --build --wait`. Native: back up, stop the old application, extract the new bundle, copy the original `config/application.properties` and `data/` into it (or retain configuration for a fixed external directory), then start it. Do not run two versions against the same management database/data directory at once.
-
-Flyway migrates on startup; do not enable Hibernate schema creation/update. Migration rollback may require backups. PG major upgrades require database migration. Switching bundled/existing PG does not move data automatically: migrate the database, retain application files and the same master key first.
-
-Docker `stop`, `restart` and `down` retain named volumes; **`docker compose down -v` permanently deletes volumes in that configuration**. Keep the same Compose project name/repository directory, or a fixed `-p` name, to avoid selecting new volumes. Native deployments must retain `data/`. Shutdown interrupts active runs; recovery marks them `INTERRUPTED` without automatically resuming.
-
-## Troubleshooting and verification
-
-If health does not become `UP`, check matching logs, then PG address/access, database existence, credentials, key format, data permissions and port conflicts. Docker Server/Workers run as UID/GID 10001; custom bind mounts must be writable by that user. An offline target affects target probes/tests, not management health.
-
-All three methods can use this read-only check from a source checkout; set `JDBC_TEST_BASE_URL` for a different port:
-
-```sh
-sh scripts/docker-smoke.sh
-```
-
-It checks health, catalog, SPA routes and assets without executing database tests. Real target acceptance is described in [Development testing](development.md#testing); bundles do not contain test sources.
-
-Bundled PG can additionally verify persistence in a separate acceptance environment (never wipe existing installations for testing):
-
-```sh
-python3 scripts/docker-persistence.py capture /tmp/jdbc-test-checkpoint.json
-docker compose restart jdbc-test
-# Wait for health UP before verification.
-python3 scripts/docker-persistence.py verify /tmp/jdbc-test-checkpoint.json
-```
-
-Repeat after `down`/`up -d`. Checkpoints verify captured IDs, driver/report hashes, results and saved-password probes. Existing PG/native deployments use matching stop/start steps to confirm data persists. Share only sanitized diagnostics.
+**Standard Docker source build was retried and blocked by Docker Hub OAuth token timeout for the Temurin21 JDK base image**; the alternate runtime tests do not count as standard-build success. Windows host ACL/process behavior, this revision’s PowerShell runtime and IDEA UI Run/Debug remain unverified. No target tests, QA or historical-copy acceptance were performed.

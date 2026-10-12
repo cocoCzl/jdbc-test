@@ -65,7 +65,7 @@ jobs:
           docker compose config --quiet
           docker compose -f docker-compose.external.yml config --quiet
       - name: Package native server distribution
-        run: python3 scripts/build_distribution.py --skip-build --output dist
+        run: ./jdbc-test build --output dist
       - uses: actions/upload-artifact@v4
         with:
           name: native-server
@@ -75,4 +75,4 @@ jobs:
       - name: Build production image without publishing
         run: docker build --build-arg REVISION=${{ github.sha }} -t jdbc-test:ci .
       - name: Verify all three deployment modes
-        run: python3 scripts/test_deployment_runtime.py --image jdbc-test:ci
+        run: python3 scripts/test_deployment_runtime.py --image jdbc-test:ci --source-dev

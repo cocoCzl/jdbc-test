@@ -42,6 +42,8 @@ class DistributionTest(unittest.TestCase):
         shutil.copytree(ROOT / "deploy", self.source / "deploy")
         shutil.copytree(ROOT / "docs", self.source / "docs")
         shutil.copy2(ROOT / "LICENSE", self.source / "LICENSE")
+        for entry in ("jdbc-test", "jdbc-test.ps1", ".env.example"):
+            shutil.copy2(ROOT / entry, self.source / entry)
         # Runtime secrets/data must never enter the distribution.
         (self.source / ".env").write_text("fixture-private-secret", encoding="utf-8")
         (self.source / "data").mkdir()
@@ -49,15 +51,16 @@ class DistributionTest(unittest.TestCase):
 
     def bundle(self):
         with patch.object(build_distribution, "PROJECT_ROOT", self.source):
-            return build_distribution.build(self.root / "output", skip_build=True)
+            return build_distribution.build(self.root / "output")
 
     def test_archives_are_complete_and_exclude_runtime_secrets(self):
         directory, archive, windows_archive = self.bundle()
-        required = {"server/jdbc-test-server.jar", "worker/jdbc-test-worker.jar", "web/index.html", "web/assets/app.js", "start.sh", "start.ps1", "config/application.properties.example", "docs/deployment.md", "docs/deployment.zh-CN.md"}
+        required = {"jdbc-test", "jdbc-test.ps1", ".env.example", "server/jdbc-test-server.jar", "worker/jdbc-test-worker.jar", "web/index.html", "web/assets/app.js", "start.sh", "start.ps1", "config/application.properties.example", "docs/deployment.md", "docs/deployment.zh-CN.md"}
         with zipfile.ZipFile(windows_archive) as bundle:
             contents = {name.split("/", 1)[1] for name in bundle.namelist()}
             self.assertTrue(required <= contents)
             self.assertNotIn(".env", contents)
+            self.assertTrue({"init.sh", "init.ps1", "check.sh", "check.ps1"}.isdisjoint(contents))
             self.assertNotIn("config/application.properties", contents)
             self.assertFalse(any(name.startswith("data/") for name in contents))
         with tarfile.open(archive) as bundle:
@@ -67,6 +70,22 @@ class DistributionTest(unittest.TestCase):
                 path.with_name(path.name + ".sha256").read_text().split()[0],
                 hashlib.sha256(path.read_bytes()).hexdigest(),
             )
+
+    def test_tar_launcher_is_executable_without_host_execute_bits(self):
+        gettarinfo = tarfile.TarFile.gettarinfo
+
+        def without_execute_bits(bundle, *args, **kwargs):
+            info = gettarinfo(bundle, *args, **kwargs)
+            # Simulate Windows file metadata even when this test runs on Unix.
+            info.mode &= ~0o111
+            return info
+
+        with patch.object(tarfile.TarFile, "gettarinfo", without_execute_bits):
+            directory, archive, _ = self.bundle()
+        with tarfile.open(archive) as bundle:
+            for launcher in ("jdbc-test", "start.sh"):
+                self.assertEqual(bundle.getmember(f"{directory.name}/{launcher}").mode, 0o755)
+            self.assertFalse(bundle.getmember(f"{directory.name}/config/application.properties.example").mode & 0o111)
 
     def test_rebuilding_cannot_overwrite_an_existing_installation(self):
         directory, _, _ = self.bundle()
@@ -101,20 +120,39 @@ class DistributionTest(unittest.TestCase):
             java.chmod(0o755)
             launcher = ["sh", str(directory / "start.sh")]
         record = self.root / "record.json"
-        environment = {**os.environ, "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}", "TEST_LAUNCH_RECORD": str(record)}
+        environment = {key: value for key, value in os.environ.items() if not key.startswith(("SPRING_", "JDBC_TEST_"))}
+        environment.update({"PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}", "TEST_LAUNCH_RECORD": str(record)})
         result = subprocess.run([*launcher, "--server.port=19080"], cwd=self.root, env=environment, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         invocation = json.loads(record.read_text())
         self.assertEqual(Path(invocation["cwd"]).resolve(), directory.resolve())
-        self.assertIn("--spring.config.additional-location=file:./config/application.properties", invocation["args"])
+        self.assertIn("-Dloader.main=com.jdbctest.server.deploy.UnifiedLauncher", invocation["args"])
+        self.assertIn("start", invocation["args"])
         self.assertIn("--server.port=19080", invocation["args"])
         self.assertNotIn("fixture$#secret", json.dumps(invocation))
-        configuration.unlink()
-        record.unlink()
-        result = subprocess.run(launcher, cwd=self.root, env=environment, capture_output=True, text=True)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("Copy config/application.properties.example", result.stderr)
-        self.assertFalse(record.exists())
+
+
+class SourceEntryTest(unittest.TestCase):
+    def test_missing_dotenv_stops_before_toolchain_or_build_and_creates_nothing(self):
+        with tempfile.TemporaryDirectory(prefix="jdbc empty source ") as temporary:
+            source = Path(temporary)
+            (source / "pom.xml").write_text("fixture", encoding="utf-8")
+            for entry in ("jdbc-test", "jdbc-test.ps1", ".env.example"):
+                shutil.copy2(ROOT / entry, source / entry)
+            if os.name == "nt":
+                powershell = shutil.which("pwsh") or shutil.which("powershell")
+                if not powershell: self.skipTest("PowerShell unavailable")
+                command = [powershell, "-NoProfile", "-File", str(source / "jdbc-test.ps1"), "dev"]
+            else:
+                command = ["sh", str(source / "jdbc-test"), "dev"]
+            # No Bootstrap, mvnw, Java or Node binaries in this fixture: fast refusal
+            # must precede invoking any of them, and must not write a template.
+            result = subprocess.run(command, cwd=source, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Copy .env.example to .env", result.stderr)
+            self.assertNotIn("Checking/building", result.stdout)
+            self.assertFalse((source / ".env").exists())
+            self.assertFalse((source / "target").exists())
 
 
 class ComposeTest(unittest.TestCase):

@@ -1,0 +1,29 @@
+#!/bin/sh
+set -eu
+umask 077
+cd "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+command="${1:-}"
+case "$command" in
+  docker) shift; exec sh deploy/docker/launch.sh "$@" ;;
+  dev|build)
+    [ -f pom.xml ] || { echo 'dev/build require the source checkout; use start in a deployment bundle.' >&2; exit 1; }
+    if [ "$command" = dev ] && [ ! -e .env ] && [ ! -L .env ]; then
+      echo 'Missing source-root .env. Copy .env.example to .env without overwriting an existing file (umask 077; cp -n .env.example .env), fill SPRING_DATASOURCE_URL/USERNAME/PASSWORD, then run ./jdbc-test dev.' >&2
+      exit 1
+    fi
+    command -v java >/dev/null 2>&1 || { echo 'Install JDK 21 and put java on PATH for dev/build.' >&2; exit 1; }
+    command -v javac >/dev/null 2>&1 || { echo 'JDK 21 (including javac) is required for dev/build.' >&2; exit 1; }
+    [ ! -L target ] || { echo 'Build target must not be a symlink.' >&2; exit 1; }
+    mkdir -p target
+    bootstrap_classes="$(mktemp -d target/.jdbc-bootstrap.XXXXXXXX)"
+    trap 'rm -rf "$bootstrap_classes"' EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' HUP TERM
+    javac --release 21 -d "$bootstrap_classes" deploy/Bootstrap.java jdbc-test-server/src/main/java/com/jdbctest/server/deploy/LaunchProcesses.java
+    java -cp "$bootstrap_classes" Bootstrap "$@" ;;
+  start)
+    [ -f server/jdbc-test-server.jar ] || { echo 'start requires a complete deployment bundle; use dev in source.' >&2; exit 1; }
+    command -v java >/dev/null 2>&1 || { echo 'Install Java 21 runtime and put java on PATH.' >&2; exit 1; }
+    exec java -Dloader.main=com.jdbctest.server.deploy.UnifiedLauncher -cp server/jdbc-test-server.jar org.springframework.boot.loader.launch.PropertiesLauncher "$@" ;;
+  *) echo 'Usage: ./jdbc-test dev | build | docker --bundled-pg/--external-pg [--stop]; bundle: ./jdbc-test start' >&2; exit 1 ;;
+esac

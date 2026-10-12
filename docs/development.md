@@ -2,7 +2,85 @@
 
 English | [简体中文](development.zh-CN.md)
 
-This guide covers architecture, local development, persistence, REST APIs and the Worker protocol. For operations see [Deployment](deployment.md); for scope, cleanup and result accounting see [Execution safety](execution-safety.md).
+For source edits use the unified development command below. To run the website without developing source, choose [Docker or a non-Docker deployment bundle](deployment.md). Native is a deployment bundle, not IDEA source startup.
+
+<a id="local-startup"></a>
+<a id="local-source-startup"></a>
+## Local source startup
+
+### First-time preparation: three steps
+
+Install **JDK21 (including javac)** and **Node >=22.12/npm**. The committed Maven Wrapper supplies Maven3.9.15; first downloads need network access. dev requires no Python. Prepare a dedicated empty development **platform PG** database/login with schema/migration permissions; Server applies Flyway migrations at formal startup. This stores application state and encrypted credentials, while target databases are separate UI configurations and unnecessary for page/Catalog startup. Do not use QA or historical copies.
+
+1. In the **source root**, copy **`.env.example` to `.env` only if absent**. Existing `.env`, Key and data are never replaced. There is one source-development template; no template selection is needed.
+2. In a local editor open that **actual source-root `.env`**. Fill `SPRING_DATASOURCE_URL` (full URL including database name, no credentials), `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD` (existing PG password). For local PG the example URL is `jdbc:postgresql://localhost:5432/jdbc_test`; replace its actual host/port/database and username. New platform: leave `JDBC_TEST_MASTER_KEY` empty. Existing platform: preserve its original Key and data path. Do not put secrets into terminal history, shared IDEA configs or Git.
+3. Run **`./jdbc-test dev`** in the source root. It protects the owner's local `.env` before reading, authenticates PG and checks state before generating a Key. Confirm `NEW` only for a genuinely new empty platform, then open the printed ready address. Missing `.env` exits immediately before Java/build, tells you where to copy, and creates no configuration.
+
+**Terminal commands — Linux/macOS, source root (edit after copy):**
+
+```sh
+umask 077
+cp -n .env.example .env
+# Open this actual .env in your editor and fill the three datasource fields.
+./jdbc-test dev
+```
+
+**PowerShell terminal alternative — source root:**
+
+```powershell
+if (-not (Test-Path '.env')) { Copy-Item .env.example .env }
+# Edit this actual .env locally before starting.
+./jdbc-test.ps1 dev
+```
+
+**Interactive input — actual new-platform confirmation:**
+
+```text
+For a confirmed NEW empty platform type NEW; for existing data/recovery press Enter: NEW
+```
+
+The independent 32-byte Base64 Master Key is saved in the same `.env`, never printed. It encrypts stored target credentials, not PG authentication. Normal starts reuse it; missing Key with existing schema/data/legacy config stops and requires the original Key. Canceling does not generate a replacement. No account password changes, DROP or target tests occur.
+
+Password rules are literal: everything after `=` in an unquoted value is retained (spaces, `$`, `#`, backslashes, `=`, `${NAME}`, valid UTF-8). No inline comments or Shell expansion. A value starting with double quotes is a JSON string; use JSON escapes, or enclose a quote-leading password in single quotes. Controls/newlines are rejected without trimming. Never source/eval `.env`. See [configuration rules](deployment.md#configuration-rules).
+
+The same command builds the current Java/Suite/Worker, finds the **exact current POM-version Worker** (never first-glob/stale fallback), installs dependencies on first use/lockfile/toolchain change, launches the **source main via Maven spring-boot:run** and Vite. It waits for health/Catalog/page/proxied Catalog, then prints URLs; it does not build production frontend assets in dev.
+
+Defaults: page **http://127.0.0.1:5173**, backend **http://127.0.0.1:8080**. Change `.env` `SERVER_PORT` or optional `JDBC_TEST_WEB_PORT` and rerun; proxy follows the actual backend port automatically. Occupied ports abort without killing other services. Only backend receives credentials/Key; Vite does not load `.env`. Data defaults to source-root **`data/`**, or `JDBC_TEST_DATA_DIRECTORY`; reuse the same path and back up config/Key/data together.
+
+### Daily development
+
+```sh
+# Source root, dedicated platform PG already running:
+./jdbc-test dev
+```
+
+PowerShell: `./jdbc-test.ps1 dev`. Reuse original `.env`, Key and data; no repeated `--new-install`. The Java build checks current modules each launch; dependencies are installed only when needed. While running, frontend edits use Vite HMR and require no Java rebuild. Server source changes need a restart; Worker/Suite changes are rebuilt on the next dev launch, so Server never silently uses an old external Worker. Ctrl+C stops both sides and only their owned descendants; a failed side also stops the other. PG/config/Key/data are retained. Port conflicts, failed builds and authentication errors abort without leaving a half-started environment.
+
+### Advanced: IDEA Debug or manual source launch
+
+The default does not require IDEA. For debugging with the **same `.env` and automatic Worker/proxy flow**, import root `pom.xml` in IDEA with JDK 21, run:
+
+```sh
+./jdbc-test dev --debug
+```
+
+Then create **Run → Edit Configurations → + → Remote JVM Debug**:
+
+| Setting | Value |
+|---|---|
+| Project SDK / Maven importer | JDK 21 |
+| Debugger mode | Attach to remote JVM |
+| Host / port | `127.0.0.1` / `5005` (must be free) |
+| Module sources | `jdbc-test-server` |
+| Main source being debugged | `com.jdbctest.server.JdbcTestServerApplication` |
+
+Click Debug to attach; do not start a second backend. The debug socket is loopback-only. IDEA attaching does not rebuild the external Worker; stop/relaunch dev after Worker/Suite changes. This runs a source main, not the packaged Server. **IDEA UI Run/Debug has not been exercised**; configuration is checked against code.
+
+For a fully manual alternative, the old Maven/IDEA Application flow still works: build `./mvnw -DskipTests install`, supply Spring datasource/Key configuration **to that actual backend process**, set `JDBC_TEST_WORKER_EXECUTABLE` to the exact current `jdbc-test-worker/target/jdbc-test-worker-<POM-version>-all.jar`, and run `./mvnw -pl jdbc-test-server spring-boot:run`. IDEA Application uses JDK 21, main class above, `jdbc-test-server` runtime classpath and source-root working directory; no profile is required. Do not put secrets in Program arguments, VM options or shared run configurations. The unified command reads `.env`; **manual Maven/IDEA do not**. A terminal export does not update already-running IDEA. Choose one backend launch method, not both.
+
+Manual frontend alternative: first `cd jdbc-test-web && npm ci`, then `npm run dev`; daily only `npm run dev`, reinstall after dependency/lockfile changes. Set nonsecret `JDBC_TEST_DEV_API_URL` in that Vite process if backend port differs (default proxy is localhost:8080). Stop each manual process in its own terminal. Files, Shell environment and IDEA environment are different sources; do not maintain duplicate secret files for the unified flow.
+
+For literal dotenv rules, legacy properties/environment compatibility, build/runtime dependency split and validation limits see [Deployment](deployment.md#configuration-rules). No target probes/runs are part of startup acceptance.
 
 ## Architecture
 
@@ -58,33 +136,6 @@ Validated with IDEA 2026.2.3, build IU-262.10968.63. Its formatter does not opti
 the current import blocks were separately reordered using Java compiler source positions without
 adding/removing imports. Existing wildcard imports are retained. Do not substitute another engine,
 bypass a running IDE's instance lock, or automatically rewrite sources during Maven builds.
-
-## Local startup
-
-Requirements: JDK 21, Maven >=3.9 (Wrapper 3.9.15), Node >=22.12.0 and npm; Python >=3.9 for CLI tools. Prepare Platform PostgreSQL, a persistent 32-byte Base64 master key and a writable data directory.
-
-From the repository root:
-
-```sh
-./mvnw -DskipTests install
-export SPRING_DATASOURCE_URL='jdbc:postgresql://localhost:5432/jdbc_platform'
-export SPRING_DATASOURCE_USERNAME='jdbc_platform'
-export SPRING_DATASOURCE_PASSWORD='your-platform-password'
-export JDBC_TEST_MASTER_KEY='your-32-byte-base64-master-key'
-export JDBC_TEST_DATA_DIRECTORY="$PWD/data"
-export JDBC_TEST_WORKER_EXECUTABLE="$PWD/jdbc-test-worker/target/jdbc-test-worker-1.2.1-SNAPSHOT-all.jar"
-./mvnw -pl jdbc-test-server spring-boot:run
-```
-
-Replace placeholders; keep secrets out of Git. In another terminal:
-
-```sh
-cd jdbc-test-web
-npm ci
-npm run dev
-```
-
-Open `http://localhost:5173`. Vite proxies `/api` to Server `:8080` without SSE timeouts. `VITE_API_BASE_URL` optionally sets the API base at build time. Production serves built assets from Server `:8080`; the ordinary Maven lifecycle does not run npm.
 
 ## Web UI
 

@@ -2,7 +2,85 @@
 
 [English](development.md) | 简体中文
 
-本指南说明架构、本地开发、持久化、REST API 和 Worker 协议。运维见[部署指南](deployment.zh-CN.md)，授权范围、清理与结果统计见[执行安全](execution-safety.zh-CN.md)。
+修改源码使用下面的统一开发命令；只运行网站请选择[Docker 或非 Docker 部署包](deployment.zh-CN.md)。Native 是部署包运行，不是 IDEA 源码启动。
+
+<a id="local-startup"></a>
+<a id="local-source-startup"></a>
+## 本地源码启动
+
+### 第一次准备：三步
+
+安装 **JDK21（含 javac）**、**Node >=22.12/npm**。仓库 Maven Wrapper 提供 Maven3.9.15，首次依赖下载需要网络，dev 不需要 Python。先准备专用空的开发**平台 PG** 数据库/账号及建表/migration 权限；正式 Server 启动会执行 Flyway migration。平台保存状态和加密凭据；目标库另在 UI 配置，打开页面/Catalog 不需要目标库，不使用现有 QA 或历史副本。
+
+1. 在**源码根目录**，**仅在 `.env` 不存在时将 `.env.example` 复制为 `.env`**。已有 `.env`、Key 和数据不能覆盖。源码开发只有这一份模板，不需再选模板。
+2. 用本地编辑器打开**源码根目录实际 `.env`**，填写 `SPRING_DATASOURCE_URL`（完整地址，含数据库名，不含凭据）、`SPRING_DATASOURCE_USERNAME` 和 `SPRING_DATASOURCE_PASSWORD`（PG 现有密码）。本机 PG 示例 `jdbc:postgresql://localhost:5432/jdbc_test`，填写实际主机/端口/库名/用户名。全新平台 `JDBC_TEST_MASTER_KEY` 留空；已有平台保留原 Key 和数据路径。秘密不写入终端历史、共享 IDEA 配置或 Git。
+3. 在源码根目录执行 **`./jdbc-test dev`**。入口读取前保护当前所有者的本地 `.env`，先认证 PG、检查状态再生成 Key。仅全新空平台确认 `NEW`，然后打开打印的就绪地址。缺 `.env` 时立即在 Java/构建前退出并提示复制位置，不生成文件。
+
+**终端命令 — Linux/macOS，源码根目录（复制后先编辑）：**
+
+```sh
+umask 077
+cp -n .env.example .env
+# 在本地编辑器打开这个实际 .env，填写数据库三项。
+./jdbc-test dev
+```
+
+**PowerShell 终端替代命令 — 源码根目录：**
+
+```powershell
+if (-not (Test-Path '.env')) { Copy-Item .env.example .env }
+# 先在本地编辑实际 .env，然后启动。
+./jdbc-test.ps1 dev
+```
+
+**交互输入 — 实际新平台确认：**
+
+```text
+For a confirmed NEW empty platform type NEW; for existing data/recovery press Enter: NEW
+```
+
+独立32字节 Base64 Master Key 保存到同一 `.env`，不打印，用于加密已保存的目标库凭据，不是 PG 认证密码。正常启动复用原 Key；已有 schema/数据/旧配置却缺 Key 时停止，必须恢复原 Key。取消不生成替代 Key。不改账号密码、不 DROP、不跑目标测试。
+
+密码采用字面值规则：未加引号时保留 `=` 之后所有字符（空格、`$`、`#`、反斜杠、`=`、`${NAME}`、合法 UTF-8），不能行尾注释，不做 Shell 展开。以双引号开头必须是 JSON 字符串，按 JSON 转义；双引号起始密码也可用单引号包裹。控制字符/换行拒绝，不 trim。不能 source/eval `.env`，详见[配置规则](deployment.zh-CN.md#configuration-rules)。
+
+同一命令构建当前 Java/Suite/Worker，按**当前 POM 精确版本**找 Worker（不随意选 glob/退回旧产物），首次或 lockfile/工具链变化时安装依赖，通过 **Maven spring-boot:run 启动源码主类**和 Vite。等待 health/Catalog/页面/代理 Catalog 后打印地址；dev 不构建生产前端。
+
+默认页面 **http://127.0.0.1:5173**，后端 **http://127.0.0.1:8080**。修改 `.env` 的 `SERVER_PORT` 或可选 `JDBC_TEST_WEB_PORT` 后重跑，代理自动跟随。占用端口则退出，不杀其他服务。只有后端收到秘密，Vite 不读取 `.env`。数据默认源码根目录 **`data/`**，可设 `JDBC_TEST_DATA_DIRECTORY`；以后复用同一路径，配置/Key/数据一起备份。
+
+### 以后日常开发
+
+```sh
+# 源码根目录，专用平台 PG 已运行：
+./jdbc-test dev
+```
+
+PowerShell 用 `./jdbc-test.ps1 dev`。复用原 `.env`、Key 和数据，不再 `--new-install`。每次入口检查构建当前 Java 模块，只在必要时重装依赖。运行中改前端通过 Vite HMR 生效，无需重构建 Java；改 Server 源码需要重启。修改 Worker/Suite 后，下次 dev 会重构建相关产物，不静默使用旧 Worker。Ctrl+C 停止本次前后端和所属子进程；一端失败会收尾另一端。PG、配置、Key 和数据保留。端口占用、构建失败、认证错误都中止，不留下半启动环境。
+
+### 进阶：IDEA Debug 或手工源码启动
+
+默认不用 IDEA。若希望**继续使用同一 `.env` 和自动 Worker/代理流程**调试，在 IDEA 用 JDK 21 导入根 `pom.xml`，运行：
+
+```sh
+./jdbc-test dev --debug
+```
+
+在 **Run → Edit Configurations → + → Remote JVM Debug** 新建：
+
+| 设置 | 值 |
+|---|---|
+| Project SDK / Maven importer | JDK 21 |
+| Debugger mode | Attach to remote JVM |
+| Host / port | `127.0.0.1` / `5005`（必须空闲） |
+| Module sources | `jdbc-test-server` |
+| 被调试的源码主类 | `com.jdbctest.server.JdbcTestServerApplication` |
+
+点击 Debug 连接，不另开第二个后端。调试端口只绑定 loopback。IDEA attach 不自动更新外部 Worker，修改 Worker/Suite 后停止并重跑 dev。这是源码主类，不是部署 Server JAR。**尚未实际操作 IDEA UI Run/Debug**，表格依据代码核对。
+
+完全手工方式仍兼容旧 Maven/IDEA Application：先 `./mvnw -DskipTests install`，把 Spring 数据库/Key 配置提供给**实际后端进程**，将 `JDBC_TEST_WORKER_EXECUTABLE` 指向 `jdbc-test-worker/target/jdbc-test-worker-<当前 POM 版本>-all.jar`，运行 `./mvnw -pl jdbc-test-server spring-boot:run`。IDEA Application 使用 JDK 21、上述主类、`jdbc-test-server` 运行 classpath、源码根 working directory，无需 profile。秘密不能写入 Program arguments、VM options 或共享运行配置。统一入口读取 `.env`，**手工 Maven/IDEA 不自动读取**；终端 export 也不会更新已打开的 IDEA。两种后端启动方式任选一种。
+
+手工前端首次 `cd jdbc-test-web && npm ci`，再 `npm run dev`；日常只需 `npm run dev`，依赖/lockfile 变化后再安装。后端端口改变时在该 Vite 进程设置非秘密 `JDBC_TEST_DEV_API_URL`（默认代理 localhost:8080）。两个手工进程分别在各自终端停止。文件、Shell 环境和 IDEA 环境不是自动共享的配置；统一流程无需同步维护多份秘密文件。
+
+.env 字面值规则、旧 properties/环境兼容、构建/运行依赖区别和验证边界见[部署指南](deployment.zh-CN.md#configuration-rules)。启动验收不执行目标库探测或测试。
 
 ## 架构
 
@@ -54,33 +132,6 @@ apply/check 使用同一 IDEA 原生引擎和 XML；check 使用不写文件的 
 已在 IDEA 2026.2.3（IU-262.10968.63）验证。原生命令不会 Optimize Imports；
 当前 import 块另外通过 Java 编译器源码位置重排，未增删导入，已有通配导入保留。
 不替换格式引擎、不绕过正在运行的 IDE 实例锁，普通 Maven 构建不会自动改写源码。
-
-## 本地启动
-
-需要 JDK 21、Maven >=3.9（Wrapper 3.9.15）、Node >=22.12.0 和 npm；CLI 工具需要 Python >=3.9。先准备平台 PostgreSQL、持久保存的 32 字节 Base64 master key 和可写数据目录。
-
-在仓库根目录执行：
-
-```sh
-./mvnw -DskipTests install
-export SPRING_DATASOURCE_URL='jdbc:postgresql://localhost:5432/jdbc_platform'
-export SPRING_DATASOURCE_USERNAME='jdbc_platform'
-export SPRING_DATASOURCE_PASSWORD='your-platform-password'
-export JDBC_TEST_MASTER_KEY='your-32-byte-base64-master-key'
-export JDBC_TEST_DATA_DIRECTORY="$PWD/data"
-export JDBC_TEST_WORKER_EXECUTABLE="$PWD/jdbc-test-worker/target/jdbc-test-worker-1.2.1-SNAPSHOT-all.jar"
-./mvnw -pl jdbc-test-server spring-boot:run
-```
-
-替换示例占位值，不要将凭据提交到 Git。另开终端：
-
-```sh
-cd jdbc-test-web
-npm ci
-npm run dev
-```
-
-打开 `http://localhost:5173`。Vite 将 `/api` 代理到 Server `:8080`，不对 SSE 设置超时。`VITE_API_BASE_URL` 可在构建时指定 API 基地址。生产环境由 Server `:8080` 托管构建产物；普通 Maven 生命周期不执行 npm。
 
 ## Web UI
 

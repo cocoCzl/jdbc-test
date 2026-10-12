@@ -6,36 +6,34 @@
 
 测试会执行 DDL/DML。使用专用数据库/schema，运行前阅读[执行安全](docs/execution-safety.zh-CN.md)。本项目不是官方 JDBC 认证工具，也不用于性能压测、迁移、业务 SQL 或厂商专有 API 测试。
 
-## 选择部署方式
+## 快速开始：复制、编辑、启动
 
-| 方式 | 配置 | 启动 |
-|---|---|---|
-| [Docker + 自带 PG](docs/deployment.zh-CN.md#bundled-pg) | `.env.example` → `.env`，填写密码和密钥 | `docker compose up -d --build --wait` |
-| [Docker + 已有 PG](docs/deployment.zh-CN.md#external-pg) | `.env.external.example` → `.env`，填写 PG URL、账号、密码和密钥 | `docker compose -f docker-compose.external.yml up -d --build --wait` |
-| [非 Docker + 已有 PG](docs/deployment.zh-CN.md#native) | Server 部署包的 `config/application.properties` | `sh start.sh` 或 PowerShell `./start.ps1` |
+准备 **JDK21、Node >=22.12/npm** 和预先创建的专用**平台 PostgreSQL** 数据库/账号。在**源码根目录**：
 
-三种方式提供相同的 Web UI；管理数据库与页面中配置的目标数据库相互独立。详细准备、启动、备份步骤见表中的链接。
+1. **仅在 `.env` 不存在时，将 `.env.example` 复制为 `.env`**。已有配置和 Key 保留，不覆盖。
+2. 用本地编辑器打开**源码根目录实际 `.env`**，填写 **`SPRING_DATASOURCE_URL`**、**`SPRING_DATASOURCE_USERNAME`**、**`SPRING_DATASOURCE_PASSWORD`**：平台完整 JDBC 地址、账号和现有密码。URL 示例 `jdbc:postgresql://localhost:5432/jdbc_test`，替换实际主机/端口/库名，必须含数据库名，不嵌入账号密码。全新平台 `JDBC_TEST_MASTER_KEY` 留空；已有平台保留原 Key。
+3. 执行 **`./jdbc-test dev`**，只有全新空平台才确认 `NEW`，随后打开打印地址。工具安全保存 Key，构建 Java/Worker、按需安装依赖并启动源码后端＋Vite。Ctrl+C 停止本次进程；以后复用同一 `.env`/Key/数据，执行同一命令。
 
-## 快速开始：Docker + 自带 PG
-
-需要 Docker Engine/Desktop 和 Compose v2，主机无需安装 Java、Maven、Node 或 PostgreSQL。
+**终端命令 — Linux/macOS，源码根目录（复制后先编辑，再 dev）：**
 
 ```sh
-cp .env.example .env
-chmod 600 .env
-openssl rand -base64 32
+umask 077
+cp -n .env.example .env
+# 用本地编辑器打开实际 .env，填写三个 SPRING_DATASOURCE 字段。
+./jdbc-test dev
 ```
 
-编辑 `.env`：设置强密码 `POSTGRES_PASSWORD`，将生成的 32 字节 Base64 密钥填入 `JDBC_TEST_MASTER_KEY`。保存连接密码后必须保留同一密钥，不要提交 `.env`。
+**PowerShell 终端 — 源码根目录：**
 
-```sh
-docker compose up -d --build --wait
-docker compose ps
+```powershell
+if (-not (Test-Path '.env')) { Copy-Item .env.example .env }
+# 编辑实际 .env：平台 URL、用户名、现有密码。
+./jdbc-test.ps1 dev
 ```
 
-两项服务健康后打开 **http://localhost:8080**。上传并验证 JDBC 驱动，保存并探测连接，配置明确授权的数据库/schema，再核对选择并同意运行。首次构建需访问 npm、Maven 和镜像仓库；应用容器必须能够访问目标数据库。
+缺 `.env` 时在 **Java/工具链/构建之前**提示复制位置，不再先运行一次生成模板。不能 source `.env` 或把秘密放入命令参数。准备条件、密码字面值语法、日常启动和可选 IDEA Debug 见[开发指南](docs/development.zh-CN.md#local-source-startup)。
 
-应用**没有用户认证**，仅适合 localhost 或可信内网。Web 默认绑定本机回环地址，平台 PostgreSQL 不向主机发布端口。
+只运行网站不开发源码，请看[部署指南](docs/deployment.zh-CN.md)：`./jdbc-test docker --bundled-pg`、`./jdbc-test docker --external-pg`，或在**解压后的非 Docker 部署包内** `./jdbc-test start`。用 `./jdbc-test build` 构建部署包。Docker 运行机器只需 Docker/Compose，部署包运行机器只需 Java21；构建机器额外需要 Python >=3.9 归档。每套环境一份私有配置，普通用户只使用统一入口。
 
 ## 文档
 
@@ -55,7 +53,7 @@ docker compose ps
 
 ## 开发环境
 
-需要 JDK 21、Maven >=3.9（Wrapper 3.9.15）、用于 CLI 工具的 Python >=3.9，以及使用者提供的目标数据库与驱动。Web 开发还需要 Node >=22.12.0 和 npm、平台 PostgreSQL、持久保存的 master key 和已构建的 Worker。启动步骤见[本地启动](docs/development.zh-CN.md#本地启动)。
+源码 Web 开发需 JDK 21、Maven Wrapper 3.9.15、Node >=22.12.0/npm 和专用平台 PG；配置、Key 与 Worker 准备见[本地源码启动](docs/development.zh-CN.md#local-source-startup)。Python >=3.9、已授权目标库和驱动是 CLI 目标测试的额外要求，不是打开开发网站的前提。
 
 ## CLI 快速开始
 
@@ -116,7 +114,7 @@ python3 scripts/build_release.py --output dist
 非 Docker 的 Web/Server 部署包单独构建：
 
 ```sh
-python3 scripts/build_distribution.py
+./jdbc-test build
 ```
 
 生成 `dist/jdbc-test-server-<版本>/`、`.tar.gz`、`.zip` 和校验文件，包含 Server、Worker、前端和启动脚本。构建机器需要 JDK 21、Python、Node/npm，运行机器仅需 Java 21 和已有 PG；步骤见[非 Docker 部署](docs/deployment.zh-CN.md#native)。

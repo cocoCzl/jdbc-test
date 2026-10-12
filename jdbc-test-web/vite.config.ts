@@ -4,6 +4,8 @@ import tailwindcss from "@tailwindcss/vite";
 import { fileURLToPath, URL } from "node:url";
 
 export default defineConfig({
+  // Unified startup never loads the platform secret file into Vite.
+  envDir: process.env.JDBC_TEST_MANAGED_FRONTEND === "1" ? false : undefined,
   plugins: [react(), tailwindcss()],
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   server: {
@@ -11,7 +13,7 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       "/api": {
-        target: "http://localhost:8080",
+        target: process.env.JDBC_TEST_DEV_API_URL || "http://localhost:8080",
         changeOrigin: true,
         timeout: 0,
         proxyTimeout: 0,

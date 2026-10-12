@@ -84,3 +84,16 @@ node_modules/
 
 # Local QA evidence, snapshots, backups, builds and development history
 /.local/
+
+# Native platform credentials and interrupted initialization files
+**/config/application.properties
+**/config/master-key
+.jdbc-test-init.lock/
+.docker-init.lock/
+.docker-init.lock.*/
+.config-*.tmp
+.config-private-*/
+*.input
+
+.docker-launch.lock/
+.docker-launch.lock.*/

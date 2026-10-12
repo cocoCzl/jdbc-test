@@ -6,36 +6,34 @@ A JDBC 4.3 compatibility and regression framework for database vendors and drive
 
 Tests execute DDL/DML. Use a dedicated database/schema and review [Execution safety](docs/execution-safety.md) before running. This is not an official JDBC certification suite or a performance, migration, business-SQL or proprietary-API test tool.
 
-## Choose a deployment method
+## Quick start: copy, edit, run
 
-| Method | Configuration | Start |
-|---|---|---|
-| [Docker + bundled PG](docs/deployment.md#bundled-pg) | `.env.example` → `.env`; set password and key | `docker compose up -d --build --wait` |
-| [Docker + existing PG](docs/deployment.md#external-pg) | `.env.external.example` → `.env`; set PG URL/user/password and key | `docker compose -f docker-compose.external.yml up -d --build --wait` |
-| [Without Docker + existing PG](docs/deployment.md#native) | Server bundle's `config/application.properties` | `sh start.sh` or PowerShell `./start.ps1` |
+Prepare **JDK21, Node >=22.12/npm** and a dedicated, already-created **platform PostgreSQL** database/account. In the **source root**:
 
-All three methods serve the same Web UI. The management database is separate from targets configured in the UI. Follow the linked preparation, startup and backup steps.
+1. Copy **`.env.example` → `.env` only if `.env` is absent**. Keep any existing configuration/Key.
+2. Open that actual **source-root `.env`** in your local editor. Set **`SPRING_DATASOURCE_URL`**, **`SPRING_DATASOURCE_USERNAME`** and **`SPRING_DATASOURCE_PASSWORD`** to your platform's full JDBC URL, login and existing password. Example URL: `jdbc:postgresql://localhost:5432/jdbc_test`; replace host/port/database, include database name and keep credentials out of the URL. New platform: leave `JDBC_TEST_MASTER_KEY` empty; existing platform: keep the original Key.
+3. Execute **`./jdbc-test dev`**, confirm `NEW` only for a new empty platform, then open the printed address. The tool safely saves the Key, builds Java/Worker, installs frontend dependencies if needed and starts source backend + Vite. Ctrl+C stops this launch; later run the same command with original `.env`/Key/data.
 
-## Quick start: Docker + bundled PG
-
-Use Docker Engine/Desktop with Compose v2; no host Java, Maven, Node or PostgreSQL installation is needed.
+**Terminal commands — Linux/macOS, source root (edit between copy and dev):**
 
 ```sh
-cp .env.example .env
-chmod 600 .env
-openssl rand -base64 32
+umask 077
+cp -n .env.example .env
+# Edit .env locally: the three SPRING_DATASOURCE fields (file: .env).
+./jdbc-test dev
 ```
 
-Edit `.env`: set a strong `POSTGRES_PASSWORD` and put the generated 32-byte Base64 key in `JDBC_TEST_MASTER_KEY`. Preserve that key after saving connection passwords; never commit `.env`.
+**PowerShell terminal — source root:**
 
-```sh
-docker compose up -d --build --wait
-docker compose ps
+```powershell
+if (-not (Test-Path '.env')) { Copy-Item .env.example .env }
+# Edit the actual .env locally: URL, username, existing password.
+./jdbc-test.ps1 dev
 ```
 
-When both services are healthy, open **http://localhost:8080**. Upload and validate your JDBC driver, save/probe a connection, configure its authorized database/schema, then review selection and consent before starting a run. The first build needs npm, Maven and image registry access; the target database must be reachable from the app container.
+Missing `.env` stops **before Java/toolchain/build**, with the copy location; no first-run generation round trip. Never source `.env` or put secrets in command arguments. See [Development](docs/development.md#local-source-startup) for preparation, literal password syntax, daily startup and optional IDEA Debug.
 
-The application has **no authentication** and is intended for localhost/trusted networks. Web binds to loopback by default; Platform PostgreSQL has no published host port.
+To run the website without source development, choose [Deployment](docs/deployment.md): `./jdbc-test docker --bundled-pg`, `./jdbc-test docker --external-pg`, or **`./jdbc-test start` in an extracted non-Docker bundle**. Build that bundle with `./jdbc-test build`. Docker hosts need Docker/Compose only; bundle runtime needs Java21 only. Build machines also need Python >=3.9 for the archive step. Each environment has one private configuration; ordinary users only use the unified entry.
 
 ## Documentation
 
@@ -55,7 +53,7 @@ See [verified combinations](docs/execution-safety.md#verified-combinations) for 
 
 ## Development requirements
 
-JDK 21, Maven >=3.9 (Wrapper 3.9.15), Python >=3.9 for CLI tools, and a user-provided target database/driver. Web development also requires Node >=22.12.0 and npm, Platform PostgreSQL, a persistent master key and the built Worker. Follow [local startup](docs/development.md#local-startup).
+Source Web development requires JDK 21, Maven Wrapper 3.9.15, Node >=22.12.0/npm and a dedicated platform PG; follow [local source startup](docs/development.md#local-source-startup) for config/Key/Worker preparation. Python >=3.9 and an authorized target database/driver are additionally needed for CLI target tests, not for opening the development website.
 
 ## CLI quick start
 
@@ -116,10 +114,10 @@ The source-only ZIP excludes third-party driver JARs and includes a SHA-256 file
 Build the native Web/Server distribution separately:
 
 ```sh
-python3 scripts/build_distribution.py
+./jdbc-test build
 ```
 
-Produces `dist/jdbc-test-server-<version>/`, `.tar.gz`, `.zip` and checksums containing Server, Worker, frontend and launchers. Building requires JDK 21, Python and Node/npm; running requires only Java 21 and existing PG. Follow [native deployment](docs/deployment.md#native) to configure and start.
+Produces `dist/jdbc-test-server-<version>/`, `.tar.gz`, `.zip` and checksums containing Server, Worker, frontend and launchers. Building requires JDK 21, Python and Node/npm; running requires only Java 21 and existing PG. Follow [non-Docker bundle startup](docs/deployment.md#native) to configure and start.
 
 ## License
 
