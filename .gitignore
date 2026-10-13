@@ -85,6 +85,9 @@ node_modules/
 # Local QA evidence, snapshots, backups, builds and development history
 /.local/
 
+# Personal repository instructions
+/AGENTS.md
+
 # Native platform credentials and interrupted initialization files
 **/config/application.properties
 **/config/master-key
