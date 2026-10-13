@@ -21,10 +21,22 @@ class LaunchProcessesTest {
       Process parent;
       try (var processes = new LaunchProcesses()) {
         parent = processes.start(command("parent", directory), directory, LaunchProcesses.basicEnvironment());
+        Path childPid = directory.resolve("child.pid");
         assertTimeoutPreemptively(Duration.ofSeconds(10), () -> {
-          while (!Files.exists(directory.resolve("child.pid"))) Thread.sleep(20);
+          while (true) {
+            try {
+              String value = Files.readString(childPid).trim();
+              if (!value.isEmpty()) {
+                Long.parseLong(value);
+                break;
+              }
+            } catch (NoSuchFileException | NumberFormatException ignored) {
+              // The probe creates the file before its contents are visible.
+            }
+            Thread.sleep(20);
+          }
         });
-        child = Long.parseLong(Files.readString(directory.resolve("child.pid")));
+        child = Long.parseLong(Files.readString(childPid).trim());
         Thread.sleep(100); // tracker has observed the complete launched tree
       }
       assertFalse(parent.isAlive());
