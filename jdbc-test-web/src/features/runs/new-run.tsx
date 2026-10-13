@@ -142,13 +142,13 @@ export default function NewRun() {
                 "flex items-center gap-3 rounded-xl border p-3 text-left text-sm",
                 index === step
                   ? "border-primary bg-accent text-primary"
-                  : "border-border bg-white text-muted-foreground",
+                  : "border-border bg-card text-muted-foreground",
               )}
             >
               <span
                 className={cn(
                   "flex size-7 items-center justify-center rounded-full text-xs font-semibold",
-                  index === step ? "bg-primary text-white" : "bg-secondary",
+                  index === step ? "bg-primary text-primary-foreground" : "bg-secondary",
                 )}
               >
                 {index < step ? <Check className="size-4" /> : index + 1}

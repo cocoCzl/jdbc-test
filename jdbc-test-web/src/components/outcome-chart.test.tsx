@@ -11,8 +11,30 @@ const init = vi.hoisted(() => vi.fn(() => chart));
 vi.mock("echarts/core", () => ({ use: vi.fn(), init }));
 vi.unmock("@/components/outcome-chart");
 import OutcomeChart from "./outcome-chart";
+import { themeStore } from "@/hooks/use-theme";
 
 describe("ECharts lifecycle", () => {
+  it("recolors the existing chart and tooltip without losing values or its canvas lifecycle", () => {
+    act(() => themeStore.setPreference("light"));
+    const view = render(<OutcomeChart passed={3} failed={2} skipped={1} aborted={4} />);
+    const creations = init.mock.calls.length;
+    const disposals = chart.dispose.mock.calls.length;
+    document.documentElement.style.setProperty("--success", "#6ee7b7");
+    document.documentElement.style.setProperty("--floating-surface", "#2a2723");
+    document.documentElement.style.setProperty("--floating-border", "#4a443d");
+    document.documentElement.style.setProperty("--foreground", "#f6f4f1");
+    act(() => themeStore.setPreference("dark"));
+    expect(init).toHaveBeenCalledTimes(creations);
+    expect(chart.dispose).toHaveBeenCalledTimes(disposals);
+    const option = chart.setOption.mock.calls.at(-1)![0];
+    expect(option.color[0]).toBe("#6ee7b7");
+    expect(option.tooltip).toMatchObject({backgroundColor:"#2a2723", borderColor:"#4a443d", textStyle:{color:"#f6f4f1"}});
+    expect(option.series[0].data.map((item: {value: number}) => item.value)).toEqual([3,2,1,4]);
+    view.unmount();
+    expect(chart.dispose).toHaveBeenCalledTimes(disposals + 1);
+    for (const token of ["--success", "--floating-surface", "--floating-border", "--foreground"]) document.documentElement.style.removeProperty(token);
+    act(() => themeStore.setPreference("system"));
+  });
   it("renders genuine PASSED/FAILED/SKIPPED/ABORTED outcomes with accessible text", () => {
     render(<OutcomeChart passed={3} failed={2} skipped={1} aborted={4} />);
     expect(screen.getByRole("img")).toHaveAccessibleName(

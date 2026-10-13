@@ -7,6 +7,16 @@
   --background: #ffffff;
   --foreground: #2d2a26;
   --card: #fff;
+  --floating-surface: var(--card);
+  --floating-border: var(--line);
+  --primary-hover: #7f7a74;
+  --primary-contrast: #ffffff;
+  --danger-fill: var(--danger);
+  --border-hover: #cecbc6;
+  --success-text: #087f5b;
+  --selection: color-mix(in srgb, var(--primary) 18%, white);
+  --badge-base: #ffffff;
+  --focus-ring: var(--primary);
   --primary: #8b8680;
   --success: #10b981;
   --danger: #c65746;
@@ -38,6 +48,41 @@
   --keeper-menu-selected-bg: var(--surface-selected);
 }
 
+// Dark palette adapted from themes.scss at the pinned CPA commit (MIT).
+// Semantic text is brightened locally for JDBC result badges, errors and disabled controls.
+:root[data-theme='dark'] {
+  --background: #151412;
+  --foreground: #f6f4f1;
+  --card: #1d1b18;
+  --surface-muted: #262320;
+  --surface-selected: #2e2a26;
+  --floating-surface: #2a2723;
+  --floating-border: #4a443d;
+  --floating-shadow: 0 14px 30px rgb(0 0 0 / 40%);
+  --line: #3a3530;
+  --border-hover: #5a544d;
+  --ink-muted: #c9c3bb;
+  --text-secondary: #c9c3bb;
+  --text-tertiary: #9c958d;
+  --primary: #a6a099;
+  --primary-hover: #b8b2ab;
+  --primary-contrast: #151412;
+  --success: #6ee7b7;
+  --success-text: #6ee7b7;
+  --danger: #f1b0a6;
+  --danger-fill: #a84436;
+  --warning: #ffd862;
+  --neutral: #b7b0a8;
+  --highlight: #c4a5ef;
+  --cyan: #73cddd;
+  --surface-shadow: 0 10px 15px -3px rgb(0 0 0 / 30%);
+  --selection: #4a443d;
+  --badge-base: var(--card);
+  --focus-ring: #c9c3bb;
+}
+html { color-scheme: light; }
+html[data-theme='dark'] { color-scheme: dark; }
+
 @layer components {
 
 .jdbc-button {
@@ -46,8 +91,8 @@
   border: 1px solid transparent; border-radius: var(--control-radius);
   color: var(--foreground); font-size: 12px; font-weight: 600; line-height: 1;
   white-space: nowrap; transition: background-color .15s ease, border-color .15s ease;
-  &[data-variant='default'] { background: var(--primary); color: white; }
-  &[data-variant='destructive'] { background: var(--danger); color: white; }
+  &[data-variant='default'] { background: var(--primary); color: var(--primary-contrast); }
+  &[data-variant='destructive'] { background: var(--danger-fill); color: white; }
   &[data-variant='outline'] { background: var(--card); border-color: var(--line); box-shadow: 0 1px 2px rgb(0 0 0 / 4%); }
   &[data-variant='secondary'] { background: var(--surface-selected); }
   &[data-variant='ghost'] { color: var(--ink-muted); }
@@ -70,7 +115,7 @@
   border-radius: var(--control-radius); font-size: 12px;
   box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
   transition: border-color .15s, box-shadow .15s;
-  &:hover:not(:disabled) { border-color: #cecbc6; }
+  &:hover:not(:disabled) { border-color: var(--border-hover); }
   &:disabled { opacity: .6; cursor: not-allowed; background: var(--surface-muted); }
   &[aria-invalid='true'] { border-color: var(--danger); }
 }
@@ -78,7 +123,7 @@
 .jdbc-select { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; }
 .jdbc-select > span:first-child { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .jdbc-select[data-state='open'] { border-color: var(--primary); }
-.jdbc-menu { @include menu.surface; z-index: 2010; }
+.jdbc-menu { @include menu.surface; z-index: 2010; background: var(--floating-surface); border-color: var(--floating-border); }
 .jdbc-menu-item {
   @include menu.item;
   justify-content: space-between; outline: none; gap: 20px;
@@ -119,7 +164,7 @@
 .jdbc-nav-link:hover { background:color-mix(in srgb,var(--surface-muted) 60%,transparent); }
 .jdbc-nav-link[aria-current='page'] { font-weight:650; }
 .jdbc-nav-link[aria-current='page']::before { content:'';position:absolute;inset:6px 0;z-index:-1;border:1px solid color-mix(in srgb,var(--foreground) 8%,transparent);border-radius:20px;background:var(--card);box-shadow:0 1px 2px rgb(0 0 0 / 8%),0 3px 8px rgb(0 0 0 / 6%); }
-.jdbc-language.jdbc-button {width:44px;height:44px;padding:0;border:0;border-radius:50%;background:transparent;box-shadow:none;font-size:13px;font-weight:600;}
+.jdbc-language.jdbc-button, .jdbc-theme-toggle.jdbc-button {width:44px;height:44px;padding:0;border:0;border-radius:50%;background:transparent;box-shadow:none;font-size:13px;font-weight:600;}
 .jdbc-nav-desktop { position:relative; z-index:1; display: flex; align-items: center; gap: 4px; }
 .jdbc-nav-mobile {position:relative;z-index:1;display:none;}
 .jdbc-page-header { margin-bottom: 18px; padding: 0 2px; }
@@ -177,7 +222,7 @@ details[open] > summary .disclosure-closed {display:none;}
 .jdbc-dialog-body {padding:24px;max-height:65vh;overflow:auto;overscroll-behavior:contain;}
 .jdbc-confirm {padding:24px;}
 .jdbc-button[data-variant='default'] {border-color:var(--primary);}
-.jdbc-button[data-variant='default']:hover:not(:disabled) {background:#7f7a74;border-color:#7f7a74;filter:none;}
+.jdbc-button[data-variant='default']:hover:not(:disabled) {background:var(--primary-hover);border-color:var(--primary-hover);filter:none;}
 .jdbc-input:focus {border-color:var(--primary);box-shadow:0 0 0 3px rgba(139,134,128,.18);}
 .jdbc-table tbody tr:hover {background:var(--surface-muted);}
 
@@ -187,3 +232,18 @@ details[open] > summary .disclosure-closed {display:none;}
 .jdbc-table {line-height:normal;}
 .jdbc-dialog {box-shadow:0 10px 15px -3px rgba(0,0,0,.1);}
 .jdbc-dialog > button:last-child {top:12px;right:12px;border:1px solid var(--line);border-radius:50%;background:var(--card);}
+
+:root[data-theme='dark'] :is(.jdbc-dialog, .jdbc-tooltip) {
+  background: var(--floating-surface);
+  border-color: var(--floating-border);
+  box-shadow: var(--floating-shadow);
+}
+:root[data-theme='dark'] [data-sonner-toaster] {
+  --normal-bg: var(--floating-surface);
+  --normal-text: var(--foreground);
+  --normal-border: var(--floating-border);
+  --success-bg: #193529; --success-text: var(--success); --success-border: #33634f;
+  --error-bg: #412723; --error-text: var(--danger); --error-border: #805047;
+  --warning-bg: #3a321c; --warning-text: var(--warning); --warning-border: #6f5c2c;
+  --info-bg: #253439; --info-text: var(--cyan); --info-border: #43616b;
+}

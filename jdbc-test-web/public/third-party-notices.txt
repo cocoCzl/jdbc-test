@@ -9,9 +9,9 @@ statLabel/statValue; web/src/components/usage/StatCards.tsx accent triples.
 Adapted design/style model: web/src/styles/{components,themes,variables,layout}.scss;
 web/src/components/ui/{Button,Input,Card,Select,Modal,EmptyState}.tsx and
 Select.module.scss; App.css; styles/reset.scss; DashboardHeader.module.scss; DashboardToolbar.module.scss.
-Local changes: jdbc-test namespace/tokens, data-theme=white theme with independent per-card accents, Radix
+Local changes: jdbc-test namespace/tokens, pure-white light and pinned dark theme palettes with independent per-card accents, Radix
 interaction engine, semantic HTML tables, router navigation, existing form APIs,
-responsive document scrolling; no CPA business state, brand assets or API logic.
+responsive document scrolling, local system/light/dark preference and accessible JDBC semantic colors; no CPA business state, brand assets or API logic.
 
 MIT License
 

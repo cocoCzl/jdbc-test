@@ -37,8 +37,8 @@ test("TEST FIXTURE ONLY: long text, pagination, masked Oracle URL and execution 
     await page.setViewportSize({width, height: 900});
     await page.goto("/");
     await expect(page.getByRole("table").getByRole("link")).toHaveCount(1);
-    await expect(page.getByText("Not run 16", {exact: true})).toBeVisible();
-    await expect(page.getByText("Incomplete 1", {exact: true})).toBeVisible();
+    await expect(page.locator(".run-result-metric").filter({has:page.getByText("Not run", {exact:true})}).locator(".run-result-value")).toHaveText("16");
+    await expect(page.locator(".run-result-metric").filter({has:page.getByText("Incomplete", {exact:true})}).locator(".run-result-value")).toHaveText("1");
     await noOverflow();
     await page.goto("/runs");
     await page.getByRole("button", {name: "Next page"}).click();

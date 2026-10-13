@@ -1,5 +1,6 @@
 import { GlassSurface } from "./GlassSurface";
 import { LanguageSelector } from "./language-selector";
+import { ThemeToggle } from "./theme-toggle";
 import { useTranslation } from "react-i18next";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { Cable, Database, LayoutDashboard, Play, Terminal, ChevronDown } from "lucide-react";
@@ -19,7 +20,7 @@ export function AppShell() {
   return <div className="jdbc-app min-h-screen"><div className="jdbc-frame">
     <header className="jdbc-header">
       <Link to="/" className="jdbc-brand"><span className="jdbc-brand-icon"><Database className="size-5" /></span>jdbc-test</Link>
-      <div className="flex items-center gap-5"><LanguageSelector /></div>
+      <div className="flex items-center gap-5"><LanguageSelector /><ThemeToggle /></div>
     </header>
     <div className="jdbc-shell-body">
       <nav aria-label={t("ui.mainNavigation")} className="jdbc-navigation">

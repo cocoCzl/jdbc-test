@@ -5,12 +5,14 @@ import { PieChart } from "echarts/charts";
 import { AriaComponent, TooltipComponent } from "echarts/components";
 import { CanvasRenderer } from "echarts/renderers";
 import { formatNumber } from "@/lib/format";
+import { useTheme } from "@/hooks/use-theme";
 echarts.use([PieChart, AriaComponent, TooltipComponent, CanvasRenderer]);
 
 export default function OutcomeChart({ passed, failed, skipped, aborted }: {
   passed: number | null; failed: number | null; skipped: number | null; aborted: number | null;
 }) {
   const { t, i18n } = useTranslation();
+  const { resolved } = useTheme();
   const locale = i18n.resolvedLanguage;
   const container = useRef<HTMLDivElement>(null);
   const instance = useRef<ReturnType<typeof echarts.init> | null>(null);
@@ -33,7 +35,11 @@ export default function OutcomeChart({ passed, failed, skipped, aborted }: {
       color: colors,
       // Text changes must not replay the outcome distribution's animation.
       animationDurationUpdate: 0,
-      tooltip: { trigger: "item", renderMode: "richText", formatter: (item: {name: string; value: number}) => `${item.name}: ${formatNumber(item.value)}` },
+      tooltip: { trigger: "item", renderMode: "richText",
+        backgroundColor: style.getPropertyValue("--floating-surface").trim(),
+        borderColor: style.getPropertyValue("--floating-border").trim(),
+        textStyle: { color: style.getPropertyValue("--foreground").trim() },
+        formatter: (item: {name: string; value: number}) => `${item.name}: ${formatNumber(item.value)}` },
       series: [{ type: "pie", radius: ["70%", "88%"], center: ["50%", "50%"], padAngle: 3,
         itemStyle: { borderRadius: 6 }, label: { show: false },
         data: [
@@ -42,7 +48,7 @@ export default function OutcomeChart({ passed, failed, skipped, aborted }: {
         ].map((item, index) => ({...item, itemStyle: {color: colors[index]}})).filter(item => item.value != null && item.value > 0),
       }],
     });
-  }, [passed, failed, skipped, aborted, locale, t, description]);
+  }, [passed, failed, skipped, aborted, locale, t, description, resolved]);
   const entries = [
     {id: "passed", label: t("ui.passed"), value: passed, color: "text-success"},
     {id: "failed", label: t("ui.failed"), value: failed, color: "text-destructive"},

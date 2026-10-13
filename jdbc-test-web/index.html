@@ -3,7 +3,27 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#F6F8FC" />
+    <meta name="theme-color" content="#ffffff" />
+    <script>
+      // Apply before styles/modules/first paint. Keep preference distinct from CPA's rendered variant.
+      (() => {
+        let preference = "system";
+        try {
+          const saved = localStorage.getItem("jdbc-test.theme");
+          if (saved === "system" || saved === "light" || saved === "dark") preference = saved;
+        } catch { /* Storage is optional. */ }
+        const dark = preference === "dark" || (preference === "system" &&
+          typeof matchMedia === "function" && matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.dataset.theme = dark ? "dark" : "white";
+        document.documentElement.dataset.themePreference = preference;
+        document.documentElement.style.colorScheme = dark ? "dark" : "light";
+        document.querySelector('meta[name="theme-color"]').content = dark ? "#151412" : "#ffffff";
+      })();
+    </script>
+    <style>
+      html { background: #ffffff; }
+      html[data-theme="dark"] { background: #151412; }
+    </style>
     <link rel="icon" type="image/svg+xml" href="/src/assets/favicon.svg" />
     <meta
       name="description"

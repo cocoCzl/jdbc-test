@@ -24,3 +24,32 @@ test("TEST FIXTURE ONLY: nested menu scrolling, disabled, focus, tooltip, toast,
   }
   expect(api).toEqual([]);
 });
+
+test("TEST FIXTURE ONLY: dark shared states and live theme changes inside open portals", async ({page}) => {
+  await page.emulateMedia({colorScheme:"dark",reducedMotion:"reduce"});
+  await page.route(url=>url.pathname.startsWith("/api/"),route=>route.abort());
+  await page.goto("/e2e/fixtures/primitives.html");
+  await page.getByRole("button",{name:"Help fixture"}).focus();
+  await expect(page.getByRole("tooltip")).toHaveCSS("background-color","rgb(42, 39, 35)");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button",{name:"Show toast"}).click();
+  await expect(page.locator("[data-sonner-toast]")).toHaveCSS("background-color","rgb(65, 39, 35)");
+  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.getByText("Fixture empty",{exact:true})).toBeVisible();
+  await expect(page.getByText("Fixture loading",{exact:true})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Disabled fixture"})).toBeDisabled();
+  await page.screenshot({path:"test-results/theme/fixture-shared-states-dark.png",fullPage:true});
+  await page.getByRole("button",{name:"Open modal"}).click();
+  await page.getByRole("combobox").click();
+  await expect(page.getByRole("option",{name:"Disabled option"})).toHaveAttribute("aria-disabled","true");
+  await expect(page.getByRole("listbox")).toHaveCSS("background-color","rgb(42, 39, 35)");
+  const selected = page.getByRole("option",{selected:true});
+  await expect(selected).toHaveCSS("background-color","rgb(46, 42, 38)");
+  await page.emulateMedia({colorScheme:"light"});
+  await expect(page.getByRole("listbox")).toHaveCSS("background-color","rgb(255, 255, 255)");
+  // Radix temporarily aria-hides the underlying dialog while its modal listbox is open.
+  await expect(page.getByRole("dialog",{includeHidden:true})).toBeVisible();
+  await page.emulateMedia({colorScheme:"dark"});
+  await expect(page.getByRole("listbox")).toHaveCSS("background-color","rgb(42, 39, 35)");
+  await page.screenshot({path:"test-results/theme/fixture-nested-menu-dark.png",fullPage:true});
+});

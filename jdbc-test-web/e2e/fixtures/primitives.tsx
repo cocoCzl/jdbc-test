@@ -3,7 +3,9 @@ import "../../src/i18n";
 import "../../src/index.css";
 import "../../src/styles/foundation.scss";
 import { useState } from "react";
-import { Toaster, toast } from "sonner";
+import { toast } from "sonner";
+import { ThemeToaster } from "../../src/components/theme-toaster";
+import { ThemeToggle } from "../../src/components/layout/theme-toggle";
 import { Dialog } from "../../src/components/ui/dialog";
 import { Select } from "../../src/components/ui/select";
 import { Button } from "../../src/components/ui/button";
@@ -16,6 +18,7 @@ export default function Fixture() {
   const [submits, setSubmits] = useState(0);
   return <main className="mx-auto max-w-4xl space-y-5 p-4">
     <h1>TEST FIXTURE ONLY — shared primitives; no database</h1>
+    <ThemeToggle />
     <Card title="Global interaction states">
       <div className="flex flex-wrap gap-3">
         <Button type="button" onClick={() => setOpen(true)}>Open modal</Button>
@@ -39,6 +42,6 @@ export default function Fixture() {
         <Button type="submit" variant="outline" className="mt-4">Fixture submit</Button>
       </form>
     </Dialog>
-    <Toaster richColors />
+    <ThemeToaster />
   </main>;
 }

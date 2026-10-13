@@ -73,6 +73,7 @@ test("TEST FIXTURE ONLY: bilingual Dashboard, menu, semantic Run Detail, skipped
   await expect(page.locator('[data-stat="未执行"]')).toContainText("4");
   await expect(page.locator('[data-stat="已开始但未完成"]')).toContainText("2");
   await expect(page.getByRole("progressbar")).toHaveAttribute("value", "6");
+  await page.getByText("统计说明", {exact:true}).click();
   await expect(page.getByText(/包含明确跳过/)).toBeVisible();
   await page.screenshot({path: "test-results/fixture-run-detail-zh-CN.png", fullPage: true});
   await switchTo(page, "en");

@@ -74,7 +74,7 @@
   }
   .run-result-label { color: var(--ink-muted); }
   .run-result-value { color: var(--ink-muted); font-size: 12px; font-weight: 550; text-align: right; }
-  .run-result-success .run-result-value { color: #087f5b; font-weight: 650; }
+  .run-result-success .run-result-value { color: var(--success-text); font-weight: 650; }
   .run-result-danger .run-result-value { color: var(--danger); font-weight: 650; }
   .run-result-warning .run-result-value { color: var(--warning); font-weight: 650; }
   .run-result-extra { grid-column: 1 / -1; }

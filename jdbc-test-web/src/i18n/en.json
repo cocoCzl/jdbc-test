@@ -1,4 +1,8 @@
 {
+  "theme.system": "System",
+  "theme.light": "Light",
+  "theme.dark": "Dark",
+  "theme.toggle": "Theme: {{current}}. Switch to {{next}}.",
   "ui.noScenarioExecutionWasVerifiedSkippedCases": "No scenario execution was verified; skipped cases do not establish compatibility.",
   "ui.aPackageCanContainAtMost20": "A package can contain at most 20 artifacts.",
   "ui.aSelectedModuleIsUnavailableRefreshThe": "A selected module is unavailable. Refresh the test catalog.",
