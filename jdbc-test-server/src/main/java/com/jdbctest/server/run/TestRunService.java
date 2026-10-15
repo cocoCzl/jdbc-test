@@ -68,6 +68,10 @@ final class TestRunService {
       DatabaseConnectionProfileEntity connection = connections.findById(request.connectionId())
           .orElseThrow(() -> problem(HttpStatus.NOT_FOUND, "CONNECTION_NOT_FOUND",
               "Connection was not found"));
+      if (JdbcUrlSanitizer.containsCredentials(connection.getJdbcUrl())) {
+        throw problem(HttpStatus.UNPROCESSABLE_CONTENT, "CONNECTION_URL_CONTAINS_CREDENTIALS",
+            "JDBC URL must not contain credentials");
+      }
       if (!AdapterCatalog.contains(connection.getAdapterId())) {
         throw problem(HttpStatus.UNPROCESSABLE_CONTENT, "ADAPTER_NOT_FOUND",
             "Connection adapter was not found");
@@ -297,13 +301,13 @@ final class TestRunService {
     return new TestRunResponse(run.getId(), run.getStatus(), run.getProfile(),
         new TestRunResponse.ConnectionSnapshot(run.getConnectionNameSnapshot(),
             run.getDatabaseTypeSnapshot(), run.getAdapterIdSnapshot(),
-            run.getJdbcUrlSanitizedSnapshot()),
+            JdbcUrlSanitizer.sanitize(run.getJdbcUrlSanitizedSnapshot())),
         new TestRunResponse.DriverSnapshot(run.getDriver().getId(), run.getDriverNameSnapshot(),
             run.getDriverVendorSnapshot(), run.getDriverVersionSnapshot(),
             run.getDriverClassSnapshot(), run.getDriverFingerprintSnapshot()), moduleIds,
         run.getTotalCases(), run.getCompletedCases(), run.getPassed(), run.getFailed(),
         run.getSkipped(), run.getCurrentModule(), run.getCurrentTestCase(), run.getCreatedAt(),
-        run.getStartedAt(), run.getFinishedAt(), duration, run.getFailureReason(),
+        run.getStartedAt(), run.getFinishedAt(), duration, JdbcUrlSanitizer.sanitize(run.getFailureReason()),
         ExecutionAccounting.of(run, selected.findByRun_IdOrderByScenarioId(run.getId())),
         scopeSnapshot(run), issueSnapshot(run));
   }
@@ -392,8 +396,8 @@ final class TestRunService {
 
   private TestCaseResultResponse result(TestCaseResultEntity value) {
     return new TestCaseResultResponse(value.getId(), value.getScenarioId(), value.getModuleId(),
-        value.getDisplayName(), value.getStatus(), value.getDurationMs(), value.getMessage(),
-        value.getStackTrace(), value.getStartedAt(), value.getFinishedAt(),
+        value.getDisplayName(), value.getStatus(), value.getDurationMs(), JdbcUrlSanitizer.sanitize(value.getMessage()),
+        JdbcUrlSanitizer.sanitize(value.getStackTrace()), value.getStartedAt(), value.getFinishedAt(),
         value.getExecutionEvidence() == null ? null
             : new tools.jackson.databind.ObjectMapper().readValue(value.getExecutionEvidence(),
                 java.util.Map.class));

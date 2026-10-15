@@ -203,6 +203,9 @@ final class TestRunExecutor {
         throw new IllegalArgumentException("EXECUTION_SCOPE_REQUIRED");
       }
       JsonNode frozen = mapper.readTree(run.getExecutionInput());
+      if (JdbcUrlSanitizer.containsCredentials(frozen.path("jdbcUrl").asString())) {
+        throw new IllegalArgumentException("CONNECTION_URL_CONTAINS_CREDENTIALS");
+      }
       List<String> paths = artifacts.findByDriver_Id(run.getDriver().getId()).stream()
           .map(item -> storage.resolve(item.getStorageKey()).toAbsolutePath().toString()).toList();
       List<TestRunSelectedScenarioEntity> scenarios = selected.findByRun_IdOrderByScenarioId(runId);

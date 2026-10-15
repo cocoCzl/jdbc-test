@@ -109,11 +109,13 @@ public final class WorkerMain {
     Path configFile = workspace.resolve("temp").resolve("config.json");
     DriverLoader.LoadedDriver loaded = null;
     boolean timedOut = false;
+    PrintStream originalError = System.err;
     PrintStream originalOutput = System.out;
     PrintStream driverOutput = new PrintStream(new BoundedDiagnosticOutputStream(), true,
         StandardCharsets.UTF_8);
     try {
       System.setOut(driverOutput);
+      System.setErr(driverOutput);
       loaded = DriverLoader.load(request.driver());
       JdbcContext.setIsolatedDriver(loaded.driver());
       writeConfig(configFile, request);
@@ -138,6 +140,7 @@ public final class WorkerMain {
       return fail(request.runId(), code, "RUN_FAILURE", exception);
     } finally {
       System.setOut(originalOutput);
+      System.setErr(originalError);
       driverOutput.close();
       // An interrupted JDBC call can still be running. Do not race cleanup against that thread.
       // Main exits the process; the persisted ownership journal is the residual evidence.
@@ -177,11 +180,13 @@ public final class WorkerMain {
           Map.of("errorType", "INVALID_REQUEST", "message", "driverClass is required"));
       return INVALID_REQUEST;
     }
+    PrintStream originalError = System.err;
     PrintStream originalOutput = System.out;
     PrintStream driverOutput = new PrintStream(new BoundedDiagnosticOutputStream(), true,
         StandardCharsets.UTF_8);
     try {
       System.setOut(driverOutput);
+      System.setErr(driverOutput);
       try (DriverLoader.LoadedDriver loaded = DriverLoader.load(
           new WorkerRunRequest.DriverRequest(request.driverClass(), request.artifacts()))) {
         Driver driver = loaded.driver();
@@ -196,6 +201,7 @@ public final class WorkerMain {
       return DRIVER_FAILURE;
     } finally {
       System.setOut(originalOutput);
+      System.setErr(originalError);
       driverOutput.close();
     }
   }
@@ -215,11 +221,13 @@ public final class WorkerMain {
           Map.of("errorType", "INVALID_REQUEST", "message", "Driver and JDBC URL are required"));
       return INVALID_REQUEST;
     }
+    PrintStream originalError = System.err;
     PrintStream originalOutput = System.out;
     PrintStream driverOutput = new PrintStream(new BoundedDiagnosticOutputStream(), true,
         StandardCharsets.UTF_8);
     try {
       System.setOut(driverOutput);
+      System.setErr(driverOutput);
       try (DriverLoader.LoadedDriver loaded = DriverLoader.load(request.driver())) {
         Driver driver = loaded.driver();
         java.util.Properties credentials = new java.util.Properties();
@@ -247,6 +255,7 @@ public final class WorkerMain {
       return DRIVER_FAILURE;
     } finally {
       System.setOut(originalOutput);
+      System.setErr(originalError);
       driverOutput.close();
     }
   }
@@ -505,6 +514,10 @@ public final class WorkerMain {
         ? com.jdbctest.catalog.DataSourceProviders.empty() : request.driver().dataSources();
     if (!providers.capabilities(request.capabilities()).equals(request.capabilities())) {
       throw new IllegalArgumentException("DataSource capabilities must match configured providers");
+    }
+    if (com.jdbctest.security.CredentialRedactor.containsCredentials(
+        request.connection().jdbcUrl())) {
+      throw new IllegalArgumentException("CONNECTION_URL_CONTAINS_CREDENTIALS");
     }
     if (blank(request.connection().jdbcUrl())) {
       throw new IllegalArgumentException("connection.jdbcUrl is required");

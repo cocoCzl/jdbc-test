@@ -57,7 +57,7 @@ final class WorkerReportWriter {
         evidence.started().size(), "passed", passed, "failed", failed, "skipped", skipped,
         "aborted", results.stream().filter(row -> "ABORTED".equals(row.get("status"))).count()));
     Path output = reportDir.resolve("report.json");
-    new ObjectMapper().writerWithDefaultPrettyPrinter().writeValue(output.toFile(), report);
+    new ObjectMapper().writerWithDefaultPrettyPrinter().writeValue(output.toFile(), com.jdbctest.security.CredentialRedactor.sanitizeValue(report));
     return output;
   }
 }

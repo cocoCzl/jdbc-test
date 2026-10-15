@@ -184,6 +184,10 @@ final class ConnectionService {
 
   private ConnectionProbeResponse probe(DriverSnapshot driver, String jdbcUrl, String username,
       String password) {
+    if (JdbcUrlSanitizer.containsCredentials(jdbcUrl)) {
+      throw new ConnectionException(HttpStatus.UNPROCESSABLE_CONTENT,
+          "CONNECTION_URL_CONTAINS_CREDENTIALS", "JDBC URL must not contain credentials");
+    }
     try {
       WorkerProcessRunner.Result result = worker.run("--probe-connection", Map.of(
           "driver", Map.of("driverClass", driver.driverClass(), "artifacts",
@@ -278,7 +282,7 @@ final class ConnectionService {
     DriverSummaryResponse summary = new DriverSummaryResponse(driver.getId(), driver.getName(),
         driver.getVendor(), driver.getVersion(), driver.getStatus());
     return new ConnectionResponse(entity.getId(), entity.getName(), entity.getDatabaseType(),
-        entity.getAdapterId(), entity.getJdbcUrl(), entity.getUsername(),
+        entity.getAdapterId(), JdbcUrlSanitizer.sanitize(entity.getJdbcUrl()), entity.getUsername(),
         entity.getEncryptedPassword() != null, summary, entity.getDescription(),
         entity.getLastConnectionTestAt(), entity.getLastConnectionTestStatus(),
         entity.getCreatedAt(), entity.getUpdatedAt(), entity.getExecutionDatabase(),
@@ -312,7 +316,7 @@ final class ConnectionService {
 
   private JsonNode read(String line) {
     try {
-      return mapper.readTree(line);
+      return mapper.readTree(JdbcUrlSanitizer.sanitizeJson(line));
     } catch (RuntimeException ignored) {
       return null;
     }
