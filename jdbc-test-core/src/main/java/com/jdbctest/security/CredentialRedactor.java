@@ -80,9 +80,6 @@ public final class CredentialRedactor {
   }
 
   private static int endOfSecret(String text, int start) {
-    if (text.startsWith(MASK, start)) {
-      return start + MASK.length();
-    }
     if (start >= text.length()) {
       return start;
     }

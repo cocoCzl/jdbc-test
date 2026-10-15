@@ -12,24 +12,31 @@ final class CredentialSanitizer {
   }
 
   static String sanitize(String value) {
-    String safe = value == null ? "" : com.jdbctest.security.CredentialRedactor.sanitize(value);
+    String raw = value == null ? "" : value;
     String password = knownPassword;
-    return password == null || password.isEmpty() ? safe : safe.replace(password, "[REDACTED]");
+    if (password != null && !password.isEmpty()) {
+      // Match the complete raw secret first, but do not replace substrings of an existing mask.
+      raw = java.util.regex.Pattern.compile(java.util.regex.Pattern.quote(password)
+          + "|" + java.util.regex.Pattern.quote("[REDACTED]"))
+          .matcher(raw).replaceAll(java.util.regex.Matcher.quoteReplacement("[REDACTED]"));
+    }
+    return com.jdbctest.security.CredentialRedactor.sanitize(raw);
   }
 
   static Object project(Object value) {
-    Object safe = com.jdbctest.security.CredentialRedactor.sanitizeValue(value);
-    if (safe instanceof java.util.Map<?, ?> fields) {
+    if (value instanceof java.util.Map<?, ?> fields) {
       var result = new java.util.LinkedHashMap<String, Object>();
       fields.forEach((key, item) -> result.put(String.valueOf(key),
-          item instanceof String text && java.util.Set.of("message", "stackTrace",
+          com.jdbctest.security.CredentialRedactor.sensitiveKey(String.valueOf(key)) && item != null
+              ? "[REDACTED]"
+              : item instanceof String text && java.util.Set.of("message", "stackTrace",
               "databaseProductName", "databaseProductVersion", "driverName", "driverVersion")
               .contains(String.valueOf(key)) ? sanitize(text) : project(item)));
       return result;
     }
-    if (safe instanceof java.util.List<?> values) {
+    if (value instanceof java.util.List<?> values) {
       return values.stream().map(CredentialSanitizer::project).toList();
     }
-    return safe;
+    return com.jdbctest.security.CredentialRedactor.sanitizeValue(value);
   }
 }
