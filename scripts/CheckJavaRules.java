@@ -25,7 +25,9 @@ import javax.tools.DiagnosticCollector;
 import javax.tools.JavaFileObject;
 import javax.tools.ToolProvider;
 
-/** Syntax-only development check. No attribution, application classes or annotation processors. */
+/**
+ * Syntax-only development check. No attribution, application classes or annotation processors.
+ */
 public final class CheckJavaRules {
 
   private CheckJavaRules() {
