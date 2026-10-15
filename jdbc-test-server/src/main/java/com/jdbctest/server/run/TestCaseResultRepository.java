@@ -16,5 +16,8 @@ public interface TestCaseResultRepository extends JpaRepository<TestCaseResultEn
   Page<TestCaseResultEntity> findByRun_IdAndModuleId(UUID runId, String moduleId,
       Pageable pageable);
 
+  Page<TestCaseResultEntity> findByRun_IdAndStatusAndModuleId(UUID runId,
+      TestCaseResultStatus status, String moduleId, Pageable pageable);
+
   List<TestCaseResultEntity> findByRun_Id(UUID runId);
 }

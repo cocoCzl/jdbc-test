@@ -372,8 +372,7 @@ describe("Run detail / results / report", () => {
         api.mock.calls.some(([url]) => String(url).includes("status=ABORTED")),
       ).toBe(true),
     );
-    expect(screen.getByLabelText("Filter result module")).toBeDisabled();
-    await chooseOption(user, screen.getByLabelText("Filter result status"), "");
+    expect(screen.getByLabelText("Filter result module")).toBeEnabled();
     await chooseOption(user,
       screen.getByLabelText("Filter result module"),
       "statement",
@@ -381,7 +380,7 @@ describe("Run detail / results / report", () => {
     await waitFor(() =>
       expect(
         api.mock.calls.some(([url]) =>
-          String(url).includes("moduleId=statement"),
+          String(url).includes("moduleId=statement") && String(url).includes("status=ABORTED"),
         ),
       ).toBe(true),
     );

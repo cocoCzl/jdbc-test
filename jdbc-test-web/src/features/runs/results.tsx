@@ -138,7 +138,6 @@ export default function Results({
             onValueChange={(value) => {
               setStatus(value as ResultStatus | "");
               setPage(0);
-              setModule("");
             }}
           >
             <option value="">{t("ui.allResults")}</option>
@@ -154,7 +153,6 @@ export default function Results({
             aria-label={t("ui.filterResultModule")}
             className=" mt-1 w-48"
             value={moduleId}
-            disabled={!!status}
             onValueChange={(value) => {
               setModule(value);
               setPage(0);
@@ -182,10 +180,6 @@ export default function Results({
           </Select>
         </label>
       </div>
-      {status ? (
-        <p className="mb-4 text-xs text-muted-foreground">
-          {t("ui.clearTheStatusFilterToFilterResults")}</p>
-      ) : null}
       {query.isError && query.data ? <ErrorState error={query.error} retry={() => void query.refetch()} /> : null}
       {query.isPending ? (
         <Loading />

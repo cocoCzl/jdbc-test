@@ -166,12 +166,16 @@ final class TestRunService {
 
   PageResponse<TestCaseResultResponse> results(UUID runId, int page, int size, String sort,
       TestCaseResultStatus status, String moduleId) {
-    var pageable = page(page, size, sort, RESULT_SORTS, "scenarioId,asc");
+    var primary = page(page, size, sort, RESULT_SORTS, "scenarioId,asc");
+    var pageable = primary.withSort(primary.getSort().and(Sort.by("scenarioId")));
+    String module = moduleId == null || moduleId.isBlank() ? null : moduleId;
     return transactions.execute(tx -> {
       requiredRun(runId);
-      var value = status != null ? results.findByRun_IdAndStatus(runId, status, pageable)
-          : moduleId != null ? results.findByRun_IdAndModuleId(runId, moduleId, pageable)
-              : results.findByRun_Id(runId, pageable);
+      var value = status != null && module != null
+          ? results.findByRun_IdAndStatusAndModuleId(runId, status, module, pageable)
+          : status != null ? results.findByRun_IdAndStatus(runId, status, pageable)
+              : module != null ? results.findByRun_IdAndModuleId(runId, module, pageable)
+                  : results.findByRun_Id(runId, pageable);
       return new PageResponse<>(value.getContent().stream().map(this::result).toList(),
           value.getNumber(), value.getSize(), value.getTotalElements(), value.getTotalPages());
     });
@@ -289,7 +293,11 @@ final class TestRunService {
     if (parts.length != 2 || !allowed.contains(parts[0])) {
       throw problem(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Unsupported sort field");
     }
-    return PageRequest.of(page, size, Sort.by(Sort.Direction.fromString(parts[1]), parts[0]));
+    try {
+      return PageRequest.of(page, size, Sort.by(Sort.Direction.fromString(parts[1]), parts[0]));
+    } catch (IllegalArgumentException exception) {
+      throw problem(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Invalid sort direction");
+    }
   }
 
   private List<String> moduleIds(UUID runId) {
