@@ -1,6 +1,6 @@
 import { chooseOption } from "./select";
 import { expect, test } from "@playwright/test";
-import type { Driver, Run } from "../src/types/api";
+import type { Catalog, Driver, Run } from "../src/types/api";
 
 declare global {
   interface Window {
@@ -9,7 +9,7 @@ declare global {
   }
 }
 
-test("REAL PostgreSQL browser flow: external Driver → Statement 23 → Connection 17 → SSE/report/history", async ({
+test("REAL PostgreSQL browser flow: external Driver → Statement/Connection → SSE/report/history", async ({
   page,
   request,
 }) => {
@@ -59,7 +59,7 @@ test("REAL PostgreSQL browser flow: external Driver → Statement 23 → Connect
   });
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: "Compatibility, at a glance" }),
+    page.getByRole("heading", { name: "Workspace overview" }),
   ).toBeVisible();
   await page.getByRole("link", { name: "Drivers", exact: true }).click();
   await page
@@ -108,6 +108,10 @@ test("REAL PostgreSQL browser flow: external Driver → Statement 23 → Connect
     .getByLabel("Username", { exact: true })
     .fill(process.env.JDBC_TEST_E2E_USERNAME ?? "jdbc_ui");
   await page.getByLabel("Password", { exact: true }).fill(password);
+  await page.getByLabel("Authorized test database", { exact: true })
+    .fill(process.env.JDBC_TEST_E2E_DATABASE ?? "jdbc_ui");
+  await page.getByLabel("Authorized test schema", { exact: true })
+    .fill(process.env.JDBC_TEST_E2E_SCHEMA ?? "jdbc_ui");
   await page
     .getByRole("button", { name: "Test connection", exact: true })
     .click();
@@ -123,10 +127,13 @@ test("REAL PostgreSQL browser flow: external Driver → Statement 23 → Connect
   const connectionId = page.url().split("/").at(-1)!;
   await page.reload();
   await expect(page.getByText("Saved password available")).toBeVisible();
-  for (const [module, count] of [
-    ["Statement", 23],
-    ["Connection", 17],
-  ] as const) {
+  const catalogResponse = await request.get("/api/test-catalog");
+  expect(catalogResponse.status()).toBe(200);
+  const catalog = await catalogResponse.json() as Catalog;
+  const createdRunIds: string[] = [];
+  for (const module of ["Statement", "Connection"]) {
+    const count = catalog.modules.find(item => item.id === module.toLowerCase())!.scenarioCount;
+    expect(count).toBeGreaterThan(0);
     await page.getByRole("link", { name: "Start run", exact: true }).click();
     await page.getByRole("button", { name: /^Next:/ }).click();
     await page.getByRole("button", { name: /^Next:/ }).click();
@@ -143,7 +150,8 @@ test("REAL PostgreSQL browser flow: external Driver → Statement 23 → Connect
     await page.getByRole("button", { name: "Start test run" }).click();
     await expect(page).toHaveURL(/\/runs\/[a-f0-9-]+$/);
     const id = page.url().split("/").at(-1)!;
-    await expect(page.getByText("Succeeded", { exact: true })).toBeVisible({
+    createdRunIds.push(id);
+    await expect(page.getByText("Run succeeded", { exact: true })).toBeVisible({
       timeout: 60_000,
     });
     await expect(
@@ -152,13 +160,19 @@ test("REAL PostgreSQL browser flow: external Driver → Statement 23 → Connect
     const detail = await request.get(`/api/runs/${id}`);
     expect(detail.status()).toBe(200);
     const run = (await detail.json()) as Run;
+    // The bundled PG declaration disables only this selected multi-result scenario.
+    // Additional/unexplained skips must fail acceptance, not become a permissive allowance.
+    const expectedSkippedIds = module === "Statement" ? ["statement.result_sequence"] : [];
     expect(run).toMatchObject({
       status: "SUCCEEDED",
       totalCases: count,
-      passed: count,
+      passed: count - expectedSkippedIds.length,
       failed: 0,
-      skipped: 0,
+      skipped: expectedSkippedIds.length,
       selectedModules: [module.toLowerCase()],
+      cleanupEvidence: { status: "SUCCESS" },
+      accounting: { notRun: 0, incomplete: 0 },
+      connection: { adapterId: "postgresql" },
     });
     expect(run.driver.packageFingerprint).toBe(driver.packageFingerprint);
     expect(run.driver.id).toBe(driver.id);
@@ -184,7 +198,7 @@ test("REAL PostgreSQL browser flow: external Driver → Statement 23 → Connect
     )).toBe(true);
     await page.getByRole("tab", { name: "Test cases" }).click();
     await page.reload();
-    await expect(page.getByText("Succeeded", { exact: true })).toBeVisible();
+    await expect(page.getByText("Run succeeded", { exact: true })).toBeVisible();
     await page.getByRole("tab", { name: "Test cases" }).click();
     const resultsResponse = await request.get(
       `/api/runs/${id}/results?size=100`,
@@ -192,15 +206,28 @@ test("REAL PostgreSQL browser flow: external Driver → Statement 23 → Connect
     expect(resultsResponse.status()).toBe(200);
     const results = (await resultsResponse.json()) as {
       totalElements: number;
-      items: { moduleId: string; status: string }[];
+      items: { scenarioId: string; moduleId: string; status: string; message: string | null }[];
     };
     expect(results.totalElements).toBe(count);
     expect(
       results.items.every(
         (item) =>
-          item.moduleId === module.toLowerCase() && item.status === "PASSED",
+          item.moduleId === module.toLowerCase() &&
+          item.status === (expectedSkippedIds.includes(item.scenarioId) ? "SKIPPED" : "PASSED"),
       ),
     ).toBe(true);
+    expect(run.accounting?.scenarios).toHaveLength(count);
+    expect(new Set(results.items.map(item => item.scenarioId)).size).toBe(count);
+    expect(results.items.map(item => item.scenarioId).sort()).toEqual(
+      run.accounting!.scenarios.map(item => item.scenarioId).sort(),
+    );
+    expect(results.items.filter(item => item.status === "SKIPPED").map(item => item.scenarioId).sort())
+      .toEqual(expectedSkippedIds);
+    for (const item of results.items.filter(item => item.status === "SKIPPED")) {
+      expect(item.message).toContain("Execution capability disabled");
+      expect(item.message).toContain("multiple_result_sets");
+      expect(item.message).toContain("multiple_result_sequences");
+    }
     await page.getByRole("tab", { name: "Report", exact: true }).click();
     await expect(page.getByText("Captured environment")).toBeVisible();
     await page.getByRole("button", { name: "View report JSON" }).click();
@@ -232,8 +259,9 @@ test("REAL PostgreSQL browser flow: external Driver → Statement 23 → Connect
       expect(filteredPage.items.every((item) => item.status === "SUCCEEDED")).toBe(true);
     }
     await expect(
-      page.getByRole("link", { name: connectionName }).first(),
+      page.getByRole("table").getByText(connectionName).first(),
     ).toBeVisible();
+    await expect(page.getByRole("table").locator(`a[href="/runs/${id}"]`)).toHaveText(module);
     await page.goto(`/connections/${connectionId}`);
   }
   for (const width of [1280, 1024, 768]) {
@@ -241,8 +269,11 @@ test("REAL PostgreSQL browser flow: external Driver → Statement 23 → Connect
     await page.goto("/");
     await expect(page.getByText("Recent runs", { exact: true })).toBeVisible();
     await expect(
-      page.getByRole("link", { name: connectionName }).first(),
+      page.getByRole("table").getByText(connectionName).first(),
     ).toBeVisible();
+    for (const id of createdRunIds) {
+      await expect(page.getByRole("table").locator(`a[href="/runs/${id}"]`)).toBeVisible();
+    }
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
