@@ -85,6 +85,10 @@ final class ConnectionService {
   }
 
   ConnectionPageResponse list(int page, int size, String sort) {
+    return list(page, size, sort, null);
+  }
+
+  ConnectionPageResponse list(int page, int size, String sort, String adapterId) {
     if (page < 0 || size < 1 || size > 100) {
       throw invalid("Invalid pagination parameters");
     }
@@ -98,8 +102,14 @@ final class ConnectionService {
     } catch (IllegalArgumentException exception) {
       throw invalid("Invalid sort direction");
     }
+    String filter = adapterId == null || adapterId.isBlank() ? null : adapterId.trim();
+    if (filter != null && filter.length() > 100) {
+      throw invalid("Invalid adapter filter");
+    }
     return transactions.execute(status -> {
-      var result = connections.findAll(PageRequest.of(page, size, Sort.by(direction, parts[0])));
+      var pageable = PageRequest.of(page, size, Sort.by(direction, parts[0]));
+      var result = filter == null ? connections.findAll(pageable)
+          : connections.findByAdapterId(filter, pageable);
       return new ConnectionPageResponse(result.getContent().stream().map(this::response).toList(),
           result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
     });

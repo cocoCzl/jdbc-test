@@ -1,4 +1,7 @@
 import { Card } from "@/components/ui/card";
+import { Select } from "@/components/ui/select";
+import { adaptersApi, adapterKeys } from "@/api/adapters";
+import { AdapterDetails } from "@/features/connections/adapter-details";
 import { moduleName, profileName } from "@/lib/presentation";
 import { t } from "i18next";
 import { useTranslation } from "react-i18next";
@@ -41,6 +44,7 @@ export default function NewRun() {
   const presetId = search.get("connectionId");
   const [step, setStep] = useState(0);
   const [page, setPage] = useState(0);
+  const [adapterFilter, setAdapterFilter] = useState("");
   const [connection, setConnection] = useState<Connection | null>(null);
   const [driver, setDriver] = useState<DriverSummary | null>(null);
   const [profile, setProfile] = useState<CreateRun["profile"]>("CORE");
@@ -50,7 +54,12 @@ export default function NewRun() {
   const [password, setPassword] = useState("");
   const [emptyPassword, setEmptyPassword] = useState(false);
   const [error, setError] = useState<string | Error | null>(null);
-  const params = { page, size: 12, sort: "name,asc" };
+  const params = { page, size: 12, sort: "name,asc", adapterId: adapterFilter || undefined };
+  const adapters = useQuery({
+    queryKey: adapterKeys.all,
+    queryFn: ({ signal }) => adaptersApi.list(signal),
+    staleTime: 300_000,
+  });
   const connections = useQuery({
     queryKey: connectionsKeys.list(params),
     queryFn: ({ signal }) => connectionsApi.list(params, signal),
@@ -67,6 +76,8 @@ export default function NewRun() {
   });
   const chosen = connection ?? preset.data ?? null;
   const chosenDriver = driver ?? chosen?.defaultDriver ?? null;
+  const outsideFilter = !!chosen && !!adapterFilter && chosen.adapterId !== adapterFilter;
+  const chosenAdapter = adapters.data?.find((item) => item.id === chosen?.adapterId);
   const driverDetail = useQuery({
     queryKey: driversKeys.detail(chosenDriver?.id ?? ""),
     queryFn: ({ signal }) => driversApi.get(chosenDriver!.id, signal),
@@ -118,7 +129,7 @@ export default function NewRun() {
           ?.scenarioCount;
   const continueAllowed =
     step === 0
-      ? !!chosen
+      ? !!chosen && !outsideFilter
       : step === 1
         ? chosenDriver?.status === "VALIDATED" && (!needsPassword || !!password || emptyPassword)
         : step === 2
@@ -164,6 +175,23 @@ export default function NewRun() {
         {step === 0 ? (
           <>
             <h2 className="mb-3 text-xl font-semibold">{t("ui.chooseAConnection")}</h2>
+            <div className="mb-4">
+              <Field id="run-adapter-filter" label={t("adapter.filter")} hint={t("adapter.filterHint")}>
+                <Select id="run-adapter-filter" value={adapterFilter}
+                  disabled={!adapters.data}
+                  onValueChange={(value) => { setAdapterFilter(value); setPage(0); }}>
+                  <option value="">{t("adapter.all")}</option>
+                  {adapters.data?.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </Select>
+              </Field>
+              {adapters.isError ? <ErrorState error={adapters.error} retry={() => void adapters.refetch()} /> : null}
+            </div>
+            {outsideFilter ? (
+              <div className="mb-4 rounded-xl border border-warning/30 p-4 text-sm" role="status">
+                <p>{t("adapter.selectedOutsideFilter", { name: chosen.name })}</p>
+                <Button variant="ghost" onClick={() => { setAdapterFilter(""); setPage(0); }}>{t("adapter.clearFilter")}</Button>
+              </div>
+            ) : null}
             {connections.data.items.length ? (
               <div className="grid gap-4 md:grid-cols-2">
                 {connections.data.items.map((item) => (
@@ -206,8 +234,8 @@ export default function NewRun() {
               </div>
             ) : (
               <EmptyState
-                title={t("ui.noConnectionsYet")}
-                description={t("ui.addATargetDatabaseConnectionFirst")}
+                title={t(adapterFilter ? "adapter.noMatchingConnections" : "ui.noConnectionsYet")}
+                description={t(adapterFilter ? "adapter.createMatchingConnection" : "ui.addATargetDatabaseConnectionFirst")}
                 action={
                   <Button asChild>
                     <Link to="/connections/new">{t("ui.addConnection")}</Link>
@@ -220,6 +248,7 @@ export default function NewRun() {
             !connections.data.items.some((item) => item.id === chosen.id) ? (
               <p className="mt-4 text-sm">{t("ui.selectedConnection")} {chosen.name}</p>
             ) : null}
+            {chosen ? <div className="mt-4"><AdapterDetails adapter={chosenAdapter} /></div> : null}
           </>
         ) : null}
         {step === 1 ? (
@@ -231,6 +260,7 @@ export default function NewRun() {
               selected={chosenDriver}
               onChange={setDriver}
             />
+            <p className="text-sm text-muted-foreground">{t("adapter.driverValidationBoundary")}</p>
             {chosen?.hasSavedPassword ? (
               <label className="flex items-center gap-2 text-sm">
                 <input

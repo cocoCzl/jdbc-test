@@ -285,6 +285,54 @@ Worker 范围行为取自冻结快照；元数据身份/版本预检继续先于
 对象归属与既有安全回归，不证明真实数据库兼容性。对修改的 Java 文件运行原生格式检查，并分别报告
 上文四项质量检查。调查日志与依赖证据只留本地。
 
+### 新增适配与准备驱动
+
+复用已有方言时，复制现有 `adapters/<id>/adapter.json` 到新目录（例如 `adapters/private-db/`），
+设置唯一 `id`、名称、身份/版本约束及如实声明的能力。没有充分证据前使用 `trust: "candidate"`
+或 `"local"`，不要把其他产品的已验证组合复制成自身证据。`dialect` 选择已实现行为；
+`assets.directory` 可指向可复用资产包，也可补充所需的 `ddl/<asset-id>`、`dml/<asset-id>`
+与 `pool/<asset-id>.yaml`。最后只在 `adapters/catalog.json` 登记一次 ID。
+无需新增 `DbType` 常量、Java 产品分支或前端名单。`private-db` 仅为 fixture/示例身份，
+不是正式支持产品；共享契约和 API fixture 已覆盖这一扩展路径。
+
+真正的新方言须先实现最小的 `SqlDialect` 行为、对应资产与失败/清理测试，再登记声明。
+只加产品枚举常量并不等于实现兼容。先在仓库根目录执行以下检查，再使用已授权的可丢弃目标验证：
+
+```bash
+python3 -B scripts/run_contract_tests.py
+./mvnw verify
+cd jdbc-test-web
+npm run lint
+npm test
+npm run build
+```
+
+未注册的私有 CLI 包仍可通过显式 manifest 路径使用。现有生成器可在不修改内置目录的情况下准备本地包
+（请在本地替换占位值）：
+
+```bash
+python3 -B scripts/runner.py init-custom --id private-db --dialect postgresql \
+  --driver-class com.example.Driver --driver-dir /absolute/path/to/driver-jars \
+  --url jdbc:postgresql://target.example/test_db --username test_user \
+  --namespace authorized_test_schema
+```
+
+执行前审查生成的身份、版本及能力声明；这条命令只是准备，不证明兼容。生成配置、私有 manifest 与 JAR 保持本地。
+
+manifest 中的 `org.postgresql:postgresql:42.7.2` 仅为声明示例，不是最新版本或安全推荐。
+CLI 可通过 `db.driver` 指定其他固定版本（`kind: "maven"`、`coordinate: "group:artifact:version"`），
+或使用本地 JAR（`kind: "local"`、`path: "/.../driver-jars"`）。当前 CLI Maven 解析仅将主 JAR
+加入运行 classpath；下载到缓存的传递依赖不等于完整加载。多 JAR 驱动应使用现有本地目录路径，
+或在 Web 中将所需 JAR 一并上传到同一驱动包。保留私有/离线路径，不提交驱动二进制。
+更改推荐不会替换已安装包的 fingerprint 或历史运行。平台自身的 PostgreSQL 依赖用于平台存储；
+被测驱动仍是隔离 Worker 加载的外部输入。没有新增在线 Web Maven 导入功能。
+
+连接编辑器分别展示适配声明提示、声明的版本组合、已安装驱动验证状态及目标探测结果；
+`databaseType` 保持为自定义显示标签。任务向导按适配筛选已保存连接，服务端先筛选再分页，
+不改写连接适配，也不根据 vendor 限制驱动。深链接所选连接与筛选冲突时会明确保留并提示，
+清除筛选或另选连接后才可继续。已保存连接探测区分未提供密码（回退已保存凭据）与显式 `""`；
+空格及其他密码字符均原样保留。
+
 ### 连接
 
 | 方法 | 接口 | 用途 |
@@ -305,7 +353,7 @@ Worker 范围行为取自冻结快照；元数据身份/版本预检继续先于
 
 | 方法 | 接口 | 用途 |
 |---|---|---|
-| GET | `/api/test-catalog` | 测试配置、模块与场景 |
+| GET | `/api/test-catalog` | 测试配置、模块与场景数量 |
 | POST / GET | `/api/runs` | 创建 / 列出任务（可按 `status` 筛选） |
 | GET | `/api/runs/{id}` | 快照与进度 |
 | POST | `/api/runs/{id}/cancel` | 取消 |
@@ -314,7 +362,7 @@ Worker 范围行为取自冻结快照；元数据身份/版本预检继续先于
 | GET | `/api/runs/{id}/report` | 汇总与失败结果 |
 | GET | `/api/runs/{id}/report.json` | 原始 JSON 证据 |
 
-共有 17 个模块，CORE 选择 153 个场景，FULL 选择 270 个，CUSTOM 自选模块/场景。这些是目录数量，不是已验证通过的数量。新任务要求明确授权范围和 `destructiveConsent: true`。入队时冻结场景选择和非敏感执行输入，不自动重新验证驱动或探测连接。
+模块与配置的场景数量以当前目录为准；CUSTOM 自选模块/场景。这些目录数量不是已验证通过的数量。新任务要求明确授权范围和 `destructiveConsent: true`。入队时冻结场景选择和非敏感执行输入，不自动重新验证驱动或探测连接。
 
 正常状态：`QUEUED → PREPARING → RUNNING → GENERATING_REPORT → SUCCEEDED`。失败、取消和恢复分别进入 `FAILED`、`CANCELLED`、`INTERRUPTED`。本地 FIFO 调度器限制并发 Worker，工作目录为 `<data-dir>/runs/<run-id>`。任务行锁防止迟到结果与取消竞态覆盖终态。超时为 `FAILED / RUN_TIMEOUT`，进程清理完成前仍占用调度名额。
 
@@ -372,11 +420,13 @@ export JDBC_TEST_E2E_DRIVER_JAR='/absolute/path/to/postgresql.jar'
 export JDBC_TEST_E2E_DRIVER_VERSION='your-driver-version'
 export JDBC_TEST_E2E_TARGET_URL='jdbc:postgresql://127.0.0.1:55433/jdbc_ui'
 export JDBC_TEST_E2E_USERNAME='jdbc_ui'
+export JDBC_TEST_E2E_DATABASE='jdbc_ui'
+export JDBC_TEST_E2E_SCHEMA='authorized_test_schema'
 export JDBC_TEST_E2E_PASSWORD='your-target-password'
 npm run test:e2e:real
 ```
 
-真实项目需要运行中的 Server/Worker、干净的平台数据库与驱动存储，以及单独授权的目标 PostgreSQL。缺少输入会直接失败，不回退到模拟。测试会持久保存数据；重跑时使用新的验收存储，不要连接共享或业务数据库。真实测试关闭 trace 采集。`PLAYWRIGHT_CHANNEL=chrome` 可使用已安装的 Chrome。生产模式检查见[部署指南](deployment.zh-CN.md)。
+真实项目需要运行中的 Server/Worker、干净的平台数据库与驱动存储，以及单独授权的目标 PostgreSQL。缺少输入会直接失败，不回退到模拟。测试会写入数据；每次使用新的可丢弃验收存储，不要连接共享或业务数据库。每轮结束后停止本轮服务，清理本轮创建的数据库、存储和临时配置；仅将用户要求的报告/截图保留在本地忽略路径。真实测试关闭 trace 采集。`PLAYWRIGHT_CHANNEL=chrome` 可使用已安装的 Chrome。生产模式检查见[部署指南](deployment.zh-CN.md)。
 
 构建后执行 `JDBC_TEST_E2E_PREVIEW=true PLAYWRIGHT_CHANNEL=chrome npm --prefix jdbc-test-web run test:e2e`，可基于最新构建资源进行浏览器检查。仅运行模拟 API 项目，截图明确标注 fixture，并核对浏览器加载 bundle 与 `dist` 的 SHA-256。该检查不启动 QA，也不执行目标数据库操作。
 

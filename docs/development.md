@@ -316,6 +316,61 @@ checks cover declarations, packaging, frozen inputs, ownership and existing safe
 they do not prove real-database compatibility. Run native formatting on the changed Java files and
 the four separate quality checks described above. Keep investigation logs and dependency evidence local.
 
+### Adding an adapter and preparing drivers
+
+For an adapter that reuses an implemented dialect, copy an existing
+`adapters/<id>/adapter.json` to a new directory (for example `adapters/private-db/`).
+Set its unique `id`, name, identity/version constraints and truthful capability declarations.
+Use `trust: "candidate"` or `"local"` until evidence supports another status; do not copy another
+product's validated combinations as your own. Keep `dialect` as the implemented behavior and set
+`assets.directory` to the reusable bundle, or add the necessary `ddl/<asset-id>`, `dml/<asset-id>`
+and `pool/<asset-id>.yaml` assets. List the new ID once in `adapters/catalog.json`.
+No `DbType` member, Java product branch or frontend list is needed. `private-db` is a fixture/example
+identity, not a supported product. Shared contract and API fixtures already exercise this route.
+
+A genuinely new dialect needs the smallest implemented `SqlDialect` behavior, matching assets and
+failure/cleanup tests before registration. Adding a product enum constant alone does not implement
+compatibility. Run these checks from the repository root before testing an authorized disposable target:
+
+```bash
+python3 -B scripts/run_contract_tests.py
+./mvnw verify
+cd jdbc-test-web
+npm run lint
+npm test
+npm run build
+```
+
+Unregistered private CLI packages remain available by explicit manifest path. The existing generator
+can prepare a local package without changing the built-in registry (replace the placeholders locally):
+
+```bash
+python3 -B scripts/runner.py init-custom --id private-db --dialect postgresql \
+  --driver-class com.example.Driver --driver-dir /absolute/path/to/driver-jars \
+  --url jdbc:postgresql://target.example/test_db --username test_user \
+  --namespace authorized_test_schema
+```
+
+Review the generated identity/version/capability declarations before executing anything; this command
+is preparation, not evidence of compatibility. Keep generated configs, private manifests and JARs local.
+
+The manifest coordinate `org.postgresql:postgresql:42.7.2` is a declaration example, not a latest-version
+or security recommendation. Select a different fixed version through CLI `db.driver` (`kind: "maven"`,
+`coordinate: "group:artifact:version"`) or prepare local JARs (`kind: "local"`, `path: "/.../driver-jars"`).
+The current CLI Maven resolver places only the primary JAR on the runtime classpath; downloaded
+transitive dependencies are not a complete loaded bundle. For multi-JAR drivers, use the existing
+local directory route or upload all required JARs together in the Web driver package. Private/offline
+JARs remain supported; do not commit them. Changing a recommendation never changes installed package
+fingerprints or historical runs. The platform PostgreSQL dependency serves platform storage; target
+drivers remain separate inputs loaded by the isolated Worker. There is no online Web Maven importer.
+
+The connection editor shows declaration hints and declared version combinations independently of
+installed-driver validation and target probe results. `databaseType` remains a custom display label.
+The run wizard's adapter filter queries saved connections before pagination; it does not change their
+adapter or filter drivers by vendor. An off-filter deep-linked selection remains visible and requires
+clearing the filter or choosing another connection before continuing. Saved probes distinguish omitted
+password (saved fallback) from explicit `""`; spaces and all other supplied characters are preserved.
+
 ### Connections
 
 | Method | Endpoint | Purpose |
@@ -336,7 +391,7 @@ Probes use Worker `Driver.connect`, read metadata best-effort, close and exit wi
 
 | Method | Endpoint | Purpose |
 |---|---|---|
-| GET | `/api/test-catalog` | Profiles, modules and scenarios |
+| GET | `/api/test-catalog` | Profiles, modules and scenario counts |
 | POST / GET | `/api/runs` | Create / list runs (optional `status` filter) |
 | GET | `/api/runs/{id}` | Snapshot and progress |
 | POST | `/api/runs/{id}/cancel` | Cancel |
@@ -345,7 +400,7 @@ Probes use Worker `Driver.connect`, read metadata best-effort, close and exit wi
 | GET | `/api/runs/{id}/report` | Summary and failures |
 | GET | `/api/runs/{id}/report.json` | Raw JSON evidence |
 
-There are 17 modules; CORE selects 153 scenarios, FULL 270, and CUSTOM selects modules/scenarios. These are catalog counts, not proven compatibility results. New runs require explicit scope and `destructiveConsent: true`. Selection and nonsecret execution inputs are frozen at enqueue; a new validation/probe is not performed automatically.
+Read module and profile counts from the current catalog; CUSTOM selects modules/scenarios. These counts are not proven compatibility results. New runs require explicit scope and `destructiveConsent: true`. Selection and nonsecret execution inputs are frozen at enqueue; a new validation/probe is not performed automatically.
 
 Normal states: `QUEUED → PREPARING → RUNNING → GENERATING_REPORT → SUCCEEDED`. Failure, cancellation and recovery end in `FAILED`, `CANCELLED`, `INTERRUPTED`. A local FIFO scheduler limits concurrent Workers; workspaces are `<data-dir>/runs/<run-id>`. Run row locks protect terminal states against late results/cancel races. Timeout gives `FAILED / RUN_TIMEOUT`; a slot stays occupied until process cleanup finishes.
 
@@ -403,11 +458,13 @@ export JDBC_TEST_E2E_DRIVER_JAR='/absolute/path/to/postgresql.jar'
 export JDBC_TEST_E2E_DRIVER_VERSION='your-driver-version'
 export JDBC_TEST_E2E_TARGET_URL='jdbc:postgresql://127.0.0.1:55433/jdbc_ui'
 export JDBC_TEST_E2E_USERNAME='jdbc_ui'
+export JDBC_TEST_E2E_DATABASE='jdbc_ui'
+export JDBC_TEST_E2E_SCHEMA='authorized_test_schema'
 export JDBC_TEST_E2E_PASSWORD='your-target-password'
 npm run test:e2e:real
 ```
 
-The real project requires running Server/Worker, a clean platform database/artifact store and a separate authorized target PostgreSQL. Missing inputs fail rather than fall back to mocks. It creates persistent test data; use fresh acceptance storage on rerun and never use shared/business databases. Trace collection is disabled. `PLAYWRIGHT_CHANNEL=chrome` can use installed Chrome. Production-mode checks are described in [Deployment](deployment.md).
+The real project requires running Server/Worker, a clean platform database/artifact store and a separate authorized target PostgreSQL. Missing inputs fail rather than fall back to mocks. It writes test data; use fresh disposable acceptance storage and never use shared/business databases. After each session, stop owned services and remove the databases/storage/configuration created for that session; keep only requested reports/screenshots in ignored local paths. Trace collection is disabled. `PLAYWRIGHT_CHANNEL=chrome` can use installed Chrome. Production-mode checks are described in [Deployment](deployment.md).
 
 For browser checks against the freshly built assets, use `JDBC_TEST_E2E_PREVIEW=true PLAYWRIGHT_CHANNEL=chrome npm --prefix jdbc-test-web run test:e2e` after building. This runs the mocked project only, captures explicitly labelled fixture screenshots, and verifies the loaded bundle SHA-256 against `dist`. It does not start QA or execute target database operations.
 

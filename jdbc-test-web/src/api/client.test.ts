@@ -2,10 +2,23 @@ import { describe, expect, it, vi } from "vitest";
 import { ApiError, queryString, request } from "./client";
 import { driversApi } from "./drivers";
 import { runsApi } from "./runs";
+import { connectionsApi } from "./connections";
 import { driver, run } from "@/test/fixtures";
 import { json, problem } from "@/test/harness";
 
 describe("API client", () => {
+  it.each([undefined, "", "   ", "ordinary-password"])(
+    "preserves saved-probe password presence and bytes: %j",
+    async (password) => {
+      const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(json({ success: true }));
+      await connectionsApi.testSaved("connection-1", password);
+      const [url, options] = fetch.mock.calls[0];
+      expect(url).toBe("/api/connections/connection-1/test");
+      expect(JSON.parse(options!.body as string)).toEqual(
+        password === undefined ? {} : { password },
+      );
+    },
+  );
   it("parses a resource directly and passes AbortSignal", async () => {
     const fetch = vi.spyOn(globalThis, "fetch").mockResolvedValue(json(driver));
     const controller = new AbortController();

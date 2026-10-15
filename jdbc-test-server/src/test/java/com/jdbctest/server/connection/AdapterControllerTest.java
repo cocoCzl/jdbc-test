@@ -1,10 +1,12 @@
 package com.jdbctest.server.connection;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.jdbctest.catalog.AdapterCatalog;
+import com.jdbctest.catalog.AdapterManifest;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.net.URL;
@@ -13,8 +15,30 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import tools.jackson.core.json.JsonFactory;
+import tools.jackson.databind.ObjectMapper;
 
 class AdapterControllerTest {
+  @Test
+  void publicHintsExcludePrivateSourcePathsExtensionsAndEvidenceContents() throws Exception {
+    String manifest;
+    try (InputStream input = getClass().getResourceAsStream("/adapters/postgresql/adapter.json")) {
+      manifest = new String(input.readAllBytes(), StandardCharsets.UTF_8)
+          .replace("\"kind\": \"maven\"", "\"kind\": \"local\"")
+          .replace("\"coordinate\"", "\"path\"")
+          .replace("org.postgresql:postgresql:42.7.2", "/private/fixture-only/driver.jar")
+          .replaceFirst("\\{", "{\"private_extension\":\"private-fixture-value\",");
+    }
+    var definition = AdapterManifest.read(new ByteArrayInputStream(
+        manifest.getBytes(StandardCharsets.UTF_8)));
+    var mapper = new ObjectMapper();
+    String body = mapper.writeValueAsString(AdapterResponse.from(definition));
+    assertEquals("org.postgresql.Driver", mapper.readTree(body).path("driverClass").asString());
+    assertFalse(body.contains("/private/"));
+    assertFalse(body.contains("private-fixture-value"));
+    assertFalse(body.contains("evidence/"));
+    assertTrue(mapper.readTree(body).path("recommendedMavenCoordinate").isNull());
+  }
+
   @Test
   void indexedCustomAdapterReachesApiWithoutProductOrDriverClasspathChanges() throws Exception {
     String manifest;

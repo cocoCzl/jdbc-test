@@ -2,6 +2,7 @@ import { Select } from "@/components/ui/select";
 import { t } from "i18next";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { driversApi, driversKeys } from "@/api/drivers";
 import { ErrorState, Field, Loading } from "@/components/common";
@@ -79,7 +80,9 @@ export function DriverSelect({
       </Field>}
       {!options.length ? (
         <p className="mt-3 text-sm text-muted-foreground">
-          {t("ui.noValidatedDriversOnThisPageValidate")}</p>
+          {t("ui.noValidatedDriversOnThisPageValidate")}{" "}
+          <Link className="text-primary underline" to="/drivers/new">{t("adapter.uploadDriver")}</Link>
+        </p>
       ) : null}
       {query.data.totalPages > 1 ? (
         <Pagination {...query.data} onPage={setPage} />

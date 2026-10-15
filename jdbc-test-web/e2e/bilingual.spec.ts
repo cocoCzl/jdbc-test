@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { catalog, connection, driver, finishedRun, page as paged, result } from "../src/test/fixtures";
+import { adapters, catalog, connection, driver, finishedRun, page as paged, result } from "../src/test/fixtures";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
@@ -11,6 +11,7 @@ async function mockReadOnly(page: Page) {
     expect(route.request().method()).toBe("GET");
     let body: unknown;
     if (url.pathname === "/api/test-catalog") body = catalog;
+    else if (url.pathname === "/api/adapters") body = adapters;
     else if (url.pathname === "/api/runs") body = paged([fixture]);
     else if (url.pathname === "/api/runs/run-1") body = fixture;
     else if (url.pathname.endsWith("/results")) body = paged([{...result, status: "SKIPPED", message: "capability arrays=false; skipSource=adapter"}]);

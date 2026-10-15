@@ -1,6 +1,7 @@
 import { chooseOption } from "./select";
 import { expect, test } from "@playwright/test";
 import {
+  adapters,
   catalog,
   connection,
   driver,
@@ -21,6 +22,7 @@ test("TEST FIXTURE ONLY: long text, pagination, masked Oracle URL and execution 
     expect(route.request().method()).toBe("GET");
     let body: unknown;
     if (url.pathname === "/api/test-catalog") body = catalog;
+    else if (url.pathname === "/api/adapters") body = adapters;
     else if (url.pathname === "/api/runs") body = paged([interrupted], {page: Number(url.searchParams.get("page")), totalPages: 2, totalElements: 21});
     else if (url.pathname.endsWith("/events")) return route.fulfill({contentType: "text/event-stream", body: ""});
     else if (url.pathname === "/api/runs/active") body = {...interrupted, id: "active", status: "RUNNING", accounting: {...accounting, pending: 16, running: 1, notRun: 0, incomplete: 0}};
@@ -207,4 +209,59 @@ test("API-mocked empty Dashboard and responsive navigation at 1280 / 1024 / tabl
       fullPage: true,
     });
   }
+});
+
+test("TEST FIXTURE ONLY: adapter declarations, filtered deep link and empty saved probe", async ({ page }) => {
+  const declarations = ["gaussdb", "mysql", "oracle", "postgresql", "sqlserver", "private-db"].map(id => ({
+    id, name: `Fixture ${id}`, status: "CANDIDATE", dialect: "postgresql",
+    namespaceSelection: "schema", requiresDatabase: true, driverClass: "fixture.Driver",
+    recommendedMavenCoordinate: null, validatedCombinations: [],
+  }));
+  const requests: URL[] = [];
+  const probes: unknown[] = [];
+  await page.route(url => url.pathname.startsWith("/api/"), async route => {
+    const url = new URL(route.request().url()); requests.push(url);
+    const path = url.pathname;
+    if (path.endsWith("/test")) {
+      probes.push(route.request().postDataJSON());
+      return route.fulfill({json: probe});
+    }
+    expect(route.request().method()).toBe("GET");
+    const body = path === "/api/adapters" ? declarations : path === "/api/test-catalog" ? catalog
+      : path === "/api/drivers" ? paged([]) : path === "/api/drivers/driver-1" ? driver
+      : path === "/api/connections/connection-1" ? connection
+      : path === "/api/connections" ? (url.searchParams.get("adapterId") === "mysql" ? paged([])
+        : paged([connection], {page: Number(url.searchParams.get("page")), totalElements: 25, totalPages: 3}))
+      : path === "/api/runs" ? paged([]) : undefined;
+    if (!body) throw new Error(`Unexpected adapter fixture request ${path}`);
+    await route.fulfill({json: body});
+  });
+  await page.goto("/connections/new");
+  await page.getByLabel("Database type", {exact: true}).fill("Preserved custom label");
+  for (const item of declarations) {
+    await chooseOption(page, page.getByLabel("Adapter", {exact: true}), item.id);
+    await expect(page.getByLabel("Database type", {exact: true})).toHaveValue("Preserved custom label");
+    await expect(page.getByText("No validated version combinations declared.")).toBeVisible();
+  }
+  await expect(page.getByRole("link", {name: "Upload a driver package"})).toBeVisible();
+  expect(probes).toEqual([]);
+  await page.goto("/connections/connection-1");
+  await page.getByLabel("Use an empty password explicitly").check();
+  await page.getByRole("button", {name: "Test saved connection"}).click();
+  await expect(page.getByText("Connected", {exact:true})).toBeVisible();
+  expect(probes).toEqual([{password: ""}]);
+  await page.goto("/runs/new?connectionId=connection-1");
+  await page.getByRole("button", {name: "Next page"}).click();
+  await chooseOption(page, page.getByLabel("Filter connections by database adapter"), "mysql");
+  await expect(page.getByText("No matching connections")).toBeVisible();
+  await expect(page.getByRole("button", {name: "Next: Choose driver"})).toBeDisabled();
+  expect(requests.some(url => url.pathname === "/api/connections" && url.searchParams.get("adapterId") === "mysql"
+    && url.searchParams.get("page") === "0")).toBe(true);
+  await page.getByRole("button", {name: /^Theme:/}).click();
+  await expect(page.getByLabel("Filter connections by database adapter")).toHaveAttribute("data-value", "mysql");
+  await page.setViewportSize({width: 390, height: 844});
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({path: "test-results/fixture-adapter-filter-mobile.png", fullPage: true});
+  await page.getByRole("button", {name: "Clear adapter filter"}).click();
+  await expect(page.getByRole("radio", {name: connection.name})).toBeChecked();
 });

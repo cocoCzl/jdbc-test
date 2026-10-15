@@ -33,8 +33,9 @@ final class ConnectionController {
   @GetMapping
   ConnectionPageResponse list(@RequestParam(value = "page", defaultValue = "0") int page,
       @RequestParam(value = "size", defaultValue = "20") int size,
-      @RequestParam(value = "sort", defaultValue = "createdAt,desc") String sort) {
-    return service.list(page, size, sort);
+      @RequestParam(value = "sort", defaultValue = "createdAt,desc") String sort,
+      @RequestParam(value = "adapterId", required = false) String adapterId) {
+    return service.list(page, size, sort, adapterId);
   }
 
   @GetMapping("/{id}")

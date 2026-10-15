@@ -119,6 +119,12 @@ export interface Adapter {
   id: string;
   name: string;
   status: string;
+  dialect?: string;
+  namespaceSelection?: "catalog" | "schema";
+  requiresDatabase?: boolean;
+  driverClass?: string;
+  recommendedMavenCoordinate?: string | null;
+  validatedCombinations?: { databaseVersion: string; driverVersion: string }[];
 }
 export interface CatalogModule {
   id: string;
@@ -213,6 +219,9 @@ export interface PageParams {
   page?: number;
   size?: number;
   sort?: string;
+}
+export interface ConnectionParams extends PageParams {
+  adapterId?: string;
 }
 export interface RunParams extends PageParams {
   status?: RunStatus;

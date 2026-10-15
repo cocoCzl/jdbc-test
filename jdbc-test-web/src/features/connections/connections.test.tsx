@@ -20,6 +20,38 @@ async function fillDraft(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText("Username"), "tester");
 }
 describe("Connection UI", () => {
+  it.each([undefined, "", "   ", "ordinary-password"])(
+    "sends the selected saved-probe credential unchanged: %j",
+    async (value) => {
+      const user = userEvent.setup();
+      const api = mockApi();
+      renderPage("/connections/connection-1");
+      const input = await screen.findByLabelText("Password (leave blank to keep saved credential)");
+      if (value === "") await user.click(screen.getByLabelText("Use an empty password explicitly"));
+      else if (value !== undefined) await user.type(input, value);
+      await user.click(screen.getByRole("button", { name: "Test saved connection" }));
+      await screen.findByText("Connected", { exact: true });
+      const call = api.mock.calls.find(([url]) => String(url).endsWith("/connection-1/test"))!;
+      expect(JSON.parse(call[1]!.body as string)).toEqual(value === undefined ? {} : { password: value });
+      expect(input).toHaveValue("");
+    },
+  );
+
+  it("displays custom adapter declarations without replacing an existing label or probing", async () => {
+    const user = userEvent.setup();
+    const api = mockApi(url => url.pathname === "/api/adapters" ? json([
+      { id: "private-db", name: "Private DB", status: "CANDIDATE", dialect: "postgresql",
+        namespaceSelection: "schema", driverClass: "private.Driver", recommendedMavenCoordinate: null,
+        validatedCombinations: [] },
+    ]) : undefined);
+    renderPage("/connections/new");
+    await user.type(await screen.findByLabelText("Database type"), "Historical custom label");
+    await chooseOption(user, screen.getByLabelText("Adapter"), "private-db");
+    expect(screen.getByLabelText("Database type")).toHaveValue("Historical custom label");
+    expect(screen.getByText("Declared driver class: private.Driver")).toBeVisible();
+    expect(screen.getByText("No validated version combinations declared.")).toBeVisible();
+    expect(api.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
+  });
   it("saves an explicitly selected empty password", async () => {
     const user = userEvent.setup();
     const api = mockApi((url, options) => url.pathname === "/api/connections" && options.method === "POST"

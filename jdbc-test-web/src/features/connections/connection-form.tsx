@@ -30,6 +30,7 @@ import {
 } from "@/components/common";
 import { connectionPresentation } from "@/lib/status";
 import { formatDateTime } from "@/lib/format";
+import { AdapterDetails } from "./adapter-details";
 function Editor({ connection }: { connection?: Connection }) {
   useTranslation();
   const navigate = useNavigate();
@@ -59,6 +60,7 @@ function Editor({ connection }: { connection?: Connection }) {
     queryFn: ({ signal }) => adaptersApi.list(signal),
     staleTime: 300_000,
   });
+  const selectedAdapter = adapters.data?.find((item) => item.id === form.adapterId);
   const change = (key: keyof typeof form, value: string) =>
     setForm((previous) => ({ ...previous, [key]: value }));
   const save = useMutation({
@@ -170,9 +172,9 @@ function Editor({ connection }: { connection?: Connection }) {
                 maxLength={80}
                 value={form.databaseType}
                 onChange={(event) => change("databaseType", event.target.value)}
-                hint={t("ui.anOpenLabelEGPostgreSQLAcmeDB")}
+                hint={t("adapter.displayLabelHint")}
               />
-              <Field id="adapter" label={t("ui.adapter")}>
+              <Field id="adapter" label={t("ui.adapter")} hint={t("adapter.selectionHint")}>
                 <Select
                   id="adapter"
                   required
@@ -197,6 +199,9 @@ function Editor({ connection }: { connection?: Connection }) {
                   ))}
                 </Select>
               </Field>
+              <div className="sm:col-span-2">
+                <AdapterDetails adapter={selectedAdapter} />
+              </div>
               <DriverSelect
                 value={driver?.id ?? ""}
                 selected={driver}
@@ -223,10 +228,10 @@ function Editor({ connection }: { connection?: Connection }) {
               />
               <Field id="execution-database" label={t("ui.authorizedTestDatabase")} maxLength={63}
                 value={form.executionDatabase} onChange={(event) => change("executionDatabase", event.target.value)}
-                hint={t("ui.requiredForMySQLAndPostgreSQLTestRuns")} />
+                hint={t(selectedAdapter?.requiresDatabase === false ? "adapter.databaseOptional" : "adapter.databaseRequired")} />
               <Field id="execution-schema" label={t("ui.authorizedTestSchema")} maxLength={63}
                 value={form.executionSchema} onChange={(event) => change("executionSchema", event.target.value)}
-                hint={t("ui.requiredForSchemaBasedAdaptersUseOnly")} />
+                hint={t(selectedAdapter?.namespaceSelection === "catalog" ? "adapter.schemaOptional" : "ui.requiredForSchemaBasedAdaptersUseOnly")} />
               <Field
                 id="password"
                 label={
