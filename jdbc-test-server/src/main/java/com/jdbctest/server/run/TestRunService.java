@@ -406,7 +406,7 @@ final class TestRunService {
       report.put("scenario_results", results.findByRun_Id(id).stream()
           .collect(java.util.stream.Collectors.toMap(TestCaseResultEntity::getScenarioId, row -> {
             var event = new tools.jackson.databind.ObjectMapper().readValue(
-                row.getExecutionEvidence(), java.util.Map.class);
+                JdbcUrlSanitizer.sanitizeJson(row.getExecutionEvidence()), java.util.Map.class);
             event.remove("type");
             event.remove("timestamp");
             event.remove("runId");

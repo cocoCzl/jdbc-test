@@ -90,7 +90,9 @@ final class TestRunController {
         evidence.put("cleanupState", "UNKNOWN_OR_NO_CREATE_INTENT_RECORDED");
       }
       return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON)
-          .body(new tools.jackson.databind.ObjectMapper().writeValueAsBytes(evidence));
+          .body(com.jdbctest.server.security.JdbcUrlSanitizer.sanitizeJson(
+                  new tools.jackson.databind.ObjectMapper().writeValueAsString(evidence))
+              .getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
     service.report(id);
     Path path = storage.getDataDirectory().toAbsolutePath().normalize().resolve("runs")
