@@ -216,9 +216,11 @@ class RunPostgresIT {
   }
 
   @ParameterizedTest
-  @CsvSource({"connection,17", "statement,23"})
-  void externalPostgresModulesThroughRestQueueWorkerSsePersistenceAndReports(String module,
-      int count) throws Exception {
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"connection", "statement"})
+  void externalPostgresModulesThroughRestQueueWorkerSsePersistenceAndReports(String module)
+      throws Exception {
+    int count = context.getBean(RunCatalogService.class).catalog().modules().stream()
+        .filter(item -> item.id().equals(module)).findFirst().orElseThrow().scenarioCount();
     try (var admin = java.sql.DriverManager.getConnection(TARGET.getJdbcUrl(), TARGET.getUsername(),
         TARGET.getPassword()); var statement = admin.createStatement()) {
       statement.execute("CREATE SCHEMA qa_" + module);
@@ -309,6 +311,26 @@ class RunPostgresIT {
       Files.writeString(evidenceDirectory.resolve("postgresql-" + module + "-sse.txt"), sse);
       assertEquals(count, report.path("summary").path("total").asInt());
       assertEquals(count, report.path("scenario_results").size());
+      assertEquals("SUCCESS", report.path("cleanupEvidence").path("status").asString());
+      assertEquals("MATCHED", report.path("metadataEvidence").path("status").asString());
+      assertTrue(sse.contains("event:run.cleanup"));
+      // A fresh Server application context has no original executor/event state or report cache.
+      try (var reopened = new org.springframework.boot.builder.SpringApplicationBuilder(
+          com.jdbctest.server.JdbcTestServerApplication.class)
+          .web(org.springframework.boot.WebApplicationType.NONE).run(
+              "--spring.datasource.url=" + PLATFORM.getJdbcUrl(),
+              "--spring.datasource.username=" + PLATFORM.getUsername(),
+              "--spring.datasource.password=" + PLATFORM.getPassword(),
+              "--spring.jpa.hibernate.ddl-auto=validate",
+              "--jdbc-test.security.master-key=" + Base64.getEncoder().encodeToString(new byte[32]),
+              "--jdbc-test.storage.data-directory=" + DATA)) {
+        var restored = reopened.getBean(TestRunService.class);
+        assertEquals("SUCCESS", restored.get(id).cleanupEvidence().get("status"));
+        var rebuilt = json.valueToTree(restored.evidenceReport(id));
+        assertEquals(report.path("cleanupEvidence"), rebuilt.path("cleanupEvidence"));
+        assertEquals(report.path("terminationReason"), rebuilt.path("terminationReason"));
+        assertEquals(report.path("metadataEvidence"), rebuilt.path("metadataEvidence"));
+      }
       var artifact = artifacts.findByDriver_Id(driverId).stream()
           .filter(item -> item.getFileName().equals("postgresql-external.jar")).findFirst()
           .orElseThrow();
