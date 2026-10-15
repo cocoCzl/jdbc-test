@@ -132,10 +132,87 @@ scripts/format_java.sh check
 ```
 
 Both commands use the same IDEA engine/XML; `check` is its non-writing `-d` mode.
+The explicit development source `scripts/CheckJavaRules.java` is also accepted; default roots remain
+the four modules, so use its exact path when checking the checker itself.
 Validated with IDEA 2026.2.3, build IU-262.10968.63. Its formatter does not optimize imports;
 the current import blocks were separately reordered using Java compiler source positions without
 adding/removing imports. Existing wildcard imports are retained. Do not substitute another engine,
 bypass a running IDE's instance lock, or automatically rewrite sources during Maven builds.
+
+### Java rules and verification boundaries
+
+Formatting priority is the project's `code-style/java.xml`, derived from the retained user XML;
+`.editorconfig` mirrors only its Java indentation/margin settings. Do not replace the native IDEA
+engine with google-java-format, Spotless or another formatter, or format other languages with this XML.
+For naming, exceptions, logging, collections, concurrency and security, use the applicable sections
+of the Alibaba Java Coding Guidelines, **Huangshan edition 1.7.1 (2022-02-03)**, available from the
+[official p3c repository](https://github.com/alibaba/p3c). Project-specific contracts take precedence;
+format conflicts are resolved by this project's XML. The edition is a review reference, not a claim
+that an installed plugin or the checks below implement the complete handbook.
+
+Review names and responsibilities, specific exceptions and preserved causes, meaningful logging
+without credentials, collection/generic contracts, thread/resource ownership and input validation.
+JDBC scenarios may deliberately exercise deprecated APIs or cause SQL exceptions; Worker stdout is
+the NDJSON protocol. Do not suppress these behaviors, redirect the protocol to ordinary logging,
+swallow failures, or fabricate compatibility results to satisfy a general business-code rule.
+Remove only proven redundant suppressions. Necessary narrow suppressions need a reason; never add
+`SuppressWarnings("all")`, `noinspection` or disabled inspections to hide warnings. Review actual
+source rather than folded IDE displays. Do not add meaningless logging to an intentionally ignored
+exception or change its propagation merely to satisfy a syntax check.
+
+The development-only checker uses JDK 21's public compiler tree API for parsing only, with annotation
+processing disabled. It does **not** run attribution/type analysis or load application classes.
+Run it in a source checkout. It scans every `.java` in the four modules' `src/main/java` and `src/test/java`, plus
+`scripts/CheckJavaRules.java`; it has no file/directory exclusion mechanism.
+
+| Rule | Violation | Legitimate handling / limits |
+|---|---|---|
+| `wildcard-import` | `import java.util.*;` or a static `.*` import | Explicit imports pass. Existing occurrences are individually baselined. It cannot identify unused imports or resolve imported symbols. |
+| `empty-catch` | A catch body with zero AST statements, including `{ /* explanation */ }` | A real recovery, rethrow or return statement passes this syntax rule, but its correctness requires review. Legitimate ignored exceptions need individual review; comments do not waive the rule. It cannot detect useless statements or determine whether swallowing is safe. |
+| `suppress-all` | Literal `"all"` in `@SuppressWarnings("all")`, `value = "all"` or an array | Narrow `"unchecked"`/`"deprecation"` are not violations; redundancy requires semantic/IDE review. Qualified `java.lang.SuppressWarnings` and parenthesized literals are recognized. Javac also folds adjacent string literals during parsing. Named constants and general expressions are not resolved. A same-named custom annotation can be a false positive because matching is syntactic. |
+
+Comments, ordinary strings and text blocks containing apparent violations are not code findings.
+All findings fail an unbaselined scan. Normal CI rejects new or increased findings and stale baseline
+entries. The checked-in `code-style/java-rules-baseline.json` records only reviewed occurrences as
+`[relative path, rule, enclosing class/method signature, AST detail, count]`; line numbers are only
+diagnostics. This retains historical wildcard imports/empty catches without changing business code.
+Adding another occurrence in the same declaration exceeds the count; moving one to another declaration
+changes its identity. Fixing an occurrence requires manually removing/reducing its entry. There is no
+baseline-writing mode: never regenerate it or increase allowances to make a failing change green.
+An intentional new exception requires explicit review of that exact occurrence and its rationale.
+
+```sh
+python3 -B -m unittest discover -s scripts -p 'test_java_rules.py' -v
+python3 -B scripts/check_java_rules.py
+# Read-only inventory, ignoring baseline: exits 1 if any findings exist.
+python3 -B scripts/check_java_rules.py --inventory
+# Native formatter: check only specified Java files; save and exit IDEA normally first.
+scripts/format_java.sh check scripts/CheckJavaRules.java
+git diff --check
+```
+
+Checker exit codes: **0** = no new/stale findings, **1** = rule/baseline mismatch,
+**2** = invalid input, parse error, missing JDK tool, compilation/execution error or timeout.
+All eight source roots must exist and contain Java sources; unreadable directories, source symlinks, missing paths, malformed or
+duplicate baseline entries and inconsistent tool output fail closed. Temporary compiler outputs are
+removed on success/failure. The tools are not Maven/application runtime dependencies.
+CI runs both checker contract tests and the full scoped source scan. Contract fixtures cover records,
+text blocks, comments/strings, annotation forms, baseline counts and execution failures. They are
+syntax evidence, not JDBC compatibility evidence. CI currently has no configured IDEA native runner.
+
+Report four results separately: limited static rules, checker contract tests, IDEA native formatting,
+and `git diff --check`. Neither compilation nor these rules proves complete Alibaba compliance,
+unused imports, redundant unchecked suppressions, naming/exception/logging/concurrency correctness,
+or full formatting. Missing IDEA or an instance lock means native formatting is **BLOCKED**, never
+passed; do not kill the IDE, delete locks, change its configuration or repeatedly retry. After normal
+IDE exit, rerun the specified-file command above. Optimize Imports and IDE inspections remain separate.
+
+Commit only reviewed code, automated tests, necessary fixtures/check configuration and formal project
+documentation. Task sheets, execution logs, audit reports, screenshots, evidence and review ZIPs stay
+in the existing ignored `.local/` directory or outside the repository; never add `docs/quality-evidence`.
+Local `AGENTS.md` stays ignored/untracked unless separately approved. Preserve existing workspace
+changes, configuration, Keys, data and attachments. Clean only resources created by the verification
+session, including on failure; do not rewrite history or push/PR/tag/release without authorization.
 
 ## Web UI
 

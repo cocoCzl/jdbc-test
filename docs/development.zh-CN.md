@@ -129,9 +129,72 @@ scripts/format_java.sh check
 ```
 
 apply/check 使用同一 IDEA 原生引擎和 XML；check 使用不写文件的 `-d`。
+另接受开发工具的精确路径 `scripts/CheckJavaRules.java`；默认目录仍只有四模块，检查器自身需显式指定。
 已在 IDEA 2026.2.3（IU-262.10968.63）验证。原生命令不会 Optimize Imports；
 当前 import 块另外通过 Java 编译器源码位置重排，未增删导入，已有通配导入保留。
 不替换格式引擎、不绕过正在运行的 IDE 实例锁，普通 Maven 构建不会自动改写源码。
+
+### Java 规则与验证边界
+
+格式以项目 `code-style/java.xml` 为准，其来源是保留的用户原始 XML；`.editorconfig`
+只同步 Java 缩进与列宽。不得替换为 google-java-format、Spotless 或另一格式器，不将此 XML
+用于其他语言。命名、异常、日志、集合、并发和安全采用阿里巴巴 Java 开发手册
+**黄山版 1.7.1（2022-02-03）**的适用章节，来源为[官方 p3c 仓库](https://github.com/alibaba/p3c)。
+项目明确约定优先，格式冲突按本项目 XML 处理。该版本用于人工审查，不表示安装插件或执行
+下列检查就完整覆盖了手册。
+
+审查命名与职责、具体异常与原因保留、有意义且不含凭据的日志、集合及泛型契约、线程与资源
+归属、输入校验。JDBC 场景可以故意调用过时 API 或制造 SQL 异常，Worker stdout 承载 NDJSON
+协议；不得因此禁止必要测试、将协议改成普通日志、吞掉失败或伪造兼容结论。
+只删除有证据表明冗余的抑制；必要抑制应范围最小并说明原因。不得新增
+`SuppressWarnings("all")`、`noinspection` 或关闭 inspection 来隐藏问题。核对实际源码，
+不能根据 IDE 折叠显示判断排版。不得为通过语法检查给故意忽略的异常添加无意义日志或改变传播。
+
+开发检查器仅使用 JDK 21 编译器公开树 API 解析语法，禁用注解处理，不进行类型归属/语义分析，
+不加载应用类。在源码 checkout 中运行，扫描四模块全部 `src/main/java`、`src/test/java` 中的 `.java`，以及
+`scripts/CheckJavaRules.java`，没有文件或目录排除机制。
+
+| 规则 | 违规示例 | 合法处理与限制 |
+|---|---|---|
+| `wildcard-import` | `import java.util.*;` 或静态 `.*` import | 显式导入通过；已有通配导入逐项基线保留。不能判断无用 import，也不解析符号。 |
+| `empty-catch` | catch 体没有 AST 语句，包括 `{ /* 说明 */ }` | 实际恢复、重新抛出或 return 语句通过本条语法检查，正确性仍需审查。确需忽略的异常逐项审查，注释不自动豁免。不能识别无意义语句或判断吞异常是否安全。 |
+| `suppress-all` | `@SuppressWarnings("all")`、`value = "all"` 或数组中出现字面量 `"all"` | 不将 `"unchecked"`/`"deprecation"` 判为违规；冗余性需语义/IDE 审查。识别全限定 `java.lang.SuppressWarnings` 和带括号字面量；javac 在解析期也会折叠相邻字符串字面量。不解析命名常量或一般表达式；按语法名称匹配可能误报同名自定义注解。 |
+
+注释、普通字符串、text block 中的伪代码不计为违规。无基线扫描发现任一问题即失败；正常 CI
+拒绝新增、次数增加及已过期的基线。正式配置 `code-style/java-rules-baseline.json` 仅记录已审查
+实例，格式为 `[相对路径, 规则, 所属类/方法签名, AST 内容, 次数]`，行号仅用于定位。
+因此可以保留历史通配导入和空 catch，而不修改业务代码。同一声明增加一处会超过次数，移动到
+另一声明会改变身份。修复后必须手动删除或减少对应基线。工具没有写基线模式；不得重新生成
+基线或增加额度使失败变绿。新的有意例外必须对该具体实例及理由单独审查。
+
+```sh
+python3 -B -m unittest discover -s scripts -p 'test_java_rules.py' -v
+python3 -B scripts/check_java_rules.py
+# 只读盘点，忽略基线；存在任一问题时退出 1。
+python3 -B scripts/check_java_rules.py --inventory
+# 原生格式检查仅指定 Java 文件，先保存并正常退出 IDEA。
+scripts/format_java.sh check scripts/CheckJavaRules.java
+git diff --check
+```
+
+检查器退出码：**0** 表示没有新增/过期基线，**1** 表示规则或基线不匹配，**2** 表示输入无效、
+解析失败、缺 JDK 工具、编译/执行错误或超时。八个源码根必须存在且包含 Java 文件；目录不可读、源码符号链接、
+缺失路径、基线格式错误或重复条目、工具输出不一致均报错退出。编译临时产物在成功/失败后
+删除；工具不进入 Maven 或应用运行时依赖。CI 实际执行检查器契约测试和上述全部范围扫描；
+fixture 覆盖 record、text block、注释/字符串、注解形式、基线次数和执行异常。它们只提供语法
+检查证据，不代表 JDBC 兼容性。当前 CI 未配置 IDEA 原生运行环境。
+
+交付时分别报告：有限静态规则、检查器契约测试、IDEA 原生格式、`git diff --check`。
+编译和语法检查均不能证明完整 Alibaba 合规、无用 import、unchecked 抑制冗余、命名/异常/
+日志/并发正确性或全量格式。缺 IDEA 或实例锁阻塞时原生格式标记为 **BLOCKED**，不能写通过；
+不强关 IDE、不删锁、不改用户配置、不反复重试。正常退出 IDEA 后补跑上述指定文件命令。
+Optimize Imports 和 IDE inspection 仍需独立审查。
+
+只提交经审查的代码、自动化测试、必要 fixture/检查配置及正式项目文档。任务书、执行日志、
+审查报告、截图、证据和审查 ZIP 只留在现有忽略目录 `.local/` 或仓库外，不新增
+`docs/quality-evidence`。本地 `AGENTS.md` 未经单独批准保持忽略、未跟踪。保留工作区修改、
+配置、Key、数据和附件；验证失败时也清理本轮创建的资源，不删除未知归属资源。
+未经授权不重写历史、不 push/PR/tag/release。
 
 ## Web UI
 

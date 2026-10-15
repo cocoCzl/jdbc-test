@@ -6,7 +6,7 @@ cd "$repo_dir"
 
 case "${1:-}" in
   apply|check) mode="$1" ;;
-  *) echo "Usage: scripts/format_java.sh apply|check [module/src/{main,test}/java/file.java ...]" >&2; exit 2 ;;
+  *) echo "Usage: scripts/format_java.sh apply|check [module/src/{main,test}/java/file.java | scripts/CheckJavaRules.java ...]" >&2; exit 2 ;;
 esac
 shift
 
@@ -25,8 +25,8 @@ paths=()
 if [[ $# -gt 0 ]]; then
   for file in "$@"; do
     case "$file" in
-      jdbc-test-core/src/main/java/*.java|jdbc-test-core/src/test/java/*.java|jdbc-test-suite/src/main/java/*.java|jdbc-test-suite/src/test/java/*.java|jdbc-test-worker/src/main/java/*.java|jdbc-test-worker/src/test/java/*.java|jdbc-test-server/src/main/java/*.java|jdbc-test-server/src/test/java/*.java) ;;
-      *) echo "Not a Java source in the four modules: $file" >&2; exit 2 ;;
+      jdbc-test-core/src/main/java/*.java|jdbc-test-core/src/test/java/*.java|jdbc-test-suite/src/main/java/*.java|jdbc-test-suite/src/test/java/*.java|jdbc-test-worker/src/main/java/*.java|jdbc-test-worker/src/test/java/*.java|jdbc-test-server/src/main/java/*.java|jdbc-test-server/src/test/java/*.java|scripts/CheckJavaRules.java) ;;
+      *) echo "Not a module Java source or the development checker: $file" >&2; exit 2 ;;
     esac
     if [[ "$file" == *'/../'* || ! -f "$file" || -L "$file" ]]; then
       echo "Invalid Java source path: $file" >&2; exit 2

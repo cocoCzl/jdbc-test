@@ -27,6 +27,10 @@ jobs:
           distribution: temurin
           java-version: "21"
           cache: maven
+      - name: Test limited Java rule checker contracts
+        run: python -B -m unittest discover -s scripts -p 'test_java_rules.py' -v
+      - name: Check Java sources against reviewed occurrence baseline
+        run: python -B scripts/check_java_rules.py
       - name: Validate Python contracts and adapters
         env:
           PYTHONPATH: scripts
