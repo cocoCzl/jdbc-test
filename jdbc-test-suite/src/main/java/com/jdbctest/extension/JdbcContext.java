@@ -55,10 +55,10 @@ public final class JdbcContext {
         : createHikariDataSource(config);
     closeDataSource(dataSource);
     dataSource = replacement;
+    // Inspect the raw connection before auto-namespace creation or scoped fixture access.
+    publishAndValidateMetadata(config);
     provisionNamespace(config);
     dataSource = new ScopedDataSource(dataSource, config);
-    // Mutating privilege probes are unnecessary: owned CREATE operations report precise failures.
-    publishAndValidateMetadata(config);
   }
 
   private static HikariDataSource createHikariDataSource(Config config) {
@@ -131,8 +131,17 @@ public final class JdbcContext {
     return new IllegalStateException("最小权限预检失败 [" + privilege + "]: " + message, error);
   }
 
+  private static volatile Map<String, Object> metadataEvidence = Map.of("status", "UNKNOWN");
+
+  public static Map<String, Object> metadataEvidence() {
+    return metadataEvidence;
+  }
+
   private static void publishAndValidateMetadata(Config config) {
-    try (Connection connection = getConnection()) {
+    Map<String, Object> evidence = new java.util.LinkedHashMap<>();
+    evidence.put("status", "UNKNOWN");
+    metadataEvidence = Map.copyOf(evidence);
+    try (Connection connection = dataSource.getConnection()) {
       DatabaseMetaData meta = connection.getMetaData();
       String product = nullToEmpty(meta.getDatabaseProductName());
       String productVersion = nullToEmpty(meta.getDatabaseProductVersion());
@@ -145,12 +154,23 @@ public final class JdbcContext {
       System.setProperty("jdbc.test.jdbcUrl", "redacted");
       System.setProperty("jdbc.test.adapterId", config.db.adapterId);
       System.setProperty("jdbc.test.namespace", namespace == null ? "" : namespace.name);
+      evidence.put("databaseProductName", product);
+      evidence.put("databaseProductVersion", productVersion);
+      evidence.put("driverName", driver);
+      evidence.put("driverVersion", driverVersion);
+      metadataEvidence = Map.copyOf(evidence);
       validateRegex("数据库产品", product, config.db.expectedDatabaseProductRegex);
       validateRegex("JDBC 驱动", driver, config.db.expectedDriverNameRegex);
       validateVersion("数据库版本", productVersion, config.db.databaseVersionMin,
           config.db.databaseVersionMax);
       validateVersion("驱动版本", driverVersion, config.db.driverVersionMin,
           config.db.driverVersionMax);
+      evidence.put("status", "MATCHED");
+      metadataEvidence = Map.copyOf(evidence);
+    } catch (RuntimeException error) {
+      evidence.put("status", "REJECTED");
+      metadataEvidence = Map.copyOf(evidence);
+      throw new IllegalStateException("ADAPTER_PREFLIGHT_FAILED", error);
     } catch (SQLException e) {
       throw new IllegalStateException("JDBC 元数据预检失败", e);
     }
@@ -165,7 +185,10 @@ public final class JdbcContext {
 
   private static void validateVersion(String label, String observed, String minimum,
       String maximum) {
-    int[] actual = version(observed);
+    if ((minimum == null || minimum.isBlank()) && (maximum == null || maximum.isBlank())) {
+      return;
+    }
+    var actual = version(observed);
     if (minimum != null && !minimum.isBlank() && compare(actual, version(minimum)) < 0) {
       throw new IllegalStateException(label + "低于适配范围: " + observed);
     }
@@ -174,24 +197,22 @@ public final class JdbcContext {
     }
   }
 
-  private static int[] version(String value) {
-    String[] parts = value == null ? new String[0] : value.split("[^0-9]+");
-    int[] result = new int[] {0, 0, 0, 0};
-    int index = 0;
-    for (String part : parts) {
-      if (!part.isEmpty() && index < result.length) {
-        result[index++] = Integer.parseInt(part);
-      }
+  private static java.math.BigInteger[] version(String value) {
+    var matcher = Pattern.compile("[0-9]+(?:\\.[0-9]+)*").matcher(value == null ? "" : value);
+    if (!matcher.find()) {
+      throw new IllegalStateException("ADAPTER_VERSION_UNPARSEABLE");
     }
-    return result;
+    return java.util.Arrays.stream(matcher.group().split("\\."))
+        .map(java.math.BigInteger::new).toArray(java.math.BigInteger[]::new);
   }
 
-  private static int compare(int[] left, int[] right) {
+  private static int compare(java.math.BigInteger[] left, java.math.BigInteger[] right) {
     for (int i = 0; i < Math.max(left.length, right.length); i++) {
-      int l = i < left.length ? left[i] : 0;
-      int r = i < right.length ? right[i] : 0;
-      if (l != r) {
-        return Integer.compare(l, r);
+      var l = i < left.length ? left[i] : java.math.BigInteger.ZERO;
+      var r = i < right.length ? right[i] : java.math.BigInteger.ZERO;
+      int result = l.compareTo(r);
+      if (result != 0) {
+        return result;
       }
     }
     return 0;

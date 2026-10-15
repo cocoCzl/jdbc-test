@@ -147,6 +147,25 @@ class AdapterRuntimeTest(unittest.TestCase):
         self.assertTrue(runtime["namespace"]["name"].startswith("jdbc_test_"))
         self.assertEqual("official", runtime["adapter"]["trust"])
 
+    def test_identity_and_version_declarations_reach_runtime_for_every_builtin(self):
+        for adapter_id in discover_adapters(PROJECT_ROOT):
+            adapter = load_adapter(PROJECT_ROOT, adapter_id)
+            user = {
+                "db": {"url": "jdbc:fixture:test", "username": "fixture", "password_env": "TEST_DB_PASSWORD"},
+                "namespace": {"mode": "existing", "name": "owned_scope", "destructive_consent": True},
+            }
+            with patch.dict(os.environ, {"TEST_DB_PASSWORD": ""}):
+                runtime = build_runtime_config(PROJECT_ROOT, user, adapter, {"sha256": "fixture"})
+            manifest = adapter.manifest
+            self.assertEqual(manifest["identity"]["database_product_regex"], runtime["db"]["expected_database_product_regex"])
+            self.assertEqual(manifest["identity"]["driver_name_regex"], runtime["db"]["expected_driver_name_regex"])
+            for target in ("database", "driver"):
+                for endpoint in ("min", "max"):
+                    self.assertEqual(manifest["supported_versions"].get(target, {}).get(endpoint, ""),
+                                     runtime["db"][f"{target}_version_{endpoint}"])
+            self.assertEqual(manifest["dialect"], runtime["db"]["dialect"])
+            self.assertEqual(manifest["assets"].get("directory", adapter_id), runtime["db"]["asset_id"])
+
     def test_run_requires_explicit_destructive_consent(self):
         adapter = load_adapter(PROJECT_ROOT, "mysql")
         user = {

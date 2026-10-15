@@ -26,6 +26,10 @@ final class WorkerReportWriter {
     Map<String, Object> report = new LinkedHashMap<>();
     report.put("report_schema_version", "2.0.0");
     report.put("scope", request.scope());
+    report.put("adapterExecution", request.adapterExecution() == null
+        ? com.jdbctest.catalog.AdapterExecutionConfig.load(request.connection().adapterId())
+        : request.adapterExecution());
+    report.put("metadataEvidence", com.jdbctest.extension.JdbcContext.metadataEvidence());
     report.put("capabilities", request.capabilities());
     report.put("dataSources", request.driver().dataSources() == null ? Map.of()
         : request.driver().dataSources().toMap());

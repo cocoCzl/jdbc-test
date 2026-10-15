@@ -16,8 +16,17 @@ public record WorkerRunRequest(
     com.jdbctest.catalog.ExecutionScope scope,
     String objectPrefix,
     Map<String, Boolean> capabilities,
-    Boolean destructiveConsent
+    Boolean destructiveConsent,
+    com.jdbctest.catalog.AdapterExecutionConfig adapterExecution
 ) {
+
+  public WorkerRunRequest(Integer protocolVersion, String runId, DriverRequest driver,
+      ConnectionRequest connection, SelectionRequest selection, String workspace, Long timeoutMs,
+      com.jdbctest.catalog.ExecutionScope scope, String objectPrefix,
+      Map<String, Boolean> capabilities, Boolean destructiveConsent) {
+    this(protocolVersion, runId, driver, connection, selection, workspace, timeoutMs, scope,
+        objectPrefix, capabilities, destructiveConsent, null);
+  }
 
   @JsonIgnoreProperties(ignoreUnknown = false)
   public record DriverRequest(String driverClass, List<String> artifacts,

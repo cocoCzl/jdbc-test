@@ -65,6 +65,17 @@ public class TestRunEntity {
   @Column(name = "driver_fingerprint_snapshot", length = 128)
   private String driverFingerprintSnapshot;
 
+  @Column(name = "metadata_evidence", columnDefinition = "text")
+  private String metadataEvidence;
+
+  public String getMetadataEvidence() {
+    return metadataEvidence;
+  }
+
+  void setMetadataEvidence(String value) {
+    metadataEvidence = value;
+  }
+
   @Column(name = "cleanup_evidence", columnDefinition = "text")
   private String cleanupEvidence;
   @Column(name = "worker_termination_reason", length = 100)

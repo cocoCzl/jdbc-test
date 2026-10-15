@@ -15,6 +15,24 @@ class AdapterExecutionConfigTest {
           config.capabilities().keySet().containsAll(AdapterExecutionConfig.REQUIRED_CAPABILITIES),
           id);
       assertNotNull(config.identifierQuote());
+      try (var input = getClass().getResourceAsStream("/adapters/" + id + "/adapter.json")) {
+        Map<?, ?> manifest = new org.yaml.snakeyaml.Yaml().load(input);
+        var identity = (Map<?, ?>) manifest.get("identity");
+        assertEquals(identity.get("database_product_regex"),
+            config.metadataConstraints().get("expected_database_product_regex"));
+        assertEquals(identity.get("driver_name_regex"),
+            config.metadataConstraints().get("expected_driver_name_regex"));
+        var versions = (Map<?, ?>) manifest.get("supported_versions");
+        for (String target : List.of("database", "driver")) {
+          var endpoints = (Map<?, ?>) versions.get(target);
+          for (String endpoint : List.of("min", "max")) {
+            assertEquals(endpoints.get(endpoint),
+                config.metadataConstraints().get(target + "_version_" + endpoint));
+          }
+        }
+      } catch (java.io.IOException error) {
+        fail(error);
+      }
     }
     assertTrue(AdapterExecutionConfig.load("postgresql").capabilities().get("array_type"));
     assertFalse(AdapterExecutionConfig.load("mysql").capabilities().get("array_type"));

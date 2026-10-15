@@ -35,6 +35,10 @@ class WorkerMainTest {
     try {
       System.setProperty("config.yaml", config.toString());
       var loaded = com.jdbctest.config.ConfigLoader.load();
+      assertEquals("PostgreSQL", loaded.db.expectedDatabaseProductRegex);
+      assertEquals("PostgreSQL JDBC Driver", loaded.db.expectedDriverNameRegex);
+      assertEquals("9.6", loaded.db.databaseVersionMin);
+      assertEquals("43", loaded.db.driverVersionMax);
       assertEquals(password, loaded.db.password);
       assertEquals(providers, loaded.db.dataSources);
     } finally {

@@ -122,6 +122,8 @@ public final class WorkerMain {
       System.setProperty("config.yaml", configFile.toString());
       WorkerExecutionEvidence evidence = execute(request, selected);
       evidence.recordCleanup(JdbcContext.cleanupEvidence());
+      events.write("METADATA_VALIDATED", request.runId(),
+          Map.of("metadataEvidence", JdbcContext.metadataEvidence()));
       WorkerReportWriter.write(workspace, request, selected, evidence);
       boolean failed = !"COMPLETED".equals(evidence.terminationReason());
       events.write("RUN_FINISHED", request.runId(),
@@ -443,8 +445,14 @@ public final class WorkerMain {
         blank(request.connection().adapterId()) ? "worker" : request.connection().adapterId();
     db.put("type", adapterId);
     db.put("adapter_id", adapterId);
-    db.put("asset_id", adapterId);
-    db.put("dialect", adapterId);
+    var adapter = request.adapterExecution() == null
+        ? com.jdbctest.catalog.AdapterExecutionConfig.load(adapterId) : request.adapterExecution();
+    if (!adapterId.equals(adapter.id())) {
+      throw new IllegalArgumentException("ADAPTER_SNAPSHOT_MISMATCH");
+    }
+    db.put("asset_id", adapter.assetId());
+    db.put("dialect", adapter.dialect());
+    db.putAll(adapter.metadataConstraints());
     db.put("url", request.connection().jdbcUrl());
     db.put("username", request.connection().username());
     db.put("password", request.connection().password());
@@ -459,7 +467,6 @@ public final class WorkerMain {
     config.put("ddl", Map.of("base_path", "classpath:ddl"));
     config.put("dml", Map.of("base_path", "classpath:dml"));
     config.put("pool", Map.of("profile_dir", "classpath:pool"));
-    var adapter = com.jdbctest.catalog.AdapterExecutionConfig.load(adapterId);
     db.put("identifier_quote", adapter.identifierQuote());
     Map<String, Object> namespace = new LinkedHashMap<>();
     namespace.put("mode", "existing");

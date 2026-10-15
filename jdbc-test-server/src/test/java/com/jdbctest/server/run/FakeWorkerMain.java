@@ -179,6 +179,9 @@ public final class FakeWorkerMain {
     report.put("cleanupEvidence", cleanup);
     report.put("terminationReason", reason);
     report.put("scope", request.get("scope"));
+    if (request.containsKey("adapterExecution")) {
+      report.put("adapterExecution", request.get("adapterExecution"));
+    }
     report.put("capabilities", request.get("capabilities"));
     Object providers = ((Map<?, ?>) request.get("driver")).get("dataSources");
     if (providers instanceof Map<?, ?>) {

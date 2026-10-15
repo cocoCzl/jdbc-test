@@ -795,6 +795,8 @@ class DeterministicOrchestrationTest {
     var frozen = mapper.readTree(runs.findById(response.id()).orElseThrow().getExecutionInput());
     assertEquals("custom.jdbc.Source", frozen.path("dataSources").path("dataSource")
         .path("className").asString());
+    assertEquals("PostgreSQL", frozen.path("adapterExecution").path("metadataConstraints")
+        .path("expected_database_product_regex").asString());
     assertTrue(frozen.path("capabilities").path("data_source").asBoolean());
     assertFalse(frozen.path("capabilities").path("xa_data_source").asBoolean());
     mvc.perform(patch("/api/drivers/{id}", driverId)

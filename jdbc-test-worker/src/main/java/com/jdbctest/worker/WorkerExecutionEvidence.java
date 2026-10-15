@@ -66,6 +66,13 @@ final class WorkerExecutionEvidence implements TestExecutionListener {
       if (result.getStatus() != TestExecutionResult.Status.SUCCESSFUL) {
         Map<String, Object> issue = new LinkedHashMap<>();
         issue.put("level", "CONTAINER");
+        Throwable cause = result.getThrowable().orElse(null);
+        for (int depth = 0; cause != null && depth < 10; depth++, cause = cause.getCause()) {
+          if ("ADAPTER_PREFLIGHT_FAILED".equals(cause.getMessage())) {
+            issue.put("phase", "PREFLIGHT");
+            break;
+          }
+        }
         issue.put("containerId", id.getUniqueId());
         issue.put("status", result.getStatus().name());
         issue.put("affectedScenarios", plan == null ? List.of() : plan.getDescendants(id).stream()
@@ -160,7 +167,8 @@ final class WorkerExecutionEvidence implements TestExecutionListener {
 
   synchronized String terminationReason() {
     if (!issues.isEmpty()) {
-      return "CONTAINER_FAILURE";
+      return issues.stream().anyMatch(issue -> "PREFLIGHT".equals(issue.get("phase")))
+          ? "PREFLIGHT_FAILURE" : "CONTAINER_FAILURE";
     }
     if (results.size() != methods.size()) {
       return "INCOMPLETE_EXECUTION";

@@ -241,6 +241,9 @@ final class TestRunExecutor {
                 input.scenarios(), "excludeScenarios", List.of()), "workspace",
             workspace.toString(), "timeoutMs", execution.getRunTimeout().toMillis()));
     request.put("protocolVersion", 2);
+    if (input.frozen().has("adapterExecution")) {
+      request.put("adapterExecution", input.frozen().path("adapterExecution"));
+    }
     request.put("scope", input.frozen().path("scope"));
     request.put("objectPrefix", input.frozen().path("objectPrefix").asString());
     request.put("capabilities", input.frozen().path("capabilities"));
@@ -308,6 +311,18 @@ final class TestRunExecutor {
         runs.save(run);
         events.publish(runId, "run.issue",
             mapper.convertValue(issues.get(issues.size() - 1), Map.class));
+      });
+      case "METADATA_VALIDATED" -> transactions.executeWithoutResult(tx -> {
+        TestRunEntity run = runs.findForUpdate(runId).orElseThrow();
+        if (TestRunStateTransitions.terminal(run.getStatus())) {
+          return;
+        }
+        if (!event.path("metadataEvidence").isObject()) {
+          throw protocol("Missing metadata evidence");
+        }
+        run.setMetadataEvidence(JdbcUrlSanitizer.sanitizeJson(
+            mapper.writeValueAsString(event.path("metadataEvidence"))));
+        runs.save(run);
       });
       case "CLEANUP_FINISHED" -> transactions.executeWithoutResult(tx -> {
         TestRunEntity run = runs.findForUpdate(runId).orElseThrow();
@@ -509,7 +524,9 @@ final class TestRunExecutor {
           && "SUCCESS".equals(text(mapper.readTree(run.getCleanupEvidence()), "status"));
       boolean expectedFailure = failed || hasIssues || !complete || started.isEmpty()
           || !cleanupSuccess;
-      String expectedReason = hasIssues ? "CONTAINER_FAILURE" : !complete ? "INCOMPLETE_EXECUTION"
+      boolean preflightFailure = hasIssues && mapper.readTree(run.getExecutionIssues())
+          .valueStream().anyMatch(issue -> "PREFLIGHT".equals(text(issue, "phase")));
+      String expectedReason = hasIssues ? preflightFailure ? "PREFLIGHT_FAILURE" : "CONTAINER_FAILURE" : !complete ? "INCOMPLETE_EXECUTION"
           : started.isEmpty() ? "NO_TESTS_EXECUTED" : failed ? "TEST_FAILURE"
               : !cleanupSuccess ? "CLEANUP_FAILURE" : "COMPLETED";
       boolean reasonValid = expectedReason.equals(reason) && (complete || hasIssues);
@@ -550,6 +567,10 @@ final class TestRunExecutor {
           && report.path("scope").equals(frozen.path("scope"))
           && report.path("objectPrefix").equals(frozen.path("objectPrefix"))
           && report.path("capabilities").equals(frozen.path("capabilities"))
+          && (!frozen.has("adapterExecution")
+          || report.path("adapterExecution").equals(frozen.path("adapterExecution")))
+          && (run.getMetadataEvidence() == null || report.path("metadataEvidence")
+          .equals(mapper.readTree(run.getMetadataEvidence())))
           && (!frozen.has("dataSources")
           || report.path("dataSources").equals(frozen.path("dataSources")))
           && summary.path("total").asInt(-1) == run.getTotalCases()
