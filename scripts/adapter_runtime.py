@@ -172,8 +172,8 @@ def build_runtime_config(
     manifest = adapter.manifest
     db = user_config.get("db") or {}
     password_env = db.get("password_env", "DB_PASSWORD")
-    password = os.environ.get(password_env, "")
-    if not password:
+    password = os.environ.get(password_env)
+    if password is None:
         raise ValueError(f"环境变量 {password_env} 未设置")
     connection_mode = str(db.get("connection_mode", "hikari"))
     if connection_mode not in {"hikari", "driver_manager"}:
