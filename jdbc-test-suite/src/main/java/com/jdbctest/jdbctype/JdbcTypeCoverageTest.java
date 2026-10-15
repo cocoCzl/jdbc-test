@@ -8,6 +8,7 @@ import com.jdbctest.extension.RequiresFeature;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.SQLXML;
 import java.sql.Types;
 import java.util.HashSet;
 import java.util.Set;
@@ -36,7 +37,9 @@ class JdbcTypeCoverageTest {
   @Test
   @RequiresFeature("sqlxml")
   void testSqlXmlApi(Connection connection) throws SQLException {
-    assertNotNull(connection.createSQLXML());
+    SQLXML xml = connection.createSQLXML();
+    assertNotNull(xml);
+    xml.free();
   }
 
   @Test

@@ -7,14 +7,10 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.yaml.snakeyaml.Yaml;
 
 public class ConfigLoader {
-
-  private static final Pattern ENV_PATTERN = Pattern.compile("\\$\\{([^}]+)}");
 
   private static final Map<Path, Config> CACHE = new HashMap<>();
 
@@ -77,7 +73,8 @@ public class ConfigLoader {
     config.db.assetId = nonBlank(str(db.get("asset_id")), config.db.adapterId);
     config.db.dialect = nonBlank(str(db.get("dialect")), config.db.type);
     config.db.username = str(db.get("username"));
-    config.db.password = resolveEnv(str(db.get("password")));
+    config.db.password = password(db);
+    config.db.dataSources = com.jdbctest.catalog.DataSourceProviders.fromMap(db.get("data_sources"));
     config.db.url = str(db.get("url"));
     config.db.driverClass = str(db.get("driver_class"));
     config.db.connectionMode = nonBlank(str(db.get("connection_mode")), "hikari");
@@ -246,18 +243,29 @@ public class ConfigLoader {
     return value == null || value.isBlank() ? fallback : value;
   }
 
-  private static String resolveEnv(String value) {
+  private static String password(Map<String, Object> db) {
+    return resolvePassword(db, System::getenv);
+  }
+
+  static String resolvePassword(Map<String, Object> db,
+      java.util.function.Function<String, String> environment) {
+    if (db.containsKey("password") && db.containsKey("password_env")) {
+      throw new IllegalStateException("Use either db.password or db.password_env");
+    }
+    if (!db.containsKey("password_env")) {
+      if (db.containsKey("password") && !(db.get("password") instanceof String)) {
+        throw new IllegalStateException("db.password must be a string");
+      }
+      return str(db.get("password"));
+    }
+    String name = str(db.get("password_env"));
+    if (!name.matches("[A-Za-z_][A-Za-z0-9_]*")) {
+      throw new IllegalStateException("db.password_env must be an environment variable name");
+    }
+    String value = environment.apply(name);
     if (value == null) {
-      return null;
+      throw new IllegalStateException("Password environment variable is not set: " + name);
     }
-    Matcher m = ENV_PATTERN.matcher(value);
-    StringBuilder sb = new StringBuilder();
-    while (m.find()) {
-      String envName = m.group(1);
-      String envValue = System.getenv(envName);
-      m.appendReplacement(sb, Matcher.quoteReplacement(envValue != null ? envValue : ""));
-    }
-    m.appendTail(sb);
-    return sb.toString();
+    return value;
   }
 }

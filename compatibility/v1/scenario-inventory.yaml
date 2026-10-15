@@ -521,47 +521,47 @@ scenarios:
   source_method: testSupportsTransactions
   required_capabilities: []
 - scenario_id: datasource.data_source_not_null
-  category: core
+  category: extended
   contract: datasource data source not null follows the JDBC-facing API contract.
   source_class: com.jdbctest.datasource.DataSourceTest
   source_method: testDataSourceNotNull
-  required_capabilities: []
+  required_capabilities: ["data_source"]
 - scenario_id: datasource.get_connection
-  category: core
+  category: extended
   contract: datasource get connection follows the JDBC-facing API contract.
   source_class: com.jdbctest.datasource.DataSourceTest
   source_method: testGetConnection
-  required_capabilities: []
+  required_capabilities: ["data_source"]
 - scenario_id: datasource.get_connection_with_auth
-  category: core
+  category: extended
   contract: datasource get connection with auth follows the JDBC-facing API contract.
   source_class: com.jdbctest.datasource.DataSourceTest
   source_method: testGetConnectionWithAuth
-  required_capabilities: []
+  required_capabilities: ["data_source"]
 - scenario_id: datasource.get_parent_logger
-  category: core
+  category: extended
   contract: datasource get parent logger follows the JDBC-facing API contract.
   source_class: com.jdbctest.datasource.DataSourceTest
   source_method: testGetParentLogger
-  required_capabilities: []
+  required_capabilities: ["data_source"]
 - scenario_id: datasource.log_writer
-  category: core
+  category: extended
   contract: datasource log writer follows the JDBC-facing API contract.
   source_class: com.jdbctest.datasource.DataSourceTest
   source_method: testLogWriter
-  required_capabilities: []
+  required_capabilities: ["data_source"]
 - scenario_id: datasource.login_timeout
-  category: core
+  category: extended
   contract: datasource login timeout follows the JDBC-facing API contract.
   source_class: com.jdbctest.datasource.DataSourceTest
   source_method: testLoginTimeout
-  required_capabilities: []
+  required_capabilities: ["data_source"]
 - scenario_id: datasource.multiple_connections
-  category: core
+  category: extended
   contract: datasource multiple connections follows the JDBC-facing API contract.
   source_class: com.jdbctest.datasource.DataSourceTest
   source_method: testMultipleConnections
-  required_capabilities: []
+  required_capabilities: ["data_source"]
 - scenario_id: parameter_metadata.get_parameter_class_name
   category: extended
   contract: parameter metadata get parameter class name follows the JDBC-facing API
@@ -1263,11 +1263,11 @@ scenarios:
   source_method: testConnectionWrapper
   required_capabilities: []
 - scenario_id: wrapper.data_source_wrapper
-  category: core
+  category: extended
   contract: wrapper data source wrapper follows the JDBC-facing API contract.
   source_class: com.jdbctest.wrapper.WrapperTest
   source_method: testDataSourceWrapper
-  required_capabilities: []
+  required_capabilities: ["data_source"]
 - scenario_id: wrapper.meta_data_wrapper
   category: core
   contract: wrapper meta data wrapper follows the JDBC-facing API contract.
@@ -1279,4 +1279,432 @@ scenarios:
   contract: wrapper statement and result set wrapper follows the JDBC-facing API contract.
   source_class: com.jdbctest.wrapper.WrapperTest
   source_method: testStatementAndResultSetWrapper
+  required_capabilities: []
+- scenario_id: blob_clob.blob_partial_write
+  category: extended
+  contract: "blob clob blob partial write follows the JDBC-facing API contract when capabilities blobs, lob_objects are declared."
+  source_class: com.jdbctest.blobclob.BlobObjectTest
+  source_method: testBlobPartialWrite
+  required_capabilities: ["blobs", "lob_objects"]
+- scenario_id: blob_clob.blob_truncate
+  category: extended
+  contract: "blob clob blob truncate follows the JDBC-facing API contract when capabilities blobs, lob_objects are declared."
+  source_class: com.jdbctest.blobclob.BlobObjectTest
+  source_method: testBlobTruncate
+  required_capabilities: ["blobs", "lob_objects"]
+- scenario_id: blob_clob.blob_invalid_bounds
+  category: extended
+  contract: "blob clob blob invalid bounds follows the JDBC-facing API contract when capabilities blobs, lob_objects are declared."
+  source_class: com.jdbctest.blobclob.BlobObjectTest
+  source_method: testBlobInvalidBounds
+  required_capabilities: ["blobs", "lob_objects"]
+- scenario_id: blob_clob.blob_after_free
+  category: extended
+  contract: "blob clob blob after free follows the JDBC-facing API contract when capabilities blobs, lob_objects are declared."
+  source_class: com.jdbctest.blobclob.BlobObjectTest
+  source_method: testBlobAfterFree
+  required_capabilities: ["blobs", "lob_objects"]
+- scenario_id: blob_clob.blob_stream_round_trip
+  category: extended
+  contract: "blob clob blob stream round trip follows the JDBC-facing API contract when capabilities blobs, lob_objects are declared."
+  source_class: com.jdbctest.blobclob.BlobObjectTest
+  source_method: testBlobStreamRoundTrip
+  required_capabilities: ["blobs", "lob_objects"]
+- scenario_id: blob_clob.clob_partial_write
+  category: extended
+  contract: "blob clob clob partial write follows the JDBC-facing API contract when capabilities clobs, lob_objects are declared."
+  source_class: com.jdbctest.blobclob.ClobObjectTest
+  source_method: testClobPartialWrite
+  required_capabilities: ["clobs", "lob_objects"]
+- scenario_id: blob_clob.clob_truncate_multibyte_characters
+  category: extended
+  contract: "blob clob clob truncate multibyte characters follows the JDBC-facing API contract when capabilities clobs, lob_objects are declared."
+  source_class: com.jdbctest.blobclob.ClobObjectTest
+  source_method: testClobTruncateMultibyteCharacters
+  required_capabilities: ["clobs", "lob_objects"]
+- scenario_id: blob_clob.clob_invalid_bounds
+  category: extended
+  contract: "blob clob clob invalid bounds follows the JDBC-facing API contract when capabilities clobs, lob_objects are declared."
+  source_class: com.jdbctest.blobclob.ClobObjectTest
+  source_method: testClobInvalidBounds
+  required_capabilities: ["clobs", "lob_objects"]
+- scenario_id: blob_clob.clob_after_free
+  category: extended
+  contract: "blob clob clob after free follows the JDBC-facing API contract when capabilities clobs, lob_objects are declared."
+  source_class: com.jdbctest.blobclob.ClobObjectTest
+  source_method: testClobAfterFree
+  required_capabilities: ["clobs", "lob_objects"]
+- scenario_id: blob_clob.clob_stream_round_trip
+  category: extended
+  contract: "blob clob clob stream round trip follows the JDBC-facing API contract when capabilities clobs, lob_objects are declared."
+  source_class: com.jdbctest.blobclob.ClobObjectTest
+  source_method: testClobStreamRoundTrip
+  required_capabilities: ["clobs", "lob_objects"]
+- scenario_id: blob_clob.stream_insert_and_update
+  category: extended
+  contract: "blob clob stream insert and update follows the JDBC-facing API contract when capabilities blobs, clobs are declared."
+  source_class: com.jdbctest.blobclob.LobPersistenceTest
+  source_method: testStreamInsertAndUpdate
+  required_capabilities: ["blobs", "clobs"]
+- scenario_id: blob_clob.temporary_lob_binding
+  category: extended
+  contract: "blob clob temporary lob binding follows the JDBC-facing API contract when capabilities blobs, clobs, lob_objects are declared."
+  source_class: com.jdbctest.blobclob.LobPersistenceTest
+  source_method: testTemporaryLobBinding
+  required_capabilities: ["blobs", "clobs", "lob_objects"]
+- scenario_id: blob_clob.lob_insert_rollback
+  category: extended
+  contract: "blob clob lob insert rollback follows the JDBC-facing API contract when capabilities blobs, clobs are declared."
+  source_class: com.jdbctest.blobclob.LobPersistenceTest
+  source_method: testLobInsertRollback
+  required_capabilities: ["blobs", "clobs"]
+- scenario_id: blob_clob.locator_update
+  category: extended
+  contract: "blob clob locator update follows the JDBC-facing API contract when capabilities blobs, clobs, lob_locator_updates are declared."
+  source_class: com.jdbctest.blobclob.LobPersistenceTest
+  source_method: testLocatorUpdate
+  required_capabilities: ["blobs", "clobs", "lob_locator_updates"]
+- scenario_id: callable_statement.in_out_and_in_out
+  category: extended
+  contract: "callable statement in out and in out follows the JDBC-facing API contract when capabilities callable_statement, callable_inout are declared."
+  source_class: com.jdbctest.callablestatement.ProcedureBehaviorTest
+  source_method: testInOutAndInOut
+  required_capabilities: ["callable_statement", "callable_inout"]
+- scenario_id: callable_statement.null_output
+  category: extended
+  contract: "callable statement null output follows the JDBC-facing API contract when capabilities callable_statement, callable_inout are declared."
+  source_class: com.jdbctest.callablestatement.ProcedureBehaviorTest
+  source_method: testNullOutput
+  required_capabilities: ["callable_statement", "callable_inout"]
+- scenario_id: callable_statement.repeated_binding
+  category: extended
+  contract: "callable statement repeated binding follows the JDBC-facing API contract when capabilities callable_statement, callable_inout are declared."
+  source_class: com.jdbctest.callablestatement.ProcedureBehaviorTest
+  source_method: testRepeatedBinding
+  required_capabilities: ["callable_statement", "callable_inout"]
+- scenario_id: callable_statement.procedure_parameter_metadata
+  category: extended
+  contract: "callable statement procedure parameter metadata follows the JDBC-facing API contract when capabilities callable_statement, callable_inout are declared."
+  source_class: com.jdbctest.callablestatement.ProcedureBehaviorTest
+  source_method: testProcedureParameterMetadata
+  required_capabilities: ["callable_statement", "callable_inout"]
+- scenario_id: callable_statement.ref_cursor_output
+  category: extended
+  contract: "callable statement ref cursor output follows the JDBC-facing API contract when capabilities callable_statement, ref_cursor are declared."
+  source_class: com.jdbctest.callablestatement.RefCursorTest
+  source_method: testRefCursorOutput
+  required_capabilities: ["callable_statement", "ref_cursor"]
+- scenario_id: connection.commit_visible_to_new_connection
+  category: core
+  contract: "connection commit visible to new connection follows the JDBC-facing API contract."
+  source_class: com.jdbctest.connection.TransactionBehaviorTest
+  source_method: testCommitVisibleToNewConnection
+  required_capabilities: []
+- scenario_id: connection.rollback_and_close
+  category: core
+  contract: "connection rollback and close follows the JDBC-facing API contract."
+  source_class: com.jdbctest.connection.TransactionBehaviorTest
+  source_method: testRollbackAndClose
+  required_capabilities: []
+- scenario_id: connection.consecutive_transactions
+  category: core
+  contract: "connection consecutive transactions follows the JDBC-facing API contract."
+  source_class: com.jdbctest.connection.TransactionBehaviorTest
+  source_method: testConsecutiveTransactions
+  required_capabilities: []
+- scenario_id: connection.write_after_rollback
+  category: core
+  contract: "connection write after rollback follows the JDBC-facing API contract."
+  source_class: com.jdbctest.connection.TransactionBehaviorTest
+  source_method: testWriteAfterRollback
+  required_capabilities: []
+- scenario_id: connection.enable_auto_commit_commits_pending_work
+  category: core
+  contract: "connection enable auto commit commits pending work follows the JDBC-facing API contract."
+  source_class: com.jdbctest.connection.TransactionBehaviorTest
+  source_method: testEnableAutoCommitCommitsPendingWork
+  required_capabilities: []
+- scenario_id: connection.multiple_operations_rollback
+  category: core
+  contract: "connection multiple operations rollback follows the JDBC-facing API contract."
+  source_class: com.jdbctest.connection.TransactionBehaviorTest
+  source_method: testMultipleOperationsRollback
+  required_capabilities: []
+- scenario_id: database_metadata.imported_keys
+  category: core
+  contract: "database metadata imported keys follows the JDBC-facing API contract."
+  source_class: com.jdbctest.databasemetadata.MetadataRelationsTest
+  source_method: testImportedKeys
+  required_capabilities: []
+- scenario_id: database_metadata.exported_keys
+  category: core
+  contract: "database metadata exported keys follows the JDBC-facing API contract."
+  source_class: com.jdbctest.databasemetadata.MetadataRelationsTest
+  source_method: testExportedKeys
+  required_capabilities: []
+- scenario_id: database_metadata.index_info
+  category: core
+  contract: "database metadata index info follows the JDBC-facing API contract."
+  source_class: com.jdbctest.databasemetadata.MetadataRelationsTest
+  source_method: testIndexInfo
+  required_capabilities: []
+- scenario_id: database_metadata.view_metadata
+  category: core
+  contract: "database metadata view metadata follows the JDBC-facing API contract."
+  source_class: com.jdbctest.databasemetadata.MetadataRelationsTest
+  source_method: testViewMetadata
+  required_capabilities: []
+- scenario_id: prepared_statement.batch_snapshots_parameters
+  category: core
+  contract: "prepared statement batch snapshots parameters follows the JDBC-facing API contract."
+  source_class: com.jdbctest.preparedstatement.BatchBehaviorTest
+  source_method: testBatchSnapshotsParameters
+  required_capabilities: []
+- scenario_id: prepared_statement.clear_batch_discards_queued_rows
+  category: core
+  contract: "prepared statement clear batch discards queued rows follows the JDBC-facing API contract."
+  source_class: com.jdbctest.preparedstatement.BatchBehaviorTest
+  source_method: testClearBatchDiscardsQueuedRows
+  required_capabilities: []
+- scenario_id: prepared_statement.middle_batch_failure_and_rollback
+  category: core
+  contract: "prepared statement middle batch failure and rollback follows the JDBC-facing API contract."
+  source_class: com.jdbctest.preparedstatement.BatchBehaviorTest
+  source_method: testMiddleBatchFailureAndRollback
+  required_capabilities: []
+- scenario_id: prepared_statement.batch_keys_by_column_name
+  category: extended
+  contract: "prepared statement batch keys by column name follows the JDBC-facing API contract when capabilities generated_keys, batch_generated_keys are declared."
+  source_class: com.jdbctest.preparedstatement.BatchBehaviorTest
+  source_method: testBatchKeysByColumnName
+  required_capabilities: ["generated_keys", "batch_generated_keys"]
+- scenario_id: prepared_statement.batch_keys_by_column_index
+  category: extended
+  contract: "prepared statement batch keys by column index follows the JDBC-facing API contract when capabilities generated_keys, batch_generated_keys, generated_keys_by_index are declared."
+  source_class: com.jdbctest.preparedstatement.BatchBehaviorTest
+  source_method: testBatchKeysByColumnIndex
+  required_capabilities: ["generated_keys", "batch_generated_keys", "generated_keys_by_index"]
+- scenario_id: prepared_statement.batch_keys_automatic
+  category: extended
+  contract: "prepared statement batch keys automatic follows the JDBC-facing API contract when capabilities generated_keys, batch_generated_keys are declared."
+  source_class: com.jdbctest.preparedstatement.BatchBehaviorTest
+  source_method: testBatchKeysAutomatic
+  required_capabilities: ["generated_keys", "batch_generated_keys"]
+- scenario_id: prepared_statement.millisecond_precision
+  category: core
+  contract: "prepared statement millisecond precision follows the JDBC-facing API contract."
+  source_class: com.jdbctest.preparedstatement.TemporalPrecisionTest
+  source_method: testMillisecondPrecision
+  required_capabilities: []
+- scenario_id: prepared_statement.microsecond_precision
+  category: core
+  contract: "prepared statement microsecond precision follows the JDBC-facing API contract."
+  source_class: com.jdbctest.preparedstatement.TemporalPrecisionTest
+  source_method: testMicrosecondPrecision
+  required_capabilities: []
+- scenario_id: prepared_statement.null_timestamp
+  category: core
+  contract: "prepared statement null timestamp follows the JDBC-facing API contract."
+  source_class: com.jdbctest.preparedstatement.TemporalPrecisionTest
+  source_method: testNullTimestamp
+  required_capabilities: []
+- scenario_id: prepared_statement.timestamp_boundaries
+  category: core
+  contract: "prepared statement timestamp boundaries follows the JDBC-facing API contract."
+  source_class: com.jdbctest.preparedstatement.TemporalPrecisionTest
+  source_method: testTimestampBoundaries
+  required_capabilities: []
+- scenario_id: result_set.fetch_windows_preserve_all_rows
+  category: core
+  contract: "result set fetch windows preserve all rows follows the JDBC-facing API contract."
+  source_class: com.jdbctest.resultset.FetchWindowTest
+  source_method: testFetchWindowsPreserveAllRows
+  required_capabilities: []
+- scenario_id: result_set.row_id_round_trip
+  category: extended
+  contract: "result set row id round trip follows the JDBC-facing API contract when capabilities rowid_operations are declared."
+  source_class: com.jdbctest.resultset.RowIdBehaviorTest
+  source_method: testRowIdRoundTrip
+  required_capabilities: ["rowid_operations"]
+- scenario_id: result_set.update_and_delete_by_row_id
+  category: extended
+  contract: "result set update and delete by row id follows the JDBC-facing API contract when capabilities rowid_operations are declared."
+  source_class: com.jdbctest.resultset.RowIdBehaviorTest
+  source_method: testUpdateAndDeleteByRowId
+  required_capabilities: ["rowid_operations"]
+- scenario_id: result_set.batch_row_id_binding
+  category: extended
+  contract: "result set batch row id binding follows the JDBC-facing API contract when capabilities rowid_operations are declared."
+  source_class: com.jdbctest.resultset.RowIdBehaviorTest
+  source_method: testBatchRowIdBinding
+  required_capabilities: ["rowid_operations"]
+- scenario_id: statement.result_sequence
+  category: extended
+  contract: "statement result sequence follows the JDBC-facing API contract when capabilities callable_statement, multiple_result_sets, multiple_result_sequences are declared."
+  source_class: com.jdbctest.statement.MultipleResultsTest
+  source_method: testResultSequence
+  required_capabilities: ["callable_statement", "multiple_result_sets", "multiple_result_sequences"]
+- scenario_id: prepared_statement.whitespace_and_comments
+  category: core
+  contract: "prepared statement whitespace and comments follows the JDBC-facing API contract."
+  source_class: com.jdbctest.preparedstatement.SqlSyntaxBehaviorTest
+  source_method: testWhitespaceAndComments
+  required_capabilities: []
+- scenario_id: prepared_statement.question_mark_inside_literal
+  category: core
+  contract: "prepared statement question mark inside literal follows the JDBC-facing API contract."
+  source_class: com.jdbctest.preparedstatement.SqlSyntaxBehaviorTest
+  source_method: testQuestionMarkInsideLiteral
+  required_capabilities: []
+- scenario_id: prepared_statement.repeated_query_uses_latest_parameter
+  category: core
+  contract: "prepared statement repeated query uses latest parameter follows the JDBC-facing API contract."
+  source_class: com.jdbctest.preparedstatement.SqlSyntaxBehaviorTest
+  source_method: testRepeatedQueryUsesLatestParameter
+  required_capabilities: []
+- scenario_id: savepoint.savepoint_after_rollback
+  category: extended
+  contract: "savepoint savepoint after rollback follows the JDBC-facing API contract when capabilities savepoint are declared."
+  source_class: com.jdbctest.savepoint.SavepointTest
+  source_method: testSavepointAfterRollback
+  required_capabilities: ["savepoint"]
+- scenario_id: savepoint.write_after_savepoint_rollback
+  category: extended
+  contract: "savepoint write after savepoint rollback follows the JDBC-facing API contract when capabilities savepoint are declared."
+  source_class: com.jdbctest.savepoint.SavepointTest
+  source_method: testWriteAfterSavepointRollback
+  required_capabilities: ["savepoint"]
+- scenario_id: statement.actual_query_timeout
+  category: extended
+  contract: "statement actual query timeout follows the JDBC-facing API contract when capabilities query_timeout are declared."
+  source_class: com.jdbctest.statement.ExecutionControlTest
+  source_method: testActualQueryTimeout
+  required_capabilities: ["query_timeout"]
+- scenario_id: statement.cancel_running_statement
+  category: extended
+  contract: "statement cancel running statement follows the JDBC-facing API contract when capabilities statement_cancel are declared."
+  source_class: com.jdbctest.statement.ExecutionControlTest
+  source_method: testCancelRunningStatement
+  required_capabilities: ["statement_cancel"]
+- scenario_id: datasource.independent_connection_lifetimes
+  category: extended
+  contract: "datasource independent connection lifetimes follows the JDBC-facing API contract."
+  source_class: com.jdbctest.datasource.DataSourceTest
+  source_method: testIndependentConnectionLifetimes
+  required_capabilities: ["data_source"]
+- scenario_id: sqlxml.character_streams
+  category: extended
+  contract: "sqlxml character streams follows the JDBC-facing API contract when capabilities sqlxml are declared."
+  source_class: com.jdbctest.sqlxml.SqlXmlStreamTest
+  source_method: testCharacterStreams
+  required_capabilities: ["sqlxml"]
+- scenario_id: sqlxml.binary_streams
+  category: extended
+  contract: "sqlxml binary streams follows the JDBC-facing API contract when capabilities sqlxml are declared."
+  source_class: com.jdbctest.sqlxml.SqlXmlStreamTest
+  source_method: testBinaryStreams
+  required_capabilities: ["sqlxml"]
+- scenario_id: connection.bulk_transaction_commit
+  category: core
+  contract: connection bulk transaction commit follows the JDBC-facing API contract.
+  source_class: com.jdbctest.connection.BulkTransactionTest
+  source_method: testBulkTransactionCommit
+  required_capabilities: []
+- scenario_id: connection.bulk_transaction_rollback
+  category: core
+  contract: connection bulk transaction rollback follows the JDBC-facing API contract.
+  source_class: com.jdbctest.connection.BulkTransactionTest
+  source_method: testBulkTransactionRollback
+  required_capabilities: []
+- scenario_id: connection.lock_wait_timeout_and_recovery
+  category: extended
+  contract: connection lock wait timeout and recovery follows the JDBC-facing API contract when capabilities
+    query_timeout are declared.
+  source_class: com.jdbctest.connection.LockingBehaviorTest
+  source_method: testLockWaitTimeoutAndRecovery
+  required_capabilities:
+  - query_timeout
+- scenario_id: connection.cross_lock_deadlock_and_recovery
+  category: extended
+  contract: connection cross lock deadlock and recovery follows the JDBC-facing API contract when capabilities
+    query_timeout are declared.
+  source_class: com.jdbctest.connection.LockingBehaviorTest
+  source_method: testCrossLockDeadlockAndRecovery
+  required_capabilities:
+  - query_timeout
+- scenario_id: datasource.xa_one_phase_commit
+  category: extended
+  contract: datasource xa one phase commit follows the JDBC-facing API contract when capabilities xa_data_source
+    are declared.
+  source_class: com.jdbctest.datasource.XaBehaviorTest
+  source_method: testXaOnePhaseCommit
+  required_capabilities:
+  - xa_data_source
+- scenario_id: datasource.xa_two_phase_commit
+  category: extended
+  contract: datasource xa two phase commit follows the JDBC-facing API contract when capabilities xa_data_source
+    are declared.
+  source_class: com.jdbctest.datasource.XaBehaviorTest
+  source_method: testXaTwoPhaseCommit
+  required_capabilities:
+  - xa_data_source
+- scenario_id: datasource.xa_rollback
+  category: extended
+  contract: datasource xa rollback follows the JDBC-facing API contract when capabilities xa_data_source
+    are declared.
+  source_class: com.jdbctest.datasource.XaBehaviorTest
+  source_method: testXaRollback
+  required_capabilities:
+  - xa_data_source
+- scenario_id: datasource.xa_prepared_recovery_rollback
+  category: extended
+  contract: datasource xa prepared recovery rollback follows the JDBC-facing API contract when capabilities
+    xa_data_source are declared.
+  source_class: com.jdbctest.datasource.XaBehaviorTest
+  source_method: testXaPreparedRecoveryRollback
+  required_capabilities:
+  - xa_data_source
+- scenario_id: datasource.pooled_logical_close_event_and_reuse
+  category: extended
+  contract: datasource pooled logical close event and reuse follows the JDBC-facing API contract when
+    capabilities connection_pool are declared.
+  source_class: com.jdbctest.datasource.PooledConnectionBehaviorTest
+  source_method: testPooledLogicalCloseEventAndReuse
+  required_capabilities:
+  - connection_pool
+- scenario_id: datasource.pooled_replacement_invalidates_previous_handle
+  category: extended
+  contract: datasource pooled replacement invalidates previous handle follows the JDBC-facing API contract
+    when capabilities connection_pool are declared.
+  source_class: com.jdbctest.datasource.PooledConnectionBehaviorTest
+  source_method: testPooledReplacementInvalidatesPreviousHandle
+  required_capabilities:
+  - connection_pool
+- scenario_id: result_set.scrollable_fetch_windows_after_last
+  category: extended
+  contract: result set scrollable fetch windows after last follows the JDBC-facing API contract when capabilities
+    scrollable_result_set are declared.
+  source_class: com.jdbctest.resultset.FetchWindowTest
+  source_method: testScrollableFetchWindowsAfterLast
+  required_capabilities:
+  - scrollable_result_set
+- scenario_id: result_set.scrollable_execute_fetch_windows_after_last
+  category: extended
+  contract: result set scrollable execute fetch windows after last follows the JDBC-facing API contract
+    when capabilities scrollable_result_set are declared.
+  source_class: com.jdbctest.resultset.FetchWindowTest
+  source_method: testScrollableExecuteFetchWindowsAfterLast
+  required_capabilities:
+  - scrollable_result_set
+- scenario_id: result_set.prepared_max_rows_restores_full_window
+  category: core
+  contract: result set prepared max rows restores full window follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultset.FetchWindowTest
+  source_method: testPreparedMaxRowsRestoresFullWindow
+  required_capabilities: []
+- scenario_id: result_set.default_holdability_across_commit
+  category: core
+  contract: result set default holdability across commit follows the JDBC-facing API contract.
+  source_class: com.jdbctest.resultset.FetchWindowTest
+  source_method: testDefaultHoldabilityAcrossCommit
   required_capabilities: []

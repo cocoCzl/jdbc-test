@@ -212,7 +212,7 @@ Probes use Worker `Driver.connect`, read metadata best-effort, close and exit wi
 | GET | `/api/runs/{id}/report` | Summary and failures |
 | GET | `/api/runs/{id}/report.json` | Raw JSON evidence |
 
-There are 17 modules; CORE selects 136 scenarios, FULL 202, and CUSTOM selects modules/scenarios. These are catalog counts, not proven compatibility results. New runs require explicit scope and `destructiveConsent: true`. Selection and nonsecret execution inputs are frozen at enqueue; a new validation/probe is not performed automatically.
+There are 17 modules; CORE selects 153 scenarios, FULL 270, and CUSTOM selects modules/scenarios. These are catalog counts, not proven compatibility results. New runs require explicit scope and `destructiveConsent: true`. Selection and nonsecret execution inputs are frozen at enqueue; a new validation/probe is not performed automatically.
 
 Normal states: `QUEUED → PREPARING → RUNNING → GENERATING_REPORT → SUCCEEDED`. Failure, cancellation and recovery end in `FAILED`, `CANCELLED`, `INTERRUPTED`. A local FIFO scheduler limits concurrent Workers; workspaces are `<data-dir>/runs/<run-id>`. Run row locks protect terminal states against late results/cancel races. Timeout gives `FAILED / RUN_TIMEOUT`; a slot stays occupied until process cleanup finishes.
 
@@ -234,7 +234,7 @@ Deploy Server and Worker together. Each Worker reads one stdin JSON request and 
 java -jar jdbc-test-worker/target/jdbc-test-worker-1.2.1-SNAPSHOT-all.jar --describe-catalog
 ```
 
-Server checks protocol version at catalog load and again before every execution. Mismatch gives `WORKER_PROTOCOL_MISMATCH` before sending execution credentials. Validation/probe modes retain their separate request contracts. For execution fields see [WorkerRunRequest.java](../jdbc-test-worker/src/main/java/com/jdbctest/worker/WorkerRunRequest.java): `protocolVersion`, `runId`, `driver`, `connection`, `selection`, `workspace`, `timeoutMs`, `scope`, `objectPrefix`, `capabilities`, `destructiveConsent`. Requests require version 2, explicit scope/consent, prefix `j` plus 20 lowercase hex digits, all 25 boolean capability declarations and the selected `connection.adapterId`.
+Server checks protocol version at catalog load and again before every execution. Mismatch gives `WORKER_PROTOCOL_MISMATCH` before sending execution credentials. Validation/probe modes retain their separate request contracts. For execution fields see [WorkerRunRequest.java](../jdbc-test-worker/src/main/java/com/jdbctest/worker/WorkerRunRequest.java): `protocolVersion`, `runId`, `driver`, `connection`, `selection`, `workspace`, `timeoutMs`, `scope`, `objectPrefix`, `capabilities`, `destructiveConsent`. Requests require version 2, explicit scope/consent, prefix `j` plus 20 lowercase hex digits, all 34 boolean capability declarations and the selected `connection.adapterId`.
 
 Events include `RUN_STARTED`, `MODULE_STARTED`, `CASE_STARTED`, `CASE_FINISHED`, `MODULE_FINISHED`, `RUN_FINISHED`, `RUN_FAILED`. Malformed/unexpected events, wrong run IDs and unselected/duplicate results fail with `WORKER_PROTOCOL_ERROR`. Report output is `<workspace>/report/report.json`, schema `2.0.0`; temporary config is deleted on exit.
 
@@ -292,3 +292,39 @@ Use `components/ui` for controls, Card and dialogs, `components/common` for metr
 `npm run lint`, `npm run test`, `npm run build` and the mocked `npm run test:e2e` verify UI behavior. The explicitly selected `history-readonly` Playwright project only reads preserved history; it never creates runs or probes connections. It requires an already verified viewer backend, `JDBC_TEST_HISTORY_READONLY=true`, and the current built preview. Standard `real` E2E still requires a separate writable acceptance database and must not be run against historical QA.
 
 The test-only nested-menu/tooltip/toast fixture runs with `PLAYWRIGHT_CHANNEL=chrome npx playwright test --project=primitives` (Vite dev, not preview); its HTML entry is outside the production router/build.
+
+### Testing driver-owned DataSource implementations
+
+Driver upload and **Edit metadata** expose optional standard DataSource implementations. Supply classes
+from the uploaded JARs; configuring an interface enables its FULL-profile cases. Unconfigured
+interfaces are skipped, not passed. The platform's connection facade is tested only as infrastructure.
+Queued runs freeze these definitions and include them in reports. No vendor class is inferred.
+
+CLI/runtime YAML uses `db.data_sources` with the same definitions as API `dataSources`:
+
+```yaml
+db:
+  data_sources:
+    dataSource:
+      className: org.postgresql.ds.PGSimpleDataSource
+      urlProperty: URL
+      userProperty: user
+      passwordProperty: password
+    connectionPoolDataSource:
+      className: org.postgresql.ds.PGConnectionPoolDataSource
+    xaDataSource:
+      className: org.postgresql.xa.PGXADataSource
+```
+
+Property names map to public single-argument JavaBean setters. Defaults are `URL`, `user`, and
+`password`; additional `db.properties` use scalar bean setters (String/int/long/boolean).
+These names are not credentials. XA execution also requires the database's XA prerequisites.
+Examples for other public drivers: MySQL `com.mysql.cj.jdbc.MysqlDataSource`,
+`MysqlConnectionPoolDataSource`, `MysqlXADataSource` in the same package; Oracle
+`oracle.jdbc.pool.OracleDataSource`, `oracle.jdbc.pool.OracleConnectionPoolDataSource`,
+`oracle.jdbc.xa.client.OracleXADataSource`.
+
+`db.password` in Java runtime configuration is a literal string: `${...}`, backslashes and whitespace
+are preserved. Explicit `db.password_env: MY_DB_PASSWORD` resolves one environment variable, without
+expanding its value; missing variables and simultaneous `password`/`password_env` fail configuration.
+CLI user configs use `password_env` and generate a private runtime literal. Never commit credentials.

@@ -91,8 +91,8 @@ class WorkerCapabilityIT {
         Files.writeString(evidenceDirectory.resolve("postgresql-" + mode + ".json"),
             report.toPrettyString());
         if (mode.equals("full")) {
-          assertEquals(202, report.path("summary").path("total").asInt());
-          assertEquals(202, report.path("summary").path("completed").asInt(),
+          assertEquals(com.jdbctest.catalog.TestCatalog.loadDefault().testCases().size(), report.path("summary").path("total").asInt());
+          assertEquals(com.jdbctest.catalog.TestCatalog.loadDefault().testCases().size(), report.path("summary").path("completed").asInt(),
               report.toPrettyString());
           assertEquals(0, report.path("notRun").size());
           assertEquals(0, report.path("incomplete").size());

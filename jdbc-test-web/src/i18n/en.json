@@ -1,4 +1,10 @@
 {
+  "ui.dataSourceProviders": "Standard DataSource implementations (optional)",
+  "ui.dataSourceProvidersHint": "Use classes from this driver package. Configuring an interface enables its JDBC tests; leaving it empty skips those tests. Enter bean property names, never credentials.",
+  "ui.implementationClass": "Implementation class",
+  "ui.urlProperty": "URL property name",
+  "ui.userProperty": "Username property name",
+  "ui.passwordProperty": "Password property name",
   "theme.system": "System",
   "theme.light": "Light",
   "theme.dark": "Dark",

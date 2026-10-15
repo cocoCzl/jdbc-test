@@ -13,6 +13,9 @@ import { Button } from "@/components/ui/button";
 import { Field, FormError, PageHeader } from "@/components/common";
 import { formatBytes } from "@/lib/format";
 import { validateFiles } from "@/lib/driver-upload";
+import { DataSourceFields } from "./data-source-fields";
+import type { DataSourceProviders } from "@/types/api";
+
 export default function DriverForm() {
   useTranslation();
   const navigate = useNavigate();
@@ -25,6 +28,7 @@ export default function DriverForm() {
     driverClass: "",
     urlPrefix: "",
   });
+  const [dataSources, setDataSources] = useState<DataSourceProviders>({});
   const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | Error | null>(null);
   const [candidates, setCandidates] = useState<string[]>([]);
@@ -33,6 +37,7 @@ export default function DriverForm() {
       driversApi.upload(
         {
           ...form,
+          dataSources,
           driverClass: form.driverClass || undefined,
           urlPrefix: form.urlPrefix || undefined,
         },
@@ -146,6 +151,7 @@ export default function DriverForm() {
               </div>
             ) : null}
           </Card>
+          <DataSourceFields value={dataSources} onChange={setDataSources} />
           <Card as="section" className="panel">
             <h2 className="mb-5 text-lg font-semibold">{t("ui.driverArtifacts")}</h2>
             <input

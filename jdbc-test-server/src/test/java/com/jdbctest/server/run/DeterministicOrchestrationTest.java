@@ -711,10 +711,10 @@ class DeterministicOrchestrationTest {
   }
 
   @ParameterizedTest
-  @CsvSource({"CORE,all,136", "FULL,all,202", "CUSTOM,connection,17", "CUSTOM,statement,23"})
+  @CsvSource({"CORE,all,153", "FULL,all,270", "CUSTOM,connection,27", "CUSTOM,statement,26"})
   void selectionSnapshotUsesActualDatabaseRows(String profile, String module, int expected)
       throws Exception {
-    assertEquals(202, catalog.catalog().totalScenarioCount());
+    assertEquals(270, catalog.catalog().totalScenarioCount());
     assertEquals(17, catalog.catalog().modules().size());
     UUID blocker = run("BLOCK", 1);
     scheduler.enqueue(blocker);
@@ -737,6 +737,46 @@ class DeterministicOrchestrationTest {
     scheduler.cancel(response.id());
     release(blocker);
     done(blocker, TestRunStatus.SUCCEEDED, null);
+  }
+
+  @Test
+  void providerMetadataRoundTripsAndQueuedRunUsesFrozenImplementations() throws Exception {
+    UUID blocker = run("BLOCK", 1);
+    scheduler.enqueue(blocker);
+    started(blocker);
+    var resource = resource("NORMAL");
+    UUID driverId = resource.getDefaultDriver().getId();
+    String definition = """
+        {"name":"D1","vendor":"Vendor","version":"V1","driverClass":"org.external.Driver",
+         "dataSources":{"dataSource":{"className":"custom.jdbc.Source","urlProperty":"jdbcUrl",
+         "userProperty":"username","passwordProperty":"secret"}}}
+        """;
+    mvc.perform(patch("/api/drivers/{id}", driverId)
+            .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content(definition))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.dataSources.dataSource.className").value("custom.jdbc.Source"));
+    mvc.perform(get("/api/drivers/{id}", driverId)).andExpect(status().isOk())
+        .andExpect(jsonPath("$.dataSources.dataSource.userProperty").value("username"));
+    TestRunResponse response = service.create(new CreateTestRunRequest(resource.getId(), null,
+        "CUSTOM", List.of(), List.of("connection.is_valid"), List.of(), null, true));
+    created.add(response.id());
+    var mapper = new tools.jackson.databind.ObjectMapper();
+    var frozen = mapper.readTree(runs.findById(response.id()).orElseThrow().getExecutionInput());
+    assertEquals("custom.jdbc.Source", frozen.path("dataSources").path("dataSource")
+        .path("className").asString());
+    assertTrue(frozen.path("capabilities").path("data_source").asBoolean());
+    assertFalse(frozen.path("capabilities").path("xa_data_source").asBoolean());
+    mvc.perform(patch("/api/drivers/{id}", driverId)
+            .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+            .content(definition.replace("custom.jdbc.Source", "custom.jdbc.Changed")))
+        .andExpect(status().isOk());
+    release(blocker);
+    done(blocker, TestRunStatus.SUCCEEDED, null);
+    started(response.id());
+    done(response.id(), TestRunStatus.SUCCEEDED, null);
+    var input = mapper.readTree(Files.readString(workspace(response.id()).resolve("input-evidence.json")));
+    assertEquals("custom.jdbc.Source", input.path("driver").path("dataSources")
+        .path("dataSource").path("className").asString());
   }
 
   @Test

@@ -30,7 +30,7 @@ Hard stops can leave `CREATING`, `CREATED`, `DROPPING` or `UNKNOWN` entries. Ter
 
 ## Capabilities and result accounting
 
-CLI and Worker share official adapter declarations. All 25 managed capabilities must be boolean. Missing/invalid declarations fail configuration; `false` causes an explicit sourced skip, while `true` enables a test and does not prove compatibility. Driver metadata does not bypass manifest-driven tests. FULL selects 202 scenarios.
+CLI and Worker share official adapter declarations. All 34 managed capabilities must be boolean. Missing/invalid declarations fail configuration; `false` causes an explicit sourced skip, while `true` enables a test and does not prove compatibility. DataSource interface capabilities come from explicitly configured driver-owned providers; all other capabilities remain manifest-driven. FULL selects 270 scenarios.
 
 New runs use `protocolVersion: 2` and `report_schema_version: 2.0.0`; deploy Server/Worker together. Flyway V5 is additive. Legacy runs keep original outcomes without invented starts or v2 evidence.
 

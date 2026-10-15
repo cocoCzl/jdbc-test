@@ -175,6 +175,12 @@ class StatementTest {
   @DisplayName("getMaxRows 和 setMaxRows")
   void testMaxRows(Connection conn) throws SQLException {
     try (Statement stmt = conn.createStatement()) {
+      int expected;
+      try (ResultSet rows = stmt.executeQuery(JdbcContext.sql("SELECT COUNT(*) FROM {{statement_test}}"))) {
+        assertTrue(rows.next());
+        expected = rows.getInt(1);
+      }
+      assertTrue(expected >= 2, "Fixture must contain enough rows to exercise MaxRows");
       stmt.setMaxRows(2);
       assertEquals(2, stmt.getMaxRows(), "getMaxRows 应返回 2");
 
@@ -183,11 +189,18 @@ class StatementTest {
         while (rs.next()) {
           count++;
         }
-        assertTrue(count <= 2, "行数不应超过 MaxRows");
+        assertEquals(2, count, "MaxRows 应返回恰好两行");
       }
 
       stmt.setMaxRows(0);
       assertEquals(0, stmt.getMaxRows(), "setMaxRows(0) 表示无限制");
+      try (ResultSet rows = stmt.executeQuery(JdbcContext.sql("SELECT * FROM {{statement_test}}"))) {
+        int count = 0;
+        while (rows.next()) {
+          count++;
+        }
+        assertEquals(expected, count, "清除 MaxRows 后应读取全部记录");
+      }
     }
   }
 

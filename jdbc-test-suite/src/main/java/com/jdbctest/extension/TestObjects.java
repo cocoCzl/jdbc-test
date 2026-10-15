@@ -21,7 +21,7 @@ public final class TestObjects {
   private static final Pattern TOKEN = Pattern.compile(
       "\\{\\{(?:(local|name):)?([a-z][a-z0-9_]*)}} ".trim());
   private static final Pattern CREATE = Pattern.compile(
-      "(?is)^\\s*CREATE\\s+(TABLE|INDEX|FUNCTION|PROCEDURE|SEQUENCE|TYPE)\\s+\\{\\{(?:local:)?([a-z][a-z0-9_]*)}}");
+      "(?is)^\\s*CREATE\\s+(TABLE|VIEW|INDEX|FUNCTION|PROCEDURE|SEQUENCE|TYPE)\\s+\\{\\{(?:local:)?([a-z][a-z0-9_]*)}}");
   private final String namespace;
   private final String objectPrefix;
   private final String dialect;
@@ -247,7 +247,8 @@ public final class TestObjects {
       suffix = " PURGE";
     }
     String command = "DROP " + kind + " " + qualified(logical) + suffix;
-    if (kind.equals("INDEX") && "mysql".equalsIgnoreCase(dialect)) {
+    if (kind.equals("INDEX") && ("mysql".equalsIgnoreCase(dialect)
+        || "sqlserver".equalsIgnoreCase(dialect))) {
       command =
           "DROP INDEX " + quote(name(logical)) + " ON " + qualified(entry.get("parent").toString());
     }

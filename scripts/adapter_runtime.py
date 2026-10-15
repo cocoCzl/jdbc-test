@@ -38,6 +38,8 @@ MANAGED_CAPABILITIES = {
     "generated_keys", "multiple_result_sets", "statement_cancel",
     "query_timeout", "network_timeout", "client_info", "request_boundaries",
     "sharding", "connection_pool", "xa_data_source", "java_time",
+    "lob_objects", "lob_locator_updates", "batch_generated_keys", "generated_keys_by_index",
+    "callable_inout", "ref_cursor", "rowid_operations", "multiple_result_sequences", "data_source",
 }
 
 
@@ -190,6 +192,12 @@ def build_runtime_config(
         if env_value is None:
             raise ValueError(f"连接属性 {key} 所需环境变量 {env_name} 未设置")
         properties[key] = env_value
+    providers = db.get("data_sources") or {}
+    capabilities = dict(manifest["capabilities"])
+    for interface, feature in (("dataSource", "data_source"),
+                               ("connectionPoolDataSource", "connection_pool"),
+                               ("xaDataSource", "xa_data_source")):
+        capabilities[feature] = bool(providers.get(interface))
     identity = manifest["identity"]
     versions = manifest["supported_versions"]
     namespace_spec = dict(manifest["namespace"])
@@ -228,6 +236,7 @@ def build_runtime_config(
             "driver_class": manifest["driver"]["class"],
             "connection_mode": connection_mode,
             "properties": properties,
+            "data_sources": providers,
             "identifier_quote": manifest.get("identifier_quote", '"'),
             "expected_database_product_regex": identity["database_product_regex"],
             "expected_driver_name_regex": identity["driver_name_regex"],
@@ -267,7 +276,7 @@ def build_runtime_config(
             "version": manifest["version"],
             "trust": manifest["trust"],
             "revision": manifest.get("revision", "release"),
-            "capabilities": manifest["capabilities"],
+            "capabilities": capabilities,
             "validated_combinations": manifest["validated_combinations"],
             "experimental_override": bool(user_config.get("experimental_override", False)),
         },

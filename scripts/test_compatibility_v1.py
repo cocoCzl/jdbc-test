@@ -3,6 +3,7 @@ from pathlib import Path
 import sys
 import tempfile
 import json
+import re
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
@@ -31,6 +32,25 @@ from compatibility_v1 import (
 
 
 class CompatibilityV1Test(unittest.TestCase):
+    def test_catalog_scenarios_depend_only_on_public_jdbc_and_test_apis(self):
+        # Fixture SQL may vary by dialect; driver operations must use public standard APIs.
+        allowed = (
+            "java.", "javax.sql.", "javax.transaction.xa.", "javax.xml.",
+            "org.junit.", "org.w3c.dom.", "org.xml.sax.",
+            "com.jdbctest.extension.", "com.jdbctest.config.",
+        )
+        classes = {item.class_name for item in build_scenario_inventory(PROJECT_ROOT).values()}
+        for class_name in classes:
+            source = PROJECT_ROOT / "jdbc-test-suite/src/main/java" / (
+                class_name.replace(".", "/") + ".java"
+            )
+            text = source.read_text()
+            with self.subTest(scenario_class=class_name):
+                imports = re.findall(r"^import (?:static )?([^;]+);", text, re.MULTILINE)
+                self.assertTrue(all(name.startswith(allowed) for name in imports), imports)
+                self.assertNotIn("Class.forName(", text)
+                self.assertNotIn("java.lang.reflect", text)
+
     def test_stable_enum_values(self):
         self.assertEqual("1.1.0", COMPATIBILITY_BASELINE_VERSION)
         self.assertEqual("1.0.0", REPORT_SCHEMA_VERSION)

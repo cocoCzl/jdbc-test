@@ -62,6 +62,7 @@ final class DriverService {
           required(request.vendor()), required(request.version()), driverClass,
           DriverSourceType.UPLOAD);
       entity.setUrlPrefix(optional(request.urlPrefix()));
+      entity.setDataSources(request.dataSources());
       entity.setPackageFingerprint(fingerprint);
       List<DriverStorage.StoredArtifact> stored = storage.moveToDriver(staged, entity.getId());
       try {
@@ -121,6 +122,9 @@ final class DriverService {
       entity.updateMetadata(required(request.name()), required(request.vendor()),
           required(request.version()), optional(request.urlPrefix()),
           required(request.driverClass()));
+      if (request.dataSources() != null) {
+        entity.setDataSources(request.dataSources());
+      }
       packages.save(entity);
       return response(entity, artifacts.findByDriver_Id(id));
     });
@@ -224,6 +228,6 @@ final class DriverService {
         entity.getStatus(), entity.getPackageFingerprint(), entity.getCreatedAt().toString(),
         entity.getUpdatedAt().toString(), records.stream().map(
         item -> new DriverArtifactResponse(item.getId(), item.getFileName(), item.getSize(),
-            item.getSha256())).toList());
+            item.getSha256())).toList(), entity.getDataSources());
   }
 }

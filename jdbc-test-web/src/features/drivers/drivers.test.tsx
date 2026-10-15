@@ -52,6 +52,10 @@ describe("Driver UI", () => {
     );
     await user.clear(screen.getByLabelText("Name"));
     await user.type(screen.getByLabelText("Name"), "Renamed");
+    await user.click(screen.getByText("Standard DataSource implementations (optional)"));
+    await user.type(screen.getByLabelText("dataSource — Implementation class"), "custom.jdbc.Source");
+    await user.clear(screen.getByLabelText("URL property name"));
+    await user.type(screen.getByLabelText("URL property name"), "jdbcUrl");
     await user.click(screen.getByRole("button", { name: "Save metadata" }));
     await waitFor(() =>
       expect(
@@ -63,6 +67,7 @@ describe("Driver UI", () => {
         .body as string,
     );
     expect(body.name).toBe("Renamed");
+    expect(body.dataSources.dataSource).toEqual({ className: "custom.jdbc.Source", urlProperty: "jdbcUrl" });
     expect(body).not.toHaveProperty("artifacts");
     expect(body).not.toHaveProperty("storageKey");
   });
@@ -125,6 +130,8 @@ describe("Driver UI", () => {
         : undefined,
     );
     const { router } = renderPage("/drivers/new");
+    await user.click(screen.getByText("Standard DataSource implementations (optional)"));
+    await user.type(screen.getByLabelText("xaDataSource — Implementation class"), "custom.jdbc.XA");
     await user.type(await screen.findByLabelText("Name"), "PostgreSQL JDBC");
     await user.type(screen.getByLabelText("Vendor"), "PostgreSQL");
     await user.type(screen.getByLabelText("Version"), "42.7.10");
@@ -145,6 +152,14 @@ describe("Driver UI", () => {
       ([, options]) => options?.method === "POST",
     )![1]!.body as FormData;
     expect(body.getAll("files")).toHaveLength(2);
+    const metadataText = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(body.get("metadata") as Blob);
+    });
+    const metadata = JSON.parse(metadataText);
+    expect(metadata.dataSources.xaDataSource.className).toBe("custom.jdbc.XA");
   });
   it("validates a driver and presents the returned probe metadata", async () => {
     const user = userEvent.setup();

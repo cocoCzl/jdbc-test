@@ -440,6 +440,8 @@ public final class WorkerMain {
     db.put("password", request.connection().password());
     db.put("driver_class", request.driver().driverClass());
     db.put("connection_mode", "driver_manager");
+    db.put("data_sources", request.driver().dataSources() == null ? Map.of()
+        : request.driver().dataSources().toMap());
     db.put("properties",
         request.connection().properties() == null ? Map.of() : request.connection().properties());
     Map<String, Object> config = new LinkedHashMap<>();
@@ -499,6 +501,11 @@ public final class WorkerMain {
     }
     request.scope().validate(request.connection().adapterId());
     com.jdbctest.catalog.AdapterExecutionConfig.validateCapabilities(request.capabilities());
+    var providers = request.driver().dataSources() == null
+        ? com.jdbctest.catalog.DataSourceProviders.empty() : request.driver().dataSources();
+    if (!providers.capabilities(request.capabilities()).equals(request.capabilities())) {
+      throw new IllegalArgumentException("DataSource capabilities must match configured providers");
+    }
     if (blank(request.connection().jdbcUrl())) {
       throw new IllegalArgumentException("connection.jdbcUrl is required");
     }

@@ -34,6 +34,7 @@ public final class FakeWorkerMain {
     Path workspace = Path.of(String.valueOf(request.get("workspace")));
     Files.createDirectories(workspace.resolve("report"));
     Files.writeString(workspace.resolve("input-evidence.json"), json.writeValueAsString(Map.of(
+        "driver", request.get("driver"),
         "scope", request.get("scope"), "jdbcUrl", connection.get("jdbcUrl"), "username",
         connection.get("username"), "capabilities", request.get("capabilities"))));
     slot = java.nio.channels.FileChannel.open(
@@ -169,6 +170,10 @@ public final class FakeWorkerMain {
     report.put("terminationReason", reason);
     report.put("scope", request.get("scope"));
     report.put("capabilities", request.get("capabilities"));
+    Object providers = ((Map<?, ?>) request.get("driver")).get("dataSources");
+    if (providers instanceof Map<?, ?>) {
+      report.put("dataSources", providers);
+    }
     report.put("objectPrefix", request.get("objectPrefix"));
     Files.writeString(workspace.resolve("report/report.json"), json.writeValueAsString(report));
     if ("REPORT_INVALID".equals(mode)) {

@@ -61,31 +61,32 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
 
     Class<?> testClass = context.getRequiredTestClass();
 
-    var testMethod = context.getTestMethod();
-    if (testMethod.isPresent()) {
-      RequiresFeature methodAnnotation = testMethod.get().getAnnotation(RequiresFeature.class);
-      if (methodAnnotation != null) {
-        return checkFeatures(methodAnnotation);
-      }
-    }
-
-    RequiresFeature classAnnotation = testClass.getAnnotation(RequiresFeature.class);
-    if (classAnnotation != null) {
-      return checkFeatures(classAnnotation);
-    }
-
-    return ConditionEvaluationResult.enabled("无需特殊能力");
+    return checkFeatures(requiredFeatures(testClass, context.getTestMethod().orElse(null)));
   }
 
-  private ConditionEvaluationResult checkFeatures(RequiresFeature annotation) {
+  static List<String> requiredFeatures(Class<?> testClass, java.lang.reflect.Method method) {
+    var required = new java.util.LinkedHashSet<String>();
+    RequiresFeature classAnnotation = testClass.getAnnotation(RequiresFeature.class);
+    if (classAnnotation != null) {
+      required.addAll(List.of(classAnnotation.value()));
+    }
+    RequiresFeature methodAnnotation = method == null ? null : method.getAnnotation(
+        RequiresFeature.class);
+    if (methodAnnotation != null) {
+      required.addAll(List.of(methodAnnotation.value()));
+    }
+    return List.copyOf(required);
+  }
+
+  static ConditionEvaluationResult checkFeatures(List<String> required) {
     List<String> missing = new ArrayList<>();
-    for (String feature : annotation.value()) {
+    for (String feature : required) {
       if (!FeatureProfile.supports(feature)) {
         missing.add(feature);
       }
     }
     if (!missing.isEmpty()) {
-      String reason = String.format("Adapter explicitly declares capability disabled: %s",
+      String reason = String.format("Execution capability disabled (adapter declaration or unconfigured DataSource provider): %s",
           String.join(", ", missing));
       return ConditionEvaluationResult.disabled(reason);
     }
@@ -102,7 +103,8 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
         if (!initialized || !configKey.equals(initializedConfigKey)
             || JdbcContext.getDataSource() == null) {
           JdbcContext.init(config);
-          FeatureProfile.load(config.adapter == null ? null : config.adapter.capabilities);
+          FeatureProfile.load(config.db.dataSources.capabilities(
+              config.adapter == null ? null : config.adapter.capabilities));
           initialized = true;
           initializedConfigKey = configKey;
           return config;

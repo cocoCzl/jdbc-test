@@ -28,6 +28,8 @@ public class Config {
     public String driverClass;
     public String connectionMode = "hikari";
     public Map<String, String> properties = Map.of();
+    public com.jdbctest.catalog.DataSourceProviders dataSources =
+        com.jdbctest.catalog.DataSourceProviders.empty();
     public String identifierQuote = "\"";
     public String expectedDatabaseProductRegex;
     public String expectedDriverNameRegex;

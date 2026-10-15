@@ -171,9 +171,14 @@ public final class TestCatalog {
           "class " + className.substring(className.lastIndexOf('.') + 1));
       int methodPosition = source.indexOf(methodName + "(", classPosition);
       String classAnnotations = source.substring(0, classPosition);
-      int previousMethodEnd =
-          source.substring(classPosition, methodPosition).lastIndexOf('}') + classPosition;
-      String methodAnnotations = source.substring(previousMethodEnd + 1, methodPosition);
+      // Array-valued annotations contain '}' too; only a standalone closing brace ends a block.
+      Matcher blockEnd = Pattern.compile("(?m)^[ \\t]*}[ \\t]*$").matcher(source);
+      blockEnd.region(classPosition, methodPosition);
+      int previousMethodEnd = classPosition;
+      while (blockEnd.find()) {
+        previousMethodEnd = blockEnd.end();
+      }
+      String methodAnnotations = source.substring(previousMethodEnd, methodPosition);
       LinkedHashSet<String> capabilities = new LinkedHashSet<>();
       capabilities.addAll(annotationValues(classAnnotations));
       capabilities.addAll(annotationValues(methodAnnotations));

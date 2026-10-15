@@ -1,4 +1,10 @@
 {
+  "ui.dataSourceProviders": "标准 DataSource 实现（可选）",
+  "ui.dataSourceProvidersHint": "填写此驱动包中的实现类。配置接口后启用对应 JDBC 用例；留空则跳过。下方只填写属性名，不填写密码等凭据。",
+  "ui.implementationClass": "实现类",
+  "ui.urlProperty": "URL 属性名",
+  "ui.userProperty": "用户名属性名",
+  "ui.passwordProperty": "密码属性名",
   "theme.system": "跟随系统",
   "theme.light": "浅色",
   "theme.dark": "深色",

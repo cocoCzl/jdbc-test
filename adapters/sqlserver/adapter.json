@@ -2,7 +2,7 @@
   "id": "sqlserver",
   "name": "Microsoft SQL Server",
   "version": "1.0.0",
-  "revision": "1.0.0",
+  "revision": "1.1.0",
   "trust": "candidate",
   "dialect": "sqlserver",
   "identifier_quote": "\"",
@@ -28,7 +28,9 @@
     "generated_keys": true, "multiple_result_sets": true,
     "statement_cancel": true, "query_timeout": true, "network_timeout": true,
     "client_info": true, "request_boundaries": false, "sharding": false,
-    "connection_pool": false, "xa_data_source": false, "java_time": true
+    "data_source": false,
+    "connection_pool": false, "xa_data_source": false, "java_time": true,
+    "lob_objects": true, "lob_locator_updates": false, "batch_generated_keys": true, "generated_keys_by_index": true, "callable_inout": true, "ref_cursor": false, "rowid_operations": false, "multiple_result_sequences": true
   },
   "assets": {
     "ddl": "ddl", "dml": "dml", "pool": "pool",

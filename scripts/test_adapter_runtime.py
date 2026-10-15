@@ -16,6 +16,18 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 class AdapterRuntimeTest(unittest.TestCase):
+    def test_all_scenario_requirements_are_declared_by_official_adapters(self):
+        from compatibility_v1 import build_scenario_inventory
+
+        required = {
+            capability
+            for scenario in build_scenario_inventory(PROJECT_ROOT).values()
+            for capability in scenario.required_capabilities
+        }
+        for adapter_id in ("mysql", "postgresql", "oracle", "sqlserver", "gaussdb"):
+            package = load_adapter(PROJECT_ROOT, adapter_id)
+            self.assertTrue(required <= set(package.manifest["capabilities"]), adapter_id)
+
 
     def test_release_files_are_allowlisted_and_patch_versioned(self):
         self.assertEqual("1.2.1", project_version())
@@ -108,15 +120,30 @@ class AdapterRuntimeTest(unittest.TestCase):
         self.assertEqual("token-value", runtime["db"]["properties"]["vendor.token"])
         self.assertNotIn("property_env", runtime["db"])
 
+    def test_explicit_provider_configuration_reaches_runtime_and_enables_only_configured_interfaces(self):
+        adapter = load_adapter(PROJECT_ROOT, "postgresql")
+        providers = {"dataSource": {"className": "example.jdbc.Source", "urlProperty": "jdbcUrl"}}
+        user = {
+            "db": {"url": "jdbc:postgresql://example/test", "username": "tester",
+                   "password_env": "TEST_DB_PASSWORD", "data_sources": providers},
+            "namespace": {"mode": "auto", "destructive_consent": True},
+        }
+        with patch.dict(os.environ, {"TEST_DB_PASSWORD": "secret"}):
+            runtime = build_runtime_config(PROJECT_ROOT, user, adapter, {"sha256": "abc"})
+        self.assertEqual(providers, runtime["db"]["data_sources"])
+        self.assertTrue(runtime["adapter"]["capabilities"]["data_source"])
+        self.assertFalse(runtime["adapter"]["capabilities"]["connection_pool"])
+        self.assertFalse(adapter.manifest["capabilities"]["data_source"])
+
     def test_runtime_config_resolves_password_without_persisting_connection_identity_in_adapter(self):
         adapter = load_adapter(PROJECT_ROOT, "postgresql")
         user = {
             "db": {"url": "jdbc:postgresql://example/test", "username": "tester", "password_env": "TEST_DB_PASSWORD"},
             "namespace": {"mode": "auto", "destructive_consent": True},
         }
-        with patch.dict(os.environ, {"TEST_DB_PASSWORD": "secret"}):
+        with patch.dict(os.environ, {"TEST_DB_PASSWORD": " fixture-${MISSING}-$\\password "}):
             runtime = build_runtime_config(PROJECT_ROOT, user, adapter, {"sha256": "abc", "path": "/tmp/driver.jar"})
-        self.assertEqual("secret", runtime["db"]["password"])
+        self.assertEqual(" fixture-${MISSING}-$\\password ", runtime["db"]["password"])
         self.assertTrue(runtime["namespace"]["name"].startswith("jdbc_test_"))
         self.assertEqual("official", runtime["adapter"]["trust"])
 

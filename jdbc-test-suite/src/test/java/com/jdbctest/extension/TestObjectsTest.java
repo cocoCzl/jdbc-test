@@ -53,6 +53,36 @@ class TestObjectsTest {
   }
 
   @Test
+  void sqlServerIndexCleanupNamesItsOwnedTable() throws Exception {
+    Config value = config("j01234567890123456789");
+    value.db.dialect = "sqlserver";
+    TestObjects objects = new TestObjects(value);
+    List<String> commands = new ArrayList<>();
+    Statement sql = statement(commands, null);
+    objects.create(sql, "CREATE TABLE {{parent}} (id INTEGER)");
+    objects.create(sql, "CREATE INDEX {{local:owned_index}} ON {{parent}} (id)");
+    objects.cleanup(connection(sql));
+    assertEquals(objects.sql("DROP INDEX {{local:owned_index}} ON {{parent}}"), commands.get(2));
+    assertEquals("DROP TABLE " + objects.qualified("parent"), commands.get(3));
+  }
+
+  @Test
+  void ownedViewIsDroppedBeforeItsParentAndFailedViewIsRetained() throws Exception {
+    TestObjects objects = new TestObjects(config("j01234567890123456789"));
+    List<String> commands = new ArrayList<>();
+    Statement sql = statement(commands, objects.name("uncertain_view"));
+    objects.create(sql, "CREATE TABLE {{parent}} (id INTEGER)");
+    objects.create(sql, "CREATE VIEW {{owned_view}} AS SELECT id FROM {{parent}}");
+    assertThrows(SQLException.class, () -> objects.create(sql,
+        "CREATE VIEW {{uncertain_view}} AS SELECT id FROM {{parent}}"));
+    objects.cleanup(connection(sql));
+    assertEquals("DROP VIEW " + objects.qualified("owned_view"), commands.get(3));
+    assertEquals("DROP TABLE " + objects.qualified("parent"), commands.get(4));
+    assertEquals("UNKNOWN", objects.snapshot().get(2).get("state"));
+    assertEquals(5, commands.size());
+  }
+
+  @Test
   void rejectsMissingScopeBeforeAnyDdl() {
     Config value = config("j01234567890123456789");
     value.namespace.name = null;

@@ -14,6 +14,39 @@ import org.junit.jupiter.api.Test;
 class WorkerMainTest {
 
   @Test
+  void runtimeConfigPreservesLiteralCredentialsAndCustomProviders(
+      @org.junit.jupiter.api.io.TempDir Path directory) throws Exception {
+    var provider = new com.jdbctest.catalog.DataSourceProviders.Provider(
+        "custom.jdbc.Source", "jdbcUrl", "username", "secret");
+    var providers = new com.jdbctest.catalog.DataSourceProviders(provider, null, null);
+    String password = " fixture-${MISSING}-$\\中文-password ";
+    var request = new WorkerRunRequest(2, "fixture",
+        new WorkerRunRequest.DriverRequest("custom.jdbc.Driver", List.of(), providers),
+        new WorkerRunRequest.ConnectionRequest("jdbc:fixture:test", "tester", password,
+            java.util.Map.of(), "postgresql"), null, directory.toString(), 1000L,
+        new com.jdbctest.catalog.ExecutionScope("fixture", "owned_scope"),
+        "j01234567890123456789", providers.capabilities(
+            com.jdbctest.catalog.AdapterExecutionConfig.load("postgresql").capabilities()), true);
+    Path config = directory.resolve("config.json");
+    var method = WorkerMain.class.getDeclaredMethod("writeConfig", Path.class, WorkerRunRequest.class);
+    method.setAccessible(true);
+    method.invoke(new WorkerMain(), config, request);
+    String original = System.getProperty("config.yaml");
+    try {
+      System.setProperty("config.yaml", config.toString());
+      var loaded = com.jdbctest.config.ConfigLoader.load();
+      assertEquals(password, loaded.db.password);
+      assertEquals(providers, loaded.db.dataSources);
+    } finally {
+      if (original == null) {
+        System.clearProperty("config.yaml");
+      } else {
+        System.setProperty("config.yaml", original);
+      }
+    }
+  }
+
+  @Test
   void catalogSmokeLoadsPackagedScenarios() {
     assertEquals(0, new WorkerMain().run(new String[] {"--catalog-smoke"}));
   }

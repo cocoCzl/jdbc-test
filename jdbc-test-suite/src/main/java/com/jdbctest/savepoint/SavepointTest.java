@@ -148,4 +148,40 @@ class SavepointTest {
 
     conn.setAutoCommit(true);
   }
+
+  @Test
+  @DisplayName("完整回滚后旧保存点失效")
+  void testSavepointAfterRollback(Connection conn) throws SQLException {
+    conn.setAutoCommit(false);
+    try {
+      Savepoint savepoint = conn.setSavepoint("rolled_back_sp");
+      conn.rollback();
+      assertThrows(SQLException.class, () -> conn.rollback(savepoint));
+    } finally {
+      conn.rollback();
+    }
+  }
+
+  @Test
+  @DisplayName("保存点回滚后可继续写入并整体回滚")
+  void testWriteAfterSavepointRollback(Connection conn) throws SQLException {
+    conn.setAutoCommit(false);
+    try (Statement sql = conn.createStatement()) {
+      Savepoint savepoint = conn.setSavepoint("resume_sp");
+      assertEquals(1, sql.executeUpdate(JdbcContext.sql(
+          "INSERT INTO {{savepoint_test}} (name, value) VALUES ('savepoint_discard', 101)")));
+      conn.rollback(savepoint);
+      assertEquals(1, sql.executeUpdate(JdbcContext.sql(
+          "INSERT INTO {{savepoint_test}} (name, value) VALUES ('savepoint_retained', 102)")));
+      try (ResultSet rows = sql.executeQuery(JdbcContext.sql(
+          "SELECT name, value FROM {{savepoint_test}} WHERE name IN ('savepoint_discard', 'savepoint_retained')"))) {
+        assertTrue(rows.next());
+        assertEquals("savepoint_retained", rows.getString(1));
+        assertEquals(102, rows.getInt(2));
+        assertFalse(rows.next());
+      }
+    } finally {
+      conn.rollback();
+    }
+  }
 }

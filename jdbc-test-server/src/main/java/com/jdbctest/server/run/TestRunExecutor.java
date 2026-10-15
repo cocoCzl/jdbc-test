@@ -228,7 +228,8 @@ final class TestRunExecutor {
         executable.toAbsolutePath().toString()).start();
     Map<String, Object> request = new java.util.LinkedHashMap<>(
         Map.of("runId", input.runId().toString(), "driver",
-            Map.of("driverClass", input.driverClass(), "artifacts", input.artifacts()),
+            Map.of("driverClass", input.driverClass(), "artifacts", input.artifacts(),
+                "dataSources", input.frozen().path("dataSources")),
             "connection", Map.of("jdbcUrl", input.jdbcUrl(), "username",
                 input.username() == null ? "" : input.username(), "password", input.password(),
                 "properties", Map.of(), "adapterId", input.adapterId()),
@@ -521,6 +522,8 @@ final class TestRunExecutor {
           && report.path("scope").equals(frozen.path("scope"))
           && report.path("objectPrefix").equals(frozen.path("objectPrefix"))
           && report.path("capabilities").equals(frozen.path("capabilities"))
+          && (!frozen.has("dataSources")
+          || report.path("dataSources").equals(frozen.path("dataSources")))
           && summary.path("total").asInt(-1) == run.getTotalCases()
           && summary.path("completed").asInt(-1) == cases.size()
           && summary.path("started").asInt(-1) == started.size()

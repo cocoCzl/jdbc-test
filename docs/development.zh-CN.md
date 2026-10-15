@@ -208,7 +208,7 @@ Flyway V1–V5 管理 schema；Hibernate 使用 `ddl-auto=validate`。记录使�
 | GET | `/api/runs/{id}/report` | 汇总与失败结果 |
 | GET | `/api/runs/{id}/report.json` | 原始 JSON 证据 |
 
-共有 17 个模块，CORE 选择 136 个场景，FULL 选择 202 个，CUSTOM 自选模块/场景。这些是目录数量，不是已验证通过的数量。新任务要求明确授权范围和 `destructiveConsent: true`。入队时冻结场景选择和非敏感执行输入，不自动重新验证驱动或探测连接。
+共有 17 个模块，CORE 选择 153 个场景，FULL 选择 270 个，CUSTOM 自选模块/场景。这些是目录数量，不是已验证通过的数量。新任务要求明确授权范围和 `destructiveConsent: true`。入队时冻结场景选择和非敏感执行输入，不自动重新验证驱动或探测连接。
 
 正常状态：`QUEUED → PREPARING → RUNNING → GENERATING_REPORT → SUCCEEDED`。失败、取消和恢复分别进入 `FAILED`、`CANCELLED`、`INTERRUPTED`。本地 FIFO 调度器限制并发 Worker，工作目录为 `<data-dir>/runs/<run-id>`。任务行锁防止迟到结果与取消竞态覆盖终态。超时为 `FAILED / RUN_TIMEOUT`，进程清理完成前仍占用调度名额。
 
@@ -230,7 +230,7 @@ Server 和 Worker 必须配套部署。每个 Worker 从 stdin 读取一个 JSON
 java -jar jdbc-test-worker/target/jdbc-test-worker-1.2.1-SNAPSHOT-all.jar --describe-catalog
 ```
 
-Server 在加载目录和每次执行前检查协议版本。版本不匹配时返回 `WORKER_PROTOCOL_MISMATCH`，不发送执行凭据。验证/探测模式使用各自的请求契约。执行字段见 [WorkerRunRequest.java](../jdbc-test-worker/src/main/java/com/jdbctest/worker/WorkerRunRequest.java)：`protocolVersion`、`runId`、`driver`、`connection`、`selection`、`workspace`、`timeoutMs`、`scope`、`objectPrefix`、`capabilities`、`destructiveConsent`。请求必须提供版本 2、明确范围与同意、`j` 加 20 位小写十六进制数字的对象前缀、全部 25 项布尔能力声明，以及所选 `connection.adapterId`。
+Server 在加载目录和每次执行前检查协议版本。版本不匹配时返回 `WORKER_PROTOCOL_MISMATCH`，不发送执行凭据。验证/探测模式使用各自的请求契约。执行字段见 [WorkerRunRequest.java](../jdbc-test-worker/src/main/java/com/jdbctest/worker/WorkerRunRequest.java)：`protocolVersion`、`runId`、`driver`、`connection`、`selection`、`workspace`、`timeoutMs`、`scope`、`objectPrefix`、`capabilities`、`destructiveConsent`。请求必须提供版本 2、明确范围与同意、`j` 加 20 位小写十六进制数字的对象前缀、全部 34 项布尔能力声明，以及所选 `connection.adapterId`。
 
 事件包括 `RUN_STARTED`、`MODULE_STARTED`、`CASE_STARTED`、`CASE_FINISHED`、`MODULE_FINISHED`、`RUN_FINISHED`、`RUN_FAILED`。格式错误或非预期事件、错误任务 ID、未选择或重复结果导致 `WORKER_PROTOCOL_ERROR`。报告输出到 `<workspace>/report/report.json`，schema 为 `2.0.0`；退出时删除临时配置。
 
@@ -288,3 +288,37 @@ CPA Keeper 白色 UI 基础层固定引用上游 [`2c09d65d6a90b1dc9802fe7b26704
 使用 `npm run lint`、`npm run test`、`npm run build` 和 mocked `npm run test:e2e` 验证。显式选择的 `history-readonly` Playwright 项目仅读取保全历史，不创建运行或测试连接；需已核验的历史副本后端、`JDBC_TEST_HISTORY_READONLY=true` 和当前构建 preview。原有 `real` E2E 仍需独立可写验收数据库，禁止用于历史 QA。
 
 弹窗内菜单、tooltip/toast 的测试专用页面使用 `PLAYWRIGHT_CHANNEL=chrome npx playwright test --project=primitives`（Vite dev，非 preview），入口不进入生产路由或构建。
+
+### 测试驱动自身的 DataSource 实现
+
+上传驱动及“编辑元数据”中可配置 DataSource、ConnectionPoolDataSource、XADataSource 的实现类。
+实现类须来自上传的驱动 JAR；配置后启用 FULL 配置中的对应接口用例，留空则明确跳过，不计为通过。
+平台连接包装层仅由框架单元测试验证。任务入队时冻结实现类配置，报告包含此配置，不根据厂商推断类名。
+
+CLI/运行 YAML 的 `db.data_sources` 对应 API 的 `dataSources`：
+
+```yaml
+db:
+  data_sources:
+    dataSource:
+      className: org.postgresql.ds.PGSimpleDataSource
+      urlProperty: URL
+      userProperty: user
+      passwordProperty: password
+    connectionPoolDataSource:
+      className: org.postgresql.ds.PGConnectionPoolDataSource
+    xaDataSource:
+      className: org.postgresql.xa.PGXADataSource
+```
+
+属性名对应公开的单参数 JavaBean setter，默认 `URL`、`user`、`password`。
+附加 `db.properties` 使用 String/int/long/boolean 类型的 setter；不允许覆盖连接凭据属性。
+这些配置填写属性名，不填写凭据。XA 用例还要求数据库满足 XA 的运行条件。
+MySQL 实现示例为 `com.mysql.cj.jdbc` 包的 `MysqlDataSource`、`MysqlConnectionPoolDataSource`、
+`MysqlXADataSource`；Oracle 为 `oracle.jdbc.pool.OracleDataSource`、
+`oracle.jdbc.pool.OracleConnectionPoolDataSource`、`oracle.jdbc.xa.client.OracleXADataSource`。
+
+Java 运行配置的 `db.password` 是字面字符串，保留 `${...}`、反斜杠和空白字符。
+需要环境变量时显式写 `db.password_env: MY_DB_PASSWORD`，仅读取该变量，变量值不会再次展开；
+变量未设置或同时配置 `password` 与 `password_env` 时直接报错。
+CLI 用户配置使用 `password_env`，生成私有的字面密码运行配置。凭据不得提交到 Git。

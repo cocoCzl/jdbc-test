@@ -21,6 +21,8 @@ import {
 import { driverPresentation } from "@/lib/status";
 import { formatBytes, formatDateTime } from "@/lib/format";
 import type { Driver, DriverInput } from "@/types/api";
+import { DataSourceFields } from "./data-source-fields";
+
 function MetadataForm({
   driver,
   close,
@@ -35,6 +37,7 @@ function MetadataForm({
     version: driver.version,
     driverClass: driver.driverClass,
     urlPrefix: driver.urlPrefix ?? "",
+    dataSources: driver.dataSources ?? {},
   });
   const [error, setError] = useState<string | Error | null>(null);
   const client = useQueryClient();
@@ -83,6 +86,8 @@ function MetadataForm({
           />
         ))}
       </div>
+      <DataSourceFields value={form.dataSources ?? {}}
+        onChange={(dataSources) => setForm((previous) => ({ ...previous, dataSources }))} />
       <FormError message={error} />
       <div className="flex gap-2">
         <Button disabled={update.isPending}>
@@ -160,6 +165,9 @@ export default function DriverDetail() {
             {Object.entries({
               [t("ui.driverClass")]: driver.driverClass,
               [t("ui.jdbcURLPrefix")]: driver.urlPrefix ?? "—",
+              DataSource: driver.dataSources?.dataSource?.className ?? "—",
+              ConnectionPoolDataSource: driver.dataSources?.connectionPoolDataSource?.className ?? "—",
+              XADataSource: driver.dataSources?.xaDataSource?.className ?? "—",
               [t("ui.source")]: t(`driverSource.${driver.sourceType}`),
               [t("ui.created")]: formatDateTime(driver.createdAt),
               [t("ui.updated")]: formatDateTime(driver.updatedAt),

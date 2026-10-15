@@ -21,19 +21,24 @@ final class ScopedDataSource implements DataSource, AutoCloseable {
   }
 
   private Connection scope(Connection connection) throws SQLException {
+    return scope(connection, config.namespace);
+  }
+
+  static Connection scope(Connection connection, Config.NamespaceConfig namespace)
+      throws SQLException {
     try {
-      if ("catalog".equals(config.namespace.selection)) {
-        connection.setCatalog(config.namespace.name);
-        if (!config.namespace.name.equals(connection.getCatalog())) {
+      if ("catalog".equals(namespace.selection)) {
+        connection.setCatalog(namespace.name);
+        if (!namespace.name.equals(connection.getCatalog())) {
           throw new SQLException("EXECUTION_SCOPE_MISMATCH: catalog");
         }
       } else {
-        if (config.namespace.database != null && !config.namespace.database.isBlank()
-            && !config.namespace.database.equals(connection.getCatalog())) {
+        if (namespace.database != null && !namespace.database.isBlank()
+            && !namespace.database.equals(connection.getCatalog())) {
           throw new SQLException("EXECUTION_SCOPE_MISMATCH: database");
         }
-        connection.setSchema(config.namespace.name);
-        if (!config.namespace.name.equals(connection.getSchema())) {
+        connection.setSchema(namespace.name);
+        if (!namespace.name.equals(connection.getSchema())) {
           throw new SQLException("EXECUTION_SCOPE_MISMATCH: schema");
         }
       }

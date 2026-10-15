@@ -82,6 +82,13 @@ class BlobClobTest {
       ps.setString(2, testText);
       assertEquals(1, ps.executeUpdate());
     }
+    try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql(
+        "SELECT text_data FROM {{blobclob_test}} WHERE name = 'setString测试'"));
+        ResultSet rs = ps.executeQuery()) {
+      assertTrue(rs.next());
+      assertEquals(testText, rs.getString(1));
+      assertFalse(rs.next());
+    }
   }
 
   @Test
@@ -125,8 +132,10 @@ class BlobClobTest {
         ResultSet rs = ps.executeQuery()) {
       assertTrue(rs.next());
       try (Reader reader = rs.getCharacterStream("text_data");
-          BufferedReader br = new BufferedReader(reader)) {
-        assertNotNull(br.readLine());
+          StringWriter actual = new StringWriter()) {
+        assertNotNull(reader);
+        reader.transferTo(actual);
+        assertEquals(text, actual.toString(), "All characters and line breaks must round trip");
       }
     }
   }
@@ -196,6 +205,16 @@ class BlobClobTest {
       ps.setNull(2, Types.BINARY);
       ps.setString(3, "文本不为空");
       ps.executeUpdate();
+    }
+    try (PreparedStatement ps = conn.prepareStatement(JdbcContext.sql(
+        "SELECT binary_data, text_data FROM {{blobclob_test}} WHERE name = 'null测试'"));
+        ResultSet rows = ps.executeQuery()) {
+      assertTrue(rows.next());
+      assertNull(rows.getBytes(1));
+      assertTrue(rows.wasNull());
+      assertEquals("文本不为空", rows.getString(2));
+      assertFalse(rows.wasNull());
+      assertFalse(rows.next());
     }
   }
 }

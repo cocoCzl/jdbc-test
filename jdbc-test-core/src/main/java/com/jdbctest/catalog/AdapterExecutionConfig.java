@@ -19,7 +19,9 @@ public record AdapterExecutionConfig(String id, String dialect, String identifie
       "scrollable_result_set", "generated_keys", "multiple_result_sets", "statement_cancel",
       "query_timeout",
       "network_timeout", "client_info", "request_boundaries", "sharding", "connection_pool",
-      "xa_data_source", "java_time");
+      "xa_data_source", "java_time", "lob_objects", "lob_locator_updates",
+      "batch_generated_keys", "generated_keys_by_index", "callable_inout", "ref_cursor",
+      "rowid_operations", "multiple_result_sequences", "data_source");
 
   public static AdapterExecutionConfig load(String id) {
     if (!AdapterCatalog.contains(id)) {

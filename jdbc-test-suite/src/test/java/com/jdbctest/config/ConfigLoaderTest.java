@@ -78,21 +78,41 @@ class ConfigLoaderTest {
   }
 
   @Test
-  void resolvesEnvironmentPlaceholdersToEmptyStringWhenMissing() throws Exception {
+  void preservesLiteralPasswordIncludingEnvironmentSyntax() throws Exception {
     Path config = tempDir.resolve("jdbc-test.yaml");
     Files.writeString(config, """
         db:
           type: postgresql
           url: jdbc:postgresql://localhost:5432/postgres
           username: develop
-          password: ${JDBC_TEST_PASSWORD_THAT_SHOULD_NOT_EXIST}
+          password: ' fixture-${JDBC_TEST_PASSWORD_THAT_SHOULD_NOT_EXIST}-$\\中文-password '
         """);
     System.setProperty("config.yaml", config.toString());
 
     Config loaded = ConfigLoader.load();
 
     assertEquals("postgresql", loaded.db.type);
-    assertEquals("", loaded.db.password);
+    assertEquals(" fixture-${JDBC_TEST_PASSWORD_THAT_SHOULD_NOT_EXIST}-$\\中文-password ",
+        loaded.db.password);
+  }
+
+  @Test
+  void explicitEnvironmentReferenceIsResolvedOnce() {
+    String literal = "fixture-${OTHER_VAR}-$\\password";
+    assertEquals(literal, ConfigLoader.resolvePassword(java.util.Map.of(
+        "password_env", "TEST_SECRET"), name -> literal));
+  }
+
+  @Test
+  void rejectsMissingAmbiguousOrInvalidEnvironmentReferences() {
+    assertThrows(IllegalStateException.class, () -> ConfigLoader.resolvePassword(
+        java.util.Map.of("password_env", "UNSET"), name -> null));
+    assertThrows(IllegalStateException.class, () -> ConfigLoader.resolvePassword(
+        java.util.Map.of("password", "literal", "password_env", "TEST_SECRET"), name -> "secret"));
+    assertThrows(IllegalStateException.class, () -> ConfigLoader.resolvePassword(
+        java.util.Map.of("password_env", "${TEST_SECRET}"), name -> "secret"));
+    assertThrows(IllegalStateException.class, () -> ConfigLoader.resolvePassword(
+        java.util.Map.of("password", 1234), name -> "secret"));
   }
 
   @Test

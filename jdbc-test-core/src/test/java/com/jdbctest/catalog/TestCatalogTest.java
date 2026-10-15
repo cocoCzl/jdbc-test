@@ -27,8 +27,22 @@ class TestCatalogTest {
   }
 
   @Test
+  void arrayValuedMethodRequirementsRemainExtended() {
+    var scenario = CATALOG.testCases().stream()
+        .filter(item -> item.scenarioId().equals("prepared_statement.batch_keys_by_column_index"))
+        .findFirst().orElseThrow();
+    assertEquals(List.of("generated_keys", "batch_generated_keys", "generated_keys_by_index"),
+        scenario.requiredCapabilities());
+    assertEquals(TestProfile.FULL, scenario.profile());
+    var lob = CATALOG.testCases().stream()
+        .filter(item -> item.scenarioId().equals("blob_clob.temporary_lob_binding"))
+        .findFirst().orElseThrow();
+    assertEquals(List.of("blobs", "clobs", "lob_objects"), lob.requiredCapabilities());
+  }
+
+  @Test
   void discoversExpectedScenarioInventory() {
-    assertEquals(202, CATALOG.testCases().size());
+    assertEquals(270, CATALOG.testCases().size());
     assertEquals(17, CATALOG.modules().size());
   }
 
@@ -46,21 +60,21 @@ class TestCatalogTest {
 
   @Test
   void coreProfileSelectsCurrentCoreScenarios() {
-    assertEquals(136, CATALOG.select(TestSelection.core()).size());
+    assertEquals(153, CATALOG.select(TestSelection.core()).size());
     assertTrue(CATALOG.select(TestSelection.core()).stream()
         .allMatch(item -> item.profile() == TestProfile.CORE));
   }
 
   @Test
   void fullProfileSelectsAllScenarios() {
-    assertEquals(202, CATALOG.select(TestSelection.full()).size());
+    assertEquals(270, CATALOG.select(TestSelection.full()).size());
   }
 
   @Test
   void selectsOneModule() {
     List<TestCaseDescriptor> selected = CATALOG.select(TestSelection.custom(
         TestProfile.FULL, Set.of("statement"), Set.of(), Set.of()));
-    assertEquals(23, selected.size());
+    assertEquals(26, selected.size());
     assertTrue(selected.stream().allMatch(item -> "statement".equals(item.module().id())));
   }
 
@@ -68,7 +82,7 @@ class TestCatalogTest {
   void selectsMultipleModules() {
     List<TestCaseDescriptor> selected = CATALOG.select(TestSelection.custom(
         TestProfile.FULL, Set.of("connection", "statement"), Set.of(), Set.of()));
-    assertEquals(40, selected.size());
+    assertEquals(53, selected.size());
   }
 
   @Test
@@ -83,7 +97,7 @@ class TestCatalogTest {
   void excludesScenario() {
     List<TestCaseDescriptor> selected = CATALOG.select(TestSelection.custom(
         TestProfile.FULL, Set.of(), Set.of(), Set.of("statement.execute_select")));
-    assertEquals(201, selected.size());
+    assertEquals(269, selected.size());
     assertTrue(
         selected.stream().noneMatch(item -> "statement.execute_select".equals(item.scenarioId())));
   }

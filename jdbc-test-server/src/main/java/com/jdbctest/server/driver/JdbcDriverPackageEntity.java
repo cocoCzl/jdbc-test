@@ -33,6 +33,18 @@ public class JdbcDriverPackageEntity {
   @Column(name = "updated_at", nullable = false)
   private Instant updatedAt;
 
+  @Column(name = "data_sources_config", columnDefinition = "text")
+  private String dataSourcesConfig;
+
+  public com.jdbctest.catalog.DataSourceProviders getDataSources() {
+    return com.jdbctest.catalog.DataSourceProviders.fromMap(dataSourcesConfig == null ? null
+        : new org.yaml.snakeyaml.Yaml().load(dataSourcesConfig));
+  }
+
+  public void setDataSources(com.jdbctest.catalog.DataSourceProviders value) {
+    dataSourcesConfig = value == null ? null : new org.yaml.snakeyaml.Yaml().dump(value.toMap());
+  }
+
   protected JdbcDriverPackageEntity() {
   }
 

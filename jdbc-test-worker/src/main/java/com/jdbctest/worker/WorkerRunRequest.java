@@ -20,7 +20,11 @@ public record WorkerRunRequest(
 ) {
 
   @JsonIgnoreProperties(ignoreUnknown = false)
-  public record DriverRequest(String driverClass, List<String> artifacts) {
+  public record DriverRequest(String driverClass, List<String> artifacts,
+      com.jdbctest.catalog.DataSourceProviders dataSources) {
+    public DriverRequest(String driverClass, List<String> artifacts) {
+      this(driverClass, artifacts, null);
+    }
 
   }
 

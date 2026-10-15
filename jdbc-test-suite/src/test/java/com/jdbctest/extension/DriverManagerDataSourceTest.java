@@ -23,7 +23,7 @@ class DriverManagerDataSourceTest {
         RecordingDriver.class.getName(),
         "jdbc:recording:test",
         "tester",
-        "secret",
+        "fixture-${LITERAL}-$\\password",
         Map.of("vendor.app.name", "jdbc-test")
     );
 
@@ -33,8 +33,29 @@ class DriverManagerDataSourceTest {
 
     assertEquals("jdbc:recording:test", RecordingDriver.lastUrl);
     assertEquals("tester", RecordingDriver.lastProperties.getProperty("user"));
-    assertEquals("secret", RecordingDriver.lastProperties.getProperty("password"));
+    assertEquals("fixture-${LITERAL}-$\\password",
+        RecordingDriver.lastProperties.getProperty("password"));
     assertEquals("jdbc-test", RecordingDriver.lastProperties.getProperty("vendor.app.name"));
+  }
+
+  @Test
+  void platformFacadeExposesItsOwnDriverManagerSettingsAndWrapper() throws Exception {
+    var source = new DriverManagerDataSource(RecordingDriver.class.getName(),
+        "jdbc:recording:test", "tester", "fixture", Map.of());
+    java.io.PrintWriter originalWriter = DriverManager.getLogWriter();
+    int originalTimeout = DriverManager.getLoginTimeout();
+    try (var writer = new java.io.PrintWriter(new java.io.StringWriter())) {
+      source.setLogWriter(writer);
+      source.setLoginTimeout(15);
+      org.junit.jupiter.api.Assertions.assertSame(writer, source.getLogWriter());
+      assertEquals(15, source.getLoginTimeout());
+      org.junit.jupiter.api.Assertions.assertTrue(source.isWrapperFor(javax.sql.DataSource.class));
+      org.junit.jupiter.api.Assertions.assertSame(source, source.unwrap(javax.sql.DataSource.class));
+      assertNotNull(source.getParentLogger());
+    } finally {
+      DriverManager.setLogWriter(originalWriter);
+      DriverManager.setLoginTimeout(originalTimeout);
+    }
   }
 
   public static final class RecordingDriver implements Driver {

@@ -1,0 +1,1 @@
+CREATE TABLE {{temporal_precision}} (id INTEGER PRIMARY KEY, ts3 TIMESTAMP(3), ts6 TIMESTAMP(6));

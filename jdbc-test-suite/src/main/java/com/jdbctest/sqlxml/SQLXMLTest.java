@@ -40,9 +40,13 @@ class SQLXMLTest {
       assertTrue(rs.next());
       SQLXML xml = rs.getSQLXML("xml_data");
       assertNotNull(xml, "getSQLXML 应返回非空");
-      String content = xml.getString();
-      assertTrue(content.contains("<root>"), "XML 内容应包含 <root>");
-      assertTrue(content.contains("value1"), "XML 内容应包含 value1");
+      try {
+        String content = xml.getString();
+        assertTrue(content.contains("<root>"), "XML 内容应包含 <root>");
+        assertTrue(content.contains("value1"), "XML 内容应包含 value1");
+      } finally {
+        xml.free();
+      }
     }
   }
 
@@ -55,9 +59,13 @@ class SQLXMLTest {
         JdbcContext.sql("INSERT INTO {{sqlxml_test}} (name, xml_data) VALUES (?, ?)"))) {
       ps.setString(1, "setSQLXML测试");
       SQLXML xml = conn.createSQLXML();
-      xml.setString(xmlContent);
-      ps.setSQLXML(2, xml);
-      assertEquals(1, ps.executeUpdate());
+      try {
+        xml.setString(xmlContent);
+        ps.setSQLXML(2, xml);
+        assertEquals(1, ps.executeUpdate());
+      } finally {
+        xml.free();
+      }
     }
   }
 
@@ -70,9 +78,13 @@ class SQLXMLTest {
         ResultSet rs = ps.executeQuery()) {
       assertTrue(rs.next());
       SQLXML xml = rs.getSQLXML("xml_data");
-      String str = xml.getString();
-      assertNotNull(str);
-      assertFalse(str.isEmpty());
+      try {
+        String str = xml.getString();
+        assertNotNull(str);
+        assertFalse(str.isEmpty());
+      } finally {
+        xml.free();
+      }
     }
   }
 
@@ -101,9 +113,13 @@ class SQLXMLTest {
         ResultSet rs = ps.executeQuery()) {
       assertTrue(rs.next());
       SQLXML xml = rs.getSQLXML("xml_data");
-      // Oracle requires a specific Source class, null not supported
-      Source source = isOracle() ? xml.getSource(StreamSource.class) : xml.getSource(null);
-      assertNotNull(source, "getSource 应返回非空");
+      try {
+        // Oracle requires a specific Source class, null not supported
+        Source source = isOracle() ? xml.getSource(StreamSource.class) : xml.getSource(null);
+        assertNotNull(source, "getSource 应返回非空");
+      } finally {
+        xml.free();
+      }
     }
   }
 
@@ -147,8 +163,14 @@ class SQLXMLTest {
         ResultSet rs = ps.executeQuery()) {
       assertTrue(rs.next());
       SQLXML result = rs.getSQLXML("xml_data");
-      String content = result.getString();
-      assertTrue(content.contains("测试员"), "读回的 XML 应包含原始内容");
+      try {
+        String content = result.getString();
+        assertTrue(content.contains("<name>测试员</name>"));
+        assertTrue(content.contains("<score>100</score>"));
+        assertFalse(rs.next());
+      } finally {
+        result.free();
+      }
     }
   }
 }

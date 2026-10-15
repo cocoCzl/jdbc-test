@@ -4,8 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.jdbctest.extension.JdbcContext;
 import com.jdbctest.extension.JdbcTestExtension;
+import com.jdbctest.extension.RequiresFeature;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
@@ -24,10 +24,18 @@ class WrapperTest {
 
   @Test
   @DisplayName("DataSource Wrapper 接口")
-  void testDataSourceWrapper() throws SQLException {
-    DataSource dataSource = JdbcContext.getDataSource();
+  @RequiresFeature("data_source")
+  void testDataSourceWrapper() throws Exception {
+    DataSource dataSource = com.jdbctest.extension.VendorDataSources.dataSource(
+        com.jdbctest.config.ConfigLoader.load().db);
 
-    assertWrapperContract(dataSource, DataSource.class);
+    try {
+      assertWrapperContract(dataSource, DataSource.class);
+    } finally {
+      if (dataSource instanceof AutoCloseable closeable) {
+        closeable.close();
+      }
+    }
   }
 
   @Test

@@ -31,7 +31,19 @@ export interface DriverSummary {
   version: string;
   status: DriverStatus;
 }
+export interface DataSourceProvider {
+  className: string;
+  urlProperty?: string;
+  userProperty?: string;
+  passwordProperty?: string;
+}
+export interface DataSourceProviders {
+  dataSource?: DataSourceProvider | null;
+  connectionPoolDataSource?: DataSourceProvider | null;
+  xaDataSource?: DataSourceProvider | null;
+}
 export interface Driver extends DriverSummary {
+  dataSources?: DataSourceProviders;
   driverClass: string;
   urlPrefix: string | null;
   sourceType: "BUILTIN" | "UPLOAD" | "MAVEN";
@@ -41,6 +53,7 @@ export interface Driver extends DriverSummary {
   artifacts: Artifact[];
 }
 export interface DriverInput {
+  dataSources?: DataSourceProviders;
   name: string;
   vendor: string;
   version: string;

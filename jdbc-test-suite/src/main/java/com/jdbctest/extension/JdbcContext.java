@@ -29,8 +29,18 @@ public final class JdbcContext {
   private JdbcContext() {
   }
 
+  public static ClassLoader driverClassLoader() {
+    return isolatedDriver == null ? Thread.currentThread().getContextClassLoader()
+        : isolatedDriver.getClass().getClassLoader();
+  }
+
+  public static Connection scopeConnection(Connection connection) throws SQLException {
+    return ScopedDataSource.scope(connection, namespace);
+  }
+
   public static void init(Config config) {
-    FeatureProfile.load(config.adapter == null ? null : config.adapter.capabilities);
+    FeatureProfile.load(config.db.dataSources.capabilities(
+        config.adapter == null ? null : config.adapter.capabilities));
     objects = new TestObjects(config);
     currentAdapterId = config.db.adapterId;
     namespace = config.namespace;

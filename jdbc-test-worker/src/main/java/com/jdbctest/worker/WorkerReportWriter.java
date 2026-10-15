@@ -27,6 +27,8 @@ final class WorkerReportWriter {
     report.put("report_schema_version", "2.0.0");
     report.put("scope", request.scope());
     report.put("capabilities", request.capabilities());
+    report.put("dataSources", request.driver().dataSources() == null ? Map.of()
+        : request.driver().dataSources().toMap());
     report.put("objectPrefix", request.objectPrefix());
     report.put("selected",
         selected.stream().map(com.jdbctest.catalog.TestCaseDescriptor::scenarioId).sorted()

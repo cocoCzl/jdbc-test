@@ -8,6 +8,6 @@ public record DriverResponse(UUID id, String name, String vendor, String version
     String urlPrefix, DriverSourceType sourceType,
     DriverPackageStatus status,
     String packageFingerprint, String createdAt, String updatedAt,
-    List<DriverArtifactResponse> artifacts) {
+    List<DriverArtifactResponse> artifacts, com.jdbctest.catalog.DataSourceProviders dataSources) {
 
 }

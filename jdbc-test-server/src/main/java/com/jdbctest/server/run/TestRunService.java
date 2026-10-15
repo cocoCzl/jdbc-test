@@ -112,9 +112,10 @@ final class TestRunService {
       execution.put("destructiveConsent", request.destructiveConsent());
       execution.put("objectPrefix",
           "j" + UUID.randomUUID().toString().replace("-", "").substring(0, 20));
-      execution.put("capabilities",
+      execution.put("dataSources", driver.getDataSources().toMap());
+      execution.put("capabilities", driver.getDataSources().capabilities(
           com.jdbctest.catalog.AdapterExecutionConfig.load(connection.getAdapterId())
-              .capabilities());
+              .capabilities()));
       run.freezeExecutionInput(
           new tools.jackson.databind.ObjectMapper().writeValueAsString(execution));
       runs.save(run);
@@ -352,6 +353,9 @@ final class TestRunService {
           new tools.jackson.databind.ObjectMapper().readTree(run.getExecutionInput())
               .path("scope"));
       report.put("objectPrefix", value.executionScope().get("objectPrefix"));
+      report.put("dataSources",
+          new tools.jackson.databind.ObjectMapper().readTree(run.getExecutionInput())
+              .path("dataSources"));
       report.put("capabilities",
           new tools.jackson.databind.ObjectMapper().readTree(run.getExecutionInput())
               .path("capabilities"));
