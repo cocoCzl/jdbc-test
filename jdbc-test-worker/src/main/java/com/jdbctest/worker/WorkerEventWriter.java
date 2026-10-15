@@ -29,7 +29,7 @@ final class WorkerEventWriter {
       event.putAll(fields);
     }
     try {
-      output.println(mapper.writeValueAsString(com.jdbctest.security.CredentialRedactor.sanitizeValue(event)));
+      output.println(mapper.writeValueAsString(CredentialSanitizer.project(event)));
       output.flush();
     } catch (Exception exception) {
       throw new IllegalStateException("Unable to write worker event", exception);

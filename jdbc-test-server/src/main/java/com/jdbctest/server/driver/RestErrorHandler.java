@@ -50,7 +50,7 @@ final class RestErrorHandler {
 
   @ExceptionHandler(Exception.class)
   ResponseEntity<ErrorResponse> internal(Exception exception) {
-    LOG.error("Unexpected REST error", exception);
+    LOG.error("Unexpected REST error ({})", exception.getClass().getName());
     return problem(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "Unexpected server error",
         java.util.Map.of());
   }

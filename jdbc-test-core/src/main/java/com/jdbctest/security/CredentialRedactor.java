@@ -16,7 +16,7 @@ public final class CredentialRedactor {
   private static final Pattern ASSIGNMENT = Pattern.compile(
       "(?i)(?<![\\w])((?:[a-z_]|%[0-9a-f]{2})+)[\\\"']?\\s*[:=]\\s*");
   private static final Pattern ORACLE = Pattern.compile(
-      "(?i)(jdbc:oracle:(?:thin|oci|oci8):)(?!@)([^@\\r\\n]*)");
+      "(?i)(jdbc:oracle:(?:thin|oci|oci8):)(?!@)([^\\r\\n]*)");
 
   private CredentialRedactor() {
   }

@@ -70,12 +70,15 @@ public final class WorkerMain {
       validate(request);
     } catch (Exception exception) {
       System.err.println(
-          "[worker] invalid request: " + CredentialSanitizer.sanitize(exception.getMessage()));
+          "[worker] invalid request: " + (exception instanceof IllegalArgumentException
+              && exception.getMessage() != null && exception.getMessage().startsWith("WORKER_PROTOCOL_MISMATCH")
+              ? "WORKER_PROTOCOL_MISMATCH" : "INVALID_REQUEST"));
       events.write("RUN_FAILED", "",
           Map.of("errorType", "INVALID_REQUEST", "message", "Invalid worker request"));
       return INVALID_REQUEST;
     }
 
+    CredentialSanitizer.password(request.connection().password());
     TestCatalog catalog;
     try {
       catalog = TestCatalog.loadDefault();
@@ -220,6 +223,13 @@ public final class WorkerMain {
           Map.of("errorType", "INVALID_REQUEST", "message", "Driver and JDBC URL are required"));
       return INVALID_REQUEST;
     }
+    if (com.jdbctest.security.CredentialRedactor.containsCredentials(request.connection().jdbcUrl())
+        || request.connection().password() == null) {
+      events.write("CONNECTION_PROBE_FAILED", "", Map.of("errorType", "INVALID_REQUEST",
+          "message", "Credentials must be supplied separately"));
+      return INVALID_REQUEST;
+    }
+    CredentialSanitizer.password(request.connection().password());
     PrintStream originalError = System.err;
     PrintStream originalOutput = System.out;
     PrintStream driverOutput = new PrintStream(new BoundedDiagnosticOutputStream(), true,

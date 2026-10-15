@@ -15,12 +15,16 @@ class CredentialOutputTest {
   void eventsAndExceptionChainsUseTheSameSafeProjection() throws Exception {
     var bytes = new ByteArrayOutputStream();
     var mapper = new ObjectMapper();
+    CredentialSanitizer.password("UniqueBareSecret");
     var fields = WorkerExecutionEvidence.failure(new SQLException(
         "jdbc:oracle:thin:u/AuditOnly_Secret@host", "XX000", 7,
         new IllegalStateException("password={AuditOnly;SecretTail}}End}")));
+    fields.put("message", "driver echoed UniqueBareSecret without a label");
     fields.put("nested", Map.of("access_token", "TokenSecret"));
     new WorkerEventWriter(mapper, new PrintStream(bytes)).write("EXECUTION_ISSUE", "fixture", fields);
     String output = bytes.toString(java.nio.charset.StandardCharsets.UTF_8);
+    assertFalse(output.contains("UniqueBareSecret"));
+    CredentialSanitizer.password(null);
     assertFalse(output.contains("AuditOnly"));
     assertFalse(output.contains("SecretTail"));
     assertFalse(output.contains("TokenSecret"));

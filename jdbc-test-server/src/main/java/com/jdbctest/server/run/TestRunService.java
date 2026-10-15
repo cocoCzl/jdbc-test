@@ -346,7 +346,7 @@ final class TestRunService {
   @SuppressWarnings("unchecked")
   private List<java.util.Map<String, Object>> issueSnapshot(TestRunEntity run) {
     return run.getExecutionIssues() == null ? List.of()
-        : new tools.jackson.databind.ObjectMapper().readValue(run.getExecutionIssues(), List.class);
+        : new tools.jackson.databind.ObjectMapper().readValue(JdbcUrlSanitizer.sanitizeJson(run.getExecutionIssues()), List.class);
   }
 
   java.util.Map<String, Object> evidenceReport(UUID id) {
@@ -422,7 +422,7 @@ final class TestRunService {
         value.getDisplayName(), value.getStatus(), value.getDurationMs(), JdbcUrlSanitizer.sanitize(value.getMessage()),
         JdbcUrlSanitizer.sanitize(value.getStackTrace()), value.getStartedAt(), value.getFinishedAt(),
         value.getExecutionEvidence() == null ? null
-            : new tools.jackson.databind.ObjectMapper().readValue(value.getExecutionEvidence(),
+            : new tools.jackson.databind.ObjectMapper().readValue(JdbcUrlSanitizer.sanitizeJson(value.getExecutionEvidence()),
                 java.util.Map.class));
   }
 

@@ -11,6 +11,7 @@ class JdbcUrlSanitizerTest {
     for (String input : new String[] {
         "jdbc:oracle:thin:audit_user/AuditOnly_Secret@db.example:1521:TEST",
         "jdbc:oracle:oci:audit_user/AuditOnly_Secret@TEST",
+        "jdbc:oracle:thin:u/AuditOnly@SecretTail@host",
         "jdbc:sqlserver://host;password={AuditOnly;SecretTail}}End};encrypt=true",
         "password=\"AuditOnly Alpha Beta\"",
         "password={AuditOnly;SecretTail",
