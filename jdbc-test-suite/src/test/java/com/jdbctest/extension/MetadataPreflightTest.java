@@ -56,6 +56,50 @@ class MetadataPreflightTest {
   }
 
   @Test
+  void oracleDependencyFailurePrecedesNamespaceAndFixtureWrites() throws Exception {
+    for (boolean sqlxml : new boolean[] {true, false}) {
+      Config config = config();
+      // Custom adapter IDs must still use the declared Oracle dialect.
+      config.db.adapterId = "custom-oracle";
+      config.db.dialect = "oracle";
+      config.db.driverClass = "oracle.jdbc.OracleDriver";
+      config.db.expectedDatabaseProductRegex = null;
+      config.db.expectedDriverNameRegex = null;
+      config.db.databaseVersionMin = null;
+      config.db.databaseVersionMax = null;
+      config.db.driverVersionMin = null;
+      config.db.driverVersionMax = null;
+      config.preflight = new Config.PreflightConfig();
+      config.preflight.requireSqlxml = sqlxml;
+      var connection = mock(Connection.class);
+      when(connection.getMetaData()).thenReturn(mock(DatabaseMetaData.class));
+      var statement = mock(java.sql.Statement.class);
+      var rows = mock(java.sql.ResultSet.class);
+      when(connection.createStatement()).thenReturn(statement);
+      when(statement.executeQuery(anyString())).thenReturn(rows);
+      when(rows.next()).thenReturn(true);
+      when(rows.getInt(1)).thenReturn(852);
+      var driver = mock(Driver.class);
+      when(driver.connect(anyString(), any())).thenReturn(connection);
+      JdbcContext.setIsolatedDriver(driver);
+      try {
+        var error = assertThrows(IllegalStateException.class, () -> JdbcContext.init(config));
+        assertEquals("ADAPTER_PREFLIGHT_FAILED", error.getMessage());
+        assertTrue(error.getCause().getMessage().contains(sqlxml
+            ? "ORACLE_XML_MISSING" : "ORACLE_CHARSET_PREFLIGHT_FAILED"));
+        assertEquals("REJECTED", JdbcContext.metadataEvidence().get("status"));
+        verify(statement, never()).execute(anyString());
+        verify(connection, never()).prepareStatement(anyString());
+        if (sqlxml) {
+          verify(connection, never()).createStatement();
+        }
+      } finally {
+        JdbcContext.shutdown();
+      }
+    }
+  }
+
+  @Test
   void endpointsPrefixesManySegmentsAndLargeNumbersAreHandled() throws Exception {
     var method = JdbcContext.class.getDeclaredMethod("validateVersion", String.class,
         String.class, String.class, String.class);

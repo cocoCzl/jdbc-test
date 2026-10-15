@@ -245,6 +245,27 @@ Flyway V1–V8 管理 schema；Hibernate 使用 `ddl-auto=validate`。记录使�
 
 文件存放在 `<data-dir>/drivers/<driver-id>/<artifact-id>.jar`，用户文件名仅供显示。每个文件记录大小和 SHA-256；包指纹对排序后用换行连接的文件摘要求哈希。重复包返回 `DRIVER_PACKAGE_ALREADY_EXISTS`。修改类名会重置验证状态。Worker 验证加载驱动类但不连接数据库，默认超时 30 秒。删除已使用包返回 `DRIVER_IN_USE`。排序字段：`name`、`vendor`、`version`、`status`、`createdAt`。
 
+Oracle 驱动包可能需要配套组件。对 `oracle.jdbc.*` 驱动，验证会在**选中的隔离类加载器**中
+检查字符集转换器和 XML 类及其方法签名；不可解析时，通过新增 `warnings` 返回
+`ORACLE_I18N_MISSING` / `ORACLE_XML_MISSING`。警告不会将只使用内置字符集、不涉及 XML 的
+驱动一律判为无效。页面展示本次响应，警告不持久化为兼容性结论。这是有限组件检查，
+不解析完整依赖闭包，也不保证任意厂商版本可以混用。
+
+请上传**新的多 JAR 包**，同时包含厂商兼容版本的 `ojdbc`、
+`com.oracle.database.nls:orai18n`，SQLXML 还需 `com.oracle.database.xml:xdb` 和
+`com.oracle.database.xml:xmlparserv2`。CLI 也可将全部 JAR 放在同一本地驱动目录中。
+具体以所选驱动版本的厂商要求为准，不能仅凭文件名判定有效。这些 JAR 属于外部被测输入，
+不加入应用 POM，不静默在线下载。
+
+Oracle 执行预检在命名空间/夹具创建前，只读查询 `NLS_DATABASE_PARAMETERS`，并使用隔离驱动
+验证数据库及国家字符集的实际转换。读取失败、信息缺失或转换失败以
+`ORACLE_CHARSET_PREFLIGHT_FAILED` 停止并保留原因。Worker 实际选中的场景需要已启用的
+`sqlxml` 时，也会在写入前以 `ORACLE_XML_MISSING` 拒绝缺少 XML 组件的包。
+手工 Suite 运行配置可用 `preflight.require_sqlxml: true` 请求相同 XML 预检，默认仍为 false；
+Python CLI 尚不根据场景选择推导此标记。
+普通连接探测继续不执行 SQL。这些检查针对 Oracle 的 `oracle.jdbc.*` 实现，其他驱动保留现有行为。
+缺依赖导致的失败不能被解释为数据库兼容性失败。
+
 ### 适配注册与执行声明
 
 `adapters/catalog.json` 是唯一的内置注册索引，只列 ID。名称、trust、版本、能力与驱动提示

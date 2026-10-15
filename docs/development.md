@@ -263,6 +263,30 @@ Upload multipart `metadata` JSON and repeated `files` parts. Defaults: 20 artifa
 
 Files live at `<data-dir>/drivers/<driver-id>/<artifact-id>.jar`; user filenames are display metadata. Each artifact has size and SHA-256; the package fingerprint hashes sorted artifact digests joined by a newline. Duplicate packages return `DRIVER_PACKAGE_ALREADY_EXISTS`. Class edits reset validation. Worker validation loads the class but does not connect, with a default 30-second timeout. Used packages return `DRIVER_IN_USE` on deletion. Driver sort fields: `name`, `vendor`, `version`, `status`, `createdAt`.
 
+Oracle packages may need companion artifacts. For an `oracle.jdbc.*` driver, validation returns
+additive `warnings` codes `ORACLE_I18N_MISSING` / `ORACLE_XML_MISSING` when the charset converter or
+XML classes/method signatures cannot be resolved in the **selected isolated loader**. Warnings do
+not invalidate a driver that can handle a built-in charset without XML. They are shown in the
+validation response, not persisted as a compatibility certification. This is a limited component
+check, not a complete dependency resolver or a guarantee that all vendor versions interoperate.
+
+Upload a **new multi-JAR package** containing compatible vendor versions of `ojdbc`,
+`com.oracle.database.nls:orai18n`, and, for SQLXML, `com.oracle.database.xml:xdb` plus
+`com.oracle.database.xml:xmlparserv2`. Alternatively put all JARs in the CLI's local driver directory.
+Use the vendor's requirements for the chosen driver release; filenames alone do not prove validity.
+These are external test inputs, not application/POM dependencies, and are never downloaded silently.
+
+Before namespace/fixture creation, Oracle execution preflight reads `NLS_DATABASE_PARAMETERS`
+(SELECT only) and tests both database and national charset conversions using the isolated driver.
+An unreadable/missing charset or failed conversion stops preflight with
+`ORACLE_CHARSET_PREFLIGHT_FAILED`; the cause is retained. Worker selections requiring enabled
+`sqlxml` also reject missing XML components with `ORACLE_XML_MISSING` before writes. Hand-written
+Suite runtime configs can request this same XML preflight with `preflight.require_sqlxml: true`;
+the default is false. The Python CLI does not infer this flag from its selection. Ordinary
+connection probes still run no SQL. These checks target Oracle's
+`oracle.jdbc.*` implementation; other drivers retain existing behavior. Test failures caused by a
+missing dependency must not be reported as database compatibility failures.
+
 ### Adapter registry and execution declarations
 
 `adapters/catalog.json` is the single built-in registration index. It lists IDs only; names,

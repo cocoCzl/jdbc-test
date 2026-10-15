@@ -154,6 +154,7 @@ export default function DriverForm() {
           <DataSourceFields value={dataSources} onChange={setDataSources} />
           <Card as="section" className="panel">
             <h2 className="mb-5 text-lg font-semibold">{t("ui.driverArtifacts")}</h2>
+            <p className="mb-4 text-sm text-muted-foreground">{t("ui.driverCompanionHint")}</p>
             <input
               ref={uploadInput}
               type="file"

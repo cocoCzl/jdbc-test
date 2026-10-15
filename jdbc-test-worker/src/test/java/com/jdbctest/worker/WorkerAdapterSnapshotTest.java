@@ -45,6 +45,7 @@ class WorkerAdapterSnapshotTest {
       assertEquals(scope.namespace(snapshot.sqlDialect()), json.at("/namespace/name").asText());
       assertEquals(!"oracle".equals(dialect), json.path("namespace").has("database"));
       assertEquals("", json.at("/db/password").asText());
+      assertFalse(json.at("/preflight/require_sqlxml").asBoolean());
       var wire = mapper.readTree(mapper.writeValueAsString(snapshot));
       assertEquals(6, wire.size());
       assertFalse(wire.has("sqlDialect"));
@@ -71,7 +72,8 @@ class WorkerAdapterSnapshotTest {
     return new WorkerRunRequest(2, "fixture",
         new WorkerRunRequest.DriverRequest("fixture.Driver", List.of()),
         new WorkerRunRequest.ConnectionRequest("jdbc:fixture:test", "fixture", "", Map.of(), "private-db"),
-        null, directory.toString(), 1000L, scope, "j01234567890123456789",
+        new WorkerRunRequest.SelectionRequest("FULL", List.of("connection"), List.of(), List.of()),
+        directory.toString(), 1000L, scope, "j01234567890123456789",
         snapshot.capabilities(), true, snapshot);
   }
 }

@@ -186,6 +186,21 @@ describe("Driver UI", () => {
     );
     expect(document.body.textContent).not.toMatch(/storageKey|workspacePath/);
   });
+  it("shows companion dependency warnings without claiming complete compatibility", async () => {
+    const user = userEvent.setup();
+    mockApi((url) => url.pathname.endsWith("/validate") ? json({
+      status: "VALIDATED", driverClass: "oracle.jdbc.OracleDriver",
+      majorVersion: 21, minorVersion: 13, jdbcCompliant: true,
+      warnings: ["ORACLE_I18N_MISSING", "ORACLE_XML_MISSING"],
+    }) : undefined);
+    renderPage("/drivers/driver-1");
+    await user.click(await screen.findByRole("button", { name: "Validate driver" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("orai18n.jar");
+    expect(alert).toHaveTextContent("xdb.jar");
+    expect(alert).toHaveTextContent("xmlparserv2.jar");
+    expect(alert).toHaveTextContent("new package");
+  });
   it("keeps a referenced package when deletion returns DRIVER_IN_USE", async () => {
     const user = userEvent.setup();
     mockApi((_url, options) =>

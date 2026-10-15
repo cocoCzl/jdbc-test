@@ -86,6 +86,7 @@ public class Config {
 
   public static class PreflightConfig {
 
+    public boolean requireSqlxml;
     public String namespaceCreatePrivilege;
     public String probeName;
     public List<PrivilegeCheck> privilegeChecks = List.of();

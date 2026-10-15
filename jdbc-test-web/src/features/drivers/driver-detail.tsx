@@ -112,8 +112,9 @@ export default function DriverDetail() {
   });
   const validate = useMutation({
     mutationFn: () => driversApi.validate(id),
-    onSuccess: () => {
-      toast.success(t("ui.driverValidated"));
+    onSuccess: (result) => {
+      if (result.warnings?.length) toast.warning(t("ui.driverValidatedWithWarnings"));
+      else toast.success(t("ui.driverValidated"));
       void client.invalidateQueries({ queryKey: driversKeys.all });
     },
     onError: (error) => toast.error(errorMessage(error)),
@@ -205,6 +206,18 @@ export default function DriverDetail() {
             </p>
             <p className="mt-2 text-xs text-muted-foreground">
               {t("ui.metadataFromThisValidationResponseNotA")}</p>
+            {validate.data.warnings?.length ? (
+              <div role="alert" className="mt-4 text-sm text-warning">
+                <h3 className="font-semibold">{t("ui.driverValidatedWithWarnings")}</h3>
+                <ul className="mt-2 list-disc space-y-2 pl-5">
+                  {validate.data.warnings.map((warning) => (
+                    <li key={warning}>{t(`driverWarning.${warning}`, {
+                      defaultValue: t("ui.driverDependencyWarning"),
+                    })}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </Card>
         ) : null}
         <Card as="section" className="panel">

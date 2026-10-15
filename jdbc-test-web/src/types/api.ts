@@ -66,6 +66,7 @@ export interface DriverValidation {
   majorVersion: number;
   minorVersion: number;
   jdbcCompliant: boolean;
+  warnings?: string[];
 }
 export interface Connection {
   executionDatabase?: string | null;

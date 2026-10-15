@@ -165,6 +165,12 @@ public final class JdbcContext {
           config.db.databaseVersionMax);
       validateVersion("驱动版本", driverVersion, config.db.driverVersionMin,
           config.db.driverVersionMax);
+      if (config.db.isDialect("oracle")
+          && OracleDriverDependencies.appliesTo(config.db.getDriverClass())) {
+        OracleDriverDependencies.preflight(connection, driverClassLoader(),
+            config.preflight != null && config.preflight.requireSqlxml
+                && FeatureProfile.supports("sqlxml"));
+      }
       evidence.put("status", "MATCHED");
       metadataEvidence = Map.copyOf(evidence);
     } catch (RuntimeException error) {

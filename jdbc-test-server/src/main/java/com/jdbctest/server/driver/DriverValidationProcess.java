@@ -2,6 +2,7 @@ package com.jdbctest.server.driver;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
@@ -40,10 +41,16 @@ final class DriverValidationProcess {
         throw new DriverException(HttpStatus.UNPROCESSABLE_CONTENT, "DRIVER_VALIDATION_FAILED",
             "Driver validation failed");
       }
+      List<String> warnings = new ArrayList<>();
+      for (JsonNode warning : event.path("warnings")) {
+        if (warning.isString()) {
+          warnings.add(warning.asString());
+        }
+      }
       return new DriverValidationResponse(DriverPackageStatus.VALIDATED,
           event.path("driverClass").asString(),
           event.path("majorVersion").asInt(), event.path("minorVersion").asInt(),
-          event.path("jdbcCompliant").asBoolean());
+          event.path("jdbcCompliant").asBoolean(), warnings);
     } catch (IOException exception) {
       throw new DriverException(HttpStatus.SERVICE_UNAVAILABLE, "WORKER_UNAVAILABLE",
           "Driver validation worker is unavailable");

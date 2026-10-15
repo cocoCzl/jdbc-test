@@ -6,6 +6,7 @@ import com.jdbctest.catalog.TestCatalog;
 import com.jdbctest.catalog.TestProfile;
 import com.jdbctest.catalog.TestSelection;
 import com.jdbctest.extension.JdbcContext;
+import com.jdbctest.extension.OracleDriverDependencies;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
@@ -194,10 +195,12 @@ public final class WorkerMain {
         Driver driver = loaded.driver();
         events.write("DRIVER_VALIDATED", "", Map.of(
             "driverClass", request.driverClass(), "majorVersion", driver.getMajorVersion(),
-            "minorVersion", driver.getMinorVersion(), "jdbcCompliant", driver.jdbcCompliant()));
+            "minorVersion", driver.getMinorVersion(), "jdbcCompliant", driver.jdbcCompliant(),
+            "warnings", OracleDriverDependencies.warnings(request.driverClass(),
+                loaded.classLoader())));
         return SUCCESS;
       }
-    } catch (Exception exception) {
+    } catch (Exception | LinkageError exception) {
       events.write("DRIVER_VALIDATION_FAILED", "",
           Map.of("errorType", "DRIVER_FAILURE", "message", "Driver validation failed"));
       return DRIVER_FAILURE;
@@ -492,6 +495,9 @@ public final class WorkerMain {
     config.put("namespace", namespace);
     config.put("adapter", Map.of("id", adapterId, "capabilities",
         com.jdbctest.catalog.AdapterExecutionConfig.validateCapabilities(request.capabilities())));
+    config.put("preflight", Map.of("require_sqlxml", TestCatalog.loadDefault()
+        .select(toSelection(request.selection())).stream()
+        .anyMatch(test -> test.requiredCapabilities().contains("sqlxml"))));
     config.put("test_filter", Map.of("timeout_ms", timeoutMillis(request)));
     Files.writeString(path, mapper.writeValueAsString(config), StandardCharsets.UTF_8);
     try {

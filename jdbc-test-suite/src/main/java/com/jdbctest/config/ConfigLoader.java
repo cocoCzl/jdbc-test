@@ -158,6 +158,7 @@ public class ConfigLoader {
     config.preflight = new Config.PreflightConfig();
     Map<String, Object> preflight = (Map<String, Object>) raw.get("preflight");
     if (preflight != null) {
+      config.preflight.requireSqlxml = Boolean.TRUE.equals(preflight.get("require_sqlxml"));
       config.preflight.namespaceCreatePrivilege = str(preflight.get("namespace_create_privilege"));
       config.preflight.probeName = str(preflight.get("probe_name"));
       List<Map<String, Object>> checks = (List<Map<String, Object>>) preflight.get(

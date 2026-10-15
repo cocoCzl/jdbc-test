@@ -23,7 +23,9 @@ class WorkerMainTest {
     var request = new WorkerRunRequest(2, "fixture",
         new WorkerRunRequest.DriverRequest("custom.jdbc.Driver", List.of(), providers),
         new WorkerRunRequest.ConnectionRequest("jdbc:fixture:test", "tester", password,
-            java.util.Map.of(), "postgresql"), null, directory.toString(), 1000L,
+            java.util.Map.of(), "postgresql"),
+        new WorkerRunRequest.SelectionRequest("FULL", List.of(), List.of(), List.of()),
+        directory.toString(), 1000L,
         new com.jdbctest.catalog.ExecutionScope("fixture", "owned_scope"),
         "j01234567890123456789", providers.capabilities(
             com.jdbctest.catalog.AdapterExecutionConfig.load("postgresql").capabilities()), true);
@@ -41,6 +43,7 @@ class WorkerMainTest {
       assertEquals("43", loaded.db.driverVersionMax);
       assertEquals(password, loaded.db.password);
       assertEquals(providers, loaded.db.dataSources);
+      assertTrue(loaded.preflight.requireSqlxml);
     } finally {
       if (original == null) {
         System.clearProperty("config.yaml");
