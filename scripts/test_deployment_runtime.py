@@ -66,7 +66,13 @@ def wait_for_health(base, process=None):
 
 
 def save_credential(base, driver_jar):
-    run('sh', str(PROJECT_ROOT / 'scripts/docker-smoke.sh'), env={**os.environ, 'JDBC_TEST_BASE_URL': base})
+    smoke = subprocess.run(['sh', str(PROJECT_ROOT / 'scripts/docker-smoke.sh')],
+        env={**os.environ, 'JDBC_TEST_BASE_URL': base}, capture_output=True, text=True)
+    if smoke.returncode:
+        # Only forward the smoke script's controlled stage messages, never response bodies.
+        stage = next((line for line in smoke.stderr.splitlines()
+                      if line.startswith('Production smoke failed: ')), 'Production smoke failed')
+        raise RuntimeError(f'{stage} (exit {smoke.returncode})')
     boundary = uuid.uuid4().hex
     metadata = json.dumps({'name': 'onboarding-fixture', 'vendor': 'PostgreSQL', 'version': 'fixture', 'driverClass': 'org.postgresql.Driver', 'urlPrefix': 'jdbc:postgresql:'}).encode()
     payload = (f'--{boundary}\r\nContent-Disposition: form-data; name="metadata"\r\nContent-Type: application/json\r\n\r\n'.encode() + metadata

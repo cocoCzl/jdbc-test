@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import http.server
 import json
 import os
 import shlex
@@ -9,12 +10,14 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import threading
 import unittest
 import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
 import build_distribution
+import test_deployment_runtime
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -153,6 +156,97 @@ class SourceEntryTest(unittest.TestCase):
             self.assertNotIn("Checking/building", result.stdout)
             self.assertFalse((source / ".env").exists())
             self.assertFalse((source / "target").exists())
+
+
+@unittest.skipIf(os.name == "nt", "Production shell smoke runs on Unix")
+class ProductionSmokeTest(unittest.TestCase):
+    def setUp(self):
+        if not shutil.which("curl"):
+            self.skipTest("curl is unavailable")
+        self.catalog = {"totalScenarioCount": 270}
+        self.catalog_indent = None
+        self.overrides = {}
+        self.routes = []
+        fixture = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                fixture.routes.append(self.path)
+                if self.path in fixture.overrides:
+                    status, body = fixture.overrides[self.path]
+                elif self.path == "/actuator/health":
+                    status, body = 200, json.dumps({"status": "UP"})
+                elif self.path == "/api/test-catalog":
+                    status, body = 200, json.dumps(fixture.catalog, indent=fixture.catalog_indent)
+                elif self.path == "/assets/app.js":
+                    status, body = 200, "/* fixture */"
+                elif self.path.startswith(("/api/", "/actuator/", "/assets/")):
+                    status, body = 404, "{}"
+                else:
+                    status, body = 200, '<div id="root"></div><script src="/assets/app.js"></script>'
+                self.send_response(status)
+                self.end_headers()
+                self.wfile.write(body.encode())
+
+            def log_message(self, *args):
+                pass
+
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.addCleanup(self.server.server_close)
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+        self.addCleanup(self.thread.join)
+        self.addCleanup(self.server.shutdown)
+
+    def smoke(self):
+        base = f"http://127.0.0.1:{self.server.server_port}"
+        return subprocess.run(["sh", str(ROOT / "scripts/docker-smoke.sh")],
+            env={**os.environ, "JDBC_TEST_BASE_URL": base},
+            capture_output=True, text=True, timeout=20)
+
+    def test_catalog_growth_does_not_break_deployment_checks(self):
+        for count in (202, 270, 271):
+            for indent in (None, 2):
+                with self.subTest(count=count, indent=indent):
+                    self.catalog = {"totalScenarioCount": count}
+                    self.catalog_indent = indent
+                    self.routes.clear()
+                    result = self.smoke()
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIn("static asset: PASS", result.stdout)
+                    self.assertIn("/assets/app.js", self.routes)
+                    self.assertIn("/api/unknown", self.routes)
+
+    def test_missing_or_invalid_catalog_count_fails_with_stage(self):
+        for count in (None, 0, -1, "270", 270.5, True):
+            with self.subTest(count=count):
+                self.catalog = {} if count is None else {"totalScenarioCount": count}
+                result = self.smoke()
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("catalog must report a positive totalScenarioCount", result.stderr)
+
+    def test_excluded_routes_must_not_serve_spa(self):
+        self.overrides["/api/unknown"] = (200, '<div id="root"></div>')
+        result = self.smoke()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("expected 404: /api/unknown", result.stderr)
+
+    def test_missing_asset_fails_with_stage(self):
+        self.overrides["/assets/app.js"] = (404, "{}")
+        result = self.smoke()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("JavaScript asset request", result.stderr)
+
+
+class RuntimeDiagnosticsTest(unittest.TestCase):
+    def test_smoke_failure_reports_stage_without_dumping_response_bodies(self):
+        failure = subprocess.CompletedProcess([], 1, stdout="fixture-private-response",
+            stderr="fixture-private-error\nProduction smoke failed: catalog must report a positive totalScenarioCount\n")
+        with patch.object(test_deployment_runtime.subprocess, "run", return_value=failure):
+            with self.assertRaises(RuntimeError) as caught:
+                test_deployment_runtime.save_credential("http://127.0.0.1:1", b"")
+        self.assertEqual(str(caught.exception),
+            "Production smoke failed: catalog must report a positive totalScenarioCount (exit 1)")
 
 
 class ComposeTest(unittest.TestCase):
