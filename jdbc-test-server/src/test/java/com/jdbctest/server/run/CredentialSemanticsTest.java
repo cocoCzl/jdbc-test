@@ -85,6 +85,11 @@ class CredentialSemanticsTest {
       mvc.perform(post("/api/connections/{id}/test", id).contentType(MediaType.APPLICATION_JSON).content("{}"))
           .andExpect(status().isOk());
       assertEquals(literal, observed.getLast());
+      mvc.perform(post("/api/connections/{id}/test", id).contentType(MediaType.APPLICATION_JSON)
+              .content("{\"password\":\"\"}"))
+          .andExpect(status().isOk());
+      assertEquals("", observed.getLast());
+      assertEquals(envelope, connections.findById(id).orElseThrow().getEncryptedPassword());
       input.put("driverId", driverId);
       mvc.perform(post("/api/connections/test").contentType(MediaType.APPLICATION_JSON)
           .content(json.writeValueAsString(input))).andExpect(status().isOk());

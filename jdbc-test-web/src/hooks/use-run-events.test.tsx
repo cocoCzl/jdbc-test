@@ -19,6 +19,31 @@ function setup() {
   return { ...hook, client, source: TestEventSource.instances[0] };
 }
 describe("EventSource lifecycle", () => {
+  it("preserves passed cases and cleanup failure through terminal and late events", () => {
+    const { source, client } = setup();
+    const cleanupEvidence = {
+      status: "FAILED",
+      attempted: 1,
+      confirmedDeleted: 0,
+      retainedObjects: [{ name: "fixture_owned", sqlState: "42501" }],
+    };
+    act(() => {
+      source.emit("run.progress", { runId: run.id, completedCases: 1, passed: 1, failed: 0 });
+      source.emit("run.cleanup", { runId: run.id, cleanupEvidence });
+      source.emit("run.failed", { runId: run.id, reason: "WORKER_EXECUTION_FAILED" });
+    });
+    expect(source.closed).toBe(true);
+    expect(client.getQueryData(runsKeys.detail(run.id))).toMatchObject({
+      status: "FAILED", completedCases: 1, passed: 1, failed: 0, cleanupEvidence,
+    });
+    act(() => {
+      source.emit("run.cleanup", { runId: run.id, cleanupEvidence: { status: "SUCCESS" } });
+      source.emit("run.finished", { runId: run.id });
+    });
+    expect(client.getQueryData(runsKeys.detail(run.id))).toMatchObject({
+      status: "FAILED", passed: 1, failed: 0, cleanupEvidence,
+    });
+  });
   it("keeps pending and incomplete evidence from SSE without fabricating completed results", () => {
     const { source, client } = setup();
     act(() => source.emit("run.progress", {runId: run.id, accounting: {pending: 3, running: 1, notRun: 0, incomplete: 0}, completedCases: 1}));
