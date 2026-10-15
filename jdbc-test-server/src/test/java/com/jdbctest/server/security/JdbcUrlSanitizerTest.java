@@ -7,6 +7,33 @@ import org.junit.jupiter.api.Test;
 class JdbcUrlSanitizerTest {
 
   @Test
+  void documentedTlsSecretsAreDetectedAndProjectedWithoutBroadPasswordMatching() {
+    for (String key : new String[] {"sslpassword", "trustStorePassword", "clientKeyPassword",
+        "keyStoreSecret", "clientCertificateKeyStorePassword", "trustCertificateKeyStorePassword",
+        "javax.net.ssl.keyStorePassword", "javax.net.ssl.trustStorePassword"}) {
+      String url = "jdbc:fixture://host/db?" + key + "=ReviewOnlyTlsHeadReviewOnlyTlsTail&encrypt=true";
+      assertTrue(JdbcUrlSanitizer.containsCredentials(url), key);
+      assertTrue(JdbcUrlSanitizer.containsCredentials(url.toUpperCase(java.util.Locale.ROOT)), key);
+      String safe = JdbcUrlSanitizer.sanitize(url);
+      assertFalse(safe.contains("ReviewOnlyTlsHead"), key);
+      assertFalse(safe.contains("ReviewOnlyTlsTail"), key);
+      assertTrue(safe.endsWith("&encrypt=true"));
+      var mapper = new tools.jackson.databind.ObjectMapper();
+      String nested = mapper.writeValueAsString(java.util.Map.of("nested", java.util.List.of(
+          java.util.Map.of(key.toUpperCase(java.util.Locale.ROOT), "ReviewOnlyTlsHeadReviewOnlyTlsTail"))));
+      String projected = JdbcUrlSanitizer.sanitizeJson(nested);
+      assertFalse(projected.contains("ReviewOnlyTls"), key);
+      assertEquals(projected, JdbcUrlSanitizer.sanitizeJson(projected));
+    }
+    String ordinary = "jdbc:fixture://host/db?passwordRequired=true&sslpasswordcallback=fixture.Callback";
+    assertFalse(JdbcUrlSanitizer.containsCredentials(ordinary));
+    assertEquals(ordinary, JdbcUrlSanitizer.sanitize(ordinary));
+    String fields = "{\"passwordRequired\":true,\"sslpasswordcallback\":\"fixture.Callback\",\"tokenCount\":2}";
+    assertEquals(new tools.jackson.databind.ObjectMapper().readTree(fields),
+        new tools.jackson.databind.ObjectMapper().readTree(JdbcUrlSanitizer.sanitizeJson(fields)));
+  }
+
+  @Test
   void dialectCredentialsAndStructuredKeysAreSafe() {
     for (String input : new String[] {
         "jdbc:oracle:thin:audit_user/AuditOnly_Secret@db.example:1521:TEST",

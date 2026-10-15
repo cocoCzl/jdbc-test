@@ -12,9 +12,13 @@ public final class CredentialRedactor {
   private static final String MASK = "[REDACTED]";
   private static final Set<String> KEYS = Set.of("password", "passwd", "pwd", "secret", "token",
       "access_token", "accesstoken", "client_secret", "clientsecret", "api_key", "apikey",
-      "encryptedpassword", "masterkey", "master_key");
+      "encryptedpassword", "masterkey", "master_key",
+      // Exact pgJDBC, Microsoft JDBC, Connector/J and JSSE TLS/keystore secret properties.
+      "sslpassword", "truststorepassword", "clientkeypassword", "keystoresecret",
+      "clientcertificatekeystorepassword", "trustcertificatekeystorepassword",
+      "javax.net.ssl.keystorepassword", "javax.net.ssl.truststorepassword");
   private static final Pattern ASSIGNMENT = Pattern.compile(
-      "(?i)(?<![\\w])((?:[a-z_]|%[0-9a-f]{2})+)[\\\"']?\\s*[:=]\\s*");
+      "(?i)(?<![\\w.])((?:[a-z0-9_.]|%[0-9a-f]{2})+)[\\\"']?\\s*[:=]\\s*");
   private static final Pattern ORACLE = Pattern.compile(
       "(?i)(jdbc:oracle:(?:thin|oci|oci8):)(?!@)([^\\r\\n]*)");
 

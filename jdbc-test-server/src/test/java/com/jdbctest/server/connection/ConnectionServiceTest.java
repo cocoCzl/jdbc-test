@@ -56,6 +56,25 @@ class ConnectionServiceTest {
   }
 
   @Test
+  void tlsCredentialUrlsAreRejectedByEveryDraftWriteEntryBeforeDriverUse() {
+    for (String url : List.of("jdbc:postgresql://fixture.invalid/test?sslpassword=ReviewOnlyTlsSecret",
+        "jdbc:sqlserver://fixture.invalid;trustStorePassword=ReviewOnlyTlsSecret;encrypt=true")) {
+      var create = new CreateConnectionRequest("x", "postgresql", "postgresql", url, "u", null,
+          false, driverId, null, null, null);
+      var update = new UpdateConnectionRequest("x", "postgresql", "postgresql", url, "u", null,
+          false, false, driverId, null, null, null);
+      var draft = new DraftConnectionTestRequest("postgresql", "postgresql", url, "u", "x", driverId);
+      for (Runnable action : List.<Runnable>of(() -> service.create(create),
+          () -> service.update(UUID.randomUUID(), update), () -> service.testDraft(draft))) {
+        var error = assertThrows(ConnectionException.class, action::run);
+        assertEquals("CONNECTION_URL_CONTAINS_CREDENTIALS", error.code());
+        org.junit.jupiter.api.Assertions.assertFalse(error.getMessage().contains("ReviewOnlyTls"));
+      }
+    }
+    org.mockito.Mockito.verifyNoInteractions(worker);
+  }
+
+  @Test
   void everyDraftWriteEntryRejectsOracleCredentialsBeforeDriverUse() {
     String url = "jdbc:oracle:thin:audit_user/AuditOnly_Secret@host:1521:SID";
     var create = new CreateConnectionRequest("x", "oracle", "oracle", url, "u", null,

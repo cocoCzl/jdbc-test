@@ -147,6 +147,34 @@ class CredentialSemanticsTest {
     verifyNoInteractions(worker);
   }
 
+  @Test
+  void legacyTlsCredentialUrlsAreSafeOnHttpReadAndRejectedAtProbeAndRun() throws Exception {
+    for (String url : List.of("jdbc:postgresql://fixture.invalid/test?sslpassword=ReviewOnlyTlsSecret",
+        "jdbc:sqlserver://fixture.invalid;trustStorePassword=ReviewOnlyTlsSecret;encrypt=true")) {
+      var entity = new com.jdbctest.server.connection.DatabaseConnectionProfileEntity("legacy-tls",
+          "postgresql", "postgresql", url, "fixture");
+      entity.setExecutionScope(null, "owned_scope");
+      entity.setDefaultDriver(drivers.findById(driverId).orElseThrow());
+      entity.setEncryptedPassword(encryption.encrypt("fixture"));
+      UUID id = connections.save(entity).getId();
+      for (String endpoint : List.of("/api/connections/" + id, "/api/connections")) {
+        String body = mvc.perform(get(endpoint)).andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString();
+        assertFalse(body.contains("ReviewOnlyTls"));
+      }
+      mvc.perform(post("/api/connections/{id}/test", id).contentType(MediaType.APPLICATION_JSON)
+              .content("{}"))
+          .andExpect(status().isUnprocessableContent())
+          .andExpect(jsonPath("$.code").value("CONNECTION_URL_CONTAINS_CREDENTIALS"));
+      mvc.perform(post("/api/runs").contentType(MediaType.APPLICATION_JSON)
+              .content(json.writeValueAsString(request(id, null))))
+          .andExpect(status().isUnprocessableContent())
+          .andExpect(jsonPath("$.code").value("CONNECTION_URL_CONTAINS_CREDENTIALS"));
+      assertEquals(url, connections.findById(id).orElseThrow().getJdbcUrl());
+    }
+    verifyNoInteractions(worker);
+  }
+
   private CreateTestRunRequest request(UUID id, String password) {
     return new CreateTestRunRequest(id, null, "CUSTOM", List.of("connection"), List.of(), List.of(), password, true);
   }
