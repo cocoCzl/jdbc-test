@@ -1,0 +1,867 @@
+[
+  {
+    "name": "builtin",
+    "valid": true
+  },
+  {
+    "name": "custom-id-reuses-postgresql",
+    "valid": true,
+    "updates": [
+      {
+        "path": [
+          "id"
+        ],
+        "value": "private-db"
+      },
+      {
+        "path": [
+          "trust"
+        ],
+        "value": "local"
+      },
+      {
+        "path": [
+          "assets",
+          "directory"
+        ],
+        "value": "postgresql"
+      }
+    ]
+  },
+  {
+    "name": "known-classification-on-custom-id",
+    "valid": true,
+    "updates": [
+      {
+        "path": [
+          "id"
+        ],
+        "value": "private-db"
+      },
+      {
+        "path": [
+          "db_type"
+        ],
+        "value": "postgresql"
+      },
+      {
+        "path": [
+          "assets",
+          "directory"
+        ],
+        "value": "postgresql"
+      }
+    ]
+  },
+  {
+    "name": "unknown-classification-retained",
+    "valid": true,
+    "updates": [
+      {
+        "path": [
+          "id"
+        ],
+        "value": "private-db"
+      },
+      {
+        "path": [
+          "db_type"
+        ],
+        "value": "future-product"
+      },
+      {
+        "path": [
+          "assets",
+          "directory"
+        ],
+        "value": "postgresql"
+      }
+    ]
+  },
+  {
+    "name": "open-capability",
+    "valid": true,
+    "updates": [
+      {
+        "path": [
+          "capabilities",
+          "future_feature"
+        ],
+        "value": false
+      }
+    ]
+  },
+  {
+    "name": "nested-extension",
+    "valid": true,
+    "updates": [
+      {
+        "path": [
+          "vendor_options"
+        ],
+        "value": {
+          "nullable": null,
+          "list": [
+            false,
+            {
+              "value": 12.5
+            }
+          ],
+          "text": "中文"
+        }
+      }
+    ]
+  },
+  {
+    "name": "legacy-defaults",
+    "valid": true,
+    "remove": [
+      [
+        "revision"
+      ],
+      [
+        "identifier_quote"
+      ],
+      [
+        "assets",
+        "pool"
+      ],
+      [
+        "namespace",
+        "selection"
+      ],
+      [
+        "namespace",
+        "drop_on_exit"
+      ]
+    ]
+  },
+  {
+    "name": "empty-version-constraints",
+    "valid": true,
+    "updates": [
+      {
+        "path": [
+          "supported_versions",
+          "database"
+        ],
+        "value": {}
+      },
+      {
+        "path": [
+          "supported_versions",
+          "driver"
+        ],
+        "value": {
+          "min": "",
+          "max": ""
+        }
+      }
+    ]
+  },
+  {
+    "name": "version-zero-padding",
+    "valid": true,
+    "updates": [
+      {
+        "path": [
+          "supported_versions",
+          "database"
+        ],
+        "value": {
+          "min": "1.0",
+          "max": "1"
+        }
+      }
+    ]
+  },
+  {
+    "name": "null-name",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "name"
+        ],
+        "value": null
+      }
+    ]
+  },
+  {
+    "name": "blank-name",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "name"
+        ],
+        "value": " "
+      }
+    ]
+  },
+  {
+    "name": "numeric-name",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "name"
+        ],
+        "value": 123
+      }
+    ]
+  },
+  {
+    "name": "bad-id",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "id"
+        ],
+        "value": "../oops"
+      }
+    ]
+  },
+  {
+    "name": "short-id",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "id"
+        ],
+        "value": "a"
+      }
+    ]
+  },
+  {
+    "name": "unknown-trust",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "trust"
+        ],
+        "value": "Official"
+      }
+    ]
+  },
+  {
+    "name": "unknown-dialect",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "dialect"
+        ],
+        "value": "future"
+      }
+    ]
+  },
+  {
+    "name": "generic-is-legacy-only",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "dialect"
+        ],
+        "value": "generic"
+      }
+    ]
+  },
+  {
+    "name": "blank-classification",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "db_type"
+        ],
+        "value": ""
+      }
+    ]
+  },
+  {
+    "name": "numeric-classification",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "db_type"
+        ],
+        "value": 3
+      }
+    ]
+  },
+  {
+    "name": "capability-string",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "capabilities",
+          "array_type"
+        ],
+        "value": "false"
+      }
+    ]
+  },
+  {
+    "name": "capability-number",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "capabilities",
+          "array_type"
+        ],
+        "value": 0
+      }
+    ]
+  },
+  {
+    "name": "null-capabilities",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "capabilities"
+        ],
+        "value": null
+      }
+    ]
+  },
+  {
+    "name": "asset-directory-escape",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "assets",
+          "directory"
+        ],
+        "value": "../x"
+      }
+    ]
+  },
+  {
+    "name": "asset-absolute",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "assets",
+          "ddl"
+        ],
+        "value": "/tmp/ddl"
+      }
+    ]
+  },
+  {
+    "name": "asset-backslash",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "assets",
+          "ddl"
+        ],
+        "value": "..\\ddl"
+      }
+    ]
+  },
+  {
+    "name": "asset-parent",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "assets",
+          "ddl"
+        ],
+        "value": "ddl/../outside"
+      }
+    ]
+  },
+  {
+    "name": "asset-areas-string",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "assets",
+          "areas"
+        ],
+        "value": "connection"
+      }
+    ]
+  },
+  {
+    "name": "null-source",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "driver",
+          "source"
+        ],
+        "value": null
+      }
+    ]
+  },
+  {
+    "name": "bad-driver-source",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "driver",
+          "source",
+          "kind"
+        ],
+        "value": "network"
+      }
+    ]
+  },
+  {
+    "name": "blank-driver-class",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "driver",
+          "class"
+        ],
+        "value": " "
+      }
+    ]
+  },
+  {
+    "name": "null-identity",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "identity"
+        ],
+        "value": null
+      }
+    ]
+  },
+  {
+    "name": "invalid-regex",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "identity",
+          "database_product_regex"
+        ],
+        "value": "["
+      }
+    ]
+  },
+  {
+    "name": "numeric-regex",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "identity",
+          "database_product_regex"
+        ],
+        "value": 4
+      }
+    ]
+  },
+  {
+    "name": "null-range",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "supported_versions",
+          "database"
+        ],
+        "value": null
+      }
+    ]
+  },
+  {
+    "name": "numeric-range",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "supported_versions",
+          "database",
+          "min"
+        ],
+        "value": 1
+      }
+    ]
+  },
+  {
+    "name": "inverted-range",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "supported_versions",
+          "database"
+        ],
+        "value": {
+          "min": "10.1",
+          "max": "9.9"
+        }
+      }
+    ]
+  },
+  {
+    "name": "invalid-version",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "supported_versions",
+          "database",
+          "min"
+        ],
+        "value": "v10"
+      }
+    ]
+  },
+  {
+    "name": "bad-namespace",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "namespace",
+          "mode"
+        ],
+        "value": "guess"
+      }
+    ]
+  },
+  {
+    "name": "drop-flag-string",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "namespace",
+          "drop_on_exit"
+        ],
+        "value": "false"
+      }
+    ]
+  },
+  {
+    "name": "null-quote",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "identifier_quote"
+        ],
+        "value": null
+      }
+    ]
+  },
+  {
+    "name": "bad-quote",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "identifier_quote"
+        ],
+        "value": "xx"
+      }
+    ]
+  },
+  {
+    "name": "array-quote",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "identifier_quote"
+        ],
+        "value": []
+      }
+    ]
+  },
+  {
+    "name": "empty-evidence",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "validated_combinations"
+        ],
+        "value": []
+      }
+    ]
+  },
+  {
+    "name": "evidence-escape",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "validated_combinations"
+        ],
+        "value": [
+          {
+            "database_version": "15",
+            "driver_version": "42",
+            "evidence": "../secret"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "privileges-not-array",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "minimum_privileges"
+        ],
+        "value": {}
+      }
+    ]
+  },
+  {
+    "name": "uncovered-privilege",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "minimum_privileges"
+        ],
+        "value": [
+          "WRITE EVERYTHING"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "differences-not-array",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "known_differences"
+        ],
+        "value": null
+      }
+    ]
+  },
+  {
+    "name": "malformed-difference",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "known_differences"
+        ],
+        "value": [
+          {
+            "scenario_id": "connection.open"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "missing-name",
+    "valid": false,
+    "remove": [
+      [
+        "name"
+      ]
+    ]
+  },
+  {
+    "name": "missing-driver",
+    "valid": false,
+    "remove": [
+      [
+        "driver"
+      ]
+    ]
+  },
+  {
+    "name": "missing-identity",
+    "valid": false,
+    "remove": [
+      [
+        "identity"
+      ]
+    ]
+  },
+  {
+    "name": "missing-assets",
+    "valid": false,
+    "remove": [
+      [
+        "assets"
+      ]
+    ]
+  },
+  {
+    "name": "missing-capabilities",
+    "valid": false,
+    "remove": [
+      [
+        "capabilities"
+      ]
+    ]
+  },
+  {
+    "name": "missing-namespace",
+    "valid": false,
+    "remove": [
+      [
+        "namespace"
+      ]
+    ]
+  },
+  {
+    "name": "missing-supported_versions",
+    "valid": false,
+    "remove": [
+      [
+        "supported_versions"
+      ]
+    ]
+  },
+  {
+    "name": "missing-minimum_privileges",
+    "valid": false,
+    "remove": [
+      [
+        "minimum_privileges"
+      ]
+    ]
+  },
+  {
+    "name": "missing-privilege_checks",
+    "valid": false,
+    "remove": [
+      [
+        "privilege_checks"
+      ]
+    ]
+  },
+  {
+    "name": "missing-validated_combinations",
+    "valid": false,
+    "remove": [
+      [
+        "validated_combinations"
+      ]
+    ]
+  },
+  {
+    "name": "missing-known_differences",
+    "valid": false,
+    "remove": [
+      [
+        "known_differences"
+      ]
+    ]
+  },
+  {
+    "name": "null-root",
+    "valid": false,
+    "raw": "null"
+  },
+  {
+    "name": "array-root",
+    "valid": false,
+    "raw": "[]"
+  },
+  {
+    "name": "empty-input",
+    "valid": false,
+    "raw": ""
+  },
+  {
+    "name": "yaml",
+    "valid": false,
+    "raw": "name: database"
+  },
+  {
+    "name": "duplicate-key",
+    "valid": false,
+    "raw": "{\"id\":\"one\",\"id\":\"two\"}"
+  },
+  {
+    "name": "nested-duplicate",
+    "valid": false,
+    "raw": "{\"nested\":{\"x\":true,\"x\":false}}"
+  },
+  {
+    "name": "trailing-root",
+    "valid": false,
+    "raw": "{} {}"
+  },
+  {
+    "name": "trailing-comma",
+    "valid": false,
+    "raw": "{\"a\":true,}"
+  },
+  {
+    "name": "comment",
+    "valid": false,
+    "raw": "{/*comment*/\"a\":1}"
+  },
+  {
+    "name": "single-quote",
+    "valid": false,
+    "raw": "{'a':1}"
+  },
+  {
+    "name": "non-finite",
+    "valid": false,
+    "raw": "{\"x\":NaN}"
+  },
+  {
+    "name": "bom",
+    "valid": false,
+    "raw": "﻿{}"
+  },
+  {
+    "name": "namespace-selection-conflicts-with-dialect",
+    "valid": false,
+    "updates": [
+      {
+        "path": [
+          "namespace",
+          "selection"
+        ],
+        "value": "catalog"
+      }
+    ]
+  },
+  {
+    "name": "legacy-no-selection",
+    "valid": true,
+    "updates": [
+      {
+        "path": [
+          "namespace",
+          "selection"
+        ],
+        "value": "none"
+      }
+    ]
+  }
+]

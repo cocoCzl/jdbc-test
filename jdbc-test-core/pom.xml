@@ -9,12 +9,13 @@
     <dependencies>
         <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><scope>test</scope></dependency>
         <dependency><groupId>org.yaml</groupId><artifactId>snakeyaml</artifactId></dependency>
+        <dependency><groupId>tools.jackson.core</groupId><artifactId>jackson-core</artifactId></dependency>
     </dependencies>
     <build>
         <resources>
             <resource>
                 <directory>${project.basedir}/../adapters</directory>
-                <includes><include>*/adapter.json</include></includes>
+                <includes><include>catalog.json</include><include>*/adapter.json</include></includes>
                 <targetPath>adapters</targetPath>
             </resource>
         </resources>

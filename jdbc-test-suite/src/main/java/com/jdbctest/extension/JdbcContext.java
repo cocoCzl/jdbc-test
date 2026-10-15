@@ -62,7 +62,7 @@ public final class JdbcContext {
   }
 
   private static HikariDataSource createHikariDataSource(Config config) {
-    Map<String, Object> poolConfig = loadPoolConfig(config.db.adapterId, config.pool.profileDir);
+    Map<String, Object> poolConfig = loadPoolConfig(config.db.assetId, config.pool.profileDir);
     HikariConfig hikari = new HikariConfig();
     hikari.setJdbcUrl(config.db.getJdbcUrl());
     hikari.setUsername(config.db.username);
@@ -219,10 +219,21 @@ public final class JdbcContext {
   }
 
   @SuppressWarnings("unchecked")
-  private static Map<String, Object> loadPoolConfig(String adapterId, String poolProfileDir) {
-    Path path = Path.of(System.getProperty("user.dir", "."), poolProfileDir, adapterId + ".yaml");
+  static Map<String, Object> loadPoolConfig(String assetId, String poolProfileDir) {
+    if (poolProfileDir.startsWith("classpath:")) {
+      String resource = "/" + poolProfileDir.substring("classpath:".length()) + "/" + assetId + ".yaml";
+      try (InputStream input = JdbcContext.class.getResourceAsStream(resource)) {
+        if (input == null) {
+          throw new IllegalArgumentException("Missing packaged pool profile");
+        }
+        return (Map<String, Object>) new Yaml().load(input);
+      } catch (java.io.IOException exception) {
+        throw new IllegalStateException("Cannot read packaged pool profile", exception);
+      }
+    }
+    Path path = Path.of(System.getProperty("user.dir", "."), poolProfileDir, assetId + ".yaml");
     if (!Files.exists(path)) {
-      path = Path.of(poolProfileDir, adapterId + ".yaml");
+      path = Path.of(poolProfileDir, assetId + ".yaml");
     }
     try (InputStream in = new FileInputStream(path.toFile())) {
       return (Map<String, Object>) new Yaml().load(in);

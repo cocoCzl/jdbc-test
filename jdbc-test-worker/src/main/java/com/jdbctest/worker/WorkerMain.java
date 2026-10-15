@@ -480,9 +480,9 @@ public final class WorkerMain {
     db.put("identifier_quote", adapter.identifierQuote());
     Map<String, Object> namespace = new LinkedHashMap<>();
     namespace.put("mode", "existing");
-    namespace.put("selection", "mysql".equals(adapterId) ? "catalog" : "schema");
-    namespace.put("name", request.scope().namespace(adapterId));
-    if (!"oracle".equals(adapterId)) {
+    namespace.put("selection", adapter.sqlDialect().selection());
+    namespace.put("name", request.scope().namespace(adapter.sqlDialect()));
+    if (adapter.sqlDialect().requiresDatabase()) {
       namespace.put("database", request.scope().database());
     }
     namespace.put("object_prefix", request.objectPrefix());
@@ -526,7 +526,13 @@ public final class WorkerMain {
         || !request.objectPrefix().matches("j[0-9a-f]{20}")) {
       throw new IllegalArgumentException("EXECUTION_SCOPE_REQUIRED");
     }
-    request.scope().validate(request.connection().adapterId());
+    var adapter = request.adapterExecution() == null
+        ? com.jdbctest.catalog.AdapterExecutionConfig.load(request.connection().adapterId())
+        : request.adapterExecution();
+    if (!java.util.Objects.equals(request.connection().adapterId(), adapter.id())) {
+      throw new IllegalArgumentException("ADAPTER_SNAPSHOT_MISMATCH");
+    }
+    request.scope().validate(adapter.sqlDialect());
     com.jdbctest.catalog.AdapterExecutionConfig.validateCapabilities(request.capabilities());
     var providers = request.driver().dataSources() == null
         ? com.jdbctest.catalog.DataSourceProviders.empty() : request.driver().dataSources();

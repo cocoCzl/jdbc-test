@@ -245,6 +245,46 @@ Flyway V1–V8 管理 schema；Hibernate 使用 `ddl-auto=validate`。记录使�
 
 文件存放在 `<data-dir>/drivers/<driver-id>/<artifact-id>.jar`，用户文件名仅供显示。每个文件记录大小和 SHA-256；包指纹对排序后用换行连接的文件摘要求哈希。重复包返回 `DRIVER_PACKAGE_ALREADY_EXISTS`。修改类名会重置验证状态。Worker 验证加载驱动类但不连接数据库，默认超时 30 秒。删除已使用包返回 `DRIVER_IN_USE`。排序字段：`name`、`vendor`、`version`、`status`、`createdAt`。
 
+### 适配注册与执行声明
+
+`adapters/catalog.json` 是唯一的内置注册索引，只列 ID。名称、trust、版本、能力与驱动提示
+仍属于各自的 `adapters/<id>/adapter.json`。Core 每个类加载器一次加载并完整校验索引，生成
+不可变的 `AdapterRegistry`；`AdapterCatalog` 和 `AdapterExecutionConfig.load` 投影同一份定义。
+缺资源、重复 ID、目录/声明 ID 不一致或声明损坏均明确失败，`contains` 也不会绕过校验。
+Core 只校验元数据，不加载 Suite、SQL 或被测驱动；Suite 打包测试检查声明的 SQL 区域与连接池配置。
+索引包使用现有 classpath 根 `ddl`、`dml`、`pool`，由 `assets.directory` 独立选择资产包。
+CLI 使用同一个索引和严格元数据契约；明确指定的本地 manifest 不需要注册，并保留本地资产路径语义。
+
+`DbType` 只表达已知产品的稳定 code，不是注册白名单。自定义适配可用可选 `db_type` 分类；
+省略时，已知旧 ID 保留产品分类，未知 ID/分类保留原声明但没有已知分类。`adapterId` 和自由标签
+`databaseType` 继续为字符串。执行以冻结的 `dialect` 为准，不读取展示标签或驱动 vendor 来猜测。
+当前声明支持 `postgresql`、`mysql`、`oracle`、`sqlserver`；GaussDB 已声明 PostgreSQL 行为，
+其身份约束和资产保持独立。Suite 原有 generic 回退仅用于旧配置，不能注册为新的 manifest 方言。
+范围选择、Oracle 标识符规范化、引用及已拥有索引的清理使用这些有限行为。
+
+Core 只依赖 `tools.jackson.core:jackson-core`，不引入 Boot Starter 或 databind。
+现有 Boot BOM 基线为 3.1.4；本次仅将 Jackson 3 core 显式管理为仍维护的 3.1 LTS 分支
+已发布补丁 **3.1.7**。依据为[官方维护说明](https://github.com/FasterXML/jackson/wiki/Jackson-Releases)
+和 [Central 版本元数据](https://repo.maven.apache.org/maven2/tools/jackson/core/jackson-core/maven-metadata.xml)。
+不升级 Spring Boot 或两端 databind。Server 只解析出一份 Jackson 3 core；Worker 暂时同时包含
+原有 Jackson 2 与 Jackson 3 core，增加约 589 KiB。两者包名不同，Worker 协议序列化仍用 Jackson 2。
+被测 JDBC 驱动继续作为外部输入，由 Worker 的隔离加载器加载。
+
+声明使用 UTF-8 严格 JSON，拒绝重复键、YAML 语法、注释、尾随根、非有限数常量和尾逗号。
+上限为 1 MiB、64 层容器及 128 字符数值 token。浮点扩展值须处于有限双精度范围，避免 Python
+输出 Infinity。校验必需字段、类型、trust、完整布尔能力、
+版本区间及资源路径。Java 不可变保留完整 JSON 树，包括未知扩展字段及 null；扩展不会自动成为执行覆盖值。
+原来省略 revision、引用符及 pool 时的默认值仍为 `release`、`"`、`pool`；新增必填字段须另做兼容决策。
+Java/Python 的正则引擎并不完全相同，身份表达式应保持可移植；fixture 不证明所有正则等价。
+
+`adapterExecution` 原有传输字段与协议版本 2 不变。历史请求缺少执行快照时，继续回退到内置适配。
+Worker 范围行为取自冻结快照；元数据身份/版本预检继续先于命名空间创建和 fixture 写入。
+
+执行 `python3 -B scripts/run_contract_tests.py` 和 `./mvnw verify`。共享正反例位于
+`jdbc-test-core/src/test/resources/adapter-contract`，两种语言均执行。检查覆盖声明、打包、冻结输入、
+对象归属与既有安全回归，不证明真实数据库兼容性。对修改的 Java 文件运行原生格式检查，并分别报告
+上文四项质量检查。调查日志与依赖证据只留本地。
+
 ### 连接
 
 | 方法 | 接口 | 用途 |

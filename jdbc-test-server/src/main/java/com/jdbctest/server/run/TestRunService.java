@@ -90,8 +90,9 @@ final class TestRunService {
       }
       com.jdbctest.catalog.ExecutionScope scope = new com.jdbctest.catalog.ExecutionScope(
           connection.getExecutionDatabase(), connection.getExecutionSchema());
+      var adapterExecution = com.jdbctest.catalog.AdapterExecutionConfig.load(connection.getAdapterId());
       try {
-        scope.validate(connection.getAdapterId());
+        scope.validate(adapterExecution.sqlDialect());
       } catch (IllegalArgumentException exception) {
         throw problem(HttpStatus.UNPROCESSABLE_CONTENT, "EXECUTION_SCOPE_REQUIRED",
             exception.getMessage());
@@ -116,12 +117,9 @@ final class TestRunService {
       execution.put("destructiveConsent", request.destructiveConsent());
       execution.put("objectPrefix",
           "j" + UUID.randomUUID().toString().replace("-", "").substring(0, 20));
-      execution.put("adapterExecution",
-          com.jdbctest.catalog.AdapterExecutionConfig.load(connection.getAdapterId()));
+      execution.put("adapterExecution", adapterExecution);
       execution.put("dataSources", driver.getDataSources().toMap());
-      execution.put("capabilities", driver.getDataSources().capabilities(
-          com.jdbctest.catalog.AdapterExecutionConfig.load(connection.getAdapterId())
-              .capabilities()));
+      execution.put("capabilities", driver.getDataSources().capabilities(adapterExecution.capabilities()));
       run.freezeExecutionInput(
           new tools.jackson.databind.ObjectMapper().writeValueAsString(execution));
       runs.save(run);

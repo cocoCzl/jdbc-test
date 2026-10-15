@@ -6,14 +6,18 @@ package com.jdbctest.catalog;
 public record ExecutionScope(String database, String schema) {
 
   public ExecutionScope validate(String adapterId) {
-    if ("mysql".equals(adapterId)) {
+    return validate(AdapterExecutionConfig.load(adapterId).sqlDialect());
+  }
+
+  public ExecutionScope validate(SqlDialect dialect) {
+    if (dialect == SqlDialect.MYSQL) {
       identifier(database);
       if (schema != null && !schema.isBlank() && !schema.equals(database)) {
         throw new IllegalArgumentException("MySQL scope uses database, not a different schema");
       }
     } else {
       identifier(schema);
-      if (!"oracle".equals(adapterId)) {
+      if (dialect.requiresDatabase()) {
         identifier(database);
       }
     }
@@ -21,9 +25,12 @@ public record ExecutionScope(String database, String schema) {
   }
 
   public String namespace(String adapterId) {
-    validate(adapterId);
-    return "mysql".equals(adapterId) ? database : "oracle".equals(adapterId)
-        ? schema.toUpperCase(java.util.Locale.ROOT) : schema;
+    return namespace(AdapterExecutionConfig.load(adapterId).sqlDialect());
+  }
+
+  public String namespace(SqlDialect dialect) {
+    validate(dialect);
+    return dialect.normalizeIdentifier(dialect == SqlDialect.MYSQL ? database : schema);
   }
 
   private static void identifier(String value) {

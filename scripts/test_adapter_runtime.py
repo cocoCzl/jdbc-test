@@ -199,7 +199,7 @@ class AdapterRuntimeTest(unittest.TestCase):
         invalid = copy.deepcopy(package.manifest)
         invalid["trust"] = "local"
         invalid["known_differences"] = [{"scenario_id": "connection.get_auto_commit"}]
-        with self.assertRaisesRegex(ValueError, "缺少"):
+        with self.assertRaisesRegex(ValueError, "ADAPTER_DECLARATION_INVALID"):
             validate_adapter(AdapterPackage(package.root, invalid), PROJECT_ROOT)
 
         config = {

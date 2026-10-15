@@ -1,6 +1,7 @@
 package com.jdbctest.extension;
 
 import com.jdbctest.config.Config;
+import com.jdbctest.catalog.SqlDialect;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
@@ -24,7 +25,7 @@ public final class TestObjects {
       "(?is)^\\s*CREATE\\s+(TABLE|VIEW|INDEX|FUNCTION|PROCEDURE|SEQUENCE|TYPE)\\s+\\{\\{(?:local:)?([a-z][a-z0-9_]*)}}");
   private final String namespace;
   private final String objectPrefix;
-  private final String dialect;
+  private final SqlDialect dialect;
   private final String identifierQuote;
   private final String ledgerPath;
   private final LinkedHashMap<String, Map<String, Object>> journal = new LinkedHashMap<>();
@@ -42,7 +43,7 @@ public final class TestObjects {
     }
     this.namespace = scope.name;
     this.objectPrefix = scope.objectPrefix;
-    this.dialect = config.db.dialect;
+    this.dialect = SqlDialect.fromLegacyConfig(config.db.dialect);
     this.identifierQuote = config.db.getIdentifierQuote();
     this.ledgerPath = scope.ledgerPath;
     if (ledgerPath == null || ledgerPath.isBlank()) {
@@ -67,7 +68,7 @@ public final class TestObjects {
               MessageDigest.getInstance("SHA-256").digest(logical.getBytes(StandardCharsets.UTF_8)))
           .substring(0, 6);
       String name = objectPrefix + "_" + suffix;
-      return "oracle".equalsIgnoreCase(dialect) ? name.toUpperCase(Locale.ROOT) : name;
+      return dialect.normalizeIdentifier(name);
     } catch (java.security.NoSuchAlgorithmException impossible) {
       throw new IllegalStateException(impossible);
     }
@@ -78,8 +79,7 @@ public final class TestObjects {
   }
 
   private String quote(String name) {
-    String quote = identifierQuote;
-    return quote + name.replace(quote, quote + quote) + ("[".equals(quote) ? "]" : quote);
+    return dialect.quoteIdentifier(name, identifierQuote);
   }
 
   /**
@@ -165,8 +165,8 @@ public final class TestObjects {
         throw new SQLException("Metadata connection unavailable");
       }
       DatabaseMetaData metadata = connection.getMetaData();
-      String catalog = "mysql".equalsIgnoreCase(dialect) ? namespace : connection.getCatalog();
-      String schema = "mysql".equalsIgnoreCase(dialect) ? null : namespace;
+      String catalog = dialect == SqlDialect.MYSQL ? namespace : connection.getCatalog();
+      String schema = dialect == SqlDialect.MYSQL ? null : namespace;
       try (ResultSet rows = metadata.getPrimaryKeys(catalog, schema, name(logical))) {
         while (rows.next()) {
           addDependent(dependents, "CONSTRAINT", rows.getString("PK_NAME"));
@@ -177,7 +177,7 @@ public final class TestObjects {
           addDependent(dependents, "INDEX", rows.getString("INDEX_NAME"));
         }
       }
-      if ("oracle".equalsIgnoreCase(dialect)) {
+      if (dialect == SqlDialect.ORACLE) {
         queryDependents(connection,
             "SELECT sequence_name FROM all_tab_identity_cols WHERE owner = ? AND table_name = ?",
             logical, "SEQUENCE", dependents);
@@ -190,7 +190,7 @@ public final class TestObjects {
         queryDependents(connection,
             "SELECT constraint_name FROM all_constraints WHERE owner = ? AND table_name = ?",
             logical, "CONSTRAINT", dependents);
-      } else if ("postgresql".equalsIgnoreCase(dialect)) {
+      } else if (dialect == SqlDialect.POSTGRESQL) {
         queryDependents(connection,
             "SELECT seq.relname FROM pg_catalog.pg_class seq JOIN pg_catalog.pg_depend dep ON dep.objid = seq.oid JOIN pg_catalog.pg_class tab ON dep.refobjid = tab.oid JOIN pg_catalog.pg_namespace ns ON tab.relnamespace = ns.oid WHERE ns.nspname = ? AND tab.relname = ? AND seq.relkind = 'S' AND dep.deptype IN ('a', 'i')",
             logical, "SEQUENCE", dependents);
@@ -234,7 +234,7 @@ public final class TestObjects {
     }
     String kind = entry.get("kind").toString();
     String suffix = "";
-    if (kind.equals("FUNCTION") && "postgresql".equalsIgnoreCase(dialect)) {
+    if (kind.equals("FUNCTION") && dialect == SqlDialect.POSTGRESQL) {
       suffix = switch (logical) {
         case "add_numbers", "multiply_numbers" -> "(INTEGER, INTEGER)";
         case "get_name_by_id" -> "(INTEGER)";
@@ -243,12 +243,11 @@ public final class TestObjects {
         default -> throw new SQLException("Unknown owned function signature");
       };
     }
-    if (kind.equals("TABLE") && "oracle".equalsIgnoreCase(dialect)) {
+    if (kind.equals("TABLE") && dialect == SqlDialect.ORACLE) {
       suffix = " PURGE";
     }
     String command = "DROP " + kind + " " + qualified(logical) + suffix;
-    if (kind.equals("INDEX") && ("mysql".equalsIgnoreCase(dialect)
-        || "sqlserver".equalsIgnoreCase(dialect))) {
+    if (kind.equals("INDEX") && dialect.indexDropRequiresTable()) {
       command =
           "DROP INDEX " + quote(name(logical)) + " ON " + qualified(entry.get("parent").toString());
     }

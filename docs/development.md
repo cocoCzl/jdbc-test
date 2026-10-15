@@ -263,6 +263,59 @@ Upload multipart `metadata` JSON and repeated `files` parts. Defaults: 20 artifa
 
 Files live at `<data-dir>/drivers/<driver-id>/<artifact-id>.jar`; user filenames are display metadata. Each artifact has size and SHA-256; the package fingerprint hashes sorted artifact digests joined by a newline. Duplicate packages return `DRIVER_PACKAGE_ALREADY_EXISTS`. Class edits reset validation. Worker validation loads the class but does not connect, with a default 30-second timeout. Used packages return `DRIVER_IN_USE` on deletion. Driver sort fields: `name`, `vendor`, `version`, `status`, `createdAt`.
 
+### Adapter registry and execution declarations
+
+`adapters/catalog.json` is the single built-in registration index. It lists IDs only; names,
+trust, versions, capabilities and driver hints remain in each `adapters/<id>/adapter.json`.
+Core loads and validates the entire index once per classloader into an immutable `AdapterRegistry`.
+`AdapterCatalog` and `AdapterExecutionConfig.load` project that same definition. Missing resources,
+duplicate IDs, ID/path mismatches and malformed declarations fail explicitly, including `contains`.
+Core validates metadata without loading Suite, SQL resources or target JDBC drivers. Suite packaging
+tests check the declared SQL areas and pool profiles. Indexed packages use the existing classpath
+roots `ddl`, `dml`, `pool`; `assets.directory` selects the asset bundle independently of adapter ID.
+The CLI uses the same index and strict metadata contract. An explicitly selected local manifest
+remains independent of registration and retains its separate local asset-path semantics.
+
+`DbType` contains stable codes for known product classifications; it is not a registry whitelist.
+Optional `db_type` classifies a custom adapter. Without it, known legacy IDs retain their product
+classification; unknown IDs/classifications retain their original declaration and have no known
+classification. `adapterId` and the free-form `databaseType` remain strings. Execution uses the
+frozen `dialect`, never the display label or driver vendor. Current declared dialects are
+`postgresql`, `mysql`, `oracle`, `sqlserver`; GaussDB already declares PostgreSQL behavior and retains
+its own identity constraints and assets. The Suite's old generic fallback remains for legacy
+configuration only; it cannot be registered as a new manifest dialect. Scope selection, Oracle
+identifier normalization, quoting and owned-index cleanup use these finite behaviors.
+
+Adapter JSON uses only `tools.jackson.core:jackson-core`, with no Boot starter or databind dependency
+in Core. The existing Boot BOM baseline is 3.1.4; only Jackson 3 core is explicitly managed at
+**3.1.7**, the published patch on the maintained 3.1 LTS line checked for this change. See the
+[official maintenance policy](https://github.com/FasterXML/jackson/wiki/Jackson-Releases) and
+[Central version metadata](https://repo.maven.apache.org/maven2/tools/jackson/core/jackson-core/maven-metadata.xml).
+This does not upgrade Spring Boot or either databind stack. Server resolves one Jackson 3 core;
+Worker temporarily has both the existing Jackson 2 and Jackson 3 core (about 589 KiB added).
+Their distinct packages coexist; Worker protocol serialization remains on Jackson 2. Target JDBC
+drivers remain external inputs loaded by the isolated Worker loader.
+
+Declarations must be UTF-8 strict JSON: duplicate keys, YAML syntax, comments, trailing roots,
+nonfinite numeric constants and trailing commas are rejected. Input is limited to 1 MiB, 64 nested
+containers and 128-character numeric tokens. Floating extensions must have finite binary64 magnitude
+so Python JSON output cannot emit Infinity. Required fields, field types, trust, managed boolean
+capabilities, version ranges and resource paths are checked. The full JSON tree, including unknown
+extension fields and nulls, is retained immutably in Java; extensions do not automatically become
+execution overrides. Existing omitted revision/quote/pool defaults remain `release`, `"`, `pool`.
+New required fields require a separate compatibility decision. Java and Python regex engines are
+not identical: identity patterns must remain portable; fixtures do not prove all regexes equivalent.
+
+The existing `adapterExecution` wire fields and protocol version 2 are unchanged. Missing historical
+execution snapshots still use the bundled adapter fallback. Frozen snapshots drive Worker scope,
+while metadata identity/version validation remains before provisioning and fixture writes.
+
+Run `python3 -B scripts/run_contract_tests.py` and `./mvnw verify`. Shared positive/negative fixtures
+live in `jdbc-test-core/src/test/resources/adapter-contract`; both languages exercise them. These
+checks cover declarations, packaging, frozen inputs, ownership and existing safety regressions;
+they do not prove real-database compatibility. Run native formatting on the changed Java files and
+the four separate quality checks described above. Keep investigation logs and dependency evidence local.
+
 ### Connections
 
 | Method | Endpoint | Purpose |

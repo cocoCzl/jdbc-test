@@ -7,40 +7,14 @@ import re
 import secrets
 import shutil
 import subprocess
-from datetime import date
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-
-REQUIRED_ADAPTER_FIELDS = (
-    "id", "name", "version", "trust", "dialect", "driver", "identity",
-    "capabilities", "assets", "namespace", "minimum_privileges", "privilege_checks",
-    "supported_versions", "validated_combinations", "known_differences",
+from adapter_manifest import (
+    MANAGED_CAPABILITIES, REQUIRED_ADAPTER_FIELDS, REQUIRED_ASSET_AREAS,
+    KNOWN_DIFFERENCE_FIELDS, adapter_id, read_adapter_json, validate_adapter_metadata,
 )
-KNOWN_DIFFERENCE_FIELDS = (
-    "scenario_id", "database_version", "driver_version", "reason",
-    "issue_url", "review_after", "trust",
-)
-REQUIRED_ASSET_AREAS = {
-    "connection", "statement", "preparedstatement", "callablestatement",
-    "resultset", "metadatatest", "savepoint", "rowset", "blobclob",
-    "sqlxml", "advancedtype",
-}
-
-# Every capability used by a reportable JDBC scenario must be explicitly
-# declared by an adapter.  This keeps an omitted declaration from looking like
-# a supported feature (or a harmless skip) in a compatibility report.
-MANAGED_CAPABILITIES = {
-    "savepoint", "callable_statement", "array_type", "ref_type", "struct_type",
-    "rowid_type", "sqlxml", "rowset", "blobs", "clobs", "nclobs",
-    "parameter_metadata", "updatable_result_set", "scrollable_result_set",
-    "generated_keys", "multiple_result_sets", "statement_cancel",
-    "query_timeout", "network_timeout", "client_info", "request_boundaries",
-    "sharding", "connection_pool", "xa_data_source", "java_time",
-    "lob_objects", "lob_locator_updates", "batch_generated_keys", "generated_keys_by_index",
-    "callable_inout", "ref_cursor", "rowid_operations", "multiple_result_sequences", "data_source",
-}
 
 
 @dataclass(frozen=True)
@@ -56,20 +30,30 @@ class AdapterPackage:
 def discover_adapters(project_root: Path) -> dict[str, Path]:
     result: dict[str, Path] = {}
     adapters_root = project_root / "adapters"
-    if not adapters_root.exists():
-        return result
-    for manifest in sorted(adapters_root.glob("*/adapter.json")):
-        try:
-            adapter_id = json.loads(manifest.read_text(encoding="utf-8")).get("id")
-        except (OSError, json.JSONDecodeError):
-            continue
-        if adapter_id:
-            result[str(adapter_id)] = manifest.parent
+    ids = read_adapter_json(adapters_root / "catalog.json")
+    if not isinstance(ids, list) or not ids:
+        raise ValueError("ADAPTER_INDEX_MISSING_OR_INVALID")
+    for value in ids:
+        selected_id = adapter_id(value)
+        if selected_id in result:
+            raise ValueError(f"ADAPTER_INDEX_DUPLICATE: {selected_id}")
+        path = adapters_root / selected_id / "adapter.json"
+        if not path.resolve().is_relative_to(adapters_root.resolve()):
+            raise ValueError("ADAPTER_INDEX_PATH_ESCAPE")
+        manifest = read_adapter_json(path)
+        validate_adapter_metadata(manifest)
+        if manifest["id"] != selected_id:
+            raise ValueError(f"ADAPTER_INDEX_ID_MISMATCH: {selected_id}")
+        assets = manifest["assets"]
+        if any(assets.get(area, area) != area for area in ("ddl", "dml", "pool")):
+            raise ValueError(f"ADAPTER_PACKAGED_ASSET_ROOT_INVALID: {selected_id}")
+        result[selected_id] = path.parent
     return result
 
 
 def load_adapter(project_root: Path, reference: str) -> AdapterPackage:
     path = Path(reference)
+    bundled = False
     if not path.is_absolute():
         candidate = project_root / path
         if candidate.exists():
@@ -79,34 +63,18 @@ def load_adapter(project_root: Path, reference: str) -> AdapterPackage:
             if reference not in discovered:
                 raise ValueError(f"未找到数据库适配包: {reference}")
             path = discovered[reference]
+            bundled = True
     manifest_path = path if path.name == "adapter.json" else path / "adapter.json"
-    try:
-        raw = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except FileNotFoundError as exc:
-        raise ValueError(f"适配包清单不存在: {manifest_path}") from exc
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"适配包清单不是有效 JSON: {manifest_path}: {exc}") from exc
+    raw = read_adapter_json(manifest_path)
     package = AdapterPackage(manifest_path.parent.resolve(), raw)
-    validate_adapter(package, project_root)
+    validate_adapter(package, project_root, bundled=bundled)
     return package
 
 
-def validate_adapter(package: AdapterPackage, project_root: Path) -> None:
+def validate_adapter(package: AdapterPackage, project_root: Path, *, bundled: bool = False) -> None:
     manifest = package.manifest
-    missing = [field for field in REQUIRED_ADAPTER_FIELDS if field not in manifest]
-    if missing:
-        raise ValueError(f"适配包不完整，缺少字段: {', '.join(missing)}")
-    if manifest["trust"] not in {"official", "local", "candidate"}:
-        raise ValueError("adapter.trust 必须是 official/local/candidate")
-    if not re.fullmatch(r"[a-z][a-z0-9_-]{1,31}", str(manifest["id"])):
-        raise ValueError("适配包 id 格式无效")
-    capabilities = manifest.get("capabilities")
-    if not isinstance(capabilities, dict) or not all(isinstance(v, bool) for v in capabilities.values()):
-        raise ValueError("适配包 capabilities 必须是布尔值映射")
-    missing_capabilities = sorted(MANAGED_CAPABILITIES - set(capabilities))
-    if missing_capabilities:
-        raise ValueError(f"适配包缺少能力声明: {', '.join(missing_capabilities)}")
-
+    validate_adapter_metadata(manifest, allow_external_asset_paths=not bundled)
+    capabilities = manifest["capabilities"]
     assets = manifest.get("assets") or {}
     ddl_root = _asset_root(project_root, package.root, assets.get("ddl"))
     dml_root = _asset_root(project_root, package.root, assets.get("dml"))
@@ -123,42 +91,9 @@ def validate_adapter(package: AdapterPackage, project_root: Path) -> None:
         if not ddl.exists() or not dml.exists():
             raise ValueError(f"适配包不完整，缺少 {area} SQL 资产")
 
-    namespace = manifest.get("namespace") or {}
-    if namespace.get("mode") not in {"auto", "existing"}:
-        raise ValueError("namespace.mode 必须是 auto 或 existing")
-    if namespace.get("mode") == "auto" and not namespace.get("create_sql"):
-        raise ValueError("自动命名空间缺少 create_sql")
-    if namespace.get("drop_on_exit") and not namespace.get("drop_sql"):
-        raise ValueError("自动清理命名空间缺少 drop_sql")
-    privileges = set(manifest.get("minimum_privileges") or [])
-    covered_privileges = {item.get("privilege") for item in manifest.get("privilege_checks") or []}
-    if namespace.get("create_privilege"):
-        covered_privileges.add(namespace["create_privilege"])
-    missing_privilege_checks = sorted(privileges - covered_privileges)
-    if missing_privilege_checks:
-        raise ValueError(f"适配包缺少最小权限预检: {', '.join(missing_privilege_checks)}")
-    for check in manifest.get("privilege_checks") or []:
-        if not check.get("privilege") or not check.get("sql"):
-            raise ValueError("每个 privilege_check 必须包含 privilege 和 sql")
-
-    for record in manifest.get("known_differences") or []:
-        absent = [field for field in KNOWN_DIFFERENCE_FIELDS if not record.get(field)]
-        if absent:
-            raise ValueError(f"已知差异 {record.get('scenario_id', '<unknown>')} 缺少: {', '.join(absent)}")
-        try:
-            date.fromisoformat(str(record["review_after"]))
-        except ValueError as exc:
-            raise ValueError(f"已知差异 {record['scenario_id']} 的 review_after 必须是 ISO 日期") from exc
-        if not re.fullmatch(r"https?://.+", str(record["issue_url"])):
-            raise ValueError(f"已知差异 {record['scenario_id']} 的 issue_url 必须是 HTTP(S) URL")
     if manifest["trust"] == "official":
-        combinations = manifest.get("validated_combinations") or []
-        if not combinations:
-            raise ValueError("官方适配包必须至少包含一个已验证组合")
-        for combination in combinations:
-            evidence = combination.get("evidence")
-            if not combination.get("database_version") or not combination.get("driver_version") or not evidence:
-                raise ValueError("已验证组合必须包含数据库版本、驱动版本和证据")
+        for combination in manifest["validated_combinations"]:
+            evidence = combination["evidence"]
             if not (package.root / evidence).is_file():
                 raise ValueError(f"官方适配证据不存在: {evidence}")
 

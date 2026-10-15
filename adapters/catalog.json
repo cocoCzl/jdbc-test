@@ -1,0 +1,7 @@
+[
+  "gaussdb",
+  "mysql",
+  "oracle",
+  "postgresql",
+  "sqlserver"
+]
