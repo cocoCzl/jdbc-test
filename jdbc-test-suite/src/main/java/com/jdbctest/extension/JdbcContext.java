@@ -227,7 +227,8 @@ public final class JdbcContext {
   @SuppressWarnings("unchecked")
   static Map<String, Object> loadPoolConfig(String assetId, String poolProfileDir) {
     if (poolProfileDir.startsWith("classpath:")) {
-      String resource = "/" + poolProfileDir.substring("classpath:".length()) + "/" + assetId + ".yaml";
+      String resource =
+          "/" + poolProfileDir.substring("classpath:".length()) + "/" + assetId + ".yaml";
       try (InputStream input = JdbcContext.class.getResourceAsStream(resource)) {
         if (input == null) {
           throw new IllegalArgumentException("Missing packaged pool profile");

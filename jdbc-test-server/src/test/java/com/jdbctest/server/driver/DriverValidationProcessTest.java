@@ -18,7 +18,8 @@ class DriverValidationProcessTest {
     WorkerProcessRunner worker = mock(WorkerProcessRunner.class);
     var process = new DriverValidationProcess(new DriverWorkerProperties(), worker,
         new ObjectMapper());
-    for (String warnings : List.of("", ",\"warnings\":[\"ORACLE_I18N_MISSING\",\"ORACLE_XML_MISSING\"]")) {
+    for (String warnings : List.of("",
+        ",\"warnings\":[\"ORACLE_I18N_MISSING\",\"ORACLE_XML_MISSING\"]")) {
       when(worker.run(eq("--validate-driver"), any(), any())).thenReturn(
           new WorkerProcessRunner.Result(0, false, """
               {"type":"DRIVER_VALIDATED","driverClass":"oracle.jdbc.OracleDriver",

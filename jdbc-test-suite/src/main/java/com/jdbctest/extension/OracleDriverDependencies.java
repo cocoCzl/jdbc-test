@@ -32,7 +32,9 @@ public final class OracleDriverDependencies {
     return List.copyOf(warnings);
   }
 
-  /** Only SELECTs and in-memory conversions; call before namespace or fixture creation. */
+  /**
+   * Only SELECTs and in-memory conversions; call before namespace or fixture creation.
+   */
   public static void preflight(Connection connection, ClassLoader loader, boolean requireSqlxml) {
     if (requireSqlxml && !xmlAvailable(loader)) {
       throw new IllegalStateException("ORACLE_XML_MISSING: SQLXML requires compatible xdb.jar and "
@@ -55,7 +57,8 @@ public final class OracleDriverDependencies {
         throw new IllegalStateException("ORACLE_CHARSET_PREFLIGHT_FAILED: expected both charsets");
       }
     } catch (SQLException error) {
-      throw new IllegalStateException("ORACLE_CHARSET_PREFLIGHT_FAILED: cannot read target charsets",
+      throw new IllegalStateException(
+          "ORACLE_CHARSET_PREFLIGHT_FAILED: cannot read target charsets",
           error);
     }
   }

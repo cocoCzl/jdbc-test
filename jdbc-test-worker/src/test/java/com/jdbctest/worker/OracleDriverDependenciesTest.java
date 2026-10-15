@@ -33,7 +33,9 @@ import javax.tools.ToolProvider;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-/** Synthetic split packages: dependency diagnostics and isolation, not Oracle compatibility. */
+/**
+ * Synthetic split packages: dependency diagnostics and isolation, not Oracle compatibility.
+ */
 class OracleDriverDependenciesTest {
 
   @TempDir
@@ -125,7 +127,8 @@ class OracleDriverDependenciesTest {
   private List<String> validate(List<Path> paths) throws Exception {
     return new ObjectMapper().convertValue(
         validate(paths, "oracle.jdbc.OracleDriver", 0).path("warnings"),
-        new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {});
+        new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {
+        });
   }
 
   private com.fasterxml.jackson.databind.JsonNode validate(List<Path> paths, String driverClass,
@@ -199,7 +202,8 @@ class OracleDriverDependenciesTest {
             package oracle.xdb;
             public class XMLType { public oracle.xml.parser.v2.DOMParser parser() { return null; } }
             """,
-        "oracle.xml.parser.v2.DOMParser", "package oracle.xml.parser.v2; public class DOMParser {}");
+        "oracle.xml.parser.v2.DOMParser",
+        "package oracle.xml.parser.v2; public class DOMParser {}");
     var arguments = new ArrayList<>(List.of("--release", "21", "-d", root.toString()));
     for (var entry : sources.entrySet()) {
       Path source = root.resolve(entry.getKey().replace('.', '/') + ".java");
@@ -211,7 +215,7 @@ class OracleDriverDependenciesTest {
         arguments.toArray(String[]::new)));
     List<Path> jars = new ArrayList<>();
     for (var names : List.of(List.of("oracle.jdbc.OracleDriver", "oracle.jdbc.BrokenDriver",
-        "oracle.sql.CharacterSet"),
+            "oracle.sql.CharacterSet"),
         List.of("oracle.i18n.text.converter.CharacterConverterOGS"), List.of("oracle.xdb.XMLType"),
         List.of("oracle.xml.parser.v2.DOMParser"))) {
       Path jar = root.resolve("part-" + jars.size() + ".jar");

@@ -74,7 +74,8 @@ public class ConfigLoader {
     config.db.dialect = nonBlank(str(db.get("dialect")), config.db.type);
     config.db.username = str(db.get("username"));
     config.db.password = password(db);
-    config.db.dataSources = com.jdbctest.catalog.DataSourceProviders.fromMap(db.get("data_sources"));
+    config.db.dataSources = com.jdbctest.catalog.DataSourceProviders.fromMap(
+        db.get("data_sources"));
     config.db.url = str(db.get("url"));
     config.db.driverClass = str(db.get("driver_class"));
     config.db.connectionMode = nonBlank(str(db.get("connection_mode")), "hikari");

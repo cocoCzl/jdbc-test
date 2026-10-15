@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 class WorkerAdapterSnapshotTest {
+
   @TempDir
   Path directory;
 
@@ -24,7 +25,8 @@ class WorkerAdapterSnapshotTest {
     ObjectMapper mapper = new ObjectMapper();
     for (String dialect : List.of("mysql", "oracle", "postgresql", "sqlserver")) {
       var original = AdapterExecutionConfig.load(dialect);
-      var snapshot = new AdapterExecutionConfig("private-db", original.assetId(), original.dialect(),
+      var snapshot = new AdapterExecutionConfig("private-db", original.assetId(),
+          original.dialect(),
           original.identifierQuote(), original.capabilities(), original.metadataConstraints());
       ExecutionScope scope = "oracle".equals(dialect) ? new ExecutionScope(null, "owned_scope")
           : "mysql".equals(dialect) ? new ExecutionScope("owned_db", null)
@@ -33,7 +35,8 @@ class WorkerAdapterSnapshotTest {
       var validate = WorkerMain.class.getDeclaredMethod("validate", WorkerRunRequest.class);
       validate.setAccessible(true);
       validate.invoke(null, request);
-      var write = WorkerMain.class.getDeclaredMethod("writeConfig", Path.class, WorkerRunRequest.class);
+      var write = WorkerMain.class.getDeclaredMethod("writeConfig", Path.class,
+          WorkerRunRequest.class);
       write.setAccessible(true);
       Path config = directory.resolve(dialect + ".json");
       write.invoke(new WorkerMain(), config, request);
@@ -49,7 +52,8 @@ class WorkerAdapterSnapshotTest {
       var wire = mapper.readTree(mapper.writeValueAsString(snapshot));
       assertEquals(6, wire.size());
       assertFalse(wire.has("sqlDialect"));
-      assertEquals(snapshot, mapper.readValue(mapper.writeValueAsString(snapshot), AdapterExecutionConfig.class));
+      assertEquals(snapshot,
+          mapper.readValue(mapper.writeValueAsString(snapshot), AdapterExecutionConfig.class));
     }
   }
 
@@ -71,7 +75,8 @@ class WorkerAdapterSnapshotTest {
   private WorkerRunRequest request(AdapterExecutionConfig snapshot, ExecutionScope scope) {
     return new WorkerRunRequest(2, "fixture",
         new WorkerRunRequest.DriverRequest("fixture.Driver", List.of()),
-        new WorkerRunRequest.ConnectionRequest("jdbc:fixture:test", "fixture", "", Map.of(), "private-db"),
+        new WorkerRunRequest.ConnectionRequest("jdbc:fixture:test", "fixture", "", Map.of(),
+            "private-db"),
         new WorkerRunRequest.SelectionRequest("FULL", List.of("connection"), List.of(), List.of()),
         directory.toString(), 1000L, scope, "j01234567890123456789",
         snapshot.capabilities(), true, snapshot);

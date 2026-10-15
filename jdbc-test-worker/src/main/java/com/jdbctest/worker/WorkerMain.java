@@ -72,7 +72,8 @@ public final class WorkerMain {
     } catch (Exception exception) {
       System.err.println(
           "[worker] invalid request: " + (exception instanceof IllegalArgumentException
-              && exception.getMessage() != null && exception.getMessage().startsWith("WORKER_PROTOCOL_MISMATCH")
+              && exception.getMessage() != null && exception.getMessage()
+              .startsWith("WORKER_PROTOCOL_MISMATCH")
               ? "WORKER_PROTOCOL_MISMATCH" : "INVALID_REQUEST"));
       events.write("RUN_FAILED", "",
           Map.of("errorType", "INVALID_REQUEST", "message", "Invalid worker request"));

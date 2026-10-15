@@ -306,7 +306,8 @@ public final class TestObjects {
 
   public synchronized Map<String, Object> cleanupEvidence() {
     var entries = snapshot();
-    long attempted = entries.stream().filter(row -> Boolean.TRUE.equals(row.get("cleanupAttempted")))
+    long attempted = entries.stream()
+        .filter(row -> Boolean.TRUE.equals(row.get("cleanupAttempted")))
         .count();
     long deleted = entries.stream().filter(row -> "DROPPED".equals(row.get("state"))).count();
     boolean failed = connectionFailure != null || entries.stream()

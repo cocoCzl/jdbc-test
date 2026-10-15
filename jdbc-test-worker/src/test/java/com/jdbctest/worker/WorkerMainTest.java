@@ -28,9 +28,10 @@ class WorkerMainTest {
         directory.toString(), 1000L,
         new com.jdbctest.catalog.ExecutionScope("fixture", "owned_scope"),
         "j01234567890123456789", providers.capabilities(
-            com.jdbctest.catalog.AdapterExecutionConfig.load("postgresql").capabilities()), true);
+        com.jdbctest.catalog.AdapterExecutionConfig.load("postgresql").capabilities()), true);
     Path config = directory.resolve("config.json");
-    var method = WorkerMain.class.getDeclaredMethod("writeConfig", Path.class, WorkerRunRequest.class);
+    var method = WorkerMain.class.getDeclaredMethod("writeConfig", Path.class,
+        WorkerRunRequest.class);
     method.setAccessible(true);
     method.invoke(new WorkerMain(), config, request);
     String original = System.getProperty("config.yaml");
