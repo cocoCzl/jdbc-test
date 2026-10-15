@@ -53,6 +53,21 @@ class TestObjectsTest {
   }
 
   @Test
+  void oracleProcedureCallsUseTheVerifiedCurrentSchemaToAvoidLocalTableShadowing() {
+    for (String dialect : List.of("oracle", "postgresql", "mysql", "sqlserver", "gaussdb")) {
+      Config value = config("j01234567890123456789");
+      value.db.dialect = dialect;
+      value.namespace.name = "DEVELOP";
+      TestObjects objects = new TestObjects(value);
+      String expected = dialect.equals("oracle") ? objects.sql("{{local:procedure_inout}}")
+          : objects.qualified("procedure_inout");
+      assertEquals(expected, objects.callableName("procedure_inout"));
+      assertThrows(IllegalArgumentException.class, () -> objects.callableName("unowned.name"));
+      assertTrue(objects.snapshot().isEmpty());
+    }
+  }
+
+  @Test
   void cleanupFailureAndUnknownCreateRemainVisibleAndAreNeverRetried() throws Exception {
     TestObjects objects = new TestObjects(config("j01234567890123456789"));
     var commands = new ArrayList<String>();

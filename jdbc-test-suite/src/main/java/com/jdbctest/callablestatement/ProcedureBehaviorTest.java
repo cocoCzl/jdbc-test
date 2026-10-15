@@ -17,7 +17,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 class ProcedureBehaviorTest {
 
   private CallableStatement prepare(Connection connection) throws SQLException {
-    return connection.prepareCall(JdbcContext.sql("{call {{procedure_inout}}(?, ?, ?)}"));
+    return connection.prepareCall("{call " + JdbcContext.objects().callableName("procedure_inout")
+        + "(?, ?, ?)}");
   }
 
   @Test

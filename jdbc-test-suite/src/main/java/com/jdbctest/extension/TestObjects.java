@@ -78,6 +78,14 @@ public final class TestObjects {
     return quote(namespace) + "." + quote(name(logical));
   }
 
+  /**
+   * Callers use a connection with a verified current namespace. In Oracle PL/SQL a local table
+   * named like the schema can shadow a schema qualifier, so use the owned local name there.
+   */
+  public String callableName(String logical) {
+    return dialect == SqlDialect.ORACLE ? quote(name(logical)) : qualified(logical);
+  }
+
   private String quote(String name) {
     return dialect.quoteIdentifier(name, identifierQuote);
   }

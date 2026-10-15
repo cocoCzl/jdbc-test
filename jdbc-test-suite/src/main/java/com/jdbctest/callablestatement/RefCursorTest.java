@@ -19,8 +19,8 @@ class RefCursorTest {
   @Test
   @DisplayName("REF_CURSOR 输出按标准 JDBC 接口完整读取")
   void testRefCursorOutput(Connection connection) throws SQLException {
-    try (CallableStatement sql = connection.prepareCall(JdbcContext.sql(
-        "{call {{cursor_output}}(?)}"))) {
+    try (CallableStatement sql = connection.prepareCall(
+        "{call " + JdbcContext.objects().callableName("cursor_output") + "(?)}")) {
       sql.registerOutParameter(1, Types.REF_CURSOR);
       sql.execute();
       Object output = sql.getObject(1);
