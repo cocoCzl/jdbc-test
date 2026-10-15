@@ -26,6 +26,26 @@ async function chooseConnectionAndDriver(
   await user.click(screen.getByRole("button", { name: /^Next:/ }));
 }
 describe("New Run wizard", () => {
+  it("requires explicit intent before submitting empty credentials", async () => {
+    const user = userEvent.setup();
+    const api = mockApi((url, options) => {
+      if (url.pathname === "/api/connections") return json(page([{ ...connection, hasSavedPassword: false }]));
+      if (url.pathname === "/api/runs" && options.method === "POST") return json(run, 201);
+    });
+    const { router } = renderPage("/runs/new");
+    await user.click(await screen.findByRole("radio", { name: connection.name }));
+    await user.click(screen.getByRole("button", { name: /^Next:/ }));
+    await screen.findByLabelText("Password for this run");
+    expect(screen.getByRole("button", { name: /^Next:/ })).toBeDisabled();
+    await user.click(screen.getByLabelText("Use an empty password explicitly"));
+    await user.click(screen.getByRole("button", { name: /^Next:/ }));
+    await user.click(screen.getByRole("button", { name: /^Next:/ }));
+    await user.click(screen.getByRole("checkbox", { name: /I understand/ }));
+    await user.click(screen.getByRole("button", { name: "Start test run" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/runs/run-1"));
+    const body = JSON.parse(api.mock.calls.find(([, options]) => options?.method === "POST")![1]!.body as string);
+    expect(body.password).toBe("");
+  });
   it.each([
     ["Core", 136],
     ["Full", 202],

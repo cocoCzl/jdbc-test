@@ -100,7 +100,7 @@ final class TestRunService {
       String password =
           request.password() == null ? encryption.decrypt(connection.getEncryptedPassword())
               : request.password();
-      if (password == null || password.isEmpty()) {
+      if (password == null) {
         throw problem(HttpStatus.BAD_REQUEST, "CONNECTION_PASSWORD_REQUIRED",
             "A password is required to run tests");
       }

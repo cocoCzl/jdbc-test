@@ -20,6 +20,21 @@ async function fillDraft(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText("Username"), "tester");
 }
 describe("Connection UI", () => {
+  it("saves an explicitly selected empty password", async () => {
+    const user = userEvent.setup();
+    const api = mockApi((url, options) => url.pathname === "/api/connections" && options.method === "POST"
+      ? json(connection, 201) : undefined);
+    const { router } = renderPage("/connections/new");
+    await fillDraft(user);
+    await user.click(screen.getByLabelText("Use an empty password explicitly"));
+    await user.click(screen.getByLabelText("Save password"));
+    await user.click(screen.getByRole("button", { name: "Save connection" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/connections/connection-1"));
+    const body = JSON.parse(api.mock.calls.find(([, options]) => options?.method === "POST")![1]!.body as string);
+    expect(body.password).toBe("");
+    expect(body.savePassword).toBe(true);
+  });
+
   it("renders list metadata without expecting a password", async () => {
     mockApi();
     renderPage("/connections");

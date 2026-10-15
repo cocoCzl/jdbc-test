@@ -48,6 +48,7 @@ function Editor({ connection }: { connection?: Connection }) {
     connection?.defaultDriver ?? null,
   );
   const [password, setPassword] = useState("");
+  const [emptyPassword, setEmptyPassword] = useState(false);
   const [savePassword, setSavePassword] = useState(false);
   const [clearSavedPassword, setClearSavedPassword] = useState(false);
   const [probe, setProbe] = useState<Probe | null>(null);
@@ -67,7 +68,7 @@ function Editor({ connection }: { connection?: Connection }) {
         defaultDriverId: driver!.id,
         savePassword,
         ...(connection ? { clearSavedPassword } : {}),
-        ...(savePassword && password ? { password } : {}),
+        ...(savePassword && (password || emptyPassword) ? { password: emptyPassword ? "" : password } : {}),
       };
       return connection
         ? connectionsApi.update(connection.id, input)
@@ -79,16 +80,16 @@ function Editor({ connection }: { connection?: Connection }) {
       navigate(`/connections/${result.id}`);
     },
     onError: (failure) => setError(failure instanceof Error ? failure : new Error()),
-    onSettled: () => setPassword(""),
+    onSettled: () => { setPassword(""); setEmptyPassword(false); },
   });
   const test = useMutation({
     mutationFn: () =>
       connection
-        ? connectionsApi.testSaved(connection.id, password || undefined)
+        ? connectionsApi.testSaved(connection.id, emptyPassword ? "" : password || undefined)
         : connectionsApi.testDraft({
             ...form,
             driverId: driver!.id,
-            password: password || undefined,
+            password: emptyPassword ? "" : password || undefined,
           }),
     onSuccess: (result) => {
       setProbe(result);
@@ -96,7 +97,7 @@ function Editor({ connection }: { connection?: Connection }) {
       void client.invalidateQueries({ queryKey: connectionsKeys.all });
     },
     onError: (failure) => setError(failure instanceof Error ? failure : new Error()),
-    onSettled: () => setPassword(""),
+    onSettled: () => { setPassword(""); setEmptyPassword(false); },
   });
   const remove = useMutation({
     mutationFn: () => connectionsApi.delete(connection!.id),
@@ -141,7 +142,7 @@ function Editor({ connection }: { connection?: Connection }) {
             setError("ui.selectAValidatedDriverSentence");
             return;
           }
-          if (savePassword && !password) {
+          if (savePassword && !password && !emptyPassword) {
             setError("ui.enterAPasswordToSaveOrUncheck");
             return;
           }
@@ -237,7 +238,7 @@ function Editor({ connection }: { connection?: Connection }) {
                 autoComplete="new-password"
                 maxLength={2000}
                 value={password}
-                disabled={clearSavedPassword}
+                disabled={clearSavedPassword || emptyPassword}
                 onChange={(event) => setPassword(event.target.value)}
                 hint={t("ui.neverReturnedByTheAPIUsedIn")}
               />
@@ -246,6 +247,11 @@ function Editor({ connection }: { connection?: Connection }) {
               {connection?.hasSavedPassword ? (
                 <p className="text-sm text-success">{t("ui.savedPasswordAvailable")}</p>
               ) : null}
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={emptyPassword} disabled={clearSavedPassword}
+                  onChange={(event) => { setEmptyPassword(event.target.checked); setPassword(""); }} />
+                {t("credentials.emptyPassword")}
+              </label>
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
@@ -264,6 +270,7 @@ function Editor({ connection }: { connection?: Connection }) {
                       setClearSavedPassword(event.target.checked);
                       setPassword("");
                       setSavePassword(false);
+                      setEmptyPassword(false);
                     }}
                     className="size-4 accent-primary"
                   />

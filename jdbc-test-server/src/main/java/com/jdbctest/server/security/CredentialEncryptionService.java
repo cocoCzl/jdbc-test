@@ -33,7 +33,7 @@ public final class CredentialEncryptionService {
   }
 
   public String encrypt(String plaintext) {
-    if (plaintext == null || plaintext.isEmpty()) {
+    if (plaintext == null) {
       return null;
     }
     byte[] nonce = new byte[NONCE_BYTES];

@@ -78,6 +78,9 @@ class WorkerCleanupProcessTest {
         public class Driver implements java.sql.Driver {
           private int connections;
           public Connection connect(String url, java.util.Properties properties) throws SQLException {
+            if (!properties.containsKey("password") || !properties.getProperty("password").equals("")) {
+              throw new SQLException("fixture expected literal empty password");
+            }
             if (++connections >= 3) {
               if (url.endsWith("block")) {
                 for (;;) { try { Thread.sleep(100); } catch (InterruptedException ignored) {} }

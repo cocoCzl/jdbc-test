@@ -62,7 +62,7 @@ final class ConnectionService {
   ConnectionResponse create(CreateConnectionRequest request) {
     Values values = values(request.name(), request.databaseType(), request.adapterId(),
         request.jdbcUrl(), request.username(), request.description(), request.defaultDriverId());
-    if (Boolean.TRUE.equals(request.savePassword()) && blank(request.password())) {
+    if (Boolean.TRUE.equals(request.savePassword()) && request.password() == null) {
       throw invalid("password is required when savePassword is true");
     }
     return transactions.execute(status -> {
@@ -153,6 +153,10 @@ final class ConnectionService {
         request.username(), null, request.driverId());
     DriverSnapshot driver = transactions.execute(
         status -> driverSnapshot(requiredValidatedDriver(values.driverId())));
+    if (request.password() == null) {
+      throw new ConnectionException(HttpStatus.BAD_REQUEST, "CONNECTION_PASSWORD_REQUIRED",
+          "A password is required to test this connection");
+    }
     return probe(driver, values.jdbcUrl(), values.username(), request.password());
   }
 

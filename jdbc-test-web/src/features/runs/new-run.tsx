@@ -48,6 +48,7 @@ export default function NewRun() {
   const [consent, setConsent] = useState(false);
   const [differentPassword, setDifferentPassword] = useState(false);
   const [password, setPassword] = useState("");
+  const [emptyPassword, setEmptyPassword] = useState(false);
   const [error, setError] = useState<string | Error | null>(null);
   const params = { page, size: 12, sort: "name,asc" };
   const connections = useQuery({
@@ -81,7 +82,7 @@ export default function NewRun() {
         profile,
         modules: profile === "CUSTOM" ? modules : [],
         destructiveConsent: consent,
-        ...(needsPassword ? { password } : {}),
+        ...(emptyPassword ? { password: "" } : needsPassword ? { password } : {}),
       }),
     onSuccess: (run) => {
       toast.success(t("ui.runQueued"));
@@ -90,7 +91,7 @@ export default function NewRun() {
       navigate(`/runs/${run.id}`);
     },
     onError: (failure) => setError(failure instanceof Error ? failure : new Error()),
-    onSettled: () => setPassword(""),
+    onSettled: () => { setPassword(""); setEmptyPassword(false); },
   });
   if (
     connections.isPending ||
@@ -119,7 +120,7 @@ export default function NewRun() {
     step === 0
       ? !!chosen
       : step === 1
-        ? chosenDriver?.status === "VALIDATED" && (!needsPassword || !!password)
+        ? chosenDriver?.status === "VALIDATED" && (!needsPassword || !!password || emptyPassword)
         : step === 2
           ? !!catalog.data && (profile !== "CUSTOM" || modules.length > 0)
           : false;
@@ -169,12 +170,12 @@ export default function NewRun() {
                   <div key={item.id} data-selected={chosen?.id === item.id} className="step-card min-w-0 cursor-pointer"
                     onClick={(event) => {
                       if ((event.target as HTMLElement).closest("button, input, label")) return;
-                      setConnection(item); setDriver(null); setPassword(""); setDifferentPassword(false);
+                      setConnection(item); setDriver(null); setPassword(""); setEmptyPassword(false); setDifferentPassword(false);
                     }}>
                     <label className="mb-2 flex cursor-pointer items-center gap-2 text-sm font-medium text-primary">
                       <input type="radio" name="run-connection" aria-label={item.name}
                         className="size-4 accent-primary" checked={chosen?.id === item.id}
-                        onChange={() => { setConnection(item); setDriver(null); setPassword(""); setDifferentPassword(false); }} />
+                        onChange={() => { setConnection(item); setDriver(null); setPassword(""); setEmptyPassword(false); setDifferentPassword(false); }} />
                       {chosen?.id === item.id ? t("ui.selected") : t("ui.selectConnection")}
                     </label>
                     <div className="flex items-center justify-between">
@@ -243,6 +244,11 @@ export default function NewRun() {
                 />
                 {t("ui.useADifferentPasswordForThisRun")}</label>
             ) : null}
+            <label className="my-3 flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={emptyPassword}
+                onChange={(event) => { setEmptyPassword(event.target.checked); setPassword(""); }} />
+              {t("credentials.emptyPassword")}
+            </label>
             {needsPassword ? (
               <Field
                 id="run-password"
@@ -250,13 +256,14 @@ export default function NewRun() {
                 type="password"
                 autoComplete="new-password"
                 maxLength={2000}
+                disabled={emptyPassword}
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 hint={t("ui.thisPasswordIsUsedOnlyForThis")}
               />
             ) : (
               <p className="text-sm text-muted-foreground">
-                {t("ui.theSavedConnectionPasswordWillBeUsed")}</p>
+                {emptyPassword ? t("credentials.emptyPassword") : t("ui.theSavedConnectionPasswordWillBeUsed")}</p>
             )}
           </div>
         ) : null}
@@ -411,7 +418,7 @@ export default function NewRun() {
                 />
                 {t("ui.iUnderstandThatTheseJDBCTestsMay")}</label>
             </div>
-            {needsPassword && !password ? (
+            {needsPassword && !password && !emptyPassword ? (
               <p role="alert" className="mt-4 text-sm text-destructive">
                 {t("ui.reEnterTheTemporaryPasswordInThe")}</p>
             ) : null}
@@ -445,7 +452,7 @@ export default function NewRun() {
               create.isPending ||
               !consent ||
               chosenDriver?.status !== "VALIDATED" ||
-              (needsPassword && !password)
+              (needsPassword && !password && !emptyPassword)
             }
             onClick={() => {
               setError(null);

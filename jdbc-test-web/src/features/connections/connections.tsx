@@ -39,6 +39,7 @@ export default function Connections() {
   const [deleting, setDeleting] = useState<Connection | null>(null);
   const [testing, setTesting] = useState<Connection | null>(null);
   const [password, setPassword] = useState("");
+  const [emptyPassword, setEmptyPassword] = useState(false);
   const [probe, setProbe] = useState<Probe | null>(null);
   const [error, setError] = useState<string | Error | null>(null);
   const client = useQueryClient();
@@ -49,7 +50,7 @@ export default function Connections() {
   });
   const test = useMutation({
     mutationFn: () =>
-      connectionsApi.testSaved(testing!.id, password || undefined),
+      connectionsApi.testSaved(testing!.id, emptyPassword ? "" : password || undefined),
     onSuccess: (result) => {
       setProbe(result);
       toast.success(t("ui.connectionEstablished"));
@@ -149,7 +150,7 @@ export default function Connections() {
               setTesting(row.original);
               setProbe(null);
               setError(null);
-              setPassword("");
+              setPassword(""); setEmptyPassword(false);
             }}
           >
             {t("ui.test")}</Button>
@@ -237,7 +238,7 @@ export default function Connections() {
         onOpenChange={(open) => {
           if (!open) {
             setTesting(null);
-            setPassword("");
+            setPassword(""); setEmptyPassword(false);
           }
         }}
         title={t("common.testName", {name: testing?.name ?? t("ui.connection")})}
@@ -259,13 +260,19 @@ export default function Connections() {
             autoComplete="new-password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            required={!testing?.hasSavedPassword}
+            required={!testing?.hasSavedPassword && !emptyPassword}
+            disabled={emptyPassword}
             hint={
               testing?.hasSavedPassword
                 ? t("ui.leaveBlankToUseTheSavedPassword")
                 : t("ui.usedOnlyForThisTestNotSaved")
             }
           />
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={emptyPassword}
+              onChange={(event) => { setEmptyPassword(event.target.checked); setPassword(""); }} />
+            {t("credentials.emptyPassword")}
+          </label>
           <FormError message={error} />
           {probe ? <ProbeResult result={probe} /> : null}
           <Button disabled={test.isPending}>

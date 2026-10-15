@@ -1,4 +1,5 @@
 {
+  "credentials.emptyPassword": "明确使用空密码",
   "cleanup.label": "清理证据",
   "cleanup.SUCCESS": "已确认完成",
   "cleanup.FAILED": "清理失败",

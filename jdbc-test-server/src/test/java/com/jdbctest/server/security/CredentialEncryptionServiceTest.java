@@ -24,6 +24,17 @@ class CredentialEncryptionServiceTest {
   }
 
   @Test
+  void emptyAndWhitespacePasswordsHaveAuthenticatedEnvelopes() {
+    var encryption = service();
+    for (String value : new String[] {"", "  abc  ", "   ", ";\"中文🔐"}) {
+      String envelope = encryption.encrypt(value);
+      assertNotNull(envelope);
+      assertFalse(envelope.isEmpty());
+      assertEquals(value, encryption.decrypt(envelope));
+    }
+  }
+
+  @Test
   void tamperingAndWrongKeyFail() {
     CredentialEncryptionService service = service();
     String envelope = service.encrypt("secret");

@@ -1,4 +1,5 @@
 {
+  "credentials.emptyPassword": "Use an empty password explicitly",
   "cleanup.label": "Cleanup evidence",
   "cleanup.SUCCESS": "Confirmed complete",
   "cleanup.FAILED": "Cleanup failed",
