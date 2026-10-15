@@ -145,7 +145,7 @@ TanStack Query owns server state; forms and transport state remain local. `src/a
 
 Run detail loads REST first, then opens native `EventSource` for active runs. SSE updates the same Query cache; terminal events close the stream and refresh final results. Reconnects do not change Run status; a 10-second REST fallback covers missed terminal events. Passwords stay in component memory, clear after requests, and never enter browser storage, URLs or query caches. Diagnostics render as text.
 
-Dashboard outcomes describe only the eight loaded recent runs; catalog totals describe inventory. There are no global trend, module-aggregate or safe diagnostics endpoints. Run lists filter by status. Results support status or module filtering, with status taking precedence. The UI does not invent unavailable statistics or a Logs tab.
+Dashboard outcomes describe only the eight loaded recent runs; catalog totals describe inventory. There are no global trend, module-aggregate or safe diagnostics endpoints. Run lists filter by status. Results combine status and module filters with AND before database pagination, with a stable scenario-ID tie break. The UI does not invent unavailable statistics or a Logs tab.
 
 ### Language and metric cards
 
@@ -155,7 +155,7 @@ Metric cards share CSS tone tokens and pale gradients; outcome colors retain the
 
 ## Platform database
 
-Flyway V1–V5 owns schema; Hibernate uses `ddl-auto=validate`. UUIDs identify records and UTC `Instant` values use `timestamp with time zone`. References protect historical runs from deletion of used drivers/connections.
+Flyway V1–V8 owns schema; Hibernate uses `ddl-auto=validate`. UUIDs identify records and UTC `Instant` values use `timestamp with time zone`. References protect historical runs from deletion of used drivers/connections.
 
 | Migration | Purpose |
 |---|---|
@@ -164,6 +164,9 @@ Flyway V1–V5 owns schema; Hibernate uses `ddl-auto=validate`. UUIDs identify r
 | V3 | Explicit connection `adapter_id` |
 | V4 | Run snapshots, selected scenarios, encrypted queued credentials |
 | V5 | Authorized scope, frozen inputs, evidence version, starts/completions/issues |
+| V6 | Driver-owned DataSource providers |
+| V7 | Cleanup evidence and original Worker termination reason |
+| V8 | Observed product/driver metadata and preflight conclusion |
 
 Saved passwords use AES-256-GCM with a fresh 12-byte nonce and envelope `v1:<base64 nonce>:<base64 ciphertext>`. `JDBC_TEST_MASTER_KEY` supplies the persistent 32-byte key. Plaintext is absent from entities, snapshots and diagnostics. Queue credentials use a separate encrypted table and are deleted on Worker handoff and terminal/recovery paths. Legacy runs retain their original evidence; V5 does not infer starts.
 
@@ -193,9 +196,9 @@ Files live at `<data-dir>/drivers/<driver-id>/<artifact-id>.jar`; user filenames
 | POST | `/api/connections/test` | Probe an unsaved draft |
 | POST | `/api/connections/{id}/test` | Probe saved settings |
 
-`databaseType` is an open string; `adapterId` independently selects SQL/capabilities. A profile references a validated driver and records JDBC URL, username and authorized execution scope. Persisted URLs reject credential parameters (`password`, `passwd`, `pwd`, `secret`, `token`, `access_token`) with `CONNECTION_URL_CONTAINS_CREDENTIALS`.
+`databaseType` is an open string; `adapterId` independently selects SQL/capabilities. A profile references a validated driver and records JDBC URL, username and authorized execution scope. Create/update/draft-probe and execution paths reject Oracle Thin/OCI embedded user/password segments and credential parameters (`password`, `passwd`, `pwd`, `secret`, `token`, `access_token`) with `CONNECTION_URL_CONTAINS_CREDENTIALS`.
 
-Passwords are write-only; responses expose `hasSavedPassword`. Save/replace with `password` plus `savePassword: true`; clear with `clearSavedPassword: true`, never both actions together. A temporary probe password overrides the saved password for that request. Save and Probe are independent; save edits before probing persisted settings.
+Passwords are write-only; responses expose `hasSavedPassword`. Save/replace with `password` plus `savePassword: true`; clear with `clearSavedPassword: true`, never both actions together. A temporary probe password overrides the saved password for that request. Save and Probe are independent; save edits before probing persisted settings. Missing/null means reuse the saved credential, or `CONNECTION_PASSWORD_REQUIRED` if none exists. Explicit `""` overrides it with an empty password; spaces and Unicode remain literal. Saving `""` creates a nonempty authenticated v1 envelope and `hasSavedPassword: true`. Updates without a new password retain the old envelope. Clear plus any new password, including `""`, is rejected. UI forms require explicit empty-password selection; an untouched blank field does not select this intent. CLI password environment variables distinguish unset from set-to-empty.
 
 Probes use Worker `Driver.connect`, read metadata best-effort, close and exit without SQL or test execution. The default timeout is 30 seconds. Saved probes update last-test time/status; drafts persist nothing. A null connection gives `DRIVER_DOES_NOT_ACCEPT_URL`; used profiles cannot be deleted (`CONNECTION_IN_USE`). Sort fields: `name`, `databaseType`, `lastConnectionTestAt`, `createdAt`.
 
@@ -234,9 +237,9 @@ Deploy Server and Worker together. Each Worker reads one stdin JSON request and 
 java -jar jdbc-test-worker/target/jdbc-test-worker-1.2.1-SNAPSHOT-all.jar --describe-catalog
 ```
 
-Server checks protocol version at catalog load and again before every execution. Mismatch gives `WORKER_PROTOCOL_MISMATCH` before sending execution credentials. Validation/probe modes retain their separate request contracts. For execution fields see [WorkerRunRequest.java](../jdbc-test-worker/src/main/java/com/jdbctest/worker/WorkerRunRequest.java): `protocolVersion`, `runId`, `driver`, `connection`, `selection`, `workspace`, `timeoutMs`, `scope`, `objectPrefix`, `capabilities`, `destructiveConsent`. Requests require version 2, explicit scope/consent, prefix `j` plus 20 lowercase hex digits, all 34 boolean capability declarations and the selected `connection.adapterId`.
+Server checks protocol version at catalog load and again before every execution. Mismatch gives `WORKER_PROTOCOL_MISMATCH` before sending execution credentials. Validation/probe modes retain their separate request contracts. For execution fields see [WorkerRunRequest.java](../jdbc-test-worker/src/main/java/com/jdbctest/worker/WorkerRunRequest.java): `protocolVersion`, `runId`, `driver`, `connection`, `selection`, `workspace`, `timeoutMs`, `scope`, `objectPrefix`, `capabilities`, `destructiveConsent`, and the frozen `adapterExecution` declaration. Requests require version 2, explicit scope/consent, prefix `j` plus 20 lowercase hex digits, all 34 boolean capability declarations and the selected `connection.adapterId`.
 
-Events include `RUN_STARTED`, `MODULE_STARTED`, `CASE_STARTED`, `CASE_FINISHED`, `MODULE_FINISHED`, `RUN_FINISHED`, `RUN_FAILED`. Malformed/unexpected events, wrong run IDs and unselected/duplicate results fail with `WORKER_PROTOCOL_ERROR`. Report output is `<workspace>/report/report.json`, schema `2.0.0`; temporary config is deleted on exit.
+Events include `RUN_STARTED`, `MODULE_STARTED`, `CASE_STARTED`, `CASE_FINISHED`, `MODULE_FINISHED`, `CLEANUP_FINISHED`, `METADATA_VALIDATED`, `RUN_FINISHED`, `RUN_FAILED`. Malformed/unexpected events, wrong run IDs and unselected/duplicate results fail with `WORKER_PROTOCOL_ERROR`. Report output is `<workspace>/report/report.json`, schema `2.0.0`; temporary config is deleted on exit.
 
 | Exit code | Meaning |
 |---:|---|
@@ -328,3 +331,5 @@ Examples for other public drivers: MySQL `com.mysql.cj.jdbc.MysqlDataSource`,
 are preserved. Explicit `db.password_env: MY_DB_PASSWORD` resolves one environment variable, without
 expanding its value; missing variables and simultaneous `password`/`password_env` fail configuration.
 CLI user configs use `password_env` and generate a private runtime literal. Never commit credentials.
+
+See [Execution safety](execution-safety.md) for embedded credentials, adapter preflight, cleanup evidence and historical compatibility. This work does not change the three-step source startup, theme modes, Key or target authentication configuration.

@@ -32,7 +32,7 @@ Hard stops can leave `CREATING`, `CREATED`, `DROPPING` or `UNKNOWN` entries. Ter
 
 CLI and Worker share official adapter declarations. All 34 managed capabilities must be boolean. Missing/invalid declarations fail configuration; `false` causes an explicit sourced skip, while `true` enables a test and does not prove compatibility. DataSource interface capabilities come from explicitly configured driver-owned providers; all other capabilities remain manifest-driven. FULL selects 270 scenarios.
 
-New runs use `protocolVersion: 2` and `report_schema_version: 2.0.0`; deploy Server/Worker together. Flyway V5 is additive. Legacy runs keep original outcomes without invented starts or v2 evidence.
+New runs use `protocolVersion: 2` and `report_schema_version: 2.0.0`; deploy Server/Worker together. Flyway V5–V8 are additive; V7 stores cleanup/termination evidence and V8 stores observed metadata. Legacy runs keep original outcomes without invented starts or v2 evidence.
 
 | Scenario state | Meaning |
 |---|---|
@@ -57,3 +57,13 @@ The 2026-10-07 checkpoint used production Web → REST → external-driver Worke
 | Oracle 19.3 / ojdbc11 21.13 | 17 passed | 23 passed | 136 passed | 189 passed, 13 skipped |
 
 Selections overlap. A disabled capability is a configuration reason, not evidence of absent database support; inspect per-scenario reasons in Results or raw JSON. These results cover local production JAR deployment, not Docker image acceptance, other driver versions or release authorization. Disposable-container regressions do not replace acceptance on actual target combinations. No real targets participate in default Maven/CI tests.
+
+## Credentials, adapter preflight and cleanup evidence
+
+Embedded credentials are rejected before driver use, including historical URLs at saved-probe/run/Worker entry points. Public projections redact Oracle credential segments, query/semicolon secrets (including SQL Server brace escapes), and explicit sensitive JSON keys recursively. Driver stdout/stderr is discarded from public channels; known execution passwords are also removed from diagnostic/metadata fields. Text recognition cannot identify every arbitrary secret. Original valid input goes to the driver; redacted values never become execution URLs. Existing records are not scanned or rewritten automatically: owners should inspect old records and rotate credentials if appropriate; this is not a claim that a leak occurred.
+
+`adapterExecution` freezes manifest identity, version bounds, asset ID, dialect and quoting. Web and CLI use the same Java preflight before auto-namespace creation or fixture DDL/DML. Invalid regexes, unparseable constrained versions and mismatches reject preflight (`PREFLIGHT_FAILURE`) without invented failed cases. Reports retain declarations, observed product/driver versions and MATCHED/REJECTED. Optional absent endpoints stay unbounded. Older queued inputs without this field use the installed manifest; historical reports are not retroactively revalidated. Manifest acceptance is not proof of support for untested targets; no new GaussDB/SQL Server/MySQL/Oracle real-target claims are made here.
+
+`cleanupEvidence` is additive in protocol 2 / report schema 2.0.0: SUCCESS, FAILED, UNKNOWN or NOT_EXECUTED, phase, attempt/deletion counts, retained objects, namespace disposition and safe SQLState/vendorCode. Cleanup failure changes the run conclusion (`CLEANUP_FAILURE`), never the actual case counts. Test/container/preflight failures retain their primary reason and attached cleanup evidence; timeout/cancel/crash retain their existing primary terminal reason. Cleanup stays inside the Worker deadline on the execution thread; an interrupted live JDBC call is never raced by a second cleanup thread. Confirmed drops are not repeated. Intentionally retained namespaces are not failed object cleanup.
+
+A normal run cannot succeed without successful cleanup evidence. REST/SSE (`run.cleanup`), persisted details and rebuilt JSON retain the same evidence, including after a fresh Server application context. Missing historical evidence is UNKNOWN / not recorded, not inferred success. These fields do not authorize broad recovery deletion.

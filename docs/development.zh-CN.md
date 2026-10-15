@@ -141,7 +141,7 @@ TanStack Query 管理服务端状态；表单和传输状态留在组件内。`s
 
 任务详情先读取 REST，再为活动任务打开原生 `EventSource`。SSE 更新同一份 Query 缓存，终态事件关闭连接并刷新结果。重连不改变任务状态；10 秒 REST 轮询补偿丢失的终态事件。密码只保存在组件内存，请求后清除，不写入浏览器存储、URL 或查询缓存。诊断内容以文本显示。
 
-Dashboard 的结果只代表加载的最近 8 个任务，目录数量只代表测试资产规模。没有全局趋势、模块聚合或安全诊断接口。任务列表按状态筛选；结果支持状态或模块筛选，状态优先。UI 不生成缺少依据的统计或日志页。
+Dashboard 的结果只代表加载的最近 8 个任务，目录数量只代表测试资产规模。没有全局趋势、模块聚合或安全诊断接口。任务列表按状态筛选；结果在数据库分页前组合状态与模块条件（AND），以场景 ID 作为稳定次级排序。UI 不生成缺少依据的统计或日志页。
 
 ### 语言与指标卡
 
@@ -151,7 +151,7 @@ Dashboard 的结果只代表加载的最近 8 个任务，目录数量只代表�
 
 ## 平台数据库
 
-Flyway V1–V5 管理 schema；Hibernate 使用 `ddl-auto=validate`。记录使用 UUID，UTC `Instant` 存储为 `timestamp with time zone`。引用关系阻止删除历史任务使用的驱动与连接。
+Flyway V1–V8 管理 schema；Hibernate 使用 `ddl-auto=validate`。记录使用 UUID，UTC `Instant` 存储为 `timestamp with time zone`。引用关系阻止删除历史任务使用的驱动与连接。
 
 | 迁移 | 用途 |
 |---|---|
@@ -160,6 +160,9 @@ Flyway V1–V5 管理 schema；Hibernate 使用 `ddl-auto=validate`。记录使�
 | V3 | 显式连接 `adapter_id` |
 | V4 | 任务快照、已选场景、排队凭据加密 |
 | V5 | 授权范围、冻结输入、证据版本、开始与完成及执行问题 |
+| V6 | 驱动自身的 DataSource 提供者 |
+| V7 | 清理证据和原 Worker 终止原因 |
+| V8 | 产品/驱动观察元数据和预检结论 |
 
 已保存密码使用 AES-256-GCM，每次生成新的 12 字节 nonce，格式为 `v1:<base64 nonce>:<base64 ciphertext>`。`JDBC_TEST_MASTER_KEY` 提供持久保存的 32 字节密钥。实体、快照和诊断信息不包含明文。排队凭据存放在单独的加密表中，交接 Worker 及终态/恢复时删除。旧任务保留原有证据，V5 不推断其开始记录。
 
@@ -189,9 +192,9 @@ Flyway V1–V5 管理 schema；Hibernate 使用 `ddl-auto=validate`。记录使�
 | POST | `/api/connections/test` | 探测未保存的草稿 |
 | POST | `/api/connections/{id}/test` | 探测已保存设置 |
 
-`databaseType` 是开放字符串，`adapterId` 独立选择 SQL 与能力。连接引用已验证驱动，保存 JDBC URL、用户名和授权执行范围。持久保存的 URL 拒绝凭据参数（`password`、`passwd`、`pwd`、`secret`、`token`、`access_token`），返回 `CONNECTION_URL_CONTAINS_CREDENTIALS`。
+`databaseType` 是开放字符串，`adapterId` 独立选择 SQL 与能力。连接引用已验证驱动，保存 JDBC URL、用户名和授权执行范围。创建、更新、草稿探测和执行路径拒绝 Oracle Thin/OCI 内嵌用户名/密码片段及凭据参数（`password`、`passwd`、`pwd`、`secret`、`token`、`access_token`），返回 `CONNECTION_URL_CONTAINS_CREDENTIALS`。
 
-密码只写不读，响应仅提供 `hasSavedPassword`。通过 `password` 和 `savePassword: true` 保存或替换；通过 `clearSavedPassword: true` 清除，不能同时执行两种操作。临时探测密码仅对本次请求覆盖已保存密码。保存与探测独立；探测持久设置前先保存修改。
+密码只写不读，响应仅提供 `hasSavedPassword`。通过 `password` 和 `savePassword: true` 保存或替换；通过 `clearSavedPassword: true` 清除，不能同时执行两种操作。临时探测密码仅对本次请求覆盖已保存密码。保存与探测独立；探测持久设置前先保存修改。未提供/null 表示沿用已保存值（含已保存的空字符串）；没有保存值则返回 `CONNECTION_PASSWORD_REQUIRED`。显式 `""` 覆盖为原值空串，空格与 Unicode 原样保留。保存空串生成非空且可认证的 v1 密文，`hasSavedPassword: true`；更新未提交新密码保留原密文。清除与提供任何新密码（包括空串）冲突。前端必须明确勾选空密码，默认未填不代表此意图。CLI 密码环境变量同样区分未设置和已设为空。
 
 探测通过 Worker 的 `Driver.connect` 建立连接，尽力读取元数据，然后关闭退出，不执行 SQL 或测试。默认超时 30 秒。已保存连接的探测更新最后测试时间与状态，草稿不持久化。连接返回 null 时为 `DRIVER_DOES_NOT_ACCEPT_URL`；已使用连接不能删除（`CONNECTION_IN_USE`）。排序字段：`name`、`databaseType`、`lastConnectionTestAt`、`createdAt`。
 
@@ -230,9 +233,9 @@ Server 和 Worker 必须配套部署。每个 Worker 从 stdin 读取一个 JSON
 java -jar jdbc-test-worker/target/jdbc-test-worker-1.2.1-SNAPSHOT-all.jar --describe-catalog
 ```
 
-Server 在加载目录和每次执行前检查协议版本。版本不匹配时返回 `WORKER_PROTOCOL_MISMATCH`，不发送执行凭据。验证/探测模式使用各自的请求契约。执行字段见 [WorkerRunRequest.java](../jdbc-test-worker/src/main/java/com/jdbctest/worker/WorkerRunRequest.java)：`protocolVersion`、`runId`、`driver`、`connection`、`selection`、`workspace`、`timeoutMs`、`scope`、`objectPrefix`、`capabilities`、`destructiveConsent`。请求必须提供版本 2、明确范围与同意、`j` 加 20 位小写十六进制数字的对象前缀、全部 34 项布尔能力声明，以及所选 `connection.adapterId`。
+Server 在加载目录和每次执行前检查协议版本。版本不匹配时返回 `WORKER_PROTOCOL_MISMATCH`，不发送执行凭据。验证/探测模式使用各自的请求契约。执行字段见 [WorkerRunRequest.java](../jdbc-test-worker/src/main/java/com/jdbctest/worker/WorkerRunRequest.java)：`protocolVersion`、`runId`、`driver`、`connection`、`selection`、`workspace`、`timeoutMs`、`scope`、`objectPrefix`、`capabilities`、`destructiveConsent` 及冻结的 `adapterExecution` 声明。请求必须提供版本 2、明确范围与同意、`j` 加 20 位小写十六进制数字的对象前缀、全部 34 项布尔能力声明，以及所选 `connection.adapterId`。
 
-事件包括 `RUN_STARTED`、`MODULE_STARTED`、`CASE_STARTED`、`CASE_FINISHED`、`MODULE_FINISHED`、`RUN_FINISHED`、`RUN_FAILED`。格式错误或非预期事件、错误任务 ID、未选择或重复结果导致 `WORKER_PROTOCOL_ERROR`。报告输出到 `<workspace>/report/report.json`，schema 为 `2.0.0`；退出时删除临时配置。
+事件包括 `RUN_STARTED`、`MODULE_STARTED`、`CASE_STARTED`、`CASE_FINISHED`、`MODULE_FINISHED`、`CLEANUP_FINISHED`、`METADATA_VALIDATED`、`RUN_FINISHED`、`RUN_FAILED`。格式错误或非预期事件、错误任务 ID、未选择或重复结果导致 `WORKER_PROTOCOL_ERROR`。报告输出到 `<workspace>/report/report.json`，schema 为 `2.0.0`；退出时删除临时配置。
 
 | 退出码 | 含义 |
 |---:|---|
@@ -322,3 +325,6 @@ Java 运行配置的 `db.password` 是字面字符串，保留 `${...}`、反斜
 需要环境变量时显式写 `db.password_env: MY_DB_PASSWORD`，仅读取该变量，变量值不会再次展开；
 变量未设置或同时配置 `password` 与 `password_env` 时直接报错。
 CLI 用户配置使用 `password_env`，生成私有的字面密码运行配置。凭据不得提交到 Git。
+
+
+内嵌凭据、适配预检、清理证据及历史兼容见[执行安全](execution-safety.zh-CN.md)。本轮不改变三步源码启动、三态主题、Key 或目标认证配置。

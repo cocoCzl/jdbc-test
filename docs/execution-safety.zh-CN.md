@@ -32,7 +32,7 @@ CLI 的已有命名空间模式同样要求明确的 `namespace.name`；登录�
 
 CLI 和 Worker 共用官方适配能力声明。全部 34 项受管能力必须为布尔值。缺失或无效声明导致配置失败；`false` 产生带来源的明确跳过，`true` 只启用测试，不代表兼容通过。DataSource 接口能力来自显式配置的驱动实现，其余能力仍由适配声明控制。FULL 选择 270 个场景。
 
-新任务使用 `protocolVersion: 2` 和 `report_schema_version: 2.0.0`，Server/Worker 必须配套部署。Flyway V5 为增量迁移；旧任务保留原结果，不补造开始记录或 v2 证据。
+新任务使用 `protocolVersion: 2` 和 `report_schema_version: 2.0.0`，Server/Worker 必须配套部署。Flyway V5–V8 均为增量迁移，V7 保存清理/终止证据，V8 保存观察元数据；旧任务保留原结果，不补造开始记录或 v2 证据。
 
 | 场景状态 | 含义 |
 |---|---|
@@ -57,3 +57,13 @@ REST、SSE、持久证据和原始 JSON 使用同一套规则。崩溃后重建�
 | Oracle 19.3 / ojdbc11 21.13 | 17 通过 | 23 通过 | 136 通过 | 189 通过，13 跳过 |
 
 这些选择存在重叠。能力被禁用是配置原因，不证明数据库不支持；具体原因见结果页或原始 JSON。这些结果覆盖本地生产 JAR 部署，不代表 Docker 镜像验收、其他驱动版本或发布授权。可丢弃容器的回归不能替代真实目标组合验收。默认 Maven/CI 测试不连接真实目标。
+
+## 凭据、适配预检与清理证据
+
+内嵌凭据在驱动使用前拒绝，包括历史 URL 的已保存探测、运行及 Worker 入口。公开投影递归遮盖 Oracle 凭据片段、查询/分号秘密属性（包括 SQL Server 大括号转义）及明确敏感 JSON 键。驱动 stdout/stderr 不进入公开通道；已知执行密码也从诊断/元数据字段移除。文本识别不能保证发现任意秘密。合法原始输入交给驱动，脱敏 URL 不用于执行。不自动扫描或改写历史记录：所有者应人工检查旧记录，必要时轮换凭据；这不表示已经发生泄漏。
+
+`adapterExecution` 冻结 manifest 身份、版本范围、assetId、dialect 与引号规则。Web/CLI 共用 Java 预检，先检查再创建自动命名空间或执行 fixture DDL/DML。非法正则、受约束但不可解析的版本与不匹配均拒绝预检（`PREFLIGHT_FAILURE`），不编造用例失败。报告保留声明、产品/驱动观察版本及 MATCHED/REJECTED；可选端点缺省表示无该端限制。旧队列输入没有此字段时使用安装版本的 manifest，不重新判定历史报告。声明通过不证明未测目标受支持，本轮不新增 GaussDB/SQL Server/MySQL/Oracle 的真实目标验证声明。
+
+`cleanupEvidence` 是 protocol 2 / report schema 2.0.0 的增量字段：SUCCESS、FAILED、UNKNOWN、NOT_EXECUTED，以及阶段、尝试/确认删除数量、保留对象、命名空间处置与安全 SQLState/vendorCode。清理失败影响运行结论（`CLEANUP_FAILURE`），不改真实用例统计。用例/容器/预检失败保留主要原因并附加清理证据；超时、取消和崩溃保留既有主终态。清理在原执行线程及 Worker deadline 内进行，绝不对仍存活的中断 JDBC 调用另开线程并发清理；确认删除的对象不重复 DROP。声明保留的命名空间不算失败残留。
+
+正常运行只有存在成功清理证据才可成功。REST/SSE（`run.cleanup`）、持久化详情和重建 JSON 保留一致证据，新 Server 应用上下文重读后仍一致。历史缺失字段显示 UNKNOWN/未记录，不能推断成功。这些字段不授权大范围恢复删除。
