@@ -48,11 +48,7 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
 
   @Override
   public void afterAll(ExtensionContext context) throws Exception {
-    if (JdbcContext.getDataSource() != null) {
-      try (Connection connection = JdbcContext.getConnection()) {
-        JdbcContext.objects().cleanup(connection);
-      }
-    }
+    JdbcContext.cleanupObjects();
   }
 
   @Override

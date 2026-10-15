@@ -1,3 +1,4 @@
+import { CleanupEvidence } from "./cleanup-evidence";
 import { JdbcUrl } from "@/components/jdbc-url";
 import { Card } from "@/components/ui/card";
 import { moduleName, profileName } from "@/lib/presentation";
@@ -52,6 +53,7 @@ export default function Report({ run }: { run: Run }) {
       {summary.accounting ? <p className="mb-4 text-sm">
         {t("report.accounting", {notRun: summary.accounting.notRun, incomplete: summary.accounting.incomplete})}{summary.accounting.started === 0 ? t("ui.noScenarioExecutionWasVerifiedSkippedCases") : ""}
       </p> : null}
+      <CleanupEvidence evidence={summary.cleanupEvidence} />
       {summary.executionIssues?.length ? <Card className="panel mb-4"><h2>{t("ui.executionIssues")}</h2>
         {summary.executionIssues.map((issue, index) => <p key={index} className="break-words">{String(issue.level)}: {String(issue.message ?? issue.status)}</p>)}
       </Card> : null}

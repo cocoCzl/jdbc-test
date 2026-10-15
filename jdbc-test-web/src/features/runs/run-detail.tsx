@@ -1,3 +1,4 @@
+import { CleanupEvidence } from "./cleanup-evidence";
 import { Card } from "@/components/ui/card";
 import { JdbcUrl } from "@/components/jdbc-url";
 import { moduleName, profileName, runTitle } from "@/lib/presentation";
@@ -133,6 +134,7 @@ export default function RunDetail() {
           <TabsTrigger value="report">{t("ui.report")}</TabsTrigger>
         </TabsList>
         <TabsContent value="overview">
+          <CleanupEvidence evidence={run.cleanupEvidence} />
           <Card as="section" className="panel mb-5" aria-label={t("run.selection")}>
             <div className="mb-3 flex flex-wrap items-center gap-3"><h2 className="text-lg font-semibold">{t("run.selection")}</h2><StatusBadge label={profileName(run.profile)} tone="neutral" /><span className="text-sm text-muted-foreground">{t("run.moduleCount", {count:run.selectedModules.length})}</span></div>
             <p className="text-sm text-muted-foreground">{run.selectedModules.slice(0,3).map(id=>moduleName(id)).join(" · ")}</p>

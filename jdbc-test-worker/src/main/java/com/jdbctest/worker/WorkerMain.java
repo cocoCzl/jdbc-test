@@ -121,7 +121,7 @@ public final class WorkerMain {
       writeConfig(configFile, request);
       System.setProperty("config.yaml", configFile.toString());
       WorkerExecutionEvidence evidence = execute(request, selected);
-      JdbcContext.shutdown();
+      evidence.recordCleanup(JdbcContext.cleanupEvidence());
       WorkerReportWriter.write(workspace, request, selected, evidence);
       boolean failed = !"COMPLETED".equals(evidence.terminationReason());
       events.write("RUN_FINISHED", request.runId(),
@@ -144,9 +144,6 @@ public final class WorkerMain {
       driverOutput.close();
       // An interrupted JDBC call can still be running. Do not race cleanup against that thread.
       // Main exits the process; the persisted ownership journal is the residual evidence.
-      if (!timedOut) {
-        JdbcContext.shutdown();
-      }
       System.clearProperty("config.yaml");
       try {
         Files.deleteIfExists(configFile);
@@ -409,7 +406,11 @@ public final class WorkerMain {
       Future<?> future = executor.submit(() -> {
         Launcher launcher = LauncherFactory.create();
         launcher.registerTestExecutionListeners(listener);
-        launcher.execute(discovery);
+        try {
+          launcher.execute(discovery);
+        } finally {
+          JdbcContext.shutdown();
+        }
       });
       try {
         future.get(timeoutMillis(request), TimeUnit.MILLISECONDS);

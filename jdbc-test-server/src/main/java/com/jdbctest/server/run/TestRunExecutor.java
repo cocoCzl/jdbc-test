@@ -309,6 +309,25 @@ final class TestRunExecutor {
         events.publish(runId, "run.issue",
             mapper.convertValue(issues.get(issues.size() - 1), Map.class));
       });
+      case "CLEANUP_FINISHED" -> transactions.executeWithoutResult(tx -> {
+        TestRunEntity run = runs.findForUpdate(runId).orElseThrow();
+        if (TestRunStateTransitions.terminal(run.getStatus())) {
+          return;
+        }
+        JsonNode cleanup = event.path("cleanupEvidence");
+        if (!cleanup.isObject() || !List.of("SUCCESS", "FAILED", "UNKNOWN", "NOT_EXECUTED")
+            .contains(text(cleanup, "status"))) {
+          throw protocol("Invalid cleanup evidence");
+        }
+        String safe = JdbcUrlSanitizer.sanitizeJson(mapper.writeValueAsString(cleanup));
+        if (run.getCleanupEvidence() != null && !run.getCleanupEvidence().equals(safe)) {
+          throw protocol("Conflicting cleanup evidence");
+        }
+        run.setCleanupEvidence(safe);
+        runs.save(run);
+        events.publish(runId, "run.cleanup", Map.of("runId", runId, "cleanupEvidence",
+            mapper.readValue(safe, Map.class)));
+      });
       case "CASE_FINISHED" -> persistCase(runId, event);
       case "RUN_FAILED" -> fail(runId,
           text(event, "errorType") == null ? "WORKER_EXECUTION_FAILED" : text(event, "errorType"));
@@ -486,9 +505,13 @@ final class TestRunExecutor {
       boolean complete = notRun.isEmpty() && incomplete.isEmpty();
       boolean hasIssues =
           run.getExecutionIssues() != null && mapper.readTree(run.getExecutionIssues()).size() > 0;
-      boolean expectedFailure = failed || hasIssues || !complete || started.isEmpty();
+      boolean cleanupSuccess = run.getCleanupEvidence() != null
+          && "SUCCESS".equals(text(mapper.readTree(run.getCleanupEvidence()), "status"));
+      boolean expectedFailure = failed || hasIssues || !complete || started.isEmpty()
+          || !cleanupSuccess;
       String expectedReason = hasIssues ? "CONTAINER_FAILURE" : !complete ? "INCOMPLETE_EXECUTION"
-          : started.isEmpty() ? "NO_TESTS_EXECUTED" : failed ? "TEST_FAILURE" : "COMPLETED";
+          : started.isEmpty() ? "NO_TESTS_EXECUTED" : failed ? "TEST_FAILURE"
+              : !cleanupSuccess ? "CLEANUP_FAILURE" : "COMPLETED";
       boolean reasonValid = expectedReason.equals(reason) && (complete || hasIssues);
       JsonNode frozen = mapper.readTree(run.getExecutionInput());
       JsonNode recordedIssues =
@@ -522,6 +545,8 @@ final class TestRunExecutor {
           && exactIds(report.path("notRun"), notRun) && exactIds(report.path("incomplete"),
           incomplete)
           && report.path("issues").equals(issuePayloads)
+          && (run.getCleanupEvidence() == null ? report.path("cleanupEvidence").isMissingNode()
+          : report.path("cleanupEvidence").equals(mapper.readTree(run.getCleanupEvidence())))
           && report.path("scope").equals(frozen.path("scope"))
           && report.path("objectPrefix").equals(frozen.path("objectPrefix"))
           && report.path("capabilities").equals(frozen.path("capabilities"))
@@ -539,6 +564,7 @@ final class TestRunExecutor {
           && cases.stream()
           .allMatch(item -> sameResult(item, reportCases.path(item.getScenarioId())));
       if (valid) {
+        run.setWorkerTerminationReason(reason);
         run.markWorkerReportValidated();
         runs.save(run);
       }

@@ -153,9 +153,18 @@ public final class FakeWorkerMain {
     rows.forEach(row -> reportRows.put(String.valueOf(row.get("scenarioId")), row));
     boolean failed = rows.stream()
         .anyMatch(row -> "FAILED".equals(row.get("status")) || "ABORTED".equals(row.get("status")));
+    Map<String, Object> cleanup = Map.of("status",
+        "CLEANUP_FAILURE".equals(mode) ? "FAILED" : "SUCCESS", "attempted", 1,
+        "confirmedDeleted", "CLEANUP_FAILURE".equals(mode) ? 0 : 1,
+        "retainedObjects", "CLEANUP_FAILURE".equals(mode)
+            ? List.of(Map.of("name", "fixture_owned", "sqlState", "42501", "vendorCode", 7)) : List.of());
+    System.out.println(json.writeValueAsString(Map.of("type", "CLEANUP_FINISHED", "runId", runId,
+        "cleanupEvidence", cleanup)));
+    failed = failed || "CLEANUP_FAILURE".equals(mode);
     failed = failed || !issues.isEmpty() || "ALL_SKIP".equals(mode);
     String reason = !issues.isEmpty() ? "CONTAINER_FAILURE"
-        : "ALL_SKIP".equals(mode) ? "NO_TESTS_EXECUTED" : failed ? "TEST_FAILURE" : "COMPLETED";
+        : "ALL_SKIP".equals(mode) ? "NO_TESTS_EXECUTED"
+            : "CLEANUP_FAILURE".equals(mode) ? "CLEANUP_FAILURE" : failed ? "TEST_FAILURE" : "COMPLETED";
     Map<String, Object> report = new LinkedHashMap<>();
     report.put("runId", runId);
     report.put("report_schema_version", "2.0.0");
@@ -167,6 +176,7 @@ public final class FakeWorkerMain {
     report.put("notRun", selected.stream().filter(id -> !reportRows.containsKey(id)).toList());
     report.put("incomplete", List.of());
     report.put("issues", issues);
+    report.put("cleanupEvidence", cleanup);
     report.put("terminationReason", reason);
     report.put("scope", request.get("scope"));
     report.put("capabilities", request.get("capabilities"));

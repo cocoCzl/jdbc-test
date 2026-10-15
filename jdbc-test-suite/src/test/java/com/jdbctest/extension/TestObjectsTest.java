@@ -53,6 +53,48 @@ class TestObjectsTest {
   }
 
   @Test
+  void cleanupFailureAndUnknownCreateRemainVisibleAndAreNeverRetried() throws Exception {
+    TestObjects objects = new TestObjects(config("j01234567890123456789"));
+    var commands = new ArrayList<String>();
+    objects.create(statement(commands, null), "CREATE TABLE {{owned}} (id INTEGER)");
+    objects.cleanup(connection(statement(commands, "DROP")));
+    var evidence = objects.cleanupEvidence();
+    assertEquals("FAILED", evidence.get("status"));
+    assertEquals(1L, evidence.get("attempted"));
+    assertEquals(0L, evidence.get("confirmedDeleted"));
+    objects.cleanup(connection(statement(commands, null)));
+    assertEquals(2, commands.size());
+    assertEquals(evidence, objects.cleanupEvidence());
+    TestObjects uncertain = new TestObjects(config("j11234567890123456789"));
+    assertThrows(SQLException.class, () -> uncertain.create(statement(commands, "CREATE"),
+        "CREATE TABLE {{uncertain}} (id INTEGER)"));
+    uncertain.cleanup(connection(statement(commands, null)));
+    assertEquals("UNKNOWN", uncertain.cleanupEvidence().get("status"));
+  }
+
+  @Test
+  void cleanupConnectionFailureCarriesSafeDiagnosticEvidence() {
+    TestObjects objects = new TestObjects(config("j01234567890123456789"));
+    objects.cleanupUnavailable(new SQLException("not public", "42501", 77));
+    assertEquals("FAILED", objects.cleanupEvidence().get("status"));
+    assertEquals(Map.of("phase", "CONNECTION", "sqlState", "42501", "vendorCode", 77),
+        objects.cleanupEvidence().get("error"));
+  }
+
+  @Test
+  void successfulCleanupAndRetainedNamespaceAreIdempotent() throws Exception {
+    TestObjects objects = new TestObjects(config("j01234567890123456789"));
+    objects.recordNamespaceProvisioning("CREATED_RETAINED");
+    var commands = new ArrayList<String>();
+    objects.create(statement(commands, null), "CREATE TABLE {{owned}} (id INTEGER)");
+    objects.cleanup(connection(statement(commands, null)));
+    objects.cleanup(connection(statement(commands, null)));
+    assertEquals("SUCCESS", objects.cleanupEvidence().get("status"));
+    assertEquals(1L, objects.cleanupEvidence().get("confirmedDeleted"));
+    assertEquals(2, commands.size());
+  }
+
+  @Test
   void sqlServerIndexCleanupNamesItsOwnedTable() throws Exception {
     Config value = config("j01234567890123456789");
     value.db.dialect = "sqlserver";

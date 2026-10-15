@@ -30,6 +30,16 @@ class WorkerExecutionEvidenceTest {
     }
   }
 
+  static class Passed {
+    @Test
+    void first() {
+    }
+
+    @Test
+    void second() {
+    }
+  }
+
   @Disabled("fixture explicit container skip")
   static class SkippedContainer {
 
@@ -68,6 +78,20 @@ class WorkerExecutionEvidenceTest {
         .selectors(DiscoverySelectors.selectClass(fixture)).build();
     LauncherFactory.create().execute(request, evidence);
     return evidence;
+  }
+
+  @Test
+  void cleanupChangesOnlyRunConclusionAndPreservesPrimaryFailure() {
+    var evidence = execute(Passed.class);
+    assertEquals("CLEANUP_FAILURE", evidence.terminationReason());
+    evidence.recordCleanup(Map.of("status", "FAILED"));
+    assertEquals("CLEANUP_FAILURE", evidence.terminationReason());
+    assertEquals(2, evidence.results().stream().filter(r -> "PASSED".equals(r.get("status"))).count());
+    evidence.recordCleanup(Map.of("status", "SUCCESS"));
+    assertEquals("COMPLETED", evidence.terminationReason());
+    var failed = execute(Mixed.class);
+    failed.recordCleanup(Map.of("status", "FAILED"));
+    assertEquals("TEST_FAILURE", failed.terminationReason());
   }
 
   @Test

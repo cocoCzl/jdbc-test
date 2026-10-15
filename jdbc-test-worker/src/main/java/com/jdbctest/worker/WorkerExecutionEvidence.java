@@ -19,6 +19,17 @@ final class WorkerExecutionEvidence implements TestExecutionListener {
   private final Map<String, Map<String, Object>> results = new LinkedHashMap<>();
   private final List<Map<String, Object>> issues = new ArrayList<>();
   private TestPlan plan;
+  private Map<String, Object> cleanup = Map.of("status", "UNKNOWN", "phase", "NOT_RECORDED");
+
+  synchronized void recordCleanup(Map<String, Object> value) {
+    cleanup = Map.copyOf(value);
+    events.write("CLEANUP_FINISHED", runId, Map.of("cleanupEvidence", cleanup));
+  }
+
+  synchronized Map<String, Object> cleanupEvidence() {
+    return cleanup;
+  }
+
 
   WorkerExecutionEvidence(String runId, List<TestCaseDescriptor> selected,
       WorkerEventWriter events) {
@@ -157,8 +168,10 @@ final class WorkerExecutionEvidence implements TestExecutionListener {
     if (started.isEmpty()) {
       return "NO_TESTS_EXECUTED";
     }
-    return results.values().stream()
-        .anyMatch(row -> Set.of("FAILED", "ABORTED").contains(row.get("status"))) ? "TEST_FAILURE"
-        : "COMPLETED";
+    if (results.values().stream()
+        .anyMatch(row -> Set.of("FAILED", "ABORTED").contains(row.get("status")))) {
+      return "TEST_FAILURE";
+    }
+    return "SUCCESS".equals(cleanup.get("status")) ? "COMPLETED" : "CLEANUP_FAILURE";
   }
 }

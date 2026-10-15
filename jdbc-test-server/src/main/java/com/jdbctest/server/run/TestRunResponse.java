@@ -13,7 +13,8 @@ public record TestRunResponse(UUID id, TestRunStatus status, String profile,
     Instant createdAt, Instant startedAt, Instant finishedAt,
     Long durationMs, String failureReason, ExecutionAccounting accounting,
     java.util.Map<String, Object> executionScope,
-    java.util.List<java.util.Map<String, Object>> executionIssues) {
+    java.util.List<java.util.Map<String, Object>> executionIssues,
+    java.util.Map<String, Object> cleanupEvidence) {
 
   public record ConnectionSnapshot(String name, String databaseType, String adapterId,
       String jdbcUrl) {

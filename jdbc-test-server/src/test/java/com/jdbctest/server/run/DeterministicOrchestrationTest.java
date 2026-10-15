@@ -529,6 +529,37 @@ class DeterministicOrchestrationTest {
   }
 
   @Test
+  void cleanupFailurePersistsWithoutChangingPassedCasesAndRebuildsReport() throws Exception {
+    UUID id = run("CLEANUP_FAILURE", 1);
+    MvcResult stream = subscribe(id);
+    scheduler.enqueue(id);
+    started(id);
+    done(id, TestRunStatus.FAILED, "WORKER_EXECUTION_FAILED");
+    var detail = service.get(id);
+    assertEquals(1, detail.passed());
+    assertEquals(0, detail.failed());
+    assertEquals("FAILED", detail.cleanupEvidence().get("status"));
+    assertTrue(stream.getResponse().getContentAsString().contains("event:run.cleanup"));
+    assertTrue(stream.getResponse().getContentAsString().contains("event:run.failed"));
+    var persisted = runs.findById(id).orElseThrow();
+    assertEquals("CLEANUP_FAILURE", persisted.getWorkerTerminationReason());
+    // Rebuild solely from persistence, with the Worker artifact removed.
+    Files.delete(workspace(id).resolve("report/report.json"));
+    mvc.perform(get("/api/runs/{id}/report.json", id)).andExpect(status().isOk())
+        .andExpect(jsonPath("$.terminationReason").value("CLEANUP_FAILURE"))
+        .andExpect(jsonPath("$.cleanupEvidence.status").value("FAILED"))
+        .andExpect(jsonPath("$.cleanupEvidence.retainedObjects[0].name").value("fixture_owned"))
+        .andExpect(jsonPath("$.summary.passed").value(1))
+        .andExpect(jsonPath("$.summary.failed").value(0));
+  }
+
+  @Test
+  void missingHistoricalCleanupIsUnknown() {
+    UUID id = run("NORMAL", 1);
+    assertEquals("UNKNOWN", service.get(id).cleanupEvidence().get("status"));
+  }
+
+  @Test
   void resultsAndSanitizationPersistAllFourStatuses() throws Exception {
     UUID id = run("MIXED", 4);
     MvcResult stream = subscribe(id);

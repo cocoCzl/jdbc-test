@@ -309,7 +309,15 @@ final class TestRunService {
         run.getSkipped(), run.getCurrentModule(), run.getCurrentTestCase(), run.getCreatedAt(),
         run.getStartedAt(), run.getFinishedAt(), duration, JdbcUrlSanitizer.sanitize(run.getFailureReason()),
         ExecutionAccounting.of(run, selected.findByRun_IdOrderByScenarioId(run.getId())),
-        scopeSnapshot(run), issueSnapshot(run));
+        scopeSnapshot(run), issueSnapshot(run), cleanupSnapshot(run));
+  }
+
+  @SuppressWarnings("unchecked")
+  private java.util.Map<String, Object> cleanupSnapshot(TestRunEntity run) {
+    return run.getCleanupEvidence() == null
+        ? java.util.Map.of("status", "UNKNOWN", "phase", "NOT_RECORDED")
+        : new tools.jackson.databind.ObjectMapper().readValue(run.getCleanupEvidence(),
+            java.util.Map.class);
   }
 
   @SuppressWarnings("unchecked")
@@ -347,10 +355,9 @@ final class TestRunService {
       report.put("source", "PERSISTED_WORKER_EVENTS");
       boolean validated = run.isWorkerReportValidated();
       var accounting = value.accounting();
-      String reason = validated ? !value.executionIssues().isEmpty() ? "CONTAINER_FAILURE"
-          : accounting.started() == 0 ? "NO_TESTS_EXECUTED"
-              : accounting.failed() + accounting.aborted() > 0 ? "TEST_FAILURE" : "COMPLETED"
-          : run.getFailureReason();
+      String reason = validated && run.getWorkerTerminationReason() != null
+          ? run.getWorkerTerminationReason() : run.getFailureReason();
+      report.put("cleanupEvidence", value.cleanupEvidence());
       report.put("runStatus", run.getStatus());
       report.put("terminationReason", reason);
       report.put("scope",

@@ -11,6 +11,7 @@ const eventNames = [
   "case.finished",
   "run.progress",
   "run.issue",
+  "run.cleanup",
   "run.finished",
   "run.failed",
   "run.cancelled",
@@ -64,7 +65,7 @@ export function useRunEvents(id: string, run: Run | undefined) {
           return {
             ...previous,
             ...Object.fromEntries(
-              [...Object.keys(previous), "accounting", "executionScope", "executionIssues"]
+              [...Object.keys(previous), "accounting", "executionScope", "executionIssues", "cleanupEvidence"]
                 .filter((key) => key in body)
                 .map((key) => [key, body[key]]),
             ),
@@ -73,6 +74,8 @@ export function useRunEvents(id: string, run: Run | undefined) {
         const next = { ...previous };
         if (body.accounting && typeof body.accounting === "object")
           next.accounting = body.accounting as Run["accounting"];
+        if (event.type === "run.cleanup" && record(body.cleanupEvidence))
+          next.cleanupEvidence = body.cleanupEvidence as unknown as Run["cleanupEvidence"];
         if (event.type === "run.issue") next.executionIssues = [...(previous.executionIssues ?? []), body];
         if (status(body.status)) next.status = body.status;
         if (terminalStatus) next.status = terminalStatus;

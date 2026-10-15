@@ -41,6 +41,7 @@ public final class JdbcContext {
   public static void init(Config config) {
     FeatureProfile.load(config.db.dataSources.capabilities(
         config.adapter == null ? null : config.adapter.capabilities));
+    lastCleanup = Map.of("status", "UNKNOWN", "phase", "INITIALIZING");
     objects = new TestObjects(config);
     currentAdapterId = config.db.adapterId;
     namespace = config.namespace;
@@ -264,22 +265,37 @@ public final class JdbcContext {
     return currentAdapterId;
   }
 
+  private static volatile Map<String, Object> lastCleanup = Map.of("status", "UNKNOWN",
+      "phase", "NOT_RECORDED");
+
+  public static Map<String, Object> cleanupEvidence() {
+    return lastCleanup;
+  }
+
+  public static void cleanupObjects() {
+    if (objects == null || dataSource == null) {
+      return;
+    }
+    try (Connection connection = getConnection()) {
+      objects.cleanup(connection);
+    } catch (SQLException exception) {
+      objects.cleanupUnavailable(exception);
+    }
+    lastCleanup = objects.cleanupEvidence();
+  }
+
   public static void shutdown() {
     if (dataSource == null) {
       return;
     }
-    if (objects != null) {
-      try (Connection connection = getConnection()) {
-        objects.cleanup(connection);
-      } catch (SQLException exception) {
-        System.err.println(
-            "[JDBC_CLEANUP_ISSUE] cleanup connection unavailable; consult object ledger");
-      }
+    try {
+      cleanupObjects();
+      closeDataSource(dataSource);
+    } finally {
+      dataSource = null;
+      namespace = null;
+      isolatedDriver = null;
     }
-    closeDataSource(dataSource);
-    dataSource = null;
-    namespace = null;
-    isolatedDriver = null;
   }
 
   public static void setIsolatedDriver(Driver driver) {

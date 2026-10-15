@@ -65,6 +65,27 @@ public class TestRunEntity {
   @Column(name = "driver_fingerprint_snapshot", length = 128)
   private String driverFingerprintSnapshot;
 
+  @Column(name = "cleanup_evidence", columnDefinition = "text")
+  private String cleanupEvidence;
+  @Column(name = "worker_termination_reason", length = 100)
+  private String workerTerminationReason;
+
+  public String getCleanupEvidence() {
+    return cleanupEvidence;
+  }
+
+  void setCleanupEvidence(String value) {
+    cleanupEvidence = value;
+  }
+
+  public String getWorkerTerminationReason() {
+    return workerTerminationReason;
+  }
+
+  void setWorkerTerminationReason(String value) {
+    workerTerminationReason = value;
+  }
+
   @Column(name = "execution_issues", columnDefinition = "text")
   private String executionIssues;
 

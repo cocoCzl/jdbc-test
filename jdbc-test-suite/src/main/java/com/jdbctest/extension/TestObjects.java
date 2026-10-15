@@ -148,7 +148,7 @@ public final class TestObjects {
       return count;
     } catch (SQLException exception) {
       entry.put("state", "UNKNOWN");
-      entry.put("sqlState", Objects.toString(exception.getSQLState(), ""));
+      entry.put("sqlState", safeSqlState(exception.getSQLState()));
       entry.put("vendorCode", exception.getErrorCode());
       persist();
       throw exception; // never DROP a collision or an uncertain CREATE
@@ -198,7 +198,7 @@ public final class TestObjects {
       entry.put("dependenciesState", "RECORDED");
     } catch (SQLException exception) {
       entry.put("dependenciesState", "UNKNOWN");
-      entry.put("dependenciesSqlState", Objects.toString(exception.getSQLState(), ""));
+      entry.put("dependenciesSqlState", safeSqlState(exception.getSQLState()));
     }
     entry.put("dependentObjects", dependents);
     persist();
@@ -252,15 +252,18 @@ public final class TestObjects {
       command =
           "DROP INDEX " + quote(name(logical)) + " ON " + qualified(entry.get("parent").toString());
     }
+    entry.put("cleanupAttempted", true);
     entry.put("state", "DROPPING");
     persist();
     try (Statement statement = connection.createStatement()) {
       statement.execute(command);
       entry.put("state", "DROPPED");
+      entry.put("cleanupStatus", "SUCCESS");
       persist();
     } catch (SQLException exception) {
       entry.put("state", "UNKNOWN");
-      entry.put("sqlState", Objects.toString(exception.getSQLState(), ""));
+      entry.put("cleanupStatus", "FAILED");
+      entry.put("sqlState", safeSqlState(exception.getSQLState()));
       entry.put("vendorCode", exception.getErrorCode());
       persist();
       throw exception;
@@ -268,6 +271,7 @@ public final class TestObjects {
   }
 
   public synchronized void cleanup(Connection connection) {
+    cleanupPerformed = true;
     List<String> keys = new ArrayList<>(journal.keySet());
     Collections.reverse(keys);
     for (String logical : keys) {
@@ -277,6 +281,44 @@ public final class TestObjects {
         System.err.println("[JDBC_CLEANUP_ISSUE] owned object retained: " + qualified(logical));
       }
     }
+  }
+
+  private boolean cleanupPerformed;
+  private Map<String, Object> connectionFailure;
+
+  public synchronized void cleanupUnavailable(SQLException error) {
+    cleanupPerformed = true;
+    connectionFailure = Map.of("phase", "CONNECTION", "sqlState",
+        safeSqlState(error.getSQLState()), "vendorCode", error.getErrorCode());
+    persist();
+  }
+
+  private static String safeSqlState(String state) {
+    return state != null && state.matches("[A-Za-z0-9]{5}") ? state : "";
+  }
+
+  public synchronized Map<String, Object> cleanupEvidence() {
+    var entries = snapshot();
+    long attempted = entries.stream().filter(row -> Boolean.TRUE.equals(row.get("cleanupAttempted")))
+        .count();
+    long deleted = entries.stream().filter(row -> "DROPPED".equals(row.get("state"))).count();
+    boolean failed = connectionFailure != null || entries.stream()
+        .anyMatch(row -> "FAILED".equals(row.get("cleanupStatus")));
+    var retained = entries.stream().filter(row -> !"DROPPED".equals(row.get("state"))).toList();
+    String status = failed ? "FAILED" : !cleanupPerformed ? "NOT_EXECUTED"
+        : !retained.isEmpty() || "UNKNOWN".equals(namespaceState) ? "UNKNOWN" : "SUCCESS";
+    Map<String, Object> result = new java.util.LinkedHashMap<>();
+    result.put("status", status);
+    result.put("phase", "OWNED_OBJECTS");
+    result.put("attempted", attempted);
+    result.put("confirmedDeleted", deleted);
+    result.put("retainedObjects", retained);
+    result.put("objects", entries);
+    result.put("namespace", Map.of("name", namespace, "state", namespaceState));
+    if (connectionFailure != null) {
+      result.put("error", connectionFailure);
+    }
+    return Map.copyOf(result);
   }
 
   public synchronized List<Map<String, Object>> snapshot() {

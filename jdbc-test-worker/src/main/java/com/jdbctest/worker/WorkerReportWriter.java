@@ -42,6 +42,7 @@ final class WorkerReportWriter {
     report.put("incomplete",
         evidence.started().stream().filter(id -> !completed.contains(id)).sorted().toList());
     report.put("issues", evidence.issues());
+    report.put("cleanupEvidence", evidence.cleanupEvidence());
     report.put("terminationReason", evidence.terminationReason());
     Path ledger = workspace.resolve("object-ledger.yaml");
     if (Files.isRegularFile(ledger)) {

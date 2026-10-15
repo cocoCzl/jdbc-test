@@ -143,7 +143,14 @@ export interface ExecutionAccounting {
   skipped: number; aborted: number; pending: number; running: number; notRun: number; incomplete: number;
   scenarios: { scenarioId: string; moduleId: string; state: string; startedAt: string | null; finishedAt: string | null }[];
 }
+export interface CleanupEvidence {
+  status: "SUCCESS" | "FAILED" | "UNKNOWN" | "NOT_EXECUTED";
+  attempted?: number;
+  confirmedDeleted?: number;
+  retainedObjects?: Record<string, unknown>[];
+}
 export interface Run {
+  cleanupEvidence?: CleanupEvidence;
   accounting?: ExecutionAccounting | null;
   executionScope?: { database?: string | null; schema?: string | null } | null;
   executionIssues?: Record<string, unknown>[];

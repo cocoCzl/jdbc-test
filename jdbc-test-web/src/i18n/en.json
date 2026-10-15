@@ -1,4 +1,11 @@
 {
+  "cleanup.label": "Cleanup evidence",
+  "cleanup.SUCCESS": "Confirmed complete",
+  "cleanup.FAILED": "Cleanup failed",
+  "cleanup.UNKNOWN": "Unknown / not recorded",
+  "cleanup.NOT_EXECUTED": "Not executed",
+  "cleanup.counts": "Attempts: {{attempted}} · Confirmed deleted: {{deleted}}",
+  "cleanup.retained": "Retained objects",
   "ui.dataSourceProviders": "Standard DataSource implementations (optional)",
   "ui.dataSourceProvidersHint": "Use classes from this driver package. Configuring an interface enables its JDBC tests; leaving it empty skips those tests. Enter bean property names, never credentials.",
   "ui.implementationClass": "Implementation class",
