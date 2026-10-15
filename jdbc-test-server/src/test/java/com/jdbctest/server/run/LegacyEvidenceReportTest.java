@@ -157,4 +157,84 @@ class LegacyEvidenceReportTest {
     assertEquals(raw, results.findById(row.getId()).orElseThrow().getExecutionEvidence());
     assertTrue(Files.readString(workspace.resolve("object-ledger.yaml")).contains("ReviewOnlyLegacyHead"));
   }
+
+  @Test
+  void oldSuccessRetainsCompletedWhileCleanupRemainsUnknown() throws Exception {
+    var run = legacyRun(TestRunStatus.SUCCEEDED);
+    result(run, TestCaseResultStatus.PASSED, "{}");
+    run.markWorkerReportValidated();
+    assertReason(run, "COMPLETED");
+  }
+
+  @Test
+  void oldTestFailureRetainsTestFailureWhileCleanupRemainsUnknown() throws Exception {
+    var run = legacyRun(TestRunStatus.FAILED);
+    result(run, TestCaseResultStatus.FAILED, "{}");
+    run.markWorkerReportValidated();
+    run.setFailureReason("WORKER_EXECUTION_FAILED");
+    assertReason(run, "TEST_FAILURE");
+  }
+
+  @Test
+  void oldContainerFailureRetainsContainerFailureWhileCleanupRemainsUnknown() throws Exception {
+    var run = legacyRun(TestRunStatus.FAILED);
+    run.markWorkerReportValidated();
+    run.setExecutionIssues("[{\"level\":\"CONTAINER\",\"message\":\"fixture failure\"}]");
+    run.setFailureReason("WORKER_EXECUTION_FAILED");
+    assertReason(run, "CONTAINER_FAILURE");
+  }
+
+  @Test
+  void oldNoTestsRetainsNoTestsExecutedWhileCleanupRemainsUnknown() throws Exception {
+    var run = legacyRun(TestRunStatus.FAILED);
+    run.markWorkerReportValidated();
+    run.setFailureReason("WORKER_EXECUTION_FAILED");
+    assertReason(run, "NO_TESTS_EXECUTED");
+  }
+
+  @Test
+  void oldCancelledTimeoutAndInterruptedRetainServerReasonsAndUnknownCleanup() throws Exception {
+    for (boolean validated : new boolean[] {false, true}) {
+      for (var status : new TestRunStatus[] {TestRunStatus.CANCELLED, TestRunStatus.FAILED,
+          TestRunStatus.INTERRUPTED}) {
+        var run = legacyRun(status);
+        String reason = status == TestRunStatus.CANCELLED ? "RUN_CANCELLED"
+            : status == TestRunStatus.FAILED ? "RUN_TIMEOUT" : "SERVER_RESTARTED";
+        run.setFailureReason(reason);
+        if (validated) {
+          run.markWorkerReportValidated();
+        }
+        assertReason(run, reason);
+      }
+    }
+  }
+
+  @Test
+  void newCleanupFailureKeepsPersistedWorkerReasonAheadOfGenericServerFailure() throws Exception {
+    var run = legacyRun(TestRunStatus.FAILED);
+    result(run, TestCaseResultStatus.PASSED, "{}");
+    run.markWorkerReportValidated();
+    run.setWorkerTerminationReason("CLEANUP_FAILURE");
+    run.setFailureReason("WORKER_EXECUTION_FAILED");
+    run.setCleanupEvidence("{\"status\":\"FAILED\",\"phase\":\"DROP\"}");
+    runs.save(run);
+    var json = report(run.getId());
+    assertEquals("CLEANUP_FAILURE", json.path("terminationReason").asString());
+    assertEquals("FAILED", json.path("cleanupEvidence").path("status").asString());
+    assertEquals(1, json.path("summary").path("passed").asInt());
+    assertEquals(0, json.path("summary").path("failed").asInt());
+  }
+
+  private void assertReason(TestRunEntity run, String expected) throws Exception {
+    assertNull(run.getWorkerTerminationReason(), "legacy column must remain absent");
+    runs.save(run);
+    var json = report(run.getId());
+    assertEquals(expected, json.path("terminationReason").asString());
+    assertEquals("UNKNOWN", json.path("cleanupEvidence").path("status").asString());
+    assertEquals("NOT_RECORDED", json.path("cleanupEvidence").path("phase").asString());
+    var stored = runs.findById(run.getId()).orElseThrow();
+    assertNull(stored.getWorkerTerminationReason());
+    assertNull(stored.getCleanupEvidence());
+  }
+
 }

@@ -365,8 +365,17 @@ final class TestRunService {
       report.put("source", "PERSISTED_WORKER_EVENTS");
       boolean validated = run.isWorkerReportValidated();
       var accounting = value.accounting();
-      String reason = validated && run.getWorkerTerminationReason() != null
-          ? run.getWorkerTerminationReason() : run.getFailureReason();
+      String reason = run.getWorkerTerminationReason();
+      if (reason == null) {
+        boolean serverTermination = run.getStatus() == TestRunStatus.CANCELLED
+            || run.getStatus() == TestRunStatus.INTERRUPTED
+            || "RUN_TIMEOUT".equals(run.getFailureReason());
+        // Legacy v2 records predate the persisted Worker reason; cleanup remains independent.
+        reason = !validated || serverTermination ? run.getFailureReason()
+            : !value.executionIssues().isEmpty() ? "CONTAINER_FAILURE"
+                : accounting.started() == 0 ? "NO_TESTS_EXECUTED"
+                    : accounting.failed() + accounting.aborted() > 0 ? "TEST_FAILURE" : "COMPLETED";
+      }
       report.put("cleanupEvidence", value.cleanupEvidence());
       report.put("runStatus", run.getStatus());
       report.put("terminationReason", reason);
