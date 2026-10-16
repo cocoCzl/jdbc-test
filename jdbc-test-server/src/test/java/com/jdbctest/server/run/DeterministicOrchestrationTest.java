@@ -670,6 +670,8 @@ class DeterministicOrchestrationTest {
         org.springframework.web.servlet.mvc.method.annotation.SseEmitter.class);
     org.mockito.Mockito.doThrow(new java.io.IOException("send failed")).when(broken).send(
         any(org.springframework.web.servlet.mvc.method.annotation.SseEmitter.SseEventBuilder.class));
+    org.mockito.Mockito.doThrow(new IllegalStateException("async context already failed"))
+        .when(broken).complete();
     emitters.get(id).add(broken);
     scheduler.enqueue(id);
     started(id);
@@ -686,6 +688,29 @@ class DeterministicOrchestrationTest {
     started(noSubscribers);
     done(noSubscribers, TestRunStatus.SUCCEEDED, null);
     assertFalse(emitters.containsKey(noSubscribers));
+  }
+
+  @Test
+  void completionFailureDoesNotPreventOtherSubscribersFromCompleting() {
+    UUID id = UUID.randomUUID();
+    var broken = org.mockito.Mockito.mock(
+        org.springframework.web.servlet.mvc.method.annotation.SseEmitter.class);
+    var survivor = org.mockito.Mockito.mock(
+        org.springframework.web.servlet.mvc.method.annotation.SseEmitter.class);
+    org.mockito.Mockito.doThrow(new IllegalStateException("async context already failed"))
+        .when(broken).complete();
+    // Reflection returns Object; the field declares this exact map type.
+    @SuppressWarnings("unchecked")
+    Map<UUID, CopyOnWriteArrayList<org.springframework.web.servlet.mvc.method.annotation.SseEmitter>> emitters =
+        (Map<UUID, CopyOnWriteArrayList<org.springframework.web.servlet.mvc.method.annotation.SseEmitter>>) org.springframework.test.util.ReflectionTestUtils.getField(
+            events, "emitters");
+    emitters.put(id, new CopyOnWriteArrayList<>(List.of(broken, survivor)));
+
+    assertDoesNotThrow(() -> events.complete(id));
+
+    org.mockito.Mockito.verify(broken).complete();
+    org.mockito.Mockito.verify(survivor).complete();
+    assertFalse(emitters.containsKey(id));
   }
 
   @Test

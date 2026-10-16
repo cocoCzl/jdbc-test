@@ -5,11 +5,15 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Component
 final class RunEventPublisher {
+
+  private static final Logger LOG = LoggerFactory.getLogger(RunEventPublisher.class);
 
   private final Map<UUID, CopyOnWriteArrayList<SseEmitter>> emitters = new ConcurrentHashMap<>();
 
@@ -38,7 +42,7 @@ final class RunEventPublisher {
     var values = emitters.remove(runId);
     if (values != null) {
       for (SseEmitter emitter : values) {
-        emitter.complete();
+        completeSubscriber(runId, emitter);
       }
     }
   }
@@ -48,7 +52,16 @@ final class RunEventPublisher {
       emitter.send(SseEmitter.event().name(name).data(body));
     } catch (IOException | IllegalStateException exception) {
       remove(runId, emitter);
+      completeSubscriber(runId, emitter);
+    }
+  }
+
+  private void completeSubscriber(UUID runId, SseEmitter emitter) {
+    try {
       emitter.complete();
+    } catch (IllegalStateException exception) {
+      // A failed servlet async context can also reject completion after send has failed.
+      LOG.debug("SSE subscriber was already unavailable while completing run {}", runId);
     }
   }
 
