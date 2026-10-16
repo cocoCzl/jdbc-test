@@ -26,6 +26,11 @@ final class DriverController {
         this.service = service;
     }
 
+    @GetMapping("/presets")
+    List<DriverPreset> presets() {
+        return DriverPreset.defaults();
+    }
+
     @PostMapping(consumes = "multipart/form-data")
     ResponseEntity<DriverResponse> create(
         @Valid @RequestPart("metadata") CreateDriverRequest metadata,

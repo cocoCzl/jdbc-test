@@ -2,11 +2,14 @@ import { queryString, request } from "./client";
 import type {
   Driver,
   DriverInput,
+  DriverPreset,
   DriverValidation,
   Page,
   PageParams,
 } from "@/types/api";
 export const driversApi = {
+  presets: (signal?: AbortSignal) =>
+    request<DriverPreset[]>("/drivers/presets", { signal }),
   list: (params: PageParams, signal?: AbortSignal) =>
     request<Page<Driver>>(`/drivers${queryString(params)}`, { signal }),
   get: (id: string, signal?: AbortSignal) =>
@@ -31,6 +34,7 @@ export const driversApi = {
 };
 export const driversKeys = {
   all: ["drivers"] as const,
+  presets: ["drivers", "presets"] as const,
   list: (params: PageParams) => ["drivers", "list", params] as const,
   detail: (id: string) => ["drivers", "detail", id] as const,
 };

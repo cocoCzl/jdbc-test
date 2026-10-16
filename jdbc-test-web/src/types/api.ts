@@ -31,6 +31,13 @@ export interface DriverSummary {
   version: string;
   status: DriverStatus;
 }
+export interface DriverPreset {
+  code: string;
+  nameKey: string;
+  vendor: string;
+  driverClass: string;
+  urlPrefix: string;
+}
 export interface DataSourceProvider {
   className: string;
   urlProperty?: string;

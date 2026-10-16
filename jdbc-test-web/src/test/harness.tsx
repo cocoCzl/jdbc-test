@@ -9,6 +9,7 @@ import {
   catalog,
   connection,
   driver,
+  driverPresets,
   finishedRun,
   page,
   probe,
@@ -44,6 +45,7 @@ export function mockApi(handler?: Handler) {
       if (url.pathname === "/api/adapters") return json(adapters);
       if (url.pathname === "/api/test-catalog") return json(catalog);
       if (url.pathname === "/api/drivers") return json(page([driver]));
+      if (url.pathname === "/api/drivers/presets") return json(driverPresets);
       if (url.pathname === "/api/drivers/driver-1") return json(driver);
       if (url.pathname === "/api/connections") return json(page([connection]));
       if (url.pathname === "/api/connections/connection-1")

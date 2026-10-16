@@ -3,7 +3,7 @@ import { Select } from "@/components/ui/select";
 import { t } from "i18next";
 import { useTranslation } from "react-i18next";
 import { useRef, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { FileArchive, UploadCloud, X } from "lucide-react";
 import { toast } from "sonner";
@@ -14,13 +14,25 @@ import { Field, FormError, PageHeader } from "@/components/common";
 import { formatBytes } from "@/lib/format";
 import { validateFiles } from "@/lib/driver-upload";
 import { DataSourceFields } from "./data-source-fields";
-import type { DataSourceProviders } from "@/types/api";
+import type { DataSourceProviders, DriverPreset } from "@/types/api";
+
+const presetFields = ["vendor", "driverClass", "urlPrefix"] as const;
+type PresetField = (typeof presetFields)[number];
 
 export default function DriverForm() {
   useTranslation();
   const navigate = useNavigate();
   const client = useQueryClient();
   const uploadInput = useRef<HTMLInputElement>(null);
+  // An explicit edit (including clearing or choosing a candidate) gives the user ownership.
+  const editedFields = useRef(new Set<PresetField>());
+  const [presetCode, setPresetCode] = useState("");
+  const presets = useQuery({
+    queryKey: driversKeys.presets,
+    queryFn: ({ signal }) => driversApi.presets(signal),
+    retry: false,
+  });
+  const selectedPreset = presets.data?.find((preset) => preset.code === presetCode);
   const [form, setForm] = useState({
     name: "",
     vendor: "",
@@ -61,8 +73,21 @@ export default function DriverForm() {
         );
     },
   });
-  const change = (key: keyof typeof form, value: string) =>
+  const change = (key: keyof typeof form, value: string) => {
+    if (key === "vendor" || key === "driverClass" || key === "urlPrefix")
+      editedFields.current.add(key);
     setForm((previous) => ({ ...previous, [key]: value }));
+  };
+  const applyPreset = (preset: DriverPreset, restore = false) => {
+    // Capture ownership before scheduling the update; the updater stays pure.
+    const fields = presetFields.filter((key) => restore || !editedFields.current.has(key));
+    if (restore) editedFields.current.clear();
+    setForm((previous) => {
+      const next = { ...previous };
+      for (const key of fields) next[key] = preset[key];
+      return next;
+    });
+  };
   return (
     <>
       <PageHeader
@@ -81,6 +106,34 @@ export default function DriverForm() {
         <div className="space-y-6">
           <Card as="section" className="panel">
             <h2 className="mb-5 text-lg font-semibold">{t("ui.packageIdentity")}</h2>
+            <div className="mb-5 space-y-3">
+              <Field id="driver-preset" label={t("driverPreset.label")}
+                hint={t("driverPreset.hint")}>
+                <Select id="driver-preset" value={presetCode}
+                  disabled={!presets.data?.length}
+                  onValueChange={(code) => {
+                    setPresetCode(code);
+                    const preset = presets.data?.find((item) => item.code === code);
+                    if (preset) applyPreset(preset);
+                  }}>
+                  <option value="" disabled>{t("driverPreset.placeholder")}</option>
+                  {presets.data?.map((preset) => (
+                    <option key={preset.code} value={preset.code}>{t(preset.nameKey)}</option>
+                  ))}
+                </Select>
+              </Field>
+              {selectedPreset ? (
+                <Button type="button" variant="outline" size="sm"
+                  onClick={() => applyPreset(selectedPreset, true)}>
+                  {t("driverPreset.restore")}
+                </Button>
+              ) : null}
+              {presets.isError ? (
+                <p role="status" className="text-sm text-muted-foreground">
+                  {t("driverPreset.loadFailed")}
+                </p>
+              ) : null}
+            </div>
             <div className="grid gap-5 sm:grid-cols-2">
               <Field
                 label={t("ui.name")}
@@ -115,7 +168,7 @@ export default function DriverForm() {
                 maxLength={200}
                 value={form.urlPrefix}
                 onChange={(event) => change("urlPrefix", event.target.value)}
-                placeholder="jdbc:postgresql:"
+                hint={t("driverPreset.urlPrefixHint")}
               />
               <div className="sm:col-span-2">
                 <Field
@@ -126,8 +179,7 @@ export default function DriverForm() {
                   onChange={(event) =>
                     change("driverClass", event.target.value)
                   }
-                  hint={t("ui.leaveEmptyToDiscoverTheClassFrom")}
-                  placeholder="org.postgresql.Driver"
+                  hint={t("driverPreset.driverClassHint")}
                 />
               </div>
             </div>

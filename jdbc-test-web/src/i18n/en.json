@@ -561,5 +561,17 @@
   "adapter.driverValidationBoundary": "Driver validation checks class loading. Target probing and JDBC scenarios provide separate compatibility evidence; vendor names do not restrict your driver choice.",
   "adapter.databaseOptional": "This adapter does not require a database scope; authorize the existing test schema.",
   "adapter.databaseRequired": "Required for this execution scope. Use only a dedicated, authorized test database.",
-  "adapter.schemaOptional": "Catalog scope uses the database above; leave blank or use the same name."
+  "adapter.schemaOptional": "Catalog scope uses the database above; leave blank or use the same name.",
+  "driverPreset.label": "Driver preset",
+  "driverPreset.placeholder": "Select a driver preset",
+  "driverPreset.hint": "Optional suggestions only; choosing a preset does not verify driver compatibility.",
+  "driverPreset.restore": "Restore current preset defaults",
+  "driverPreset.loadFailed": "Driver presets could not be loaded. You can still fill in the fields and upload manually.",
+  "driverPreset.driverClassHint": "Preset suggestions are editable. Clear this field to try discovery from JAR service metadata.",
+  "driverPreset.urlPrefixHint": "Preset suggestions are editable. Enter the protocol prefix required by your driver.",
+  "driverPreset.postgresql": "PostgreSQL",
+  "driverPreset.mysql": "MySQL",
+  "driverPreset.oracle": "Oracle",
+  "driverPreset.sqlserver": "SQL Server",
+  "driverPreset.custom": "Custom"
 }

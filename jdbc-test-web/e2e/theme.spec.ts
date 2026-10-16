@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { adapters, catalog, connection, driver, finishedRun, run, result, page as paged } from "../src/test/fixtures";
+import { adapters, catalog, connection, driver, driverPresets, finishedRun, run, result, page as paged } from "../src/test/fixtures";
 import { chooseOption } from "./select";
 
 // Every API is intercepted. These fixtures never run JDBC or contact the backend.
@@ -24,6 +24,7 @@ async function fixtures(page: Page) {
     requests.push(url.pathname+url.search);
     const path = url.pathname;
     const body = path === "/api/test-catalog" ? catalog : path === "/api/adapters" ? adapters
+      : path === "/api/drivers/presets" ? driverPresets
       : path === "/api/drivers" ? paged([driver]) : path === "/api/drivers/driver-1" ? driver
       : path === "/api/connections" ? paged([{...connection,jdbcUrl:oracle}]) : path === "/api/connections/connection-1" ? connection
       : path === "/api/runs" ? paged([history],{page:Number(url.searchParams.get("page")),totalPages:2,totalElements:21})

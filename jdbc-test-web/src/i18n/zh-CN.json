@@ -556,5 +556,17 @@
   "adapter.driverValidationBoundary": "驱动验证检查类加载。目标探测和 JDBC 场景分别提供兼容性证据；驱动 vendor 名称不会限制选择。",
   "adapter.databaseOptional": "此适配不要求 database 范围；请授权已有测试 schema。",
   "adapter.databaseRequired": "此执行范围需要指定数据库；仅使用已授权的专用测试数据库。",
-  "adapter.schemaOptional": "catalog 范围使用上方数据库；此处可留空或填写相同名称。"
+  "adapter.schemaOptional": "catalog 范围使用上方数据库；此处可留空或填写相同名称。",
+  "driverPreset.label": "驱动预设",
+  "driverPreset.placeholder": "请选择驱动预设",
+  "driverPreset.hint": "预设仅用于辅助填写，不代表驱动兼容性已验证。",
+  "driverPreset.restore": "恢复当前预设默认值",
+  "driverPreset.loadFailed": "驱动预设加载失败，仍可手动填写并上传。",
+  "driverPreset.driverClassHint": "根据预设填入，可按实际驱动修改；清空后尝试从 JAR 服务元数据自动发现。",
+  "driverPreset.urlPrefixHint": "根据预设填入，可按实际驱动修改；请填写驱动要求的协议前缀。",
+  "driverPreset.postgresql": "PostgreSQL",
+  "driverPreset.mysql": "MySQL",
+  "driverPreset.oracle": "Oracle",
+  "driverPreset.sqlserver": "SQL Server",
+  "driverPreset.custom": "自定义"
 }

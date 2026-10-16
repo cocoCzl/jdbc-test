@@ -5,6 +5,7 @@ import {
   catalog,
   connection,
   driver,
+  driverPresets,
   finishedRun,
   page as paged,
   probe,
@@ -93,6 +94,7 @@ test("API-mocked browser flow: upload → connection → Custom Statement → re
       const method = route.request().method();
       if (path === "/api/drivers")
         body = method === "POST" ? driver : paged([driver]);
+      else if (path === "/api/drivers/presets") body = driverPresets;
       else if (path.endsWith("/validate"))
         body = {
           status: "VALIDATED",
@@ -264,4 +266,49 @@ test("TEST FIXTURE ONLY: adapter declarations, filtered deep link and empty save
   await page.screenshot({path: "test-results/fixture-adapter-filter-mobile.png", fullPage: true});
   await page.getByRole("button", {name: "Clear adapter filter"}).click();
   await expect(page.getByRole("radio", {name: connection.name})).toBeChecked();
+});
+
+
+test("TEST FIXTURE ONLY: bilingual driver presets preserve edits and render at desktop/mobile widths", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.route("**/api/drivers/presets", (route) => route.fulfill({ json: driverPresets }));
+  for (const locale of ["en", "zh-CN"]) {
+    await page.addInitScript((language) => localStorage.setItem("jdbc-test.locale", language), locale);
+    await page.goto("/drivers/new");
+    const chinese = locale === "zh-CN";
+    const preset = page.getByLabel(chinese ? "驱动预设" : "Driver preset", { exact: true });
+    const vendor = page.getByLabel(chinese ? "厂商" : "Vendor", { exact: true });
+    const driverClass = page.locator("#driver-class");
+    const prefix = page.locator("#driver-prefix");
+    await chooseOption(page, preset, "postgresql");
+    await expect(vendor).toHaveValue("PostgreSQL");
+    await expect(driverClass).toHaveValue("org.postgresql.Driver");
+    await expect(prefix).toHaveValue("jdbc:postgresql:");
+    await driverClass.fill("");
+    await prefix.fill("jdbc:private:");
+    await chooseOption(page, preset, "mysql");
+    await expect(vendor).toHaveValue("MySQL");
+    await expect(driverClass).toHaveValue("");
+    await expect(prefix).toHaveValue("jdbc:private:");
+    await chooseOption(page, preset, "custom");
+    await expect(vendor).toHaveValue("");
+    await expect(prefix).toHaveValue("jdbc:private:");
+    await chooseOption(page, preset, "oracle");
+    await page.getByRole("button", { name: chinese ? "恢复当前预设默认值" : "Restore current preset defaults" }).click();
+    await expect(driverClass).toHaveValue("oracle.jdbc.OracleDriver");
+    await expect(prefix).toHaveValue("jdbc:oracle:");
+    await expect(page.locator("#driver-name")).toHaveValue("");
+    await expect(page.locator("#driver-version")).toHaveValue("");
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await expect(page.getByRole("heading", { name: chinese ? "添加驱动" : "Add a driver", exact: true })).toBeVisible();
+      await expect(preset).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      await page.screenshot({ path: `test-results/fixture-driver-presets-${locale}-${width}.png`, fullPage: true });
+    }
+  }
+  expect(errors).toEqual([]);
 });

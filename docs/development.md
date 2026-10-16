@@ -250,10 +250,26 @@ Lists use bounded `page`/`size` pagination (default 20, maximum 100), sort allow
 | Method | Endpoint | Purpose |
 |---|---|---|
 | POST / GET | `/api/drivers` | Upload / list packages |
+| GET | `/api/drivers/presets` | Optional form suggestions |
 | GET / PATCH / DELETE | `/api/drivers/{id}` | Read / edit metadata / delete |
 | POST | `/api/drivers/{id}/validate` | Validate using Worker |
 
 Upload multipart `metadata` JSON and repeated `files` parts. Defaults: 20 artifacts, 100 MiB each, 250 MiB total. Binaries are immutable; upload a new package to replace them. Server reads JAR metadata/SPI only; ambiguous or absent SPI requires explicit `driverClass`.
+
+The new-driver form reads the immutable preset list from `GET /api/drivers/presets` (the same API
+access policy as other driver routes). Each item contains `code`, `nameKey`, `vendor`, `driverClass`
+and `urlPrefix`; custom has empty defaults. Presets only suggest form values, without persisting a
+preset selection or changing adapters, SQL dialects, validation status or database capabilities.
+Vendor remains a free-form issuer label, and URL prefix remains optional package metadata.
+Each of these three fields tracks explicit user edits, including clearing and selecting an SPI
+candidate. Switching presets updates only unedited fields; restoring defaults explicitly returns all
+three fields to preset control. Preset loading failures leave manual upload available.
+
+Adapter `driver.class` and source metadata describe a recommended/validated adapter combination
+(and CLI preparation inputs). Driver presets are independent form suggestions; a saved package's
+actual class and artifacts govern Worker execution. Custom drivers can use an adapter with an
+implemented compatible dialect. `GENERIC` retains only its legacy fallback role. Existing packages
+and the metadata editor are never inferred from presets or migrated.
 
 Files live at `<data-dir>/drivers/<driver-id>/<artifact-id>.jar`; user filenames are display metadata. Each artifact has size and SHA-256; the package fingerprint hashes sorted artifact digests joined by a newline. Duplicate packages return `DRIVER_PACKAGE_ALREADY_EXISTS`. Class edits reset validation. Worker validation loads the class but does not connect, with a default 30-second timeout. Used packages return `DRIVER_IN_USE` on deletion. Driver sort fields: `name`, `vendor`, `version`, `status`, `createdAt`.
 

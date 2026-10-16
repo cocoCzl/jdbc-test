@@ -4,10 +4,20 @@ import type {
   Catalog,
   Connection,
   Driver,
+  DriverPreset,
   Page,
   Probe,
   Run,
 } from "@/types/api";
+
+// API fixtures only; production form defaults come from the server.
+export const driverPresets: DriverPreset[] = [
+  { code: "postgresql", nameKey: "driverPreset.postgresql", vendor: "PostgreSQL", driverClass: "org.postgresql.Driver", urlPrefix: "jdbc:postgresql:" },
+  { code: "mysql", nameKey: "driverPreset.mysql", vendor: "MySQL", driverClass: "com.mysql.cj.jdbc.Driver", urlPrefix: "jdbc:mysql:" },
+  { code: "oracle", nameKey: "driverPreset.oracle", vendor: "Oracle", driverClass: "oracle.jdbc.OracleDriver", urlPrefix: "jdbc:oracle:" },
+  { code: "sqlserver", nameKey: "driverPreset.sqlserver", vendor: "Microsoft", driverClass: "com.microsoft.sqlserver.jdbc.SQLServerDriver", urlPrefix: "jdbc:sqlserver:" },
+  { code: "custom", nameKey: "driverPreset.custom", vendor: "", driverClass: "", urlPrefix: "" },
+];
 
 export const driver: Driver = {
   id: "driver-1",
