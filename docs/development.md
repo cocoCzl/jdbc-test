@@ -488,9 +488,9 @@ Events include `RUN_STARTED`, `MODULE_STARTED`, `CASE_STARTED`, `CASE_FINISHED`,
    existing authorized schema and does not create/drop the schema automatically. Runs use the
    existing consent, unique object prefixes, ownership ledger and cleanup mechanisms.
 5. Probe the connection before running tests. The current page's **Custom** selection operates at
-   module level, so it cannot reproduce precisely the documented 20-scenario trial. Exact selection is
+   module level. Exact scenario selection is
    available through the existing run API (`profile: "CUSTOM"`, `modules: []`, `includeScenarios`
-   containing the listed IDs) or Worker selection (`profile: "FULL"`, `includeScenarios`). Module
+   containing the intended catalog IDs) or Worker selection (`profile: "FULL"`, `includeScenarios`). Module
    selections, default CORE and full profiles include additional, unqualified cases; the initial
    broader trial timed out. Inspect metadata and cleanup evidence, not just validation status or
    `acceptsURL`.
@@ -589,12 +589,11 @@ logic, subset-filtered/non-full runs are `diagnostic_run` and yield `evaluation_
 Worker protocol-2 PASSED for selected cases is not itself that full compatibility conclusion.
 
 Therefore `validated_combinations` stays empty, `trust` stays candidate, and no supported version
-range is added. The two explicitly requested sanitized partial records use the existing adapter
-`evidence/` location, linked by descriptive qualification extensions and the execution-safety documentation;
-they are **not** validated-combination registrations. This is no general relaxation of the policy
-against committing raw logs, credentials, internal addresses or local audit archives. The records
-allowlist IDs, results, durations, version facts and method names; no private URLs, schema names,
-usernames, credentials or driver bytecode are included.
+range is added. Detailed trial reports and diagnostics belong in ignored local storage, not
+adapter manifests or committed resources. For normal platform tasks, Server persists case results
+and execution evidence in platform PostgreSQL; original Worker reports and ownership ledgers also
+use the local run workspace. Direct Worker diagnostics bypass that persistence and must not be
+represented as historical platform tasks by manually inserting incomplete results.
 
 - [V9 JDBC overview and version discovery](https://help.kingbase.com.cn/v9/development/client-interfaces/jdbc/jdbc-1.html)
 - [V9 JDBC loading and connection URLs](https://help.kingbase.com.cn/v9/development/client-interfaces/jdbc/jdbc-2.html)
@@ -602,7 +601,7 @@ usernames, credentials or driver bytecode are included.
 
 These are documentation references for the scoped decision, not test evidence for unexecuted SQL.
 
-Results and the 20-case table are in [Execution safety](execution-safety.md#kingbasees-candidate-observations).
+Qualification boundaries are in [Execution safety](execution-safety.md#kingbasees-candidate-observations). Detailed trial reports remain local.
 
 ## Testing
 

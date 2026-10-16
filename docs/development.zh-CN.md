@@ -421,9 +421,9 @@ Server 在加载目录和每次执行前检查协议版本。版本不匹配时�
 
 适配器的 `driver.source=local-drivers/kingbase` 用于 CLI 本地解析；Web/Server 使用选中的上传包，通过隔离 Worker 加载。普通构建不需要私有 JAR，不加入全局 classpath、不推断 Maven 坐标。身份要求 `^KingbaseES$` / `^Kingbase8 JDBC Driver$`，版本范围为空表示没有已确认边界，不能视为支持所有版本。
 
-有限验证不能填入 `validated_combinations`：现有校验器只检查版本与 evidence 路径结构，未定义部分认证范围；v1 对子集运行判为 `diagnostic_run` / `evaluation_inconclusive`。因此仍为 candidate、组合列表为空。按本次明确要求，仅将脱敏部分结果保存在已有适配器 evidence 目录；不保留凭据、内部地址或原始敏感日志。
+有限验证不能填入 `validated_combinations`：现有校验器只检查版本与 evidence 路径结构，未定义部分认证范围；v1 对子集运行判为 `diagnostic_run` / `evaluation_inconclusive`。因此仍为 candidate、组合列表为空。逐项验证报告与诊断记录仅留在 Git 忽略的本地目录，不作为适配器资源提交。平台正常任务由 Server 将结果与执行证据保存到平台 PostgreSQL，原始报告和所有权日志也涉及本地运行目录。独立 Worker 诊断绕过 Server 持久化，不手工补写为历史平台任务。
 
-版本来源、官方参考及可复现的单项诊断命令见[英文开发说明](development.md#kingbasees-candidate-setup)；准确组合、逐项结果与超时结论见[执行安全](execution-safety.zh-CN.md#kingbasees-候选验证)。诊断使用测试源码中的隔离加载工具，从私有连接请求 stdin 读取，须限制外层进程期限，运行后删除临时凭据文件并清理自建测试资源。
+版本来源、官方参考及可复现的单项诊断命令见[英文开发说明](development.md#kingbasees-candidate-setup)；适配范围与超时结论见[执行安全](execution-safety.zh-CN.md#kingbasees-候选验证)。诊断使用测试源码中的隔离加载工具，从私有连接请求 stdin 读取，须限制外层进程期限，运行后删除临时凭据文件并清理自建测试资源。
 
 ## 测试
 

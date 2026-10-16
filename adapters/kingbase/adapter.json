@@ -103,9 +103,7 @@
   "qualification_note_key": "adapter.kingbaseQualification",
   "qualification": {
     "scope": "Only the observed combination: server V009R002C016, database_mode=oracle, JDBC database version 12.1, driver declaration V008R006B0001. Limited trials, not full CORE qualification; other builds and modes unqualified. See docs/execution-safety.md#kingbasees-candidate-observations.",
-    "partial_validation_record": "evidence/v9-oracle-partial-20261016.json",
-    "timeout_diagnostic_record": "evidence/v9-oracle-type-info-20261016.json",
-    "timeout_note": "The initial CORE run exhausted its shared 90-second Worker execution budget. It reached get_type_info after about 80.47 seconds. A separate original-scenario run passed in 35.024 seconds; read-only instrumentation located about 35.84 seconds inside the first getTypeInfo call, with quick traversal/close and a warm second call. No full CORE pass or platform defect established; no timeout, case selection policy or capability gate changed to hide the result.",
+    "timeout_note": "The initial CORE run exhausted its shared Worker execution and cleanup budget. Narrow reproduction observed a costly initial getTypeInfo call and the original scenario completed in isolation. No full CORE pass or platform, driver or database defect established. Detailed reports remain local; no global timeout, scenario skipping policy or capability gate changed to hide the result.",
     "capability_policy": "Booleans are scenario execution gates. True enables candidate assessment, not a compatibility guarantee. False disables unqualified scenarios, not a finding of missing database support.",
     "asset_policy": "PostgreSQL assets are trial inputs for the scoped JDBC scenarios, not a claim that all PostgreSQL SQL is compatible. Callable, array, LOB, XML and rowset groups remain disabled.",
     "version_policy": "No supported version interval asserted. JDBC database version 12.1, server build V009R002C016, Manifest/metadata driver version V008R006B0001 and Driver major/minor 0.0 are distinct observations.",
