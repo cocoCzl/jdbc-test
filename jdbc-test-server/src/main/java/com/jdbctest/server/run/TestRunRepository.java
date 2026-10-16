@@ -8,23 +8,23 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface TestRunRepository extends JpaRepository<TestRunEntity, UUID> {
 
-  @org.springframework.data.jpa.repository.Query("select run from TestRunEntity run where run.status = :status")
-  Page<TestRunEntity> findByStatus(
-      @org.springframework.data.repository.query.Param("status") TestRunStatus status,
-      Pageable pageable);
+    @org.springframework.data.jpa.repository.Query("select run from TestRunEntity run where run.status = :status")
+    Page<TestRunEntity> findByStatus(
+        @org.springframework.data.repository.query.Param("status") TestRunStatus status,
+        Pageable pageable);
 
-  @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
-  @org.springframework.data.jpa.repository.Query("select run from TestRunEntity run where run.id = :id")
-  java.util.Optional<TestRunEntity> findForUpdate(
-      @org.springframework.data.repository.query.Param("id") UUID id);
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select run from TestRunEntity run where run.id = :id")
+    java.util.Optional<TestRunEntity> findForUpdate(
+        @org.springframework.data.repository.query.Param("id") UUID id);
 
-  long countByDriver_Id(UUID driverId);
+    long countByDriver_Id(UUID driverId);
 
-  long countByConnection_Id(UUID connectionId);
+    long countByConnection_Id(UUID connectionId);
 
-  List<TestRunEntity> findByStatusIn(List<TestRunStatus> statuses);
+    List<TestRunEntity> findByStatusIn(List<TestRunStatus> statuses);
 
-  @org.springframework.data.jpa.repository.Query("select run.id from TestRunEntity run where run.status in :statuses")
-  List<UUID> findIdsByStatusIn(
-      @org.springframework.data.repository.query.Param("statuses") List<TestRunStatus> statuses);
+    @org.springframework.data.jpa.repository.Query("select run.id from TestRunEntity run where run.status in :statuses")
+    List<UUID> findIdsByStatusIn(
+        @org.springframework.data.repository.query.Param("statuses") List<TestRunStatus> statuses);
 }

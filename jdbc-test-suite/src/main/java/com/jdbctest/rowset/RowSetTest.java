@@ -22,211 +22,213 @@ import org.junit.jupiter.api.extension.ExtendWith;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class RowSetTest {
 
-  private static boolean isOracle() {
-    return ConfigLoader.load().db.isDialect("oracle");
-  }
-
-  private String getJdbcUrl() {
-    var config = ConfigLoader.load();
-    return config.db.getJdbcUrl();
-  }
-
-  private String getUsername() {
-    return ConfigLoader.load().db.username;
-  }
-
-  private String getPassword() {
-    return ConfigLoader.load().db.password;
-  }
-
-  private void setupRowSet(JdbcRowSet rowSet, String sql) throws SQLException {
-    System.setProperty(javax.naming.Context.INITIAL_CONTEXT_FACTORY,
-        com.jdbctest.extension.RowSetContextFactory.class.getName());
-    rowSet.setUrl(getJdbcUrl());
-    rowSet.setUsername(getUsername());
-    rowSet.setPassword(getPassword());
-    rowSet.setCommand(qualifyRowSetTable(sql));
-    rowSet.setDataSourceName("jdbc-test/run");
-  }
-
-  private String qualifyRowSetTable(String sql) {
-    return JdbcContext.sql(sql);
-  }
-
-  @Test
-  @Order(1)
-  @DisplayName("创建 JdbcRowSet")
-  void testCreateJdbcRowSet() throws SQLException {
-    try (JdbcRowSet rowSet = RowSetProvider.newFactory().createJdbcRowSet()) {
-      assertNotNull(rowSet, "JdbcRowSet 不应为 null");
+    private static boolean isOracle() {
+        return ConfigLoader.load().db.isDialect("oracle");
     }
-  }
 
-  @Test
-  @Order(2)
-  @DisplayName("设置 URL、用户名、密码和 SQL 命令")
-  void testSetProperties(Connection conn) throws SQLException {
-    try (JdbcRowSet rowSet = RowSetProvider.newFactory().createJdbcRowSet()) {
-      setupRowSet(rowSet, JdbcContext.sql("SELECT * FROM {{rowset_test}}"));
-
-      // Test the real URL property independently; execution below uses the scoped JNDI DataSource.
-      rowSet.setUrl(getJdbcUrl());
-      assertEquals(getJdbcUrl(), rowSet.getUrl());
-      rowSet.setDataSourceName("jdbc-test/run");
-      assertEquals(qualifyRowSetTable(JdbcContext.sql("SELECT * FROM {{rowset_test}}")),
-          rowSet.getCommand());
+    private String getJdbcUrl() {
+        var config = ConfigLoader.load();
+        return config.db.getJdbcUrl();
     }
-  }
 
-  @Test
-  @Order(3)
-  @DisplayName("execute 执行查询并遍历")
-  void testExecuteAndNavigate() throws SQLException {
-    try (JdbcRowSet rowSet = RowSetProvider.newFactory().createJdbcRowSet()) {
-      setupRowSet(rowSet, JdbcContext.sql("SELECT * FROM {{rowset_test}}"));
-
-      rowSet.execute();
-      assertNotNull(rowSet);
-
-      int count = 0;
-      while (rowSet.next()) {
-        count++;
-        assertNotNull(rowSet.getString("name"), "name 不应为 null");
-      }
-      assertTrue(count >= 3, "应有至少 3 行数据");
+    private String getUsername() {
+        return ConfigLoader.load().db.username;
     }
-  }
 
-  @Test
-  @Order(4)
-  @DisplayName("first / last 导航")
-  void testFirstLast(Connection conn) throws SQLException {
-    try (JdbcRowSet rowSet = RowSetProvider.newFactory().createJdbcRowSet()) {
-      setupRowSet(rowSet, JdbcContext.sql("SELECT * FROM {{rowset_test}}"));
-
-      rowSet.execute();
-      assertTrue(rowSet.first(), "first() 应成功");
-      assertTrue(rowSet.getInt("id") > 0, "第一行的 id 应大于 0");
-
-      assertTrue(rowSet.last(), "last() 应成功");
+    private String getPassword() {
+        return ConfigLoader.load().db.password;
     }
-  }
 
-  @Test
-  @Order(5)
-  @DisplayName("absolute 绝对定位")
-  void testAbsolute(Connection conn) throws SQLException {
-    try (JdbcRowSet rowSet = RowSetProvider.newFactory().createJdbcRowSet()) {
-      setupRowSet(rowSet, JdbcContext.sql("SELECT * FROM {{rowset_test}}"));
-
-      rowSet.execute();
-      assertTrue(rowSet.absolute(2), "absolute(2) 应成功");
+    private void setupRowSet(JdbcRowSet rowSet, String sql) throws SQLException {
+        System.setProperty(javax.naming.Context.INITIAL_CONTEXT_FACTORY,
+            com.jdbctest.extension.RowSetContextFactory.class.getName());
+        rowSet.setUrl(getJdbcUrl());
+        rowSet.setUsername(getUsername());
+        rowSet.setPassword(getPassword());
+        rowSet.setCommand(qualifyRowSetTable(sql));
+        rowSet.setDataSourceName("jdbc-test/run");
     }
-  }
 
-  @Test
-  @Order(6)
-  @DisplayName("updateString / updateRow 更新数据")
-  void testUpdateRow(Connection conn) throws SQLException {
-    if (isOracle()) {
-      return;
+    private String qualifyRowSetTable(String sql) {
+        return JdbcContext.sql(sql);
     }
-    try (JdbcRowSet rowSet = RowSetProvider.newFactory().createJdbcRowSet()) {
-      setupRowSet(rowSet, JdbcContext.sql("SELECT * FROM {{rowset_test}}"));
 
-      rowSet.execute();
-      assertTrue(rowSet.first());
-
-      String originalName = rowSet.getString("name");
-      rowSet.updateString("name", "RowSet更新测试");
-      rowSet.updateRow();
-
-      // 验证更新
-      rowSet.beforeFirst();
-      boolean found = false;
-      while (rowSet.next()) {
-        if ("RowSet更新测试".equals(rowSet.getString("name"))) {
-          found = true;
-          break;
+    @Test
+    @Order(1)
+    @DisplayName("创建 JdbcRowSet")
+    void testCreateJdbcRowSet() throws SQLException {
+        try (JdbcRowSet rowSet = RowSetProvider.newFactory().createJdbcRowSet()) {
+            assertNotNull(rowSet, "JdbcRowSet 不应为 null");
         }
-      }
-      assertTrue(found, "更新后的数据应可查询到");
-
-      // 恢复
-      rowSet.absolute(1);
-      rowSet.updateString("name", originalName);
-      rowSet.updateRow();
-    }
-  }
-
-  @Test
-  @Order(7)
-  @DisplayName("insertRow 插入数据")
-  void testInsertRow(Connection conn) throws SQLException {
-    if (isOracle()) {
-      return;
-    }
-    try (JdbcRowSet rowSet = RowSetProvider.newFactory().createJdbcRowSet()) {
-      setupRowSet(rowSet, JdbcContext.sql("SELECT * FROM {{rowset_test}}"));
-
-      rowSet.execute();
-      rowSet.moveToInsertRow();
-      rowSet.updateString("name", "RowSet插入");
-      rowSet.updateInt("value", 666);
-      rowSet.insertRow();
-      rowSet.moveToCurrentRow();
     }
 
-    // 验证插入
-    try (Statement stmt = conn.createStatement();
-        ResultSet rs = stmt.executeQuery(
-            JdbcContext.sql("SELECT COUNT(*) FROM {{rowset_test}} WHERE name = 'RowSet插入'"))) {
-      assertTrue(rs.next());
-      assertEquals(1, rs.getInt(1));
-    }
-  }
+    @Test
+    @Order(2)
+    @DisplayName("设置 URL、用户名、密码和 SQL 命令")
+    void testSetProperties(Connection conn) throws SQLException {
+        try (JdbcRowSet rowSet = RowSetProvider.newFactory().createJdbcRowSet()) {
+            setupRowSet(rowSet, JdbcContext.sql("SELECT * FROM {{rowset_test}}"));
 
-  @Test
-  @Order(8)
-  @DisplayName("deleteRow 删除数据")
-  void testDeleteRow(Connection conn) throws SQLException {
-    if (isOracle()) {
-      return;
-    }
-    // 先插入一条测试数据
-    try (JdbcRowSet insertRs = RowSetProvider.newFactory().createJdbcRowSet()) {
-      setupRowSet(insertRs, JdbcContext.sql("SELECT id, name, value FROM {{rowset_test}}"));
-      insertRs.execute();
-      insertRs.moveToInsertRow();
-      insertRs.updateString("name", "待删除行");
-      insertRs.updateInt("value", 888);
-      insertRs.insertRow();
+            // Test the real URL property independently; execution below uses the scoped JNDI DataSource.
+            rowSet.setUrl(getJdbcUrl());
+            assertEquals(getJdbcUrl(), rowSet.getUrl());
+            rowSet.setDataSourceName("jdbc-test/run");
+            assertEquals(qualifyRowSetTable(JdbcContext.sql("SELECT * FROM {{rowset_test}}")),
+                rowSet.getCommand());
+        }
     }
 
-    // 删除刚插入的行
-    try (JdbcRowSet rowSet = RowSetProvider.newFactory().createJdbcRowSet()) {
-      setupRowSet(rowSet, JdbcContext.sql("SELECT * FROM {{rowset_test}} WHERE name = '待删除行'"));
-      rowSet.execute();
-      if (rowSet.first()) {
-        rowSet.deleteRow();
-      }
+    @Test
+    @Order(3)
+    @DisplayName("execute 执行查询并遍历")
+    void testExecuteAndNavigate() throws SQLException {
+        try (JdbcRowSet rowSet = RowSetProvider.newFactory().createJdbcRowSet()) {
+            setupRowSet(rowSet, JdbcContext.sql("SELECT * FROM {{rowset_test}}"));
+
+            rowSet.execute();
+            assertNotNull(rowSet);
+
+            int count = 0;
+            while (rowSet.next()) {
+                count++;
+                assertNotNull(rowSet.getString("name"), "name 不应为 null");
+            }
+            assertTrue(count >= 3, "应有至少 3 行数据");
+        }
     }
 
-    // 验证删除
-    try (Statement stmt = conn.createStatement();
-        ResultSet rs = stmt.executeQuery(
-            JdbcContext.sql("SELECT COUNT(*) FROM {{rowset_test}} WHERE name = '待删除行'"))) {
-      assertTrue(rs.next());
-      assertEquals(0, rs.getInt(1), "删除后应不存在");
-    }
-  }
+    @Test
+    @Order(4)
+    @DisplayName("first / last 导航")
+    void testFirstLast(Connection conn) throws SQLException {
+        try (JdbcRowSet rowSet = RowSetProvider.newFactory().createJdbcRowSet()) {
+            setupRowSet(rowSet, JdbcContext.sql("SELECT * FROM {{rowset_test}}"));
 
-  @Test
-  @Order(9)
-  @DisplayName("close 关闭 RowSet")
-  void testClose(Connection conn) throws SQLException {
-    try (JdbcRowSet rowSet = RowSetProvider.newFactory().createJdbcRowSet()) {
-      assertNotNull(rowSet);
+            rowSet.execute();
+            assertTrue(rowSet.first(), "first() 应成功");
+            assertTrue(rowSet.getInt("id") > 0, "第一行的 id 应大于 0");
+
+            assertTrue(rowSet.last(), "last() 应成功");
+        }
     }
-  }
+
+    @Test
+    @Order(5)
+    @DisplayName("absolute 绝对定位")
+    void testAbsolute(Connection conn) throws SQLException {
+        try (JdbcRowSet rowSet = RowSetProvider.newFactory().createJdbcRowSet()) {
+            setupRowSet(rowSet, JdbcContext.sql("SELECT * FROM {{rowset_test}}"));
+
+            rowSet.execute();
+            assertTrue(rowSet.absolute(2), "absolute(2) 应成功");
+        }
+    }
+
+    @Test
+    @Order(6)
+    @DisplayName("updateString / updateRow 更新数据")
+    void testUpdateRow(Connection conn) throws SQLException {
+        if (isOracle()) {
+            return;
+        }
+        try (JdbcRowSet rowSet = RowSetProvider.newFactory().createJdbcRowSet()) {
+            setupRowSet(rowSet, JdbcContext.sql("SELECT * FROM {{rowset_test}}"));
+
+            rowSet.execute();
+            assertTrue(rowSet.first());
+
+            String originalName = rowSet.getString("name");
+            rowSet.updateString("name", "RowSet更新测试");
+            rowSet.updateRow();
+
+            // 验证更新
+            rowSet.beforeFirst();
+            boolean found = false;
+            while (rowSet.next()) {
+                if ("RowSet更新测试".equals(rowSet.getString("name"))) {
+                    found = true;
+                    break;
+                }
+            }
+            assertTrue(found, "更新后的数据应可查询到");
+
+            // 恢复
+            rowSet.absolute(1);
+            rowSet.updateString("name", originalName);
+            rowSet.updateRow();
+        }
+    }
+
+    @Test
+    @Order(7)
+    @DisplayName("insertRow 插入数据")
+    void testInsertRow(Connection conn) throws SQLException {
+        if (isOracle()) {
+            return;
+        }
+        try (JdbcRowSet rowSet = RowSetProvider.newFactory().createJdbcRowSet()) {
+            setupRowSet(rowSet, JdbcContext.sql("SELECT * FROM {{rowset_test}}"));
+
+            rowSet.execute();
+            rowSet.moveToInsertRow();
+            rowSet.updateString("name", "RowSet插入");
+            rowSet.updateInt("value", 666);
+            rowSet.insertRow();
+            rowSet.moveToCurrentRow();
+        }
+
+        // 验证插入
+        try (Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery(
+                JdbcContext.sql(
+                    "SELECT COUNT(*) FROM {{rowset_test}} WHERE name = 'RowSet插入'"))) {
+            assertTrue(rs.next());
+            assertEquals(1, rs.getInt(1));
+        }
+    }
+
+    @Test
+    @Order(8)
+    @DisplayName("deleteRow 删除数据")
+    void testDeleteRow(Connection conn) throws SQLException {
+        if (isOracle()) {
+            return;
+        }
+        // 先插入一条测试数据
+        try (JdbcRowSet insertRs = RowSetProvider.newFactory().createJdbcRowSet()) {
+            setupRowSet(insertRs, JdbcContext.sql("SELECT id, name, value FROM {{rowset_test}}"));
+            insertRs.execute();
+            insertRs.moveToInsertRow();
+            insertRs.updateString("name", "待删除行");
+            insertRs.updateInt("value", 888);
+            insertRs.insertRow();
+        }
+
+        // 删除刚插入的行
+        try (JdbcRowSet rowSet = RowSetProvider.newFactory().createJdbcRowSet()) {
+            setupRowSet(rowSet,
+                JdbcContext.sql("SELECT * FROM {{rowset_test}} WHERE name = '待删除行'"));
+            rowSet.execute();
+            if (rowSet.first()) {
+                rowSet.deleteRow();
+            }
+        }
+
+        // 验证删除
+        try (Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery(
+                JdbcContext.sql("SELECT COUNT(*) FROM {{rowset_test}} WHERE name = '待删除行'"))) {
+            assertTrue(rs.next());
+            assertEquals(0, rs.getInt(1), "删除后应不存在");
+        }
+    }
+
+    @Test
+    @Order(9)
+    @DisplayName("close 关闭 RowSet")
+    void testClose(Connection conn) throws SQLException {
+        try (JdbcRowSet rowSet = RowSetProvider.newFactory().createJdbcRowSet()) {
+            assertNotNull(rowSet);
+        }
+    }
 }

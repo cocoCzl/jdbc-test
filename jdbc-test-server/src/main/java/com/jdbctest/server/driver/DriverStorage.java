@@ -8,25 +8,25 @@ import org.springframework.web.multipart.MultipartFile;
 
 public interface DriverStorage {
 
-  StagedDriverPackage stage(List<MultipartFile> files) throws IOException;
+    StagedDriverPackage stage(List<MultipartFile> files) throws IOException;
 
-  List<StoredArtifact> moveToDriver(StagedDriverPackage staged, UUID driverId) throws IOException;
+    List<StoredArtifact> moveToDriver(StagedDriverPackage staged, UUID driverId) throws IOException;
 
-  Path resolve(String storageKey);
+    Path resolve(String storageKey);
 
-  void deleteDriver(UUID driverId) throws IOException;
+    void deleteDriver(UUID driverId) throws IOException;
 
-  void deleteStaging(StagedDriverPackage staged);
+    void deleteStaging(StagedDriverPackage staged);
 
-  record StagedDriverPackage(Path directory, List<StagedArtifact> artifacts) {
+    record StagedDriverPackage(Path directory, List<StagedArtifact> artifacts) {
 
-  }
+    }
 
-  record StagedArtifact(Path path, String fileName, long size, String sha256) {
+    record StagedArtifact(Path path, String fileName, long size, String sha256) {
 
-  }
+    }
 
-  record StoredArtifact(UUID id, String storageKey, String fileName, long size, String sha256) {
+    record StoredArtifact(UUID id, String storageKey, String fileName, long size, String sha256) {
 
-  }
+    }
 }

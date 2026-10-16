@@ -304,12 +304,16 @@ class JavaRulesTest(unittest.TestCase):
         self.project("class Sample { broken(")
         self.assertEqual(2, self.gate()[0])
 
-    def test_java_editorconfig_matches_effective_project_xml_options(self):
+    def test_java_indentation_matches_retained_source_and_editorconfig(self):
         scheme = ET.parse(checker.REPOSITORY / "code-style/java.xml").getroot()
         java = scheme.find("codeStyleSettings[@language='JAVA']")
         options = {node.attrib["name"]: node.attrib["value"] for node in java.findall("option")}
         options.update({node.attrib["name"]: node.attrib["value"]
                         for node in java.find("indentOptions").findall("option")})
+        source = ET.parse(checker.REPOSITORY / "code-style/intellij-java-google-style.xml")
+        source_indent = source.find("codeStyleSettings[@language='JAVA']/indentOptions")
+        for node in source_indent.findall("option"):
+            self.assertEqual(node.attrib["value"], options[node.attrib["name"]])
         config = (checker.REPOSITORY / ".editorconfig").read_text(encoding="utf-8")
         values = dict(line.strip().split(" = ", 1) for line in config.splitlines() if " = " in line)
         self.assertEqual("space", values["indent_style"])

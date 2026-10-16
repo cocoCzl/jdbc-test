@@ -10,9 +10,8 @@ public record CreateDriverRequest(
     @Size(max = 300) String driverClass,
     @Size(max = 200) String urlPrefix, com.jdbctest.catalog.DataSourceProviders dataSources) {
 
-  public CreateDriverRequest(String name, String vendor, String version, String driverClass,
-      String urlPrefix) {
-    this(name, vendor, version, driverClass, urlPrefix, null);
-  }
-
+    public CreateDriverRequest(String name, String vendor, String version, String driverClass,
+        String urlPrefix) {
+        this(name, vendor, version, driverClass, urlPrefix, null);
+    }
 }

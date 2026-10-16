@@ -1,7 +1,7 @@
 # Java only. The complete IDEA scheme is code-style/java.xml.
 [*.java]
 indent_style = space
-indent_size = 2
-tab_width = 2
+indent_size = 4
+tab_width = 4
 max_line_length = 100
 ij_continuation_indent_size = 4

@@ -7,5 +7,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface TestRunSelectedScenarioRepository extends
     JpaRepository<TestRunSelectedScenarioEntity, UUID> {
 
-  List<TestRunSelectedScenarioEntity> findByRun_IdOrderByScenarioId(UUID runId);
+    List<TestRunSelectedScenarioEntity> findByRun_IdOrderByScenarioId(UUID runId);
 }

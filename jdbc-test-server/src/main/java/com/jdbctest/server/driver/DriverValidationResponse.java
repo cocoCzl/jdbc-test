@@ -6,7 +6,7 @@ public record DriverValidationResponse(DriverPackageStatus status, String driver
     int majorVersion,
     int minorVersion, boolean jdbcCompliant, List<String> warnings) {
 
-  public DriverValidationResponse {
-    warnings = List.copyOf(warnings);
-  }
+    public DriverValidationResponse {
+        warnings = List.copyOf(warnings);
+    }
 }

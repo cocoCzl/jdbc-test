@@ -7,7 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface JdbcDriverArtifactRepository extends
     JpaRepository<JdbcDriverArtifactEntity, UUID> {
 
-  List<JdbcDriverArtifactEntity> findByDriver_Id(UUID driverId);
+    List<JdbcDriverArtifactEntity> findByDriver_Id(UUID driverId);
 
-  void deleteByDriver_Id(UUID driverId);
+    void deleteByDriver_Id(UUID driverId);
 }

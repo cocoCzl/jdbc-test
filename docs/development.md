@@ -106,13 +106,13 @@ Server depends on Core and does not load Suite or uploaded driver classes. The W
 ## Java formatting
 
 The unchanged source is [intellij-java-google-style.xml](../code-style/intellij-java-google-style.xml)
-(SHA-256 `1f3578c03470362b9ad7c11cf9748308d3d362bcacbff4e04edd3b216565383f`).
+(SHA-256 `f25e4a8d94f2b2d33dd943cb672f570b64fb89e680df63d3795ad244505d0d26`).
 [java.xml](../code-style/java.xml) projects its Java settings into an IDEA scheme; other languages
 are excluded. It adds explicit reading rules: expand nonempty methods, blocks, lambdas and simple classes,
 put declaration annotations on separate lines, use continuation indentation for record components,
 wrap long resource lists/enum constants and local declaration annotations, and preserve
 blank-line whitespace in text blocks.
-Use 2-space indentation, 4-space continuation, no tabs and a 100-column target. Keep long
+Use 4-space indentation, 4-space continuation, no tabs and a 100-column target. Keep long
 SQL/URL/literal exceptions intact. The source's forced control braces are retained. Imports use
 static imports first, a blank line, then ordinary imports. Naming, exceptions, logging and security
 continue to follow project conventions and the Alibaba guidelines.

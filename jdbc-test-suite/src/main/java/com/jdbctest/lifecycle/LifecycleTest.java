@@ -21,28 +21,28 @@ import org.junit.jupiter.api.extension.ExtendWith;
 @org.junit.jupiter.api.Tag("integration")
 class LifecycleTest {
 
-  @Test
-  void testClosedConnectionRejectsOperations(Connection connection) throws SQLException {
-    connection.close();
-    assertTrue(connection.isClosed(), "close() 后连接应处于关闭状态");
-    assertDoesNotThrow(connection::close, "Connection.close() 应可重复调用");
-    assertThrows(SQLException.class, connection::createStatement,
-        "关闭后的连接不得再创建 Statement");
-  }
+    @Test
+    void testClosedConnectionRejectsOperations(Connection connection) throws SQLException {
+        connection.close();
+        assertTrue(connection.isClosed(), "close() 后连接应处于关闭状态");
+        assertDoesNotThrow(connection::close, "Connection.close() 应可重复调用");
+        assertThrows(SQLException.class, connection::createStatement,
+            "关闭后的连接不得再创建 Statement");
+    }
 
-  @Test
-  void testStatementCloseClosesCurrentResultSet(Connection connection) throws SQLException {
-    Statement statement = connection.createStatement();
-    ResultSet resultSet = statement.executeQuery(ConfigLoader.load().db.isDialect("oracle")
-        ? "SELECT 1 FROM DUAL" : "SELECT 1");
-    statement.close();
-    assertTrue(resultSet.isClosed(), "关闭 Statement 应关闭其当前 ResultSet");
-  }
+    @Test
+    void testStatementCloseClosesCurrentResultSet(Connection connection) throws SQLException {
+        Statement statement = connection.createStatement();
+        ResultSet resultSet = statement.executeQuery(ConfigLoader.load().db.isDialect("oracle")
+            ? "SELECT 1 FROM DUAL" : "SELECT 1");
+        statement.close();
+        assertTrue(resultSet.isClosed(), "关闭 Statement 应关闭其当前 ResultSet");
+    }
 
-  @Test
-  @RequiresFeature("request_boundaries")
-  void testRequestBoundaries(Connection connection) throws SQLException {
-    connection.beginRequest();
-    connection.endRequest();
-  }
+    @Test
+    @RequiresFeature("request_boundaries")
+    void testRequestBoundaries(Connection connection) throws SQLException {
+        connection.beginRequest();
+        connection.endRequest();
+    }
 }

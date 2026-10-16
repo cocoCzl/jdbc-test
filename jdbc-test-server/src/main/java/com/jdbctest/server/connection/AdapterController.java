@@ -10,8 +10,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/adapters")
 final class AdapterController {
 
-  @GetMapping
-  List<AdapterResponse> list() {
-    return AdapterRegistry.bundled().list().stream().map(AdapterResponse::from).toList();
-  }
+    @GetMapping
+    List<AdapterResponse> list() {
+        return AdapterRegistry.bundled().list().stream().map(AdapterResponse::from).toList();
+    }
 }

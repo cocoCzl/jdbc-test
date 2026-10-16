@@ -9,9 +9,9 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 public @interface UseSqlScripts {
 
-  String[] ddl() default {};
+    String[] ddl() default {};
 
-  String[] dml() default {};
+    String[] dml() default {};
 
-  String[] cleanup() default {};
+    String[] cleanup() default {};
 }

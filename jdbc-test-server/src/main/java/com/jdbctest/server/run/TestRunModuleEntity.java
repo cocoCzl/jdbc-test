@@ -8,39 +8,39 @@ import java.util.UUID;
     "run_id", "module_id"}))
 public class TestRunModuleEntity {
 
-  @Id
-  @GeneratedValue(strategy = GenerationType.UUID)
-  private UUID id;
-  @ManyToOne(fetch = FetchType.LAZY, optional = false)
-  @JoinColumn(name = "run_id", nullable = false)
-  private TestRunEntity run;
-  @Column(name = "module_id", nullable = false, length = 100)
-  private String moduleId;
-  @Column(name = "module_name", nullable = false, length = 200)
-  private String moduleName;
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "run_id", nullable = false)
+    private TestRunEntity run;
+    @Column(name = "module_id", nullable = false, length = 100)
+    private String moduleId;
+    @Column(name = "module_name", nullable = false, length = 200)
+    private String moduleName;
 
-  protected TestRunModuleEntity() {
-  }
+    protected TestRunModuleEntity() {
+    }
 
-  public TestRunModuleEntity(TestRunEntity run, String moduleId, String moduleName) {
-    this.run = run;
-    this.moduleId = moduleId;
-    this.moduleName = moduleName;
-  }
+    public TestRunModuleEntity(TestRunEntity run, String moduleId, String moduleName) {
+        this.run = run;
+        this.moduleId = moduleId;
+        this.moduleName = moduleName;
+    }
 
-  public UUID getId() {
-    return id;
-  }
+    public UUID getId() {
+        return id;
+    }
 
-  public TestRunEntity getRun() {
-    return run;
-  }
+    public TestRunEntity getRun() {
+        return run;
+    }
 
-  public String getModuleId() {
-    return moduleId;
-  }
+    public String getModuleId() {
+        return moduleId;
+    }
 
-  public String getModuleName() {
-    return moduleName;
-  }
+    public String getModuleName() {
+        return moduleName;
+    }
 }

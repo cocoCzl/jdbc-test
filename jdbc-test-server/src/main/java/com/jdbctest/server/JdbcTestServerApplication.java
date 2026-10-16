@@ -12,7 +12,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
     ExecutionProperties.class})
 public class JdbcTestServerApplication {
 
-  public static void main(String[] args) {
-    SpringApplication.run(JdbcTestServerApplication.class, args);
-  }
+    public static void main(String[] args) {
+        SpringApplication.run(JdbcTestServerApplication.class, args);
+    }
 }

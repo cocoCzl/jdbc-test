@@ -15,33 +15,33 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class FlywayConfiguration {
 
-  @Bean(initMethod = "migrate")
-  Flyway flyway(DataSource dataSource,
-      @Value("${spring.flyway.connect-retries:0}") int connectRetries) {
-    return Flyway.configure()
-        .dataSource(dataSource)
-        .locations("classpath:db/migration")
-        .connectRetries(connectRetries)
-        .load();
-  }
-
-  @Bean
-  static BeanFactoryPostProcessor hibernateDependsOnFlyway() {
-    return beanFactory -> {
-      if (beanFactory.containsBeanDefinition("entityManagerFactory")) {
-        BeanDefinition definition = beanFactory.getBeanDefinition("entityManagerFactory");
-        definition.setDependsOn(append(definition.getDependsOn(), "flyway"));
-      }
-    };
-  }
-
-  private static String[] append(String[] existing, String dependency) {
-    if (existing == null || existing.length == 0) {
-      return new String[] {dependency};
+    @Bean(initMethod = "migrate")
+    Flyway flyway(DataSource dataSource,
+        @Value("${spring.flyway.connect-retries:0}") int connectRetries) {
+        return Flyway.configure()
+            .dataSource(dataSource)
+            .locations("classpath:db/migration")
+            .connectRetries(connectRetries)
+            .load();
     }
-    String[] result = new String[existing.length + 1];
-    System.arraycopy(existing, 0, result, 0, existing.length);
-    result[existing.length] = dependency;
-    return result;
-  }
+
+    @Bean
+    static BeanFactoryPostProcessor hibernateDependsOnFlyway() {
+        return beanFactory -> {
+            if (beanFactory.containsBeanDefinition("entityManagerFactory")) {
+                BeanDefinition definition = beanFactory.getBeanDefinition("entityManagerFactory");
+                definition.setDependsOn(append(definition.getDependsOn(), "flyway"));
+            }
+        };
+    }
+
+    private static String[] append(String[] existing, String dependency) {
+        if (existing == null || existing.length == 0) {
+            return new String[] {dependency};
+        }
+        String[] result = new String[existing.length + 1];
+        System.arraycopy(existing, 0, result, 0, existing.length);
+        result[existing.length] = dependency;
+        return result;
+    }
 }

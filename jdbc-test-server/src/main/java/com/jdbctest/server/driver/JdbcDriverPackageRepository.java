@@ -6,5 +6,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface JdbcDriverPackageRepository extends JpaRepository<JdbcDriverPackageEntity, UUID> {
 
-  Optional<JdbcDriverPackageEntity> findByPackageFingerprint(String packageFingerprint);
+    Optional<JdbcDriverPackageEntity> findByPackageFingerprint(String packageFingerprint);
 }

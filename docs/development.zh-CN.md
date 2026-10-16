@@ -106,11 +106,11 @@ Server 依赖 Core，不加载 Suite 或上传的驱动类。Worker fat JAR 打�
 ## Java 格式
 
 原始来源为未改动的 [intellij-java-google-style.xml](../code-style/intellij-java-google-style.xml)，
-SHA-256 为 `1f3578c03470362b9ad7c11cf9748308d3d362bcacbff4e04edd3b216565383f`。
+SHA-256 为 `f25e4a8d94f2b2d33dd943cb672f570b64fb89e680df63d3795ad244505d0d26`。
 [java.xml](../code-style/java.xml) 仅提取其中 Java 设置，并明确补充阅读约定：
 展开非空方法、代码块、lambda 和简单类，声明注解分行，record 参数采用续行缩进，
 长资源列表及枚举常量换行，本地变量注解分行，保留 text block 空行中的空白。
-基本缩进 2 空格、续行 4 空格、不使用 Tab，100 列为目标；长 SQL、URL 和字面量保留例外。
+基本缩进 4 空格、续行 4 空格、不使用 Tab，100 列为目标；长 SQL、URL 和字面量保留例外。
 保留来源 XML 的控制语句强制大括号规则。import 按静态导入、空行、普通导入分组。
 命名、异常、日志和安全继续遵守项目约定及阿里巴巴开发规范。
 

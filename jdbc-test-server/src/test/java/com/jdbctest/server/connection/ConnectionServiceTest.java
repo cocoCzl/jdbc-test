@@ -29,135 +29,140 @@ import tools.jackson.databind.ObjectMapper;
 
 class ConnectionServiceTest {
 
-  private final UUID driverId = UUID.fromString("00000000-0000-0000-0000-000000000001");
-  private final WorkerProcessRunner worker = mock(WorkerProcessRunner.class);
-  private final DriverWorkerProperties properties = new DriverWorkerProperties();
-  private ConnectionService service;
+    private final UUID driverId = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    private final WorkerProcessRunner worker = mock(WorkerProcessRunner.class);
+    private final DriverWorkerProperties properties = new DriverWorkerProperties();
+    private ConnectionService service;
 
-  @BeforeEach
-  void setUp() {
-    JdbcDriverPackageRepository drivers = mock(JdbcDriverPackageRepository.class);
-    JdbcDriverArtifactRepository artifacts = mock(JdbcDriverArtifactRepository.class);
-    JdbcDriverPackageEntity driver = mock(JdbcDriverPackageEntity.class);
-    when(driver.getId()).thenReturn(driverId);
-    when(driver.getStatus()).thenReturn(DriverPackageStatus.VALIDATED);
-    when(driver.getDriverClass()).thenReturn("example.FakeDriver");
-    when(drivers.findById(driverId)).thenReturn(Optional.of(driver));
-    when(artifacts.findByDriver_Id(driverId)).thenReturn(List.of());
-    TransactionTemplate transactions = mock(TransactionTemplate.class);
-    when(transactions.execute(any())).thenAnswer(invocation -> {
-      TransactionCallback<?> callback = invocation.getArgument(0);
-      return callback.doInTransaction(mock(TransactionStatus.class));
-    });
-    service = new ConnectionService(mock(DatabaseConnectionProfileRepository.class), drivers,
-        artifacts, mock(TestRunRepository.class), mock(DriverStorage.class),
-        mock(CredentialEncryptionService.class), worker, properties, new ObjectMapper(),
-        transactions);
-  }
-
-  @Test
-  void tlsCredentialUrlsAreRejectedByEveryDraftWriteEntryBeforeDriverUse() {
-    for (String url : List.of("jdbc:postgresql://fixture.invalid/test?sslpassword=ReviewOnlyTlsSecret",
-        "jdbc:sqlserver://fixture.invalid;trustStorePassword=ReviewOnlyTlsSecret;encrypt=true")) {
-      var create = new CreateConnectionRequest("x", "postgresql", "postgresql", url, "u", null,
-          false, driverId, null, null, null);
-      var update = new UpdateConnectionRequest("x", "postgresql", "postgresql", url, "u", null,
-          false, false, driverId, null, null, null);
-      var draft = new DraftConnectionTestRequest("postgresql", "postgresql", url, "u", "x", driverId);
-      for (Runnable action : List.<Runnable>of(() -> service.create(create),
-          () -> service.update(UUID.randomUUID(), update), () -> service.testDraft(draft))) {
-        var error = assertThrows(ConnectionException.class, action::run);
-        assertEquals("CONNECTION_URL_CONTAINS_CREDENTIALS", error.code());
-        org.junit.jupiter.api.Assertions.assertFalse(error.getMessage().contains("ReviewOnlyTls"));
-      }
+    @BeforeEach
+    void setUp() {
+        JdbcDriverPackageRepository drivers = mock(JdbcDriverPackageRepository.class);
+        JdbcDriverArtifactRepository artifacts = mock(JdbcDriverArtifactRepository.class);
+        JdbcDriverPackageEntity driver = mock(JdbcDriverPackageEntity.class);
+        when(driver.getId()).thenReturn(driverId);
+        when(driver.getStatus()).thenReturn(DriverPackageStatus.VALIDATED);
+        when(driver.getDriverClass()).thenReturn("example.FakeDriver");
+        when(drivers.findById(driverId)).thenReturn(Optional.of(driver));
+        when(artifacts.findByDriver_Id(driverId)).thenReturn(List.of());
+        TransactionTemplate transactions = mock(TransactionTemplate.class);
+        when(transactions.execute(any())).thenAnswer(invocation -> {
+            TransactionCallback<?> callback = invocation.getArgument(0);
+            return callback.doInTransaction(mock(TransactionStatus.class));
+        });
+        service = new ConnectionService(mock(DatabaseConnectionProfileRepository.class), drivers,
+            artifacts, mock(TestRunRepository.class), mock(DriverStorage.class),
+            mock(CredentialEncryptionService.class), worker, properties, new ObjectMapper(),
+            transactions);
     }
-    org.mockito.Mockito.verifyNoInteractions(worker);
-  }
 
-  @Test
-  void everyDraftWriteEntryRejectsOracleCredentialsBeforeDriverUse() {
-    String url = "jdbc:oracle:thin:audit_user/AuditOnly_Secret@host:1521:SID";
-    var create = new CreateConnectionRequest("x", "oracle", "oracle", url, "u", null,
-        false, driverId, null, null, null);
-    var update = new UpdateConnectionRequest("x", "oracle", "oracle", url, "u", null,
-        false, false, driverId, null, null, null);
-    var draft = new DraftConnectionTestRequest("oracle", "oracle", url, "u", "x", driverId);
-    for (Runnable action : List.<Runnable>of(() -> service.create(create),
-        () -> service.update(UUID.randomUUID(), update), () -> service.testDraft(draft))) {
-      var error = assertThrows(ConnectionException.class, action::run);
-      assertEquals("CONNECTION_URL_CONTAINS_CREDENTIALS", error.code());
-      org.junit.jupiter.api.Assertions.assertFalse(error.getMessage().contains("AuditOnly"));
+    @Test
+    void tlsCredentialUrlsAreRejectedByEveryDraftWriteEntryBeforeDriverUse() {
+        for (String url : List.of(
+            "jdbc:postgresql://fixture.invalid/test?sslpassword=ReviewOnlyTlsSecret",
+            "jdbc:sqlserver://fixture.invalid;trustStorePassword=ReviewOnlyTlsSecret;encrypt=true")) {
+            var create = new CreateConnectionRequest("x", "postgresql", "postgresql", url, "u",
+                null,
+                false, driverId, null, null, null);
+            var update = new UpdateConnectionRequest("x", "postgresql", "postgresql", url, "u",
+                null,
+                false, false, driverId, null, null, null);
+            var draft = new DraftConnectionTestRequest("postgresql", "postgresql", url, "u", "x",
+                driverId);
+            for (Runnable action : List.<Runnable>of(() -> service.create(create),
+                () -> service.update(UUID.randomUUID(), update), () -> service.testDraft(draft))) {
+                var error = assertThrows(ConnectionException.class, action::run);
+                assertEquals("CONNECTION_URL_CONTAINS_CREDENTIALS", error.code());
+                org.junit.jupiter.api.Assertions.assertFalse(
+                    error.getMessage().contains("ReviewOnlyTls"));
+            }
+        }
+        org.mockito.Mockito.verifyNoInteractions(worker);
     }
-    org.mockito.Mockito.verifyNoInteractions(worker);
-  }
 
-  @Test
-  void keepsNullFilteringWhileReadingSuccessfulProbeMetadata() throws Exception {
-    respond(0, false, "diagnostic text\nnull\n{}\n"
-        + "{\"type\":\"CONNECTION_PROBED\",\"databaseProductName\":\"Test DB\","
-        + "\"jdbcMajorVersion\":4}\n");
-    ConnectionProbeResponse result = service.testDraft(request());
-    assertTrue(result.success());
-    assertEquals("Test DB", result.databaseProductName());
-    assertEquals(4, result.jdbcMajorVersion());
-  }
-
-  @Test
-  void invalidJsonAndJsonNullCannotTurnIntoProbeSuccess() throws Exception {
-    respond(0, false, "not-json\nnull\n{}\n");
-    ConnectionException exception = assertThrows(ConnectionException.class,
-        () -> service.testDraft(request()));
-    assertEquals("CONNECTION_FAILED", exception.code());
-  }
-
-  @Test
-  void nonzeroWorkerExitCannotTurnIntoProbeSuccess() throws Exception {
-    respond(1, false, "{\"type\":\"CONNECTION_PROBED\"}\n");
-    ConnectionException exception = assertThrows(ConnectionException.class,
-        () -> service.testDraft(request()));
-    assertEquals("CONNECTION_FAILED", exception.code());
-  }
-
-  @Test
-  void retainsTypedFailureAfterNullAndInvalidLines() throws Exception {
-    respond(1, false, "not-json\nnull\n"
-        + "{\"type\":\"CONNECTION_PROBE_FAILED\","
-        + "\"errorType\":\"DRIVER_DOES_NOT_ACCEPT_URL\"}\n");
-    ConnectionException exception = assertThrows(ConnectionException.class,
-        () -> service.testDraft(request()));
-    assertEquals("DRIVER_DOES_NOT_ACCEPT_URL", exception.code());
-  }
-
-  @Test
-  void retainsTimeoutFailure() throws Exception {
-    respond(-1, true, "");
-    ConnectionException exception = assertThrows(ConnectionException.class,
-        () -> service.testDraft(request()));
-    assertEquals("CONNECTION_TIMEOUT", exception.code());
-  }
-
-  @Test
-  void retainsInterruptFlagAndFailure() throws Exception {
-    when(worker.run(eq("--probe-connection"), any(),
-        eq(properties.getConnectionProbeTimeout()))).thenThrow(new InterruptedException());
-    try {
-      ConnectionException exception = assertThrows(ConnectionException.class,
-          () -> service.testDraft(request()));
-      assertEquals("CONNECTION_TIMEOUT", exception.code());
-      assertTrue(Thread.currentThread().isInterrupted());
-    } finally {
-      Thread.interrupted();
+    @Test
+    void everyDraftWriteEntryRejectsOracleCredentialsBeforeDriverUse() {
+        String url = "jdbc:oracle:thin:audit_user/AuditOnly_Secret@host:1521:SID";
+        var create = new CreateConnectionRequest("x", "oracle", "oracle", url, "u", null,
+            false, driverId, null, null, null);
+        var update = new UpdateConnectionRequest("x", "oracle", "oracle", url, "u", null,
+            false, false, driverId, null, null, null);
+        var draft = new DraftConnectionTestRequest("oracle", "oracle", url, "u", "x", driverId);
+        for (Runnable action : List.<Runnable>of(() -> service.create(create),
+            () -> service.update(UUID.randomUUID(), update), () -> service.testDraft(draft))) {
+            var error = assertThrows(ConnectionException.class, action::run);
+            assertEquals("CONNECTION_URL_CONTAINS_CREDENTIALS", error.code());
+            org.junit.jupiter.api.Assertions.assertFalse(error.getMessage().contains("AuditOnly"));
+        }
+        org.mockito.Mockito.verifyNoInteractions(worker);
     }
-  }
 
-  private void respond(int exitCode, boolean timedOut, String stdout) throws Exception {
-    when(worker.run(eq("--probe-connection"), any(),
-        eq(properties.getConnectionProbeTimeout())))
-        .thenReturn(new WorkerProcessRunner.Result(exitCode, timedOut, stdout, ""));
-  }
+    @Test
+    void keepsNullFilteringWhileReadingSuccessfulProbeMetadata() throws Exception {
+        respond(0, false, "diagnostic text\nnull\n{}\n"
+            + "{\"type\":\"CONNECTION_PROBED\",\"databaseProductName\":\"Test DB\","
+            + "\"jdbcMajorVersion\":4}\n");
+        ConnectionProbeResponse result = service.testDraft(request());
+        assertTrue(result.success());
+        assertEquals("Test DB", result.databaseProductName());
+        assertEquals(4, result.jdbcMajorVersion());
+    }
 
-  private DraftConnectionTestRequest request() {
-    return new DraftConnectionTestRequest("PostgreSQL", "postgresql",
-        "jdbc:postgresql://fixture.invalid/example", "fixture", "fixture-only", driverId);
-  }
+    @Test
+    void invalidJsonAndJsonNullCannotTurnIntoProbeSuccess() throws Exception {
+        respond(0, false, "not-json\nnull\n{}\n");
+        ConnectionException exception = assertThrows(ConnectionException.class,
+            () -> service.testDraft(request()));
+        assertEquals("CONNECTION_FAILED", exception.code());
+    }
+
+    @Test
+    void nonzeroWorkerExitCannotTurnIntoProbeSuccess() throws Exception {
+        respond(1, false, "{\"type\":\"CONNECTION_PROBED\"}\n");
+        ConnectionException exception = assertThrows(ConnectionException.class,
+            () -> service.testDraft(request()));
+        assertEquals("CONNECTION_FAILED", exception.code());
+    }
+
+    @Test
+    void retainsTypedFailureAfterNullAndInvalidLines() throws Exception {
+        respond(1, false, "not-json\nnull\n"
+            + "{\"type\":\"CONNECTION_PROBE_FAILED\","
+            + "\"errorType\":\"DRIVER_DOES_NOT_ACCEPT_URL\"}\n");
+        ConnectionException exception = assertThrows(ConnectionException.class,
+            () -> service.testDraft(request()));
+        assertEquals("DRIVER_DOES_NOT_ACCEPT_URL", exception.code());
+    }
+
+    @Test
+    void retainsTimeoutFailure() throws Exception {
+        respond(-1, true, "");
+        ConnectionException exception = assertThrows(ConnectionException.class,
+            () -> service.testDraft(request()));
+        assertEquals("CONNECTION_TIMEOUT", exception.code());
+    }
+
+    @Test
+    void retainsInterruptFlagAndFailure() throws Exception {
+        when(worker.run(eq("--probe-connection"), any(),
+            eq(properties.getConnectionProbeTimeout()))).thenThrow(new InterruptedException());
+        try {
+            ConnectionException exception = assertThrows(ConnectionException.class,
+                () -> service.testDraft(request()));
+            assertEquals("CONNECTION_TIMEOUT", exception.code());
+            assertTrue(Thread.currentThread().isInterrupted());
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
+    private void respond(int exitCode, boolean timedOut, String stdout) throws Exception {
+        when(worker.run(eq("--probe-connection"), any(),
+            eq(properties.getConnectionProbeTimeout())))
+            .thenReturn(new WorkerProcessRunner.Result(exitCode, timedOut, stdout, ""));
+    }
+
+    private DraftConnectionTestRequest request() {
+        return new DraftConnectionTestRequest("PostgreSQL", "postgresql",
+            "jdbc:postgresql://fixture.invalid/example", "fixture", "fixture-only", driverId);
+    }
 }

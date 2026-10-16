@@ -16,13 +16,13 @@ public record TestRunResponse(UUID id, TestRunStatus status, String profile,
     java.util.List<java.util.Map<String, Object>> executionIssues,
     java.util.Map<String, Object> cleanupEvidence) {
 
-  public record ConnectionSnapshot(String name, String databaseType, String adapterId,
-      String jdbcUrl) {
+    public record ConnectionSnapshot(String name, String databaseType, String adapterId,
+        String jdbcUrl) {
 
-  }
+    }
 
-  public record DriverSnapshot(UUID id, String name, String vendor, String version,
-      String driverClass, String packageFingerprint) {
+    public record DriverSnapshot(UUID id, String name, String vendor, String version,
+        String driverClass, String packageFingerprint) {
 
-  }
+    }
 }

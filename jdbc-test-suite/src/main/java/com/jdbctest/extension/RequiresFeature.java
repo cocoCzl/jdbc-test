@@ -6,5 +6,5 @@ import java.lang.annotation.*;
 @Target({ElementType.TYPE, ElementType.METHOD})
 public @interface RequiresFeature {
 
-  String[] value();
+    String[] value();
 }
