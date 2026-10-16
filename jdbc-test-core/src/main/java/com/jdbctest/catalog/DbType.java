@@ -8,6 +8,7 @@ import java.util.Optional;
  */
 public enum DbType {
     GAUSSDB("gaussdb"),
+    KINGBASE("kingbase"),
     MYSQL("mysql"),
     ORACLE("oracle"),
     POSTGRESQL("postgresql"),

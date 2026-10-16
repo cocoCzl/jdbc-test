@@ -468,6 +468,142 @@ Events include `RUN_STARTED`, `MODULE_STARTED`, `CASE_STARTED`, `CASE_FINISHED`,
 | 4 | Execution or timeout failure |
 | 5 | Catalog, workspace, report or internal failure |
 
+## KingbaseES candidate setup
+
+1. In **Drivers → Add a driver**, select **KingbaseES**. This suggests vendor `Kingbase`, class
+   `com.kingbase8.Driver` and protocol prefix `jdbc:kingbase8:`. All three remain editable. Presets
+   protect manual edits and intentional clearing; **Restore current preset defaults** explicitly
+   reapplies only those three values. No version, name, file or DataSource class is inferred.
+2. Upload the locally supplied JAR. Clearing the class allows the existing SPI discovery flow;
+   multiple classes still require an explicit selection. Run the existing driver validation action.
+   Use a version label grounded in the actual artifact, such as `V008R006B0001` for the inspected
+   file, rather than treating its filename as authoritative.
+3. In **Connections → Add a connection**, select **KingbaseES · Candidate** and independently select
+   the validated Kingbase driver package. The product display label can be `KingbaseES`. Use the
+   actual URL, for example `jdbc:kingbase8://host:4321/test`; enter credentials in their own fields.
+   Neither the preset nor adapter selection rewrites the driver class or protocol.
+4. Have the database owner provision a **dedicated test schema**, with CONNECT to the database and
+   USAGE/CREATE in that schema. Enter that schema in **Authorized test schema**; `test` is the
+   database in the example. Do not select a schema containing business data. The adapter uses an
+   existing authorized schema and does not create/drop the schema automatically. Runs use the
+   existing consent, unique object prefixes, ownership ledger and cleanup mechanisms.
+5. Probe the connection before running tests. The current page's **Custom** selection operates at
+   module level, so it cannot reproduce precisely the documented 20-scenario trial. Exact selection is
+   available through the existing run API (`profile: "CUSTOM"`, `modules: []`, `includeScenarios`
+   containing the listed IDs) or Worker selection (`profile: "FULL"`, `includeScenarios`). Module
+   selections, default CORE and full profiles include additional, unqualified cases; the initial
+   broader trial timed out. Inspect metadata and cleanup evidence, not just validation status or
+   `acceptsURL`.
+
+The adapter's `driver.source` is the existing relative local source `local-drivers/kingbase`, used by
+the CLI's local-driver resolver. CLI users place their own authorized JAR there. It is not a Maven
+coordinate, an upload destination or a server classpath dependency. Server runs load the selected
+uploaded package through the isolated Worker. Ordinary builds/tests require no proprietary JAR.
+The JAR is ignored, unmodified and not distributed by this repository.
+
+### Product and dialect responsibilities
+
+`DbType.KINGBASE` identifies a database product. `DriverPreset` only suggests form values.
+`SqlDialect.POSTGRESQL` selects existing execution infrastructure: schema scope, double-quote
+identifiers, lower-case identifier handling and index cleanup syntax. These responsibilities are
+independent. No Kingbase dialect, GENERIC fallback or substitution of the PostgreSQL driver is added.
+
+The official V9 JDBC documentation describes the Kingbase driver/protocol and partially implemented
+JDBC functionality; the schema documentation describes `search_path` and qualified objects. These
+documents do **not** establish compatibility with every PostgreSQL test script. On the supplied
+instance, metadata reports `"` quoting and lower-case identifier storage; `setSchema/getSchema`,
+catalog selection, dedicated schema creation/deletion and the selected JDBC/SQL trial passed.
+Although `SHOW database_mode` returns `oracle`, the project's Oracle dialect forces uppercase
+identifiers and is not selected merely from the mode's name.
+
+`assets.directory=postgresql` reuses the existing SQL bundle as **candidate trial inputs**, without
+copying the bundle or declaring every statement compatible. Only the selected scenario paths and
+their setup/cleanup have passed. Other modes, builds, privileges and scripts need separate testing.
+The generic API/UI still permits selecting broader scenarios; the candidate warning is not a
+runtime version/mode gate.
+
+The manifest's capability booleans are scenario execution gates. `savepoint`, `parameter_metadata`,
+`generated_keys` and `java_time` enable candidate assessment; true does not certify an entire feature.
+Other flags are false to leave unqualified feature groups disabled, **not** to assert that Kingbase
+lacks those features. In particular CallableStatement, arrays, LOB, XML, rowsets, DataSource,
+connection pooling and XA have not been qualified. No DataSource implementation is guessed.
+
+Identity preflight requires the observed, anchored names `^KingbaseES$` and
+`^Kingbase8 JDBC Driver$`. Ordinary PostgreSQL or unrelated drivers cannot pass those checks. No
+supported version interval is asserted (`supported_versions` has empty database/driver objects),
+so version checks impose no bounds. This records a lack of version qualification, not support for
+every version. Operators must confirm mode/build before reusing the candidate.
+
+### Artifact and version sources
+
+Observed on 2026-10-16 using the user-supplied artifact and database; these are separate sources:
+
+| Source | Observed value |
+| --- | --- |
+| JAR filename | `kingbase8-9.0.1.jar` (filename label only) |
+| SHA-256 | `662ad6f0646cc3fb9b552c9fff93e09bf9eb12e4a9f33f0dec18a624cb48104c` |
+| SPI / concrete class | `com.kingbase8.Driver`, implements `java.sql.Driver` |
+| Manifest Implementation-Version | `V008R006B0001` |
+| Manifest Bundle-Version | `0.0.0.V008R006B0001` |
+| Manifest JDBC Specification-Version | `4.2` |
+| Offline Worker Driver major/minor | `0.0`; `jdbcCompliant=false` |
+| Connected metadata driver name/version | `Kingbase8 JDBC Driver` / `V008R006B0001` |
+| Connected metadata database name/version | `KingbaseES` / `12.1` |
+| Server `version()` | `KingbaseES V009R002C016` |
+| Server `SHOW database_mode` | `oracle` |
+
+The filename, Driver major/minor, Manifest version, connected driver version, JDBC database version
+and server build are not interchangeable. No supported interval was fabricated from them. The
+isolated driver accepted `jdbc:kingbase8://example.invalid:4321/test` and rejected the PostgreSQL
+protocol. URL acceptance only checks format; it does not prove connection or SQL compatibility.
+
+### Narrow timeout reproduction
+
+The test-only [KingbaseTypeInfoDiagnostic](../jdbc-test-worker/src/test/java/com/jdbctest/worker/KingbaseTypeInfoDiagnostic.java)
+uses the existing isolated loader. It is not part of the service classpath or default CI execution.
+Prepare a private connection-probe JSON request locally (`driver.driverClass`, `driver.artifacts`,
+`connection.jdbcUrl`, `connection.username`, `connection.password`), restrict its permissions and
+never commit it. From the repository root after building the Worker:
+
+```sh
+./mvnw -pl jdbc-test-worker -am package -DskipTests
+java -cp "jdbc-test-worker/target/test-classes:jdbc-test-worker/target/jdbc-test-worker-1.2.1-SNAPSHOT-all.jar" \
+  com.jdbctest.worker.KingbaseTypeInfoDiagnostic < "$PRIVATE_PROBE_REQUEST"
+```
+
+`PRIVATE_PROBE_REQUEST` is an operator-supplied private path, not a repository configuration or a
+credential value. Use an external process deadline and clean the private file/process after use.
+The original-scenario reproduction additionally needs a dedicated schema, explicit consent,
+unique object prefix and the existing Worker request with `includeScenarios` containing only
+`database_metadata.get_type_info`; retain ownership cleanup even on timeout. This does not require
+running all CORE scenarios again.
+
+### Partial evidence registration
+
+The Java/Python manifest validators require database version, driver version and a relative
+`evidence` path for each `validated_combinations` entry; `official` requires a nonempty list, and
+the Python package validator checks official evidence files exist. They do **not** enforce a
+certification scope or define a typed partial-validation entry. Existing bundled evidence records
+assert `target_outcome: target_compatible` with broad suite results. In the existing v1 assessment
+logic, subset-filtered/non-full runs are `diagnostic_run` and yield `evaluation_inconclusive`.
+Worker protocol-2 PASSED for selected cases is not itself that full compatibility conclusion.
+
+Therefore `validated_combinations` stays empty, `trust` stays candidate, and no supported version
+range is added. The two explicitly requested sanitized partial records use the existing adapter
+`evidence/` location, linked by descriptive qualification extensions and the execution-safety documentation;
+they are **not** validated-combination registrations. This is no general relaxation of the policy
+against committing raw logs, credentials, internal addresses or local audit archives. The records
+allowlist IDs, results, durations, version facts and method names; no private URLs, schema names,
+usernames, credentials or driver bytecode are included.
+
+- [V9 JDBC overview and version discovery](https://help.kingbase.com.cn/v9/development/client-interfaces/jdbc/jdbc-1.html)
+- [V9 JDBC loading and connection URLs](https://help.kingbase.com.cn/v9/development/client-interfaces/jdbc/jdbc-2.html)
+- [V9 schema/search path parameters](https://help.kingbase.com.cn/v9/admin/reference/ref-database-parameter/initialization-parameters/runtime-config-client.html)
+
+These are documentation references for the scoped decision, not test evidence for unexecuted SQL.
+
+Results and the 20-case table are in [Execution safety](execution-safety.md#kingbasees-candidate-observations).
+
 ## Testing
 
 ```sh

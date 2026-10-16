@@ -71,6 +71,15 @@ class DriverServiceTest {
     }
 
     @Test
+    void discoversKingbaseSpiWithoutSubstitutingPostgresqlOrFilenameVersion() throws Exception {
+        var response = service.create(new CreateDriverRequest("KingbaseES JDBC", "Kingbase",
+            "V008R006B0001", "", "jdbc:kingbase8:"), List.of(jar("com.kingbase8.Driver\n")));
+        assertEquals("com.kingbase8.Driver", response.driverClass());
+        assertEquals("jdbc:kingbase8:", response.urlPrefix());
+        assertEquals("V008R006B0001", response.version());
+    }
+
+    @Test
     void returnsCandidatesAndAcceptsExplicitSelectionOnRetry() throws Exception {
         List<MultipartFile> files = List.of(jar("a.Driver\nb.Driver\n"));
         DriverException error = assertThrows(DriverException.class,

@@ -33,6 +33,27 @@ async function metadata(api: ReturnType<typeof mockApi>) {
 }
 
 describe("New driver presets", () => {
+  it("applies Kingbase defaults without a version and protects a cleared class and edited prefix", async () => {
+    mockApi();
+    const user = userEvent.setup();
+    renderPage("/drivers/new");
+    await select(user, "kingbase");
+    expect(vendor()).toHaveValue("Kingbase");
+    expect(driverClass()).toHaveValue("com.kingbase8.Driver");
+    expect(prefix()).toHaveValue("jdbc:kingbase8:");
+    expect(field("Version")).toHaveValue("");
+    await user.clear(driverClass());
+    await user.clear(prefix());
+    await user.type(prefix(), "jdbc:customkingbase:");
+    await select(user, "postgresql");
+    await select(user, "kingbase");
+    expect(driverClass()).toHaveValue("");
+    expect(prefix()).toHaveValue("jdbc:customkingbase:");
+    await user.click(screen.getByRole("button", { name: "Restore current preset defaults" }));
+    expect(driverClass()).toHaveValue("com.kingbase8.Driver");
+    expect(prefix()).toHaveValue("jdbc:kingbase8:");
+    expect(field("Version")).toHaveValue("");
+  });
   it("starts empty and switches only untouched suggestions without changing unrelated fields", async () => {
     mockApi();
     const user = userEvent.setup();

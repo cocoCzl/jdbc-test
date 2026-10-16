@@ -1,0 +1,118 @@
+{
+  "id": "kingbase",
+  "name": "KingbaseES",
+  "version": "0.1.0",
+  "revision": "candidate-1",
+  "trust": "candidate",
+  "dialect": "postgresql",
+  "identifier_quote": "\"",
+  "driver": {
+    "class": "com.kingbase8.Driver",
+    "source": {
+      "kind": "local",
+      "path": "local-drivers/kingbase"
+    }
+  },
+  "identity": {
+    "database_product_regex": "^KingbaseES$",
+    "driver_name_regex": "^Kingbase8 JDBC Driver$"
+  },
+  "supported_versions": {
+    "database": {},
+    "driver": {}
+  },
+  "validated_combinations": [],
+  "capabilities": {
+    "savepoint": true,
+    "callable_statement": false,
+    "array_type": false,
+    "ref_type": false,
+    "struct_type": false,
+    "rowid_type": false,
+    "sqlxml": false,
+    "rowset": false,
+    "blobs": false,
+    "clobs": false,
+    "nclobs": false,
+    "parameter_metadata": true,
+    "updatable_result_set": false,
+    "scrollable_result_set": false,
+    "generated_keys": true,
+    "multiple_result_sets": false,
+    "statement_cancel": false,
+    "query_timeout": false,
+    "network_timeout": false,
+    "client_info": false,
+    "request_boundaries": false,
+    "sharding": false,
+    "data_source": false,
+    "connection_pool": false,
+    "xa_data_source": false,
+    "java_time": true,
+    "lob_objects": false,
+    "lob_locator_updates": false,
+    "batch_generated_keys": false,
+    "generated_keys_by_index": false,
+    "callable_inout": false,
+    "ref_cursor": false,
+    "rowid_operations": false,
+    "multiple_result_sequences": false
+  },
+  "assets": {
+    "ddl": "ddl",
+    "dml": "dml",
+    "pool": "pool",
+    "areas": [
+      "connection",
+      "statement",
+      "preparedstatement",
+      "callablestatement",
+      "resultset",
+      "metadatatest",
+      "savepoint",
+      "rowset",
+      "blobclob",
+      "sqlxml",
+      "advancedtype"
+    ],
+    "directory": "postgresql"
+  },
+  "namespace": {
+    "mode": "existing",
+    "selection": "schema",
+    "drop_on_exit": false
+  },
+  "minimum_privileges": [
+    "CONNECT",
+    "USAGE AND CREATE ON TEST SCHEMA"
+  ],
+  "privilege_checks": [
+    {
+      "privilege": "CONNECT",
+      "sql": "SELECT 1",
+      "cleanup_sql": ""
+    },
+    {
+      "privilege": "USAGE AND CREATE ON TEST SCHEMA",
+      "sql": "CREATE TABLE \"{namespace}\".\"{probe}\" (id INTEGER)",
+      "cleanup_sql": "DROP TABLE \"{namespace}\".\"{probe}\""
+    }
+  ],
+  "known_differences": [],
+  "db_type": "kingbase",
+  "qualification_note_key": "adapter.kingbaseQualification",
+  "qualification": {
+    "scope": "Only the observed combination: server V009R002C016, database_mode=oracle, JDBC database version 12.1, driver declaration V008R006B0001. Limited trials, not full CORE qualification; other builds and modes unqualified. See docs/execution-safety.md#kingbasees-candidate-observations.",
+    "partial_validation_record": "evidence/v9-oracle-partial-20261016.json",
+    "timeout_diagnostic_record": "evidence/v9-oracle-type-info-20261016.json",
+    "timeout_note": "The initial CORE run exhausted its shared 90-second Worker execution budget. It reached get_type_info after about 80.47 seconds. A separate original-scenario run passed in 35.024 seconds; read-only instrumentation located about 35.84 seconds inside the first getTypeInfo call, with quick traversal/close and a warm second call. No full CORE pass or platform defect established; no timeout, case selection policy or capability gate changed to hide the result.",
+    "capability_policy": "Booleans are scenario execution gates. True enables candidate assessment, not a compatibility guarantee. False disables unqualified scenarios, not a finding of missing database support.",
+    "asset_policy": "PostgreSQL assets are trial inputs for the scoped JDBC scenarios, not a claim that all PostgreSQL SQL is compatible. Callable, array, LOB, XML and rowset groups remain disabled.",
+    "version_policy": "No supported version interval asserted. JDBC database version 12.1, server build V009R002C016, Manifest/metadata driver version V008R006B0001 and Driver major/minor 0.0 are distinct observations.",
+    "references": [
+      "https://help.kingbase.com.cn/v9/development/client-interfaces/jdbc/jdbc-1.html",
+      "https://help.kingbase.com.cn/v9/development/client-interfaces/jdbc/jdbc-2.html",
+      "https://help.kingbase.com.cn/v9/admin/reference/ref-database-parameter/initialization-parameters/runtime-config-client.html"
+    ]
+  }
+}

@@ -568,5 +568,7 @@
   "driverPreset.mysql": "MySQL",
   "driverPreset.oracle": "Oracle",
   "driverPreset.sqlserver": "SQL Server",
-  "driverPreset.custom": "自定义"
+  "driverPreset.custom": "自定义",
+  "driverPreset.kingbase": "KingbaseES（金仓数据库）",
+  "adapter.kingbaseQualification": "仅用于 KingbaseES V9 有限测试的候选适配：服务端 V009R002C016、oracle 模式、JDBC 数据库版本 12.1、驱动 V008R006B0001。PostgreSQL 基础设施与 SQL 资产作为试运行输入。首次 CORE 达到共享的 90 秒任务期限，完整 CORE 尚未通过。其他组合及未启用场景仍待验证，能力开关关闭不代表数据库不支持。"
 }

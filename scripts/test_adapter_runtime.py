@@ -24,7 +24,7 @@ class AdapterRuntimeTest(unittest.TestCase):
             for scenario in build_scenario_inventory(PROJECT_ROOT).values()
             for capability in scenario.required_capabilities
         }
-        for adapter_id in ("mysql", "postgresql", "oracle", "sqlserver", "gaussdb"):
+        for adapter_id in ("mysql", "postgresql", "oracle", "sqlserver", "gaussdb", "kingbase"):
             package = load_adapter(PROJECT_ROOT, adapter_id)
             self.assertTrue(required <= set(package.manifest["capabilities"]), adapter_id)
 
@@ -48,7 +48,7 @@ class AdapterRuntimeTest(unittest.TestCase):
     def test_bundled_adapters_are_discoverable_and_valid(self):
         adapters = discover_adapters(PROJECT_ROOT)
         self.assertEqual(
-            {"postgresql", "mysql", "oracle", "gaussdb", "sqlserver"},
+            {"postgresql", "mysql", "oracle", "gaussdb", "sqlserver", "kingbase"},
             set(adapters),
         )
         for adapter_id in adapters:
@@ -58,6 +58,35 @@ class AdapterRuntimeTest(unittest.TestCase):
         package = load_adapter(PROJECT_ROOT, "examples/adapters/postgresql-local")
         self.assertEqual("postgresql-local", package.adapter_id)
         self.assertEqual("local", package.manifest["trust"])
+
+    def test_kingbase_partial_evidence_does_not_claim_complete_qualification(self):
+        from compatibility_v1 import build_scenario_inventory
+
+        package = load_adapter(PROJECT_ROOT, "kingbase")
+        self.assertEqual("candidate", package.manifest["trust"])
+        self.assertEqual([], package.manifest["validated_combinations"])
+        qualification = package.manifest["qualification"]
+        record = json.loads((package.root / qualification["partial_validation_record"]).read_text())
+        inventory = {item.scenario_id: item for item in build_scenario_inventory(PROJECT_ROOT).values()}
+        self.assertFalse(record["complete_core_passed"])
+        for key, expected_count in (("selected_20", 20), ("core_exploration", 42)):
+            run = record[key]
+            self.assertEqual(expected_count, len(run["cases"]))
+            self.assertEqual(run["completed"], len(run["cases"]))
+            self.assertEqual(run["passed"], sum(case["status"] == "PASSED" for case in run["cases"]))
+            self.assertEqual(run["case_duration_sum_ms"], sum(case["durationMs"] for case in run["cases"]))
+            for case in run["cases"]:
+                source = inventory[case["scenarioId"]]
+                self.assertEqual((source.class_name, source.method_name),
+                                 (case["sourceClass"], case["sourceMethod"]))
+        finite_ids = {case["scenarioId"] for case in record["selected_20"]["cases"]}
+        core_ids = {case["scenarioId"] for case in record["core_exploration"]["cases"]}
+        self.assertEqual(sorted(finite_ids & core_ids), record["overlap"]["scenario_ids"])
+        self.assertEqual(7, record["overlap"]["count"])
+        self.assertEqual("TIMEOUT", record["core_exploration"]["overall_status"])
+        diagnostic = json.loads((package.root / qualification["timeout_diagnostic_record"]).read_text())
+        self.assertEqual(record["combination"], diagnostic["combination"])
+        self.assertFalse(diagnostic["complete_core_passed"])
 
     def test_custom_adapter_reuses_selected_dialect_assets(self):
         for dialect in ("oracle", "mysql", "postgresql"):

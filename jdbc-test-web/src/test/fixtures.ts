@@ -16,6 +16,7 @@ export const driverPresets: DriverPreset[] = [
   { code: "mysql", nameKey: "driverPreset.mysql", vendor: "MySQL", driverClass: "com.mysql.cj.jdbc.Driver", urlPrefix: "jdbc:mysql:" },
   { code: "oracle", nameKey: "driverPreset.oracle", vendor: "Oracle", driverClass: "oracle.jdbc.OracleDriver", urlPrefix: "jdbc:oracle:" },
   { code: "sqlserver", nameKey: "driverPreset.sqlserver", vendor: "Microsoft", driverClass: "com.microsoft.sqlserver.jdbc.SQLServerDriver", urlPrefix: "jdbc:sqlserver:" },
+  { code: "kingbase", nameKey: "driverPreset.kingbase", vendor: "Kingbase", driverClass: "com.kingbase8.Driver", urlPrefix: "jdbc:kingbase8:" },
   { code: "custom", nameKey: "driverPreset.custom", vendor: "", driverClass: "", urlPrefix: "" },
 ];
 

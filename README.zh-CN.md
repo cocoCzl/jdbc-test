@@ -43,13 +43,20 @@ if (-not (Test-Path '.env')) { Copy-Item .env.example .env }
 | 架构、本地开发、API 与 Worker 协议 | [Development](docs/development.md) | [开发指南](docs/development.zh-CN.md) |
 | 授权范围、清理与结果统计 | [Execution safety](docs/execution-safety.md) | [执行安全](docs/execution-safety.zh-CN.md) |
 
-## 已有适配包
+## 数据库接入列表
 
-- PostgreSQL、MySQL、Oracle：官方适配包，已有真实目标验证证据。
-- GaussDB、SQL Server：已实现适配包，等待真实实例验证。
-- 其他数据库：通过本地声明式适配包接入，无需修改 Java 核心。
+| 数据库 | 适配器 ID | 状态 | 已验证范围 |
+|---|---|---|---|
+| PostgreSQL | `postgresql` | 正式 | PostgreSQL 15.2 / pgjdbc 42.7.2 |
+| MySQL | `mysql` | 正式 | MySQL 8.0.30 / Connector/J 8.3.0 |
+| Oracle | `oracle` | 正式 | Oracle 19.3 / ojdbc11 21.13 |
+| GaussDB | `gaussdb` | 候选 | 等待真实实例验证 |
+| SQL Server | `sqlserver` | 候选 | 等待真实实例验证 |
+| KingbaseES（金仓） | `kingbase` | 候选 | V009R002C016、oracle 模式、JDBC 数据库版本 12.1 / 驱动 V008R006B0001 的有限测试；完整 CORE 未通过 |
 
-具体版本和验收边界见[已验证组合](docs/execution-safety.zh-CN.md#已验证组合)。
+正式状态仅对应已记录组合，不代表所有版本。驱动预设用于辅助上传，不代表数据库兼容性已验证。其他产品可以通过本地声明式适配器接入。
+
+具体结果与边界见[已验证组合](docs/execution-safety.zh-CN.md#已验证组合)及 [KingbaseES 候选验证](docs/execution-safety.zh-CN.md#kingbasees-候选验证)。
 
 ## 开发环境
 

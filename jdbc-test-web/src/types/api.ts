@@ -125,6 +125,7 @@ export interface Probe {
 }
 export interface Adapter {
   id: string;
+  qualificationNoteKey?: string | null;
   name: string;
   status: string;
   dialect?: string;

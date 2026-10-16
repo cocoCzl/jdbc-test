@@ -104,13 +104,19 @@ class ConnectionFilteringTest {
     @Test
     void catalogHasAdditiveHintsWithoutProbingOrChangingLegacyFields() throws Exception {
         mvc.perform(get("/api/adapters"))
-            .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(5))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(6))
             .andExpect(jsonPath("$[3].id").value("postgresql"))
             .andExpect(jsonPath("$[3].status").value("OFFICIAL"))
             .andExpect(jsonPath("$[3].namespaceSelection").value("schema"))
             .andExpect(jsonPath("$[3].driverClass").value("org.postgresql.Driver"))
             .andExpect(jsonPath("$[3].validatedCombinations[0].databaseVersion").value("15.2"))
-            .andExpect(jsonPath("$[3].declaration").doesNotExist());
+            .andExpect(jsonPath("$[3].declaration").doesNotExist())
+            .andExpect(jsonPath("$[5].id").value("kingbase"))
+            .andExpect(jsonPath("$[5].status").value("CANDIDATE"))
+            .andExpect(jsonPath("$[5].driverClass").value("com.kingbase8.Driver"))
+            .andExpect(jsonPath("$[5].recommendedMavenCoordinate").isEmpty())
+            .andExpect(jsonPath("$[5].validatedCombinations").isEmpty())
+            .andExpect(jsonPath("$[5].qualificationNoteKey").value("adapter.kingbaseQualification"));
         verifyNoInteractions(worker);
     }
 }

@@ -40,7 +40,7 @@ export function DriverSelect({
   )
     options.unshift(selected);
   return (
-    <div>
+    <div className="min-w-0">
       {query.isError ? <ErrorState error={query.error} retry={() => void query.refetch()} /> : null}
       {presentation === "cards" ? <fieldset className="space-y-3">
         <legend className="mb-3 text-sm font-medium">{t("ui.driverPackage")}</legend>

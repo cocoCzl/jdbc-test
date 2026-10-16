@@ -30,6 +30,8 @@ class DriverControllerTest {
                   {"code":"sqlserver","nameKey":"driverPreset.sqlserver","vendor":"Microsoft",
                    "driverClass":"com.microsoft.sqlserver.jdbc.SQLServerDriver",
                    "urlPrefix":"jdbc:sqlserver:"},
+                  {"code":"kingbase","nameKey":"driverPreset.kingbase","vendor":"Kingbase",
+                   "driverClass":"com.kingbase8.Driver","urlPrefix":"jdbc:kingbase8:"},
                   {"code":"custom","nameKey":"driverPreset.custom","vendor":"",
                    "driverClass":"","urlPrefix":""}
                 ]

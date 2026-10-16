@@ -573,5 +573,7 @@
   "driverPreset.mysql": "MySQL",
   "driverPreset.oracle": "Oracle",
   "driverPreset.sqlserver": "SQL Server",
-  "driverPreset.custom": "Custom"
+  "driverPreset.custom": "Custom",
+  "driverPreset.kingbase": "KingbaseES",
+  "adapter.kingbaseQualification": "Candidate for limited KingbaseES V9 testing: server V009R002C016, oracle mode, JDBC database version 12.1, driver V008R006B0001 only. PostgreSQL infrastructure and SQL fixtures are trial inputs. The initial CORE run reached its shared 90-second deadline; full CORE has not passed. Other combinations and disabled scenarios remain unqualified. Disabled features do not mean the database lacks support."
 }

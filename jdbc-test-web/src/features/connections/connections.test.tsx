@@ -20,6 +20,34 @@ async function fillDraft(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText("Username"), "tester");
 }
 describe("Connection UI", () => {
+  it("sends the Kingbase product, candidate adapter and actual driver/URL independently", async () => {
+    const kingbaseDriver = { ...driver, id: "kingbase-driver", name: "Kingbase JDBC", vendor: "Kingbase",
+      version: "V008R006B0001", driverClass: "com.kingbase8.Driver", urlPrefix: "jdbc:kingbase8:" };
+    const user = userEvent.setup();
+    const api = mockApi((url, options) => {
+      if (url.pathname === "/api/adapters") return json([{
+        id: "kingbase", name: "KingbaseES", status: "CANDIDATE", dialect: "postgresql",
+        namespaceSelection: "schema", driverClass: "com.kingbase8.Driver", validatedCombinations: [],
+        qualificationNoteKey: "adapter.kingbaseQualification",
+      }]);
+      if (url.pathname === "/api/drivers") return json(page([kingbaseDriver]));
+      if (url.pathname === "/api/connections" && options.method === "POST") return json(connection, 201);
+    });
+    const { router } = renderPage("/connections/new");
+    await user.type(await screen.findByLabelText("Name"), "Kingbase trial");
+    await chooseOption(user, screen.getByLabelText("Adapter"), "kingbase");
+    expect(screen.getByLabelText("Database type")).toHaveValue("KingbaseES");
+    expect(screen.getByText(/Candidate for limited KingbaseES V9 testing/)).toBeVisible();
+    expect(screen.getByText("No validated version combinations declared.")).toBeVisible();
+    await chooseOption(user, await screen.findByLabelText("Driver package"), kingbaseDriver.id);
+    await user.type(screen.getByLabelText("JDBC URL"), "jdbc:kingbase8://example.invalid:4321/test");
+    await user.type(screen.getByLabelText("Username"), "tester");
+    await user.click(screen.getByRole("button", { name: "Save connection" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/connections/connection-1"));
+    const body = JSON.parse(api.mock.calls.find(([, options]) => options?.method === "POST")![1]!.body as string);
+    expect(body).toMatchObject({ databaseType: "KingbaseES", adapterId: "kingbase",
+      defaultDriverId: "kingbase-driver", jdbcUrl: "jdbc:kingbase8://example.invalid:4321/test" });
+  });
   it.each([undefined, "", "   ", "ordinary-password"])(
     "sends the selected saved-probe credential unchanged: %j",
     async (value) => {

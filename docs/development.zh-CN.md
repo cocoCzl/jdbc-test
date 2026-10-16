@@ -411,6 +411,20 @@ Server 在加载目录和每次执行前检查协议版本。版本不匹配时�
 | 4 | 执行或超时失败 |
 | 5 | 目录、工作目录、报告或内部失败 |
 
+## KingbaseES 候选接入
+
+新增驱动时选择 KingbaseES，预设建议厂商 `Kingbase`、驱动类 `com.kingbase8.Driver`、URL 协议前缀 `jdbc:kingbase8:`。字段仍可编辑，主动清空或手动修改不会被切换预设覆盖；恢复默认值只影响这三个字段，不推断驱动版本。上传自己的 JAR，清空驱动类可使用原有 SPI 发现和多候选选择，再执行驱动校验。
+
+新增连接选择 `KingbaseES · 候选` 适配器及已校验的 Kingbase 驱动包，填写实际 `jdbc:kingbase8://host:4321/test` 地址，凭据单独填写。预先创建并授权专用测试 schema，填写执行数据库/schema、明确破坏性测试授权后运行；不使用业务 schema。适配器使用已有 schema，不自动创建或删除它。页面按模块选择不能精确重现 20 项子集；需使用运行 API 的 `CUSTOM` / `includeScenarios` 或 Worker 的场景选择。
+
+`DbType.KINGBASE` 是独立产品，`DriverPreset` 是表单建议。`SqlDialect.POSTGRESQL` 复用 schema 选择与验证、双引号、非 Oracle 的小写标识符处理及索引清理语法；没有替换 Kingbase 驱动或协议。观察到的 oracle 模式不等于本项目 Oracle 方言的强制大写语义。`assets.directory=postgresql` 仅提供候选测试输入，未确认整套 PostgreSQL SQL 都兼容。能力布尔值是场景开关：true 启用候选断言，false 保留未确认组不执行，均非数据库能力认证。
+
+适配器的 `driver.source=local-drivers/kingbase` 用于 CLI 本地解析；Web/Server 使用选中的上传包，通过隔离 Worker 加载。普通构建不需要私有 JAR，不加入全局 classpath、不推断 Maven 坐标。身份要求 `^KingbaseES$` / `^Kingbase8 JDBC Driver$`，版本范围为空表示没有已确认边界，不能视为支持所有版本。
+
+有限验证不能填入 `validated_combinations`：现有校验器只检查版本与 evidence 路径结构，未定义部分认证范围；v1 对子集运行判为 `diagnostic_run` / `evaluation_inconclusive`。因此仍为 candidate、组合列表为空。按本次明确要求，仅将脱敏部分结果保存在已有适配器 evidence 目录；不保留凭据、内部地址或原始敏感日志。
+
+版本来源、官方参考及可复现的单项诊断命令见[英文开发说明](development.md#kingbasees-candidate-setup)；准确组合、逐项结果与超时结论见[执行安全](execution-safety.zh-CN.md#kingbasees-候选验证)。诊断使用测试源码中的隔离加载工具，从私有连接请求 stdin 读取，须限制外层进程期限，运行后删除临时凭据文件并清理自建测试资源。
+
 ## 测试
 
 ```sh

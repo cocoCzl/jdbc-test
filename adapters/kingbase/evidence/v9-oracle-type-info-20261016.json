@@ -1,0 +1,200 @@
+{
+  "record_kind": "timeout_diagnostic",
+  "qualification": "candidate",
+  "complete_core_passed": false,
+  "combination": {
+    "database_product": "KingbaseES",
+    "server_build": "V009R002C016",
+    "compatibility_mode": "oracle",
+    "jdbc_database_version": "12.1",
+    "driver_name": "Kingbase8 JDBC Driver",
+    "driver_version": "V008R006B0001",
+    "driver_artifact_sha256": "662ad6f0646cc3fb9b552c9fff93e09bf9eb12e4a9f33f0dec18a624cb48104c"
+  },
+  "conclusion": "The 90-second deadline covered the complete Worker JUnit execution and cleanup, not one metadata method. Prior cases consumed most of it. On this exact combination, the first getTypeInfo call takes about 35 seconds inside the driver, while traversal/assertions/close/report finish quickly. No platform defect established; no full CORE rerun or timeout change.",
+  "limits": [
+    "Two targeted processes, not a repeated benchmark or all versions/modes qualification.",
+    "The original interrupted getTypeInfo call has no stage trace; its internal phase is inferred only by comparison with the scoped reproduction.",
+    "Socket-read stack samples identify waiting in driver type lookup but do not divide network latency, server work and driver query count.",
+    "Second call is warm on the same connection; its column-read timing is not a cold-cache comparison."
+  ],
+  "readonly_reproduction": {
+    "execution_route": "test-only standalone diagnostic -> existing isolated DriverLoader -> read-only metadata; no suite fixtures or writes",
+    "source": "jdbc-test-worker/src/test/java/com/jdbctest/worker/KingbaseTypeInfoDiagnostic.java",
+    "source_sha256": "b2fd33051857337ac107a24e1fa0b84162e9e59616a5ed938100b9fcfe002dfb",
+    "process": {
+      "exitCode": 0,
+      "processElapsedNanos": 36750555750,
+      "outerTimeoutMs": 90000
+    },
+    "phases": [
+      {
+        "phase": "driver.load",
+        "duration_nanos": 9981958
+      },
+      {
+        "phase": "connection.open",
+        "duration_nanos": 393532500
+      },
+      {
+        "phase": "connection.metadata",
+        "duration_nanos": 1472125
+      },
+      {
+        "phase": "next_only.get_type_info",
+        "duration_nanos": 35835852750
+      },
+      {
+        "phase": "next_only.first_next",
+        "duration_nanos": 26958
+      },
+      {
+        "phase": "next_only.iterate",
+        "duration_nanos": 275750
+      },
+      {
+        "phase": "next_only.assertions",
+        "duration_nanos": 3167
+      },
+      {
+        "phase": "next_only.result_set_close",
+        "duration_nanos": 16083
+      },
+      {
+        "phase": "read_columns.get_type_info",
+        "duration_nanos": 66264542
+      },
+      {
+        "phase": "read_columns.first_next",
+        "duration_nanos": 4334
+      },
+      {
+        "phase": "read_columns.iterate",
+        "duration_nanos": 2952833
+      },
+      {
+        "phase": "read_columns.assertions",
+        "duration_nanos": 916
+      },
+      {
+        "phase": "read_columns.result_set_close",
+        "duration_nanos": 2666
+      },
+      {
+        "phase": "connection.close",
+        "duration_nanos": 2242792
+      },
+      {
+        "phase": "driver.close",
+        "duration_nanos": 962875
+      }
+    ],
+    "row_counts": {
+      "next_only": 1041,
+      "read_columns": 1041
+    },
+    "status": "COMPLETED"
+  },
+  "original_scenario_reproduction": {
+    "execution_route": "standalone harness -> unmodified WorkerMain -> bundled kingbase candidate -> original JUnit method -> normal Worker report; no Web/Server queue/persistence acceptance",
+    "run_id": "kingbase-type-info-isolated",
+    "selection": {
+      "profile": "CORE",
+      "modules": [],
+      "includeScenarios": [
+        "database_metadata.get_type_info"
+      ],
+      "excludeScenarios": []
+    },
+    "worker_timeout_ms": 90000,
+    "outer_safety_timeout_ms": 110000,
+    "timeout_changed": false,
+    "properties": {},
+    "process_elapsed_nanos": 37785468708,
+    "process_exit_code": 0,
+    "worker_jar_sha256": "c7646aeda2a9ae51a377769537452900caf12e9172a39b0d179139a7d67070ae",
+    "metadata": {
+      "databaseProductName": "KingbaseES",
+      "driverName": "Kingbase8 JDBC Driver",
+      "databaseProductVersion": "12.1",
+      "driverVersion": "V008R006B0001",
+      "status": "MATCHED"
+    },
+    "case": {
+      "scenarioId": "database_metadata.get_type_info",
+      "status": "PASSED",
+      "durationMs": 35024
+    },
+    "run": {
+      "status": "PASSED",
+      "scenarioCount": 1,
+      "terminationReason": "COMPLETED"
+    },
+    "report": {
+      "schema_version": "2.0.0",
+      "sha256": "9c0a256f1a9b497d325f8f84840446e3c59e960762ea7f3f437394fd99bdfb8e",
+      "retained_full_original": false,
+      "reason": "Report retained only as the safe allowlisted projection here; no request/namespace/object ledger published."
+    },
+    "timeline_ms": {
+      "run_started_to_case_started": 1567.669,
+      "case_finished_to_cleanup_finished": 742.82,
+      "metadata_event_to_run_finished_including_report_write": 8.775,
+      "run_event_span": 37345.324
+    },
+    "thread_samples": [
+      {
+        "elapsed_ms_since_process_start": 5379,
+        "capture_exit_code": 0,
+        "method_frames": [
+          "at sun.nio.ch.Net.poll(java.base@21.0.9/Native Method)",
+          "at java.net.Socket$SocketInputStream.read(java.base@21.0.9/Socket.java:1109)",
+          "at com.kingbase8.core.VisibleBufferedInputStream.readMore(VisibleBufferedInputStream.java:210)",
+          "at com.kingbase8.core.VisibleBufferedInputStream.ensureBytes(VisibleBufferedInputStream.java:165)",
+          "at com.kingbase8.core.VisibleBufferedInputStream.read(VisibleBufferedInputStream.java:117)",
+          "at com.kingbase8.core.KBStream.receiveChar(KBStream.java:601)",
+          "at com.kingbase8.core.v3.QueryExecutorImpl.processResults(QueryExecutorImpl.java:2746)",
+          "at com.kingbase8.core.v3.QueryExecutorImpl.execute(QueryExecutorImpl.java:412)",
+          "at com.kingbase8.jdbc.KbStatement.executeInternal_(KbStatement.java:859)",
+          "at com.kingbase8.jdbc.KbStatement.execute(KbStatement.java:746)",
+          "at com.kingbase8.jdbc.KbPreparedStatement.executeWithFlags(KbPreparedStatement.java:290)",
+          "at com.kingbase8.jdbc.TypeInfoCache.getSQLType(TypeInfoCache.java:328)",
+          "at com.kingbase8.jdbc.KbDatabaseMetaData.getTypeInfo(KbDatabaseMetaData.java:4096)",
+          "at com.jdbctest.databasemetadata.DatabaseMetaDataTest.testGetTypeInfo(DatabaseMetaDataTest.java:263)"
+        ]
+      },
+      {
+        "elapsed_ms_since_process_start": 14308,
+        "capture_exit_code": 0,
+        "method_frames": [
+          "at sun.nio.ch.Net.poll(java.base@21.0.9/Native Method)",
+          "at java.net.Socket$SocketInputStream.read(java.base@21.0.9/Socket.java:1109)",
+          "at com.kingbase8.core.VisibleBufferedInputStream.readMore(VisibleBufferedInputStream.java:210)",
+          "at com.kingbase8.core.VisibleBufferedInputStream.ensureBytes(VisibleBufferedInputStream.java:165)",
+          "at com.kingbase8.core.VisibleBufferedInputStream.read(VisibleBufferedInputStream.java:117)",
+          "at com.kingbase8.core.KBStream.receiveChar(KBStream.java:601)",
+          "at com.kingbase8.core.v3.QueryExecutorImpl.processResults(QueryExecutorImpl.java:2746)",
+          "at com.kingbase8.core.v3.QueryExecutorImpl.execute(QueryExecutorImpl.java:412)",
+          "at com.kingbase8.jdbc.KbStatement.executeInternal_(KbStatement.java:859)",
+          "at com.kingbase8.jdbc.KbStatement.execute(KbStatement.java:746)",
+          "at com.kingbase8.jdbc.KbPreparedStatement.executeWithFlags(KbPreparedStatement.java:290)",
+          "at com.kingbase8.jdbc.TypeInfoCache.getSQLType(TypeInfoCache.java:328)",
+          "at com.kingbase8.jdbc.KbDatabaseMetaData.getTypeInfo(KbDatabaseMetaData.java:4096)",
+          "at com.jdbctest.databasemetadata.DatabaseMetaDataTest.testGetTypeInfo(DatabaseMetaDataTest.java:263)"
+        ]
+      }
+    ],
+    "cleanup": {
+      "worker_status": "SUCCESS",
+      "owned_objects_confirmed_deleted": 1,
+      "retained_objects": 0,
+      "outer_schema_drop": "verified absent by ownership-checked harness after Worker exit"
+    }
+  },
+  "source_references": [
+    "jdbc-test-worker/src/main/java/com/jdbctest/worker/WorkerMain.java#execute",
+    "jdbc-test-server/src/main/java/com/jdbctest/server/run/TestRunExecutor.java#execute",
+    "jdbc-test-suite/src/main/java/com/jdbctest/databasemetadata/DatabaseMetaDataTest.java#testGetTypeInfo"
+  ],
+  "redaction": "Allowlisted durations, counts, statuses, known product/driver versions and method-only stacks; excludes URLs, credentials, usernames, private filesystem paths, schema/object/type names and raw logs."
+}

@@ -299,6 +299,10 @@ test("TEST FIXTURE ONLY: bilingual driver presets preserve edits and render at d
     await page.getByRole("button", { name: chinese ? "恢复当前预设默认值" : "Restore current preset defaults" }).click();
     await expect(driverClass).toHaveValue("oracle.jdbc.OracleDriver");
     await expect(prefix).toHaveValue("jdbc:oracle:");
+    await chooseOption(page, preset, "kingbase");
+    await expect(vendor).toHaveValue("Kingbase");
+    await expect(driverClass).toHaveValue("com.kingbase8.Driver");
+    await expect(prefix).toHaveValue("jdbc:kingbase8:");
     await expect(page.locator("#driver-name")).toHaveValue("");
     await expect(page.locator("#driver-version")).toHaveValue("");
     for (const width of [1440, 390]) {
@@ -307,8 +311,43 @@ test("TEST FIXTURE ONLY: bilingual driver presets preserve edits and render at d
       await expect(page.getByRole("heading", { name: chinese ? "添加驱动" : "Add a driver", exact: true })).toBeVisible();
       await expect(preset).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-      await page.screenshot({ path: `test-results/fixture-driver-presets-${locale}-${width}.png`, fullPage: true });
+      await page.screenshot({ path: `test-results/fixture-kingbase-presets-${locale}-${width}.png`, fullPage: true });
     }
   }
   expect(errors).toEqual([]);
+});
+
+test("TEST FIXTURE ONLY: Kingbase candidate explains qualification in both languages", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const kingbase = {
+    id: "kingbase", name: "KingbaseES", status: "CANDIDATE", dialect: "postgresql",
+    namespaceSelection: "schema", requiresDatabase: true, driverClass: "com.kingbase8.Driver",
+    validatedCombinations: [], qualificationNoteKey: "adapter.kingbaseQualification",
+  };
+  const kingbaseDriver = {
+    ...driver, name: "Kingbase fixture driver", vendor: "Kingbase", version: "V008R006B0001",
+    driverClass: "com.kingbase8.Driver", urlPrefix: "jdbc:kingbase8:",
+  };
+  await page.route("**/api/adapters", (route) => route.fulfill({ json: [...adapters, kingbase] }));
+  await page.route(/\/api\/drivers(?:\?.*)?$/, (route) => route.fulfill({ json: paged([kingbaseDriver]) }));
+  for (const locale of ["en", "zh-CN"]) {
+    await page.addInitScript((language) => localStorage.setItem("jdbc-test.locale", language), locale);
+    await page.goto("/connections/new");
+    const chinese = locale === "zh-CN";
+    await chooseOption(page, page.locator("#adapter"), "kingbase");
+    await expect(page.locator("#database-type")).toHaveValue("KingbaseES");
+    await expect(page.getByText(chinese ? /仅用于 KingbaseES V9 有限测试/ : /Candidate for limited KingbaseES V9 testing/)).toBeVisible();
+    await expect(page.getByText(chinese ? "尚未声明已验证的版本组合。" : "No validated version combinations declared.")).toBeVisible();
+    await chooseOption(page, page.locator("#default-driver"), kingbaseDriver.id);
+    await page.locator("#connection-name").fill("TEST FIXTURE — Kingbase candidate");
+    await page.locator("#jdbc-url").fill("jdbc:kingbase8://fixture.invalid:4321/test");
+    await page.locator("#execution-database").fill("test");
+    await page.locator("#execution-schema").fill("dedicated_fixture_schema");
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.evaluate(() => window.scrollTo(0, 0));
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      await page.screenshot({ path: `test-results/fixture-kingbase-candidate-${locale}-${width}.png` });
+    }
+  }
 });

@@ -3,5 +3,6 @@
   "mysql",
   "oracle",
   "postgresql",
-  "sqlserver"
+  "sqlserver",
+  "kingbase"
 ]

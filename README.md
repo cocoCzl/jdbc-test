@@ -43,13 +43,20 @@ To run the website without source development, choose [Deployment](docs/deployme
 | Architecture, local development, APIs and Worker protocol | [Development](docs/development.md) | [开发指南](docs/development.zh-CN.md) |
 | Authorized scope, cleanup and result accounting | [Execution safety](docs/execution-safety.md) | [执行安全](docs/execution-safety.zh-CN.md) |
 
-## Supported adapters
+## Database support
 
-- PostgreSQL, MySQL and Oracle: official adapters with real-target validation evidence.
-- GaussDB and SQL Server: implemented adapters awaiting real-instance validation.
-- Other databases: local declarative adapters without changes to Java core.
+| Database | Adapter ID | Status | Verified scope |
+|---|---|---|---|
+| PostgreSQL | `postgresql` | Official | PostgreSQL 15.2 / pgjdbc 42.7.2 |
+| MySQL | `mysql` | Official | MySQL 8.0.30 / Connector/J 8.3.0 |
+| Oracle | `oracle` | Official | Oracle 19.3 / ojdbc11 21.13 |
+| GaussDB | `gaussdb` | Candidate | Awaiting real-instance validation |
+| SQL Server | `sqlserver` | Candidate | Awaiting real-instance validation |
+| KingbaseES | `kingbase` | Candidate | Limited tests: V009R002C016, oracle mode, JDBC database version 12.1 / driver V008R006B0001; full CORE not passed |
 
-See [verified combinations](docs/execution-safety.md#verified-combinations) for exact versions and acceptance limits.
+Official status applies to the recorded combinations, not every version. Driver presets assist upload; they do not establish database compatibility. Other products can use local declarative adapters.
+
+See [verified combinations](docs/execution-safety.md#verified-combinations) and [KingbaseES candidate observations](docs/execution-safety.md#kingbasees-candidate-observations) for results and limits.
 
 ## Development requirements
 

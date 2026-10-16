@@ -9,7 +9,8 @@ import java.util.Map;
  */
 public record AdapterResponse(String id, String name, String status, String dialect,
     String namespaceSelection, boolean requiresDatabase, String driverClass,
-    String recommendedMavenCoordinate, List<ValidatedCombination> validatedCombinations) {
+    String recommendedMavenCoordinate, List<ValidatedCombination> validatedCombinations,
+    String qualificationNoteKey) {
 
     static AdapterResponse from(AdapterDefinition definition) {
         var metadata = definition.metadata();
@@ -24,7 +25,8 @@ public record AdapterResponse(String id, String name, String status, String dial
                 Map<?, ?> combination = (Map<?, ?>) item;
                 return new ValidatedCombination((String) combination.get("database_version"),
                     (String) combination.get("driver_version"));
-            }).toList());
+            }).toList(), definition.declaration().get("qualification_note_key") instanceof String key
+                ? key : null);
     }
 
     record ValidatedCombination(String databaseVersion, String driverVersion) {

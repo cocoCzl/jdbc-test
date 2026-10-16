@@ -1,0 +1,732 @@
+{
+  "record_kind": "partial_validation",
+  "qualification": "candidate",
+  "complete_core_passed": false,
+  "combination": {
+    "database_product": "KingbaseES",
+    "server_build": "V009R002C016",
+    "compatibility_mode": "oracle",
+    "jdbc_database_version": "12.1",
+    "driver_name": "Kingbase8 JDBC Driver",
+    "driver_version": "V008R006B0001",
+    "driver_artifact_sha256": "662ad6f0646cc3fb9b552c9fff93e09bf9eb12e4a9f33f0dec18a624cb48104c"
+  },
+  "provenance": {
+    "source": "allowlisted projection of previously sanitized Worker protocol 2 events; not a complete original Worker report",
+    "execution_route": "standalone harness -> isolated Worker -> catalog/JUnit scenarios -> owned cleanup/report; no Web/Server queue/persistence/SSE acceptance",
+    "historical_request_limitation": "original private requests and full Worker report were deleted during cleanup; no historical request/Worker binary hash is asserted",
+    "event_timing_semantics": "CASE durationMs uses Worker monotonic time, includes JUnit parameter/afterEach lifecycle; excludes beforeAll fixture setup and final cleanup. Timeline uses UTC wall timestamps, not a shared monotonic clock."
+  },
+  "selected_20": {
+    "runId": "kingbase-scoped-2d520c08",
+    "selection": {
+      "profile": "FULL",
+      "modules": [],
+      "includeScenarios": [
+        "connection.commit",
+        "connection.rollback",
+        "connection.is_valid",
+        "connection.get_meta_data",
+        "connection.catalog_and_schema",
+        "database_metadata.get_database_product_name",
+        "database_metadata.get_driver_version",
+        "parameter_metadata.get_parameter_count",
+        "prepared_statement.set_boolean",
+        "prepared_statement.set_timestamp",
+        "prepared_statement.execute_update",
+        "prepared_statement.get_generated_keys",
+        "savepoint.set_savepoint",
+        "savepoint.release_savepoint",
+        "savepoint.rollback_to_savepoint",
+        "savepoint.write_after_savepoint_rollback",
+        "statement.execute_insert",
+        "statement.execute_query",
+        "statement.get_generated_keys",
+        "statement.execute_update_ddl"
+      ],
+      "excludeScenarios": []
+    },
+    "adapter_resolution": "bundled kingbase (no adapterExecution override), per original harness record",
+    "worker_timeout_ms": 60000,
+    "overall_status": "PASSED",
+    "termination_reason": "COMPLETED",
+    "selected": 20,
+    "started": 20,
+    "completed": 20,
+    "passed": 20,
+    "failed": 0,
+    "aborted": 0,
+    "skipped": 0,
+    "case_duration_sum_ms": 8744,
+    "worker_event_span_ms": 22094.53,
+    "cases": [
+      {
+        "scenarioId": "connection.commit",
+        "status": "PASSED",
+        "durationMs": 505,
+        "startedAt": "2026-10-16T09:05:39.856902Z",
+        "finishedAt": "2026-10-16T09:05:40.362405Z",
+        "content": "手动事务提交后查询确认删除结果",
+        "alsoPassedInCoreExploration": true,
+        "sourceClass": "com.jdbctest.connection.ConnectionTest",
+        "sourceMethod": "testCommit"
+      },
+      {
+        "scenarioId": "connection.rollback",
+        "status": "PASSED",
+        "durationMs": 490,
+        "startedAt": "2026-10-16T09:05:40.363306Z",
+        "finishedAt": "2026-10-16T09:05:40.853940Z",
+        "content": "删除后回滚并确认原有测试行恢复",
+        "alsoPassedInCoreExploration": true,
+        "sourceClass": "com.jdbctest.connection.ConnectionTest",
+        "sourceMethod": "testRollback"
+      },
+      {
+        "scenarioId": "connection.is_valid",
+        "status": "PASSED",
+        "durationMs": 379,
+        "startedAt": "2026-10-16T09:05:40.854504Z",
+        "finishedAt": "2026-10-16T09:05:41.233896Z",
+        "content": "有效连接 isValid(5) 返回 true",
+        "alsoPassedInCoreExploration": true,
+        "sourceClass": "com.jdbctest.connection.ConnectionTest",
+        "sourceMethod": "testIsValid"
+      },
+      {
+        "scenarioId": "connection.get_meta_data",
+        "status": "PASSED",
+        "durationMs": 352,
+        "startedAt": "2026-10-16T09:05:41.234787Z",
+        "finishedAt": "2026-10-16T09:05:41.586892Z",
+        "content": "取得非空元数据，核对产品名、驱动名及驱动版本非空",
+        "alsoPassedInCoreExploration": true,
+        "sourceClass": "com.jdbctest.connection.ConnectionTest",
+        "sourceMethod": "testGetMetaData"
+      },
+      {
+        "scenarioId": "connection.catalog_and_schema",
+        "status": "PASSED",
+        "durationMs": 460,
+        "startedAt": "2026-10-16T09:05:41.588257Z",
+        "finishedAt": "2026-10-16T09:05:42.048885Z",
+        "content": "读取 catalog/schema，将非空当前值设回，断言操作不抛异常；不测试切换到另一个 schema",
+        "alsoPassedInCoreExploration": true,
+        "sourceClass": "com.jdbctest.connection.ConnectionTest",
+        "sourceMethod": "testCatalogAndSchema"
+      },
+      {
+        "scenarioId": "database_metadata.get_database_product_name",
+        "status": "PASSED",
+        "durationMs": 344,
+        "startedAt": "2026-10-16T09:05:43.553768Z",
+        "finishedAt": "2026-10-16T09:05:43.897926Z",
+        "content": "数据库产品名称非空",
+        "alsoPassedInCoreExploration": true,
+        "sourceClass": "com.jdbctest.databasemetadata.DatabaseMetaDataTest",
+        "sourceMethod": "testGetDatabaseProductName"
+      },
+      {
+        "scenarioId": "database_metadata.get_driver_version",
+        "status": "PASSED",
+        "durationMs": 347,
+        "startedAt": "2026-10-16T09:05:43.899636Z",
+        "finishedAt": "2026-10-16T09:05:44.247134Z",
+        "content": "JDBC 驱动版本字符串非空",
+        "alsoPassedInCoreExploration": true,
+        "sourceClass": "com.jdbctest.databasemetadata.DatabaseMetaDataTest",
+        "sourceMethod": "testGetDriverVersion"
+      },
+      {
+        "scenarioId": "parameter_metadata.get_parameter_count",
+        "status": "PASSED",
+        "durationMs": 420,
+        "startedAt": "2026-10-16T09:05:48.211565Z",
+        "finishedAt": "2026-10-16T09:05:48.631601Z",
+        "content": "预编译查询的 ParameterMetaData.getParameterCount() 等于 3",
+        "alsoPassedInCoreExploration": false,
+        "sourceClass": "com.jdbctest.parametermetadata.ParameterMetaDataTest",
+        "sourceMethod": "testGetParameterCount"
+      },
+      {
+        "scenarioId": "prepared_statement.set_boolean",
+        "status": "PASSED",
+        "durationMs": 376,
+        "startedAt": "2026-10-16T09:05:50.388507Z",
+        "finishedAt": "2026-10-16T09:05:50.764842Z",
+        "content": "绑定 true 查询，断言有数据行且 active 列为 true",
+        "alsoPassedInCoreExploration": false,
+        "sourceClass": "com.jdbctest.preparedstatement.PreparedStatementTest",
+        "sourceMethod": "testSetBoolean"
+      },
+      {
+        "scenarioId": "prepared_statement.set_timestamp",
+        "status": "PASSED",
+        "durationMs": 387,
+        "startedAt": "2026-10-16T09:05:50.766247Z",
+        "finishedAt": "2026-10-16T09:05:51.154202Z",
+        "content": "绑定时间戳查询 created_at 大于阈值的数据，断言有数据行",
+        "alsoPassedInCoreExploration": false,
+        "sourceClass": "com.jdbctest.preparedstatement.PreparedStatementTest",
+        "sourceMethod": "testSetTimestamp"
+      },
+      {
+        "scenarioId": "prepared_statement.execute_update",
+        "status": "PASSED",
+        "durationMs": 398,
+        "startedAt": "2026-10-16T09:05:51.155962Z",
+        "finishedAt": "2026-10-16T09:05:51.554451Z",
+        "content": "执行预编译更新并断言影响行数",
+        "alsoPassedInCoreExploration": false,
+        "sourceClass": "com.jdbctest.preparedstatement.PreparedStatementTest",
+        "sourceMethod": "testExecuteUpdate"
+      },
+      {
+        "scenarioId": "prepared_statement.get_generated_keys",
+        "status": "PASSED",
+        "durationMs": 395,
+        "startedAt": "2026-10-16T09:05:51.555800Z",
+        "finishedAt": "2026-10-16T09:05:51.950949Z",
+        "content": "预编译插入后取得生成键，断言数值大于 0",
+        "alsoPassedInCoreExploration": false,
+        "sourceClass": "com.jdbctest.preparedstatement.PreparedStatementTest",
+        "sourceMethod": "testGetGeneratedKeys"
+      },
+      {
+        "scenarioId": "savepoint.set_savepoint",
+        "status": "PASSED",
+        "durationMs": 461,
+        "startedAt": "2026-10-16T09:05:53.335912Z",
+        "finishedAt": "2026-10-16T09:05:53.797472Z",
+        "content": "创建非空保存点并回滚到该保存点",
+        "alsoPassedInCoreExploration": false,
+        "sourceClass": "com.jdbctest.savepoint.SavepointTest",
+        "sourceMethod": "testSetSavepoint"
+      },
+      {
+        "scenarioId": "savepoint.release_savepoint",
+        "status": "PASSED",
+        "durationMs": 448,
+        "startedAt": "2026-10-16T09:05:53.799791Z",
+        "finishedAt": "2026-10-16T09:05:54.247993Z",
+        "content": "创建命名保存点并释放",
+        "alsoPassedInCoreExploration": false,
+        "sourceClass": "com.jdbctest.savepoint.SavepointTest",
+        "sourceMethod": "testReleaseSavepoint"
+      },
+      {
+        "scenarioId": "savepoint.rollback_to_savepoint",
+        "status": "PASSED",
+        "durationMs": 630,
+        "startedAt": "2026-10-16T09:05:54.249913Z",
+        "finishedAt": "2026-10-16T09:05:54.880167Z",
+        "content": "保存点之后插入数据，回滚后断言插入已撤销",
+        "alsoPassedInCoreExploration": false,
+        "sourceClass": "com.jdbctest.savepoint.SavepointTest",
+        "sourceMethod": "testRollbackToSavepoint"
+      },
+      {
+        "scenarioId": "savepoint.write_after_savepoint_rollback",
+        "status": "PASSED",
+        "durationMs": 557,
+        "startedAt": "2026-10-16T09:05:54.880979Z",
+        "finishedAt": "2026-10-16T09:05:55.438898Z",
+        "content": "回滚到保存点后继续写入，仅保留后一次写入，再整体回滚",
+        "alsoPassedInCoreExploration": false,
+        "sourceClass": "com.jdbctest.savepoint.SavepointTest",
+        "sourceMethod": "testWriteAfterSavepointRollback"
+      },
+      {
+        "scenarioId": "statement.execute_insert",
+        "status": "PASSED",
+        "durationMs": 391,
+        "startedAt": "2026-10-16T09:05:56.980302Z",
+        "finishedAt": "2026-10-16T09:05:57.371557Z",
+        "content": "Statement.execute 插入，断言无结果集且更新计数为 1",
+        "alsoPassedInCoreExploration": false,
+        "sourceClass": "com.jdbctest.statement.StatementTest",
+        "sourceMethod": "testExecuteInsert"
+      },
+      {
+        "scenarioId": "statement.execute_query",
+        "status": "PASSED",
+        "durationMs": 395,
+        "startedAt": "2026-10-16T09:05:57.372006Z",
+        "finishedAt": "2026-10-16T09:05:57.767756Z",
+        "content": "取得结果集，断言存在首行且 name 列为预期夹具值",
+        "alsoPassedInCoreExploration": false,
+        "sourceClass": "com.jdbctest.statement.StatementTest",
+        "sourceMethod": "testExecuteQuery"
+      },
+      {
+        "scenarioId": "statement.get_generated_keys",
+        "status": "PASSED",
+        "durationMs": 403,
+        "startedAt": "2026-10-16T09:05:57.769079Z",
+        "finishedAt": "2026-10-16T09:05:58.172341Z",
+        "content": "Statement 插入后取得生成键，断言数值大于 0",
+        "alsoPassedInCoreExploration": false,
+        "sourceClass": "com.jdbctest.statement.StatementTest",
+        "sourceMethod": "testGetGeneratedKeys"
+      },
+      {
+        "scenarioId": "statement.execute_update_ddl",
+        "status": "PASSED",
+        "durationMs": 606,
+        "startedAt": "2026-10-16T09:05:58.173457Z",
+        "finishedAt": "2026-10-16T09:05:58.780258Z",
+        "content": "创建自有临时表，断言 CREATE 的更新计数为 0，再按所有权记录删除",
+        "alsoPassedInCoreExploration": false,
+        "sourceClass": "com.jdbctest.statement.StatementTest",
+        "sourceMethod": "testExecuteUpdateDDL"
+      }
+    ],
+    "metadata": {
+      "databaseProductVersion": "12.1",
+      "driverName": "Kingbase8 JDBC Driver",
+      "databaseProductName": "KingbaseES",
+      "status": "MATCHED",
+      "driverVersion": "V008R006B0001"
+    },
+    "cleanup": {
+      "worker_status": "SUCCESS",
+      "owned_objects_confirmed_deleted": 8,
+      "retained_objects": 0,
+      "outer_schema_drop": "verified absent per original harness cleanup record"
+    }
+  },
+  "core_exploration": {
+    "runId": "kingbase-initial-core",
+    "selection": {
+      "profile": "CORE",
+      "modules": [],
+      "includeScenarios": [],
+      "excludeScenarios": []
+    },
+    "adapter_resolution": "explicit candidate execution snapshot, per original harness record; not bundled Kingbase in that earlier binary",
+    "worker_timeout_ms": 90000,
+    "overall_status": "TIMEOUT",
+    "selected": 153,
+    "started": 43,
+    "completed": 42,
+    "passed": 42,
+    "failed": 0,
+    "aborted": 0,
+    "skipped": 0,
+    "incomplete": [
+      "database_metadata.get_type_info"
+    ],
+    "not_started_count": 110,
+    "case_duration_sum_ms": 75172,
+    "worker_event_span_ms": 90042.113,
+    "active_case_start_offset_ms": 80468.754,
+    "active_case_elapsed_until_timeout_ms": 9573.359,
+    "cases": [
+      {
+        "scenarioId": "connection.bulk_transaction_rollback",
+        "status": "PASSED",
+        "durationMs": 27505,
+        "startedAt": "2026-10-16T08:59:08.688572Z",
+        "finishedAt": "2026-10-16T08:59:36.193717Z",
+        "sourceClass": "com.jdbctest.connection.BulkTransactionTest",
+        "sourceMethod": "testBulkTransactionRollback"
+      },
+      {
+        "scenarioId": "connection.bulk_transaction_commit",
+        "status": "PASSED",
+        "durationMs": 26667,
+        "startedAt": "2026-10-16T08:59:36.196452Z",
+        "finishedAt": "2026-10-16T09:00:02.864418Z",
+        "sourceClass": "com.jdbctest.connection.BulkTransactionTest",
+        "sourceMethod": "testBulkTransactionCommit"
+      },
+      {
+        "scenarioId": "connection.get_auto_commit",
+        "status": "PASSED",
+        "durationMs": 353,
+        "startedAt": "2026-10-16T09:00:04.455236Z",
+        "finishedAt": "2026-10-16T09:00:04.808726Z",
+        "sourceClass": "com.jdbctest.connection.ConnectionTest",
+        "sourceMethod": "testGetAutoCommit"
+      },
+      {
+        "scenarioId": "connection.set_auto_commit",
+        "status": "PASSED",
+        "durationMs": 348,
+        "startedAt": "2026-10-16T09:00:04.809985Z",
+        "finishedAt": "2026-10-16T09:00:05.158023Z",
+        "sourceClass": "com.jdbctest.connection.ConnectionTest",
+        "sourceMethod": "testSetAutoCommit"
+      },
+      {
+        "scenarioId": "connection.commit",
+        "status": "PASSED",
+        "durationMs": 498,
+        "startedAt": "2026-10-16T09:00:05.159323Z",
+        "finishedAt": "2026-10-16T09:00:05.657743Z",
+        "content": "手动事务提交后查询确认删除结果",
+        "sourceClass": "com.jdbctest.connection.ConnectionTest",
+        "sourceMethod": "testCommit"
+      },
+      {
+        "scenarioId": "connection.rollback",
+        "status": "PASSED",
+        "durationMs": 505,
+        "startedAt": "2026-10-16T09:00:05.659398Z",
+        "finishedAt": "2026-10-16T09:00:06.164536Z",
+        "content": "删除后回滚并确认原有测试行恢复",
+        "sourceClass": "com.jdbctest.connection.ConnectionTest",
+        "sourceMethod": "testRollback"
+      },
+      {
+        "scenarioId": "connection.transaction_isolation",
+        "status": "PASSED",
+        "durationMs": 583,
+        "startedAt": "2026-10-16T09:00:06.165793Z",
+        "finishedAt": "2026-10-16T09:00:06.749576Z",
+        "sourceClass": "com.jdbctest.connection.ConnectionTest",
+        "sourceMethod": "testTransactionIsolation"
+      },
+      {
+        "scenarioId": "connection.read_only",
+        "status": "PASSED",
+        "durationMs": 361,
+        "startedAt": "2026-10-16T09:00:06.750977Z",
+        "finishedAt": "2026-10-16T09:00:07.112334Z",
+        "sourceClass": "com.jdbctest.connection.ConnectionTest",
+        "sourceMethod": "testReadOnly"
+      },
+      {
+        "scenarioId": "connection.create_statement",
+        "status": "PASSED",
+        "durationMs": 346,
+        "startedAt": "2026-10-16T09:00:07.113615Z",
+        "finishedAt": "2026-10-16T09:00:07.459958Z",
+        "sourceClass": "com.jdbctest.connection.ConnectionTest",
+        "sourceMethod": "testCreateStatement"
+      },
+      {
+        "scenarioId": "connection.prepare_statement",
+        "status": "PASSED",
+        "durationMs": 387,
+        "startedAt": "2026-10-16T09:00:07.460772Z",
+        "finishedAt": "2026-10-16T09:00:07.847890Z",
+        "sourceClass": "com.jdbctest.connection.ConnectionTest",
+        "sourceMethod": "testPrepareStatement"
+      },
+      {
+        "scenarioId": "connection.is_valid",
+        "status": "PASSED",
+        "durationMs": 412,
+        "startedAt": "2026-10-16T09:00:07.849362Z",
+        "finishedAt": "2026-10-16T09:00:08.261543Z",
+        "content": "有效连接 isValid(5) 返回 true",
+        "sourceClass": "com.jdbctest.connection.ConnectionTest",
+        "sourceMethod": "testIsValid"
+      },
+      {
+        "scenarioId": "connection.get_meta_data",
+        "status": "PASSED",
+        "durationMs": 367,
+        "startedAt": "2026-10-16T09:00:08.262475Z",
+        "finishedAt": "2026-10-16T09:00:08.629780Z",
+        "content": "取得非空元数据，核对产品名、驱动名及驱动版本非空",
+        "sourceClass": "com.jdbctest.connection.ConnectionTest",
+        "sourceMethod": "testGetMetaData"
+      },
+      {
+        "scenarioId": "connection.warnings",
+        "status": "PASSED",
+        "durationMs": 341,
+        "startedAt": "2026-10-16T09:00:08.630875Z",
+        "finishedAt": "2026-10-16T09:00:08.972858Z",
+        "sourceClass": "com.jdbctest.connection.ConnectionTest",
+        "sourceMethod": "testWarnings"
+      },
+      {
+        "scenarioId": "connection.close",
+        "status": "PASSED",
+        "durationMs": 345,
+        "startedAt": "2026-10-16T09:00:08.974109Z",
+        "finishedAt": "2026-10-16T09:00:09.319604Z",
+        "sourceClass": "com.jdbctest.connection.ConnectionTest",
+        "sourceMethod": "testClose"
+      },
+      {
+        "scenarioId": "connection.native_sql",
+        "status": "PASSED",
+        "durationMs": 357,
+        "startedAt": "2026-10-16T09:00:09.321609Z",
+        "finishedAt": "2026-10-16T09:00:09.679018Z",
+        "sourceClass": "com.jdbctest.connection.ConnectionTest",
+        "sourceMethod": "testNativeSql"
+      },
+      {
+        "scenarioId": "connection.catalog_and_schema",
+        "status": "PASSED",
+        "durationMs": 447,
+        "startedAt": "2026-10-16T09:00:09.680099Z",
+        "finishedAt": "2026-10-16T09:00:10.127274Z",
+        "content": "读取 catalog/schema，将非空当前值设回，断言操作不抛异常；不测试切换到另一个 schema",
+        "sourceClass": "com.jdbctest.connection.ConnectionTest",
+        "sourceMethod": "testCatalogAndSchema"
+      },
+      {
+        "scenarioId": "connection.holdability",
+        "status": "PASSED",
+        "durationMs": 338,
+        "startedAt": "2026-10-16T09:00:10.128026Z",
+        "finishedAt": "2026-10-16T09:00:10.466608Z",
+        "sourceClass": "com.jdbctest.connection.ConnectionTest",
+        "sourceMethod": "testHoldability"
+      },
+      {
+        "scenarioId": "connection.client_info",
+        "status": "PASSED",
+        "durationMs": 335,
+        "startedAt": "2026-10-16T09:00:10.468437Z",
+        "finishedAt": "2026-10-16T09:00:10.803870Z",
+        "sourceClass": "com.jdbctest.connection.ConnectionTest",
+        "sourceMethod": "testClientInfo"
+      },
+      {
+        "scenarioId": "connection.network_timeout",
+        "status": "PASSED",
+        "durationMs": 352,
+        "startedAt": "2026-10-16T09:00:10.805059Z",
+        "finishedAt": "2026-10-16T09:00:11.157204Z",
+        "sourceClass": "com.jdbctest.connection.ConnectionTest",
+        "sourceMethod": "testNetworkTimeout"
+      },
+      {
+        "scenarioId": "connection.commit_visible_to_new_connection",
+        "status": "PASSED",
+        "durationMs": 986,
+        "startedAt": "2026-10-16T09:00:12.139437Z",
+        "finishedAt": "2026-10-16T09:00:13.125546Z",
+        "sourceClass": "com.jdbctest.connection.TransactionBehaviorTest",
+        "sourceMethod": "testCommitVisibleToNewConnection"
+      },
+      {
+        "scenarioId": "connection.rollback_and_close",
+        "status": "PASSED",
+        "durationMs": 787,
+        "startedAt": "2026-10-16T09:00:13.126773Z",
+        "finishedAt": "2026-10-16T09:00:13.914699Z",
+        "sourceClass": "com.jdbctest.connection.TransactionBehaviorTest",
+        "sourceMethod": "testRollbackAndClose"
+      },
+      {
+        "scenarioId": "connection.write_after_rollback",
+        "status": "PASSED",
+        "durationMs": 2359,
+        "startedAt": "2026-10-16T09:00:13.915951Z",
+        "finishedAt": "2026-10-16T09:00:16.275289Z",
+        "sourceClass": "com.jdbctest.connection.TransactionBehaviorTest",
+        "sourceMethod": "testWriteAfterRollback"
+      },
+      {
+        "scenarioId": "connection.multiple_operations_rollback",
+        "status": "PASSED",
+        "durationMs": 1261,
+        "startedAt": "2026-10-16T09:00:16.276463Z",
+        "finishedAt": "2026-10-16T09:00:17.537950Z",
+        "sourceClass": "com.jdbctest.connection.TransactionBehaviorTest",
+        "sourceMethod": "testMultipleOperationsRollback"
+      },
+      {
+        "scenarioId": "connection.consecutive_transactions",
+        "status": "PASSED",
+        "durationMs": 1725,
+        "startedAt": "2026-10-16T09:00:17.538777Z",
+        "finishedAt": "2026-10-16T09:00:19.264512Z",
+        "sourceClass": "com.jdbctest.connection.TransactionBehaviorTest",
+        "sourceMethod": "testConsecutiveTransactions"
+      },
+      {
+        "scenarioId": "connection.enable_auto_commit_commits_pending_work",
+        "status": "PASSED",
+        "durationMs": 943,
+        "startedAt": "2026-10-16T09:00:19.265895Z",
+        "finishedAt": "2026-10-16T09:00:20.209692Z",
+        "sourceClass": "com.jdbctest.connection.TransactionBehaviorTest",
+        "sourceMethod": "testEnableAutoCommitCommitsPendingWork"
+      },
+      {
+        "scenarioId": "database_metadata.get_database_product_name",
+        "status": "PASSED",
+        "durationMs": 339,
+        "startedAt": "2026-10-16T09:00:21.692107Z",
+        "finishedAt": "2026-10-16T09:00:22.031311Z",
+        "content": "数据库产品名称非空",
+        "sourceClass": "com.jdbctest.databasemetadata.DatabaseMetaDataTest",
+        "sourceMethod": "testGetDatabaseProductName"
+      },
+      {
+        "scenarioId": "database_metadata.get_database_product_version",
+        "status": "PASSED",
+        "durationMs": 345,
+        "startedAt": "2026-10-16T09:00:22.032590Z",
+        "finishedAt": "2026-10-16T09:00:22.378116Z",
+        "sourceClass": "com.jdbctest.databasemetadata.DatabaseMetaDataTest",
+        "sourceMethod": "testGetDatabaseProductVersion"
+      },
+      {
+        "scenarioId": "database_metadata.get_driver_name",
+        "status": "PASSED",
+        "durationMs": 340,
+        "startedAt": "2026-10-16T09:00:22.379615Z",
+        "finishedAt": "2026-10-16T09:00:22.720359Z",
+        "sourceClass": "com.jdbctest.databasemetadata.DatabaseMetaDataTest",
+        "sourceMethod": "testGetDriverName"
+      },
+      {
+        "scenarioId": "database_metadata.get_driver_version",
+        "status": "PASSED",
+        "durationMs": 343,
+        "startedAt": "2026-10-16T09:00:22.720882Z",
+        "finishedAt": "2026-10-16T09:00:23.064092Z",
+        "content": "JDBC 驱动版本字符串非空",
+        "sourceClass": "com.jdbctest.databasemetadata.DatabaseMetaDataTest",
+        "sourceMethod": "testGetDriverVersion"
+      },
+      {
+        "scenarioId": "database_metadata.get_url",
+        "status": "PASSED",
+        "durationMs": 388,
+        "startedAt": "2026-10-16T09:00:23.065559Z",
+        "finishedAt": "2026-10-16T09:00:23.454476Z",
+        "sourceClass": "com.jdbctest.databasemetadata.DatabaseMetaDataTest",
+        "sourceMethod": "testGetURL"
+      },
+      {
+        "scenarioId": "database_metadata.get_user_name",
+        "status": "PASSED",
+        "durationMs": 361,
+        "startedAt": "2026-10-16T09:00:23.455466Z",
+        "finishedAt": "2026-10-16T09:00:23.816786Z",
+        "sourceClass": "com.jdbctest.databasemetadata.DatabaseMetaDataTest",
+        "sourceMethod": "testGetUserName"
+      },
+      {
+        "scenarioId": "database_metadata.get_tables",
+        "status": "PASSED",
+        "durationMs": 459,
+        "startedAt": "2026-10-16T09:00:23.817562Z",
+        "finishedAt": "2026-10-16T09:00:24.277440Z",
+        "sourceClass": "com.jdbctest.databasemetadata.DatabaseMetaDataTest",
+        "sourceMethod": "testGetTables"
+      },
+      {
+        "scenarioId": "database_metadata.get_columns",
+        "status": "PASSED",
+        "durationMs": 434,
+        "startedAt": "2026-10-16T09:00:24.278832Z",
+        "finishedAt": "2026-10-16T09:00:24.713373Z",
+        "sourceClass": "com.jdbctest.databasemetadata.DatabaseMetaDataTest",
+        "sourceMethod": "testGetColumns"
+      },
+      {
+        "scenarioId": "database_metadata.get_primary_keys",
+        "status": "PASSED",
+        "durationMs": 420,
+        "startedAt": "2026-10-16T09:00:24.714566Z",
+        "finishedAt": "2026-10-16T09:00:25.135452Z",
+        "sourceClass": "com.jdbctest.databasemetadata.DatabaseMetaDataTest",
+        "sourceMethod": "testGetPrimaryKeys"
+      },
+      {
+        "scenarioId": "database_metadata.get_schemas",
+        "status": "PASSED",
+        "durationMs": 374,
+        "startedAt": "2026-10-16T09:00:25.136730Z",
+        "finishedAt": "2026-10-16T09:00:25.511513Z",
+        "sourceClass": "com.jdbctest.databasemetadata.DatabaseMetaDataTest",
+        "sourceMethod": "testGetSchemas"
+      },
+      {
+        "scenarioId": "database_metadata.get_catalogs",
+        "status": "PASSED",
+        "durationMs": 371,
+        "startedAt": "2026-10-16T09:00:25.512957Z",
+        "finishedAt": "2026-10-16T09:00:25.884256Z",
+        "sourceClass": "com.jdbctest.databasemetadata.DatabaseMetaDataTest",
+        "sourceMethod": "testGetCatalogs"
+      },
+      {
+        "scenarioId": "database_metadata.jdbc_version",
+        "status": "PASSED",
+        "durationMs": 339,
+        "startedAt": "2026-10-16T09:00:25.885393Z",
+        "finishedAt": "2026-10-16T09:00:26.225325Z",
+        "sourceClass": "com.jdbctest.databasemetadata.DatabaseMetaDataTest",
+        "sourceMethod": "testJDBCVersion"
+      },
+      {
+        "scenarioId": "database_metadata.database_version",
+        "status": "PASSED",
+        "durationMs": 344,
+        "startedAt": "2026-10-16T09:00:26.226920Z",
+        "finishedAt": "2026-10-16T09:00:26.570953Z",
+        "sourceClass": "com.jdbctest.databasemetadata.DatabaseMetaDataTest",
+        "sourceMethod": "testDatabaseVersion"
+      },
+      {
+        "scenarioId": "database_metadata.get_max_connections",
+        "status": "PASSED",
+        "durationMs": 351,
+        "startedAt": "2026-10-16T09:00:26.572538Z",
+        "finishedAt": "2026-10-16T09:00:26.924505Z",
+        "sourceClass": "com.jdbctest.databasemetadata.DatabaseMetaDataTest",
+        "sourceMethod": "testGetMaxConnections"
+      },
+      {
+        "scenarioId": "database_metadata.supports_transactions",
+        "status": "PASSED",
+        "durationMs": 341,
+        "startedAt": "2026-10-16T09:00:26.926538Z",
+        "finishedAt": "2026-10-16T09:00:27.268187Z",
+        "sourceClass": "com.jdbctest.databasemetadata.DatabaseMetaDataTest",
+        "sourceMethod": "testSupportsTransactions"
+      },
+      {
+        "scenarioId": "database_metadata.supports_batch_updates",
+        "status": "PASSED",
+        "durationMs": 360,
+        "startedAt": "2026-10-16T09:00:27.269431Z",
+        "finishedAt": "2026-10-16T09:00:27.629683Z",
+        "sourceClass": "com.jdbctest.databasemetadata.DatabaseMetaDataTest",
+        "sourceMethod": "testSupportsBatchUpdates"
+      },
+      {
+        "scenarioId": "database_metadata.supports_savepoints",
+        "status": "PASSED",
+        "durationMs": 355,
+        "startedAt": "2026-10-16T09:00:27.630222Z",
+        "finishedAt": "2026-10-16T09:00:27.985512Z",
+        "sourceClass": "com.jdbctest.databasemetadata.DatabaseMetaDataTest",
+        "sourceMethod": "testSupportsSavepoints"
+      }
+    ],
+    "worker_cleanup_at_timeout": "UNKNOWN_PENDING_PROCESS_EXIT",
+    "outer_schema_drop": "verified absent after process exit per original harness cleanup record"
+  },
+  "overlap": {
+    "count": 7,
+    "scenario_ids": [
+      "connection.catalog_and_schema",
+      "connection.commit",
+      "connection.get_meta_data",
+      "connection.is_valid",
+      "connection.rollback",
+      "database_metadata.get_database_product_name",
+      "database_metadata.get_driver_version"
+    ],
+    "counting_policy": "Do not add 20 and 42. Statuses are checked from CASE_FINISHED events; completion alone is not success."
+  },
+  "source_event_sha256": {
+    "initial-core.ndjson": "a45799b05ec8abea09ed3c0f537d198f048fe37d6b30be00366ac2a60ca22365",
+    "scoped-smoke.ndjson": "f5df06370d1f2c4a677d966c3848169303e10169fa09a5526332e7c0ab752df4"
+  },
+  "validated_combinations_policy": "Not registered: these are partial/diagnostic runs, not target_compatible full-suite certification. Existing validators check metadata/path shape, not certification completeness."
+}

@@ -58,6 +58,44 @@ class MetadataPreflightTest {
     }
 
     @Test
+    void kingbaseIdentityRejectsOtherProductsAndDriversBeforeWrites() throws Exception {
+        var constraints = com.jdbctest.catalog.AdapterExecutionConfig.load("kingbase")
+            .metadataConstraints();
+        for (String[] identity : new String[][] {
+            {"PostgreSQL", "Kingbase8 JDBC Driver"},
+            {"KingbaseES", "PostgreSQL JDBC Driver"},
+            {"KingbaseES-compatible PostgreSQL", "Kingbase8 JDBC Driver"}}) {
+            Config config = config();
+            config.db.adapterId = "kingbase";
+            config.db.expectedDatabaseProductRegex =
+                constraints.get("expected_database_product_regex");
+            config.db.expectedDriverNameRegex = constraints.get("expected_driver_name_regex");
+            config.db.databaseVersionMin = null;
+            config.db.databaseVersionMax = null;
+            config.db.driverVersionMin = null;
+            config.db.driverVersionMax = null;
+            DatabaseMetaData metadata = mock(DatabaseMetaData.class);
+            when(metadata.getDatabaseProductName()).thenReturn(identity[0]);
+            when(metadata.getDriverName()).thenReturn(identity[1]);
+            Connection connection = mock(Connection.class);
+            when(connection.getMetaData()).thenReturn(metadata);
+            Driver driver = mock(Driver.class);
+            when(driver.connect(anyString(), any())).thenReturn(connection);
+            JdbcContext.setIsolatedDriver(driver);
+            try {
+                assertEquals("ADAPTER_PREFLIGHT_FAILED",
+                    assertThrows(IllegalStateException.class,
+                        () -> JdbcContext.init(config)).getMessage());
+                assertEquals("REJECTED", JdbcContext.metadataEvidence().get("status"));
+                verify(connection, never()).createStatement();
+                verify(connection, never()).prepareStatement(anyString());
+            } finally {
+                JdbcContext.shutdown();
+            }
+        }
+    }
+
+    @Test
     void oracleDependencyFailurePrecedesNamespaceAndFixtureWrites() throws Exception {
         for (boolean sqlxml : new boolean[] {true, false}) {
             Config config = config();

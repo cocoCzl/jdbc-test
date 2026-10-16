@@ -9,6 +9,9 @@ export function AdapterDetails({ adapter }: { adapter?: Adapter }) {
     <div className="space-y-2 rounded-xl border border-border bg-muted/30 p-4 text-sm">
       <p className="font-medium">{adapter.name} · {adapterStatus(adapter.status)}</p>
       <p className="text-muted-foreground">{t("adapter.declarationBoundary")}</p>
+      {adapter.qualificationNoteKey ? (
+        <p className="text-muted-foreground">{t(adapter.qualificationNoteKey)}</p>
+      ) : null}
       {adapter.dialect ? <p>{t("adapter.dialect", { value: adapter.dialect })}</p> : null}
       {adapter.namespaceSelection ? <p>{t(`adapter.scope.${adapter.namespaceSelection}`)}</p> : null}
       {adapter.driverClass ? <p className="break-all">{t("adapter.driverClass", { value: adapter.driverClass })}</p> : null}
