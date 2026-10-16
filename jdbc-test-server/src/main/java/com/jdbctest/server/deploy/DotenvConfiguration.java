@@ -160,7 +160,7 @@ final class DotenvConfiguration {
         }
     }
 
-    void ensureKey(Path data, boolean confirmedNew) throws Exception {
+    void ensureKey(Path data) throws Exception {
         if (!get("JDBC_TEST_MASTER_KEY", "").isEmpty()) {
             DeploymentTool.validateKey(get("JDBC_TEST_MASTER_KEY", ""));
             return;
@@ -198,7 +198,6 @@ final class DotenvConfiguration {
                 new DeploymentTool.Settings(url, user, password, ""))) {
                 DeploymentTool.assertDatabaseEmpty(connection);
             }
-            confirmNew(confirmedNew);
             String key = Base64.getEncoder().encodeToString(DeploymentTool.randomBytes());
             current.update(Map.of("JDBC_TEST_MASTER_KEY", key));
             values.put("JDBC_TEST_MASTER_KEY", key);
@@ -206,17 +205,6 @@ final class DotenvConfiguration {
                 "Saved independent Master Key in the existing .env (owner only). Database settings were preserved; secrets are not displayed.");
         } finally {
             Files.deleteIfExists(lock);
-        }
-    }
-
-    static void confirmNew(boolean confirmed) throws Exception {
-        if (!confirmed) {
-            var console = System.console();
-            if (console == null || !"NEW".equals(console.readLine(
-                "For a confirmed NEW empty platform type NEW; for existing data/recovery press Enter: "))) {
-                DeploymentTool.fail(
-                    "Preparation cancelled. Restore the original Key for recovery, or confirm a new empty platform. .env was not changed.");
-            }
         }
     }
 }

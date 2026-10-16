@@ -14,7 +14,7 @@
 
 1. 在**源码根目录**，**仅在 `.env` 不存在时将 `.env.example` 复制为 `.env`**。已有 `.env`、Key 和数据不能覆盖。源码开发只有这一份模板，不需再选模板。
 2. 用本地编辑器打开**源码根目录实际 `.env`**，填写 `SPRING_DATASOURCE_URL`（完整地址，含数据库名，不含凭据）、`SPRING_DATASOURCE_USERNAME` 和 `SPRING_DATASOURCE_PASSWORD`（PG 现有密码）。本机 PG 示例 `jdbc:postgresql://localhost:5432/jdbc_test`，填写实际主机/端口/库名/用户名。全新平台 `JDBC_TEST_MASTER_KEY` 留空；已有平台保留原 Key 和数据路径。秘密不写入终端历史、共享 IDEA 配置或 Git。
-3. 在源码根目录执行 **`./jdbc-test dev`**。入口读取前保护当前所有者的本地 `.env`，先认证 PG、检查状态再生成 Key。仅全新空平台确认 `NEW`，然后打开打印的就绪地址。缺 `.env` 时立即在 Java/构建前退出并提示复制位置，不生成文件。
+3. 在源码根目录执行 **`./jdbc-test dev`**。入口读取前保护当前所有者的本地 `.env`，先认证 PG、检查状态再生成 Key。全新空平台检查通过后自动保存 Key，无需交互确认，然后打开打印的就绪地址。缺 `.env` 时立即在 Java/构建前退出并提示复制位置，不生成文件。
 
 **终端命令 — Linux/macOS，源码根目录（复制后先编辑）：**
 
@@ -33,13 +33,7 @@ if (-not (Test-Path '.env')) { Copy-Item .env.example .env }
 ./jdbc-test.ps1 dev
 ```
 
-**交互输入 — 实际新平台确认：**
-
-```text
-For a confirmed NEW empty platform type NEW; for existing data/recovery press Enter: NEW
-```
-
-独立32字节 Base64 Master Key 保存到同一 `.env`，不打印，用于加密已保存的目标库凭据，不是 PG 认证密码。正常启动复用原 Key；已有 schema/数据/旧配置却缺 Key 时停止，必须恢复原 Key。取消不生成替代 Key。不改账号密码、不 DROP、不跑目标测试。
+独立32字节 Base64 Master Key 保存到同一 `.env`，不打印，用于加密已保存的目标库凭据，不是 PG 认证密码。正常启动复用原 Key；已有 schema/数据/旧配置却缺 Key 时停止，必须恢复原 Key。不改账号密码、不 DROP、不跑目标测试。
 
 密码采用字面值规则：未加引号时保留 `=` 之后所有字符（空格、`$`、`#`、反斜杠、`=`、`${NAME}`、合法 UTF-8），不能行尾注释，不做 Shell 展开。以双引号开头必须是 JSON 字符串，按 JSON 转义；双引号起始密码也可用单引号包裹。控制字符/换行拒绝，不 trim。不能 source/eval `.env`，详见[配置规则](deployment.zh-CN.md#configuration-rules)。
 
@@ -54,7 +48,7 @@ For a confirmed NEW empty platform type NEW; for existing data/recovery press En
 ./jdbc-test dev
 ```
 
-PowerShell 用 `./jdbc-test.ps1 dev`。复用原 `.env`、Key 和数据，不再 `--new-install`。每次入口检查构建当前 Java 模块，只在必要时重装依赖。运行中改前端通过 Vite HMR 生效，无需重构建 Java；改 Server 源码需要重启。修改 Worker/Suite 后，下次 dev 会重构建相关产物，不静默使用旧 Worker。Ctrl+C 停止本次前后端和所属子进程；一端失败会收尾另一端。PG、配置、Key 和数据保留。端口占用、构建失败、认证错误都中止，不留下半启动环境。
+PowerShell 用 `./jdbc-test.ps1 dev`。复用原 `.env`、Key 和数据，无需初始化参数或交互确认。每次入口检查构建当前 Java 模块，只在必要时重装依赖。运行中改前端通过 Vite HMR 生效，无需重构建 Java；改 Server 源码需要重启。修改 Worker/Suite 后，下次 dev 会重构建相关产物，不静默使用旧 Worker。Ctrl+C 停止本次前后端和所属子进程；一端失败会收尾另一端。PG、配置、Key 和数据保留。端口占用、构建失败、认证错误都中止，不留下半启动环境。
 
 ### 进阶：IDEA Debug 或手工源码启动
 

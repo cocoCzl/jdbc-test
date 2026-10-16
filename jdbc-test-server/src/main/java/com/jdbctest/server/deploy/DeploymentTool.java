@@ -47,8 +47,8 @@ public final class DeploymentTool {
     /**
      * Called only by the unified Docker entry after project/path/volume checks.
      */
-    static void initializeDocker(String mode, String project, int port, boolean stateChecked,
-        boolean confirmedNew) throws Exception {
+    static void initializeDocker(String mode, String project, int port, boolean stateChecked)
+        throws Exception {
         if (!stateChecked) {
             fail(
                 "Use ./jdbc-test docker so actual Docker project/volume state is checked before initialization.");
@@ -75,7 +75,6 @@ public final class DeploymentTool {
         }
         try {
             assertDataEmpty(root.resolve("data"));
-            DotenvConfiguration.confirmNew(confirmedNew);
             var values = new LinkedHashMap<String, String>();
             values.put("COMPOSE_PROJECT_NAME", project);
             if (mode.equals("bundled")) {

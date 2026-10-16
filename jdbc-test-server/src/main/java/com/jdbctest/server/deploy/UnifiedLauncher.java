@@ -226,7 +226,7 @@ public final class UnifiedLauncher {
             checkPort("127.0.0.1", 5005);
         }
         authenticate(config);
-        config.ensureKey(data(config), options.containsKey("--new-install"));
+        config.ensureKey(data(config));
         privateDirectory(data(config));
         var backend = LaunchProcesses.basicEnvironment();
         for (String key : BACKEND) {
@@ -337,7 +337,7 @@ public final class UnifiedLauncher {
     private void initializeDocker() throws Exception {
         DeploymentTool.initializeDocker(mode(), options.getOrDefault("--project", "jdbc-test"),
             port(options.getOrDefault("--port", "8080")),
-            options.containsKey("--docker-state-checked"), options.containsKey("--new-install"));
+            options.containsKey("--docker-state-checked"));
     }
 
     private void ready(Process process, String url, boolean health) throws Exception {
@@ -460,7 +460,7 @@ public final class UnifiedLauncher {
                     "Use the root Docker entry so actual project/path/volume state is checked first.");
             }
             if (!options.containsKey("--stop")) {
-                config.ensureKey(data(config), options.containsKey("--new-install"));
+                config.ensureKey(data(config));
             }
         } else {
             if (config.get("JDBC_TEST_MASTER_KEY", "").isEmpty() || config.get("POSTGRES_PASSWORD",
@@ -472,7 +472,6 @@ public final class UnifiedLauncher {
                 }
                 DeploymentTool.assertDataEmpty(data(config));
                 DeploymentTool.assertDataEmpty(root.resolve("data"));
-                DotenvConfiguration.confirmNew(options.containsKey("--new-install"));
                 Path lock = root.resolve(".jdbc-test-init.lock");
                 Files.createDirectory(lock);
                 try {

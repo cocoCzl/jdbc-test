@@ -131,8 +131,8 @@ def values(file):
 
 
 class TerminalLaunch:
-    """A real terminal: answer only the actual NEW prompt and send actual Ctrl+C."""
-    def __init__(self, command, root, environment, log, replies=None):
+    """A real terminal: start without input and send actual Ctrl+C."""
+    def __init__(self, command, root, environment, log):
         import pty
         self.pid, self.terminal = pty.fork()
         if self.pid == 0:
@@ -140,8 +140,6 @@ class TerminalLaunch:
             os.execvpe(command[0], command, environment)
         self.log = log.open('ab')
         log.chmod(0o600)
-        self.replies = list(replies or [])
-        self.pending = bytearray()
         self.transcript = bytearray()
         self.status = None
         self.reader = threading.Thread(target=self._read_loop, daemon=True)
@@ -165,12 +163,7 @@ class TerminalLaunch:
                 data = b''
             self.log.write(data)
             self.log.flush()
-            self.pending.extend(data)
             self.transcript.extend(data)
-            if self.replies and self.replies[0][0] in self.pending:
-                _, reply = self.replies.pop(0)
-                self.pending.clear()
-                os.write(self.terminal, reply.encode() + b'\n')
         pid, status = os.waitpid(self.pid, os.WNOHANG)
         if pid:
             self.status = os.waitstatus_to_exitcode(status)
@@ -289,8 +282,7 @@ def check(image, distribution, source_dev=False, build=False, native_only=False)
             if source_dev:
                 backend, frontend = unused_port(), unused_port()
                 config = copy_example(source, f'jdbc:postgresql://127.0.0.1:{pg_port}/source_platform', 'fixture_user', PASSWORD, backend, frontend)
-                launch = TerminalLaunch(['sh', './jdbc-test', 'dev'], source, environment, workspace / 'dev.log',
-                    [(b'For a confirmed NEW empty platform type NEW;', 'NEW')])
+                launch = TerminalLaunch(['sh', './jdbc-test', 'dev'], source, environment, workspace / 'dev.log')
                 launch.ready(f'http://127.0.0.1:{backend}', f'http://127.0.0.1:{frontend}', timeout=600)
                 original = fingerprint(config)
                 key = values(config)['JDBC_TEST_MASTER_KEY']
@@ -300,11 +292,11 @@ def check(image, distribution, source_dev=False, build=False, native_only=False)
                 assert_ports_released(backend, frontend)
                 launch = TerminalLaunch(['sh', './jdbc-test', 'dev'], source, environment, workspace / 'dev-repeat.log')
                 launch.ready(f'http://127.0.0.1:{backend}', f'http://127.0.0.1:{frontend}', timeout=600)
-                assert fingerprint(config) == original and not launch.replies
+                assert fingerprint(config) == original
                 launch.stop(); launch = None
                 assert_ports_released(backend, frontend)
                 assert (source / 'data').is_dir()
-                print('PASS: copied example -> edit -> dev builds Server/Worker and starts source Server, Vite, API/Catalog/page; special password, NEW, unchanged Key on repeat, Ctrl+C releases both ports and preserves data', flush=True)
+                print('PASS: copied example -> edit -> dev builds Server/Worker and starts source Server, Vite, API/Catalog/page; special password, automatic initialization, unchanged Key on repeat, Ctrl+C releases both ports and preserves data', flush=True)
             if build:
                 distribution = workspace / 'distribution'
                 private_file(workspace / 'build.log', '')
@@ -321,8 +313,7 @@ def check(image, distribution, source_dev=False, build=False, native_only=False)
         shutil.copytree(bundle, native)
         port = unused_port()
         config = copy_example(native, f'jdbc:postgresql://127.0.0.1:{pg_port}/bundle_platform', 'fixture_user', PASSWORD, port)
-        launch = TerminalLaunch(['sh', './jdbc-test', 'start'], native, environment, workspace / 'bundle.log',
-            [(b'For a confirmed NEW empty platform type NEW;', 'NEW')])
+        launch = TerminalLaunch(['sh', './jdbc-test', 'start'], native, environment, workspace / 'bundle.log')
         base = f'http://127.0.0.1:{port}'
         launch.ready(base)
         connection_id = save_credential(base, driver_jar)
@@ -392,7 +383,7 @@ def check(image, distribution, source_dev=False, build=False, native_only=False)
                     with config.open('a') as stream:
                         stream.write('COMPOSE_PROJECT_NAME=' + project + '\n')
                 command = ['sh', './jdbc-test', 'docker', '--' + ('bundled-pg' if mode == 'bundled' else 'external-pg'), '--project', project]
-                run(*command, '--new-install', '--port', str(port), cwd=root, env=environment)
+                run(*command, '--port', str(port), cwd=root, env=environment)
                 config = root / '.env'
                 original = fingerprint(config)
                 app = run(*compose, 'ps', '-q', 'jdbc-test', cwd=root, env=environment)

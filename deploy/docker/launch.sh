@@ -19,7 +19,7 @@ while [ "$#" -gt 0 ]; do
     --project|--port)
       option="$1"; shift; [ "$#" -gt 0 ] || { echo 'Missing option value.' >&2; exit 1; }
       if [ "$option" = --project ]; then project="$1"; else port="$1"; fi ;;
-    *) echo 'Use docker --bundled-pg|--external-pg [--new-install] [--project NAME] [--port PORT] [--host-pg] [--stop]. Never pass secrets as arguments.' >&2; exit 1 ;;
+    *) echo 'Use docker --bundled-pg|--external-pg [--project NAME] [--port PORT] [--host-pg] [--stop]. Never pass secrets as arguments.' >&2; exit 1 ;;
   esac
   shift
 done
@@ -88,5 +88,5 @@ else
   docker compose "$@" up -d --build --wait
   echo 'Ready. Website binding:'
   docker compose "$@" port jdbc-test 8080
-  echo 'Open http://<printed-host>:<printed-port>. Next time rerun this command without --new-install; append --stop to stop and retain data.'
+  echo 'Open http://<printed-host>:<printed-port>. Next time rerun this command; append --stop to stop and retain data.'
 fi

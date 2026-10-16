@@ -14,7 +14,7 @@ Install **JDK21 (including javac)** and **Node >=22.12/npm**. The committed Mave
 
 1. In the **source root**, copy **`.env.example` to `.env` only if absent**. Existing `.env`, Key and data are never replaced. There is one source-development template; no template selection is needed.
 2. In a local editor open that **actual source-root `.env`**. Fill `SPRING_DATASOURCE_URL` (full URL including database name, no credentials), `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD` (existing PG password). For local PG the example URL is `jdbc:postgresql://localhost:5432/jdbc_test`; replace its actual host/port/database and username. New platform: leave `JDBC_TEST_MASTER_KEY` empty. Existing platform: preserve its original Key and data path. Do not put secrets into terminal history, shared IDEA configs or Git.
-3. Run **`./jdbc-test dev`** in the source root. It protects the owner's local `.env` before reading, authenticates PG and checks state before generating a Key. Confirm `NEW` only for a genuinely new empty platform, then open the printed ready address. Missing `.env` exits immediately before Java/build, tells you where to copy, and creates no configuration.
+3. Run **`./jdbc-test dev`** in the source root. It protects the owner's local `.env` before reading, authenticates PG and checks state before generating a Key. For a new empty platform it automatically saves the Key without an initialization prompt; open the printed ready address. Missing `.env` exits immediately before Java/build, tells you where to copy, and creates no configuration.
 
 **Terminal commands — Linux/macOS, source root (edit after copy):**
 
@@ -33,13 +33,7 @@ if (-not (Test-Path '.env')) { Copy-Item .env.example .env }
 ./jdbc-test.ps1 dev
 ```
 
-**Interactive input — actual new-platform confirmation:**
-
-```text
-For a confirmed NEW empty platform type NEW; for existing data/recovery press Enter: NEW
-```
-
-The independent 32-byte Base64 Master Key is saved in the same `.env`, never printed. It encrypts stored target credentials, not PG authentication. Normal starts reuse it; missing Key with existing schema/data/legacy config stops and requires the original Key. Canceling does not generate a replacement. No account password changes, DROP or target tests occur.
+The independent 32-byte Base64 Master Key is saved in the same `.env`, never printed. It encrypts stored target credentials, not PG authentication. Normal starts reuse it; missing Key with existing schema/data/legacy config stops and requires the original Key. No account password changes, DROP or target tests occur.
 
 Password rules are literal: everything after `=` in an unquoted value is retained (spaces, `$`, `#`, backslashes, `=`, `${NAME}`, valid UTF-8). No inline comments or Shell expansion. A value starting with double quotes is a JSON string; use JSON escapes, or enclose a quote-leading password in single quotes. Controls/newlines are rejected without trimming. Never source/eval `.env`. See [configuration rules](deployment.md#configuration-rules).
 
@@ -54,7 +48,7 @@ Defaults: page **http://127.0.0.1:5173**, backend **http://127.0.0.1:8080**. Cha
 ./jdbc-test dev
 ```
 
-PowerShell: `./jdbc-test.ps1 dev`. Reuse original `.env`, Key and data; no repeated `--new-install`. The Java build checks current modules each launch; dependencies are installed only when needed. While running, frontend edits use Vite HMR and require no Java rebuild. Server source changes need a restart; Worker/Suite changes are rebuilt on the next dev launch, so Server never silently uses an old external Worker. Ctrl+C stops both sides and only their owned descendants; a failed side also stops the other. PG/config/Key/data are retained. Port conflicts, failed builds and authentication errors abort without leaving a half-started environment.
+PowerShell: `./jdbc-test.ps1 dev`. Reuse original `.env`, Key and data; no initialization flag or confirmation is needed. The Java build checks current modules each launch; dependencies are installed only when needed. While running, frontend edits use Vite HMR and require no Java rebuild. Server source changes need a restart; Worker/Suite changes are rebuilt on the next dev launch, so Server never silently uses an old external Worker. Ctrl+C stops both sides and only their owned descendants; a failed side also stops the other. PG/config/Key/data are retained. Port conflicts, failed builds and authentication errors abort without leaving a half-started environment.
 
 ### Advanced: IDEA Debug or manual source launch
 

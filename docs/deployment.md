@@ -35,13 +35,7 @@ Source development has exactly three steps: **source-root `.env.example` → `.e
 ./jdbc-test docker --bundled-pg --stop
 ```
 
-The first invocation builds the setup/application image and prompts to confirm a **new** platform. It checks actual Compose project/path/volumes and local data; do not confirm NEW for a recovery. The existing initializer automatically generates a **32-random-byte hex PG password** and a separate **32-random-byte Base64 Master Key**, saves both in source-root `.env`, and passes the same password to PG and Server. No secret copying. It validates configuration and runs Compose with health/readiness waiting; formal Server startup applies migrations.
-
-**Actual new-install prompt / interactive input:**
-
-```text
-For a confirmed NEW empty platform type NEW; for existing data/recovery press Enter: NEW
-```
+The first invocation builds the setup/application image and checks actual Compose project/path/volumes and local data. For a new empty platform the initializer automatically generates a **32-random-byte hex PG password** and a separate **32-random-byte Base64 Master Key**, saves both in source-root `.env`, and passes the same password to PG and Server. No secret copying. It validates configuration and runs Compose with health/readiness waiting; formal Server startup applies migrations.
 
 Defaults are database/user `jdbc_test`, internal PG host `postgres:5432`. The bundled connection URL comes from `docker-compose.yml`, not a user-supplied external URL. Preserve the real `.env`, project name and volumes for all later starts. Choose a distinct project explicitly with `--project NAME` when creating an independent installation.
 
@@ -70,7 +64,7 @@ Existing platform database username: jdbc_test
 Existing database password (hidden):
 ```
 
-The unified entry asks for NEW confirmation before those fields; enter the raw URL, no `SPRING_DATASOURCE_URL=` prefix or shell quotes. Password is hidden. After read-only authentication/empty-state checks, it generates only a Master Key and saves source-root `.env`. Customer account/password is never changed. If you already have a private `.env` with these three fields and empty Key, the unified entry checks project state and database/data emptiness, then asks for NEW confirmation and fills only the Key. Existing state with missing Key stops and requires recovery.
+Enter the raw URL, no `SPRING_DATASOURCE_URL=` prefix or shell quotes. Password is hidden. After read-only authentication/empty-state checks, it generates only a Master Key and saves source-root `.env`. Customer account/password is never changed. If you already have a private `.env` with these three fields and empty Key, the unified entry checks project state and database/data emptiness, then automatically fills only the Key without an initialization prompt. Existing state with missing Key stops and requires recovery.
 
 For Linux host PG, use **`./jdbc-test docker --external-pg --host-pg`** for both start and stop (append `--stop`). Formal startup applies migrations. The container's network URL can differ from a source dev URL; use separate environments, not automated rewriting.
 
@@ -90,7 +84,7 @@ cp -n .env.example .env
 # Next time run ./jdbc-test start with the SAME configuration/Key.
 ```
 
-Use `jdbc:postgresql://localhost:5432/jdbc_test` if PG is on the runtime host; replace actual host/port/database/user. This is **the extracted bundle's `.env`**, not the source file. The entry protects the local config, authenticates PG read-only, checks new-install state, and asks for `NEW` only when Key is missing. It saves an independent Key in the same file, checks artifacts/port, starts Server, waits for health/Catalog, and serves the production page. Formal startup migrates the platform DB. Default application files: bundle **`data/`**. Existing data requires its original Key; stop never deletes config/PG/data.
+Use `jdbc:postgresql://localhost:5432/jdbc_test` if PG is on the runtime host; replace actual host/port/database/user. This is **the extracted bundle's `.env`**, not the source file. The entry protects the local config, authenticates PG read-only, checks new-install state, and automatically saves an independent Key in the same file only for a new empty platform. It then checks artifacts/port, starts Server, waits for health/Catalog, and serves the production page. Formal startup migrates the platform DB. Default application files: bundle **`data/`**. Existing data requires its original Key; stop never deletes config/PG/data.
 
 ### Windows commands, grouped alternatives
 
@@ -139,7 +133,7 @@ The new `.env` format is **literal UTF-8 assignments**:
 - Empty fields are preparation state. NUL/control/tab/newline/Unicode line separators and invalid UTF-8/duplicate names are rejected; values are never silently trimmed.
 - Old tool-generated files identified by `# Compose dotenv only;` retain their old Compose encoding and are decoded once. The root Docker entry creates a protected temporary Compose encoding from the literal source and removes it after the operation. **Do not pass new literal `.env` directly to legacy Compose** for special-character passwords.
 
-Never `source`/`eval` `.env` or Java `.properties`; they are not Shell scripts and have different rules. Examples contain empty secrets and are not a ready installation. Configuration and data are owner-protected, Git/context/archive exclusions keep secrets out of releases. The Key is generated only at runtime after empty-state/new-install confirmation, never baked into an image. Keep `.env` and data/PG backups private. Do not share actual `.env`, environment dumps, `docker inspect` or expanded Compose config.
+Never `source`/`eval` `.env` or Java `.properties`; they are not Shell scripts and have different rules. Examples contain empty secrets and are not a ready installation. Configuration and data are owner-protected, Git/context/archive exclusions keep secrets out of releases. The Key is generated only at runtime after empty-state checks pass, never baked into an image. Keep `.env` and data/PG backups private. Do not share actual `.env`, environment dumps, `docker inspect` or expanded Compose config.
 
 ### Existing properties/environment compatibility
 
@@ -149,7 +143,7 @@ With no `.env`, Spring datasource environment overrides file values, and `JDBC_T
 
 ### Advanced Docker configuration
 
-The unified entry supports `--project`, `--port`, `--host-pg`, `--new-install` (explicit new-install confirmation only), and `--stop`.  CLI `--port` overrides an existing file for that invocation; edit the saved port in `.env` for a persistent change (new-install init saves its selected port).
+The unified entry supports `--project`, `--port`, `--host-pg`, `--new-install` (accepted for compatibility; unnecessary and does not bypass state checks), and `--stop`.  CLI `--port` overrides an existing file for that invocation; edit the saved port in `.env` for a persistent change (new-install init saves its selected port).
 
 It always selects the requested PG mode, rejects mode/project mismatches and never rewrites the URL. Saved custom networks/Compose storage definitions must be restored/reviewed with their original project/config; the default wrapper cannot infer a moved/renamed historical deployment. `JDBC_TEST_SETUP_NETWORK` selects an existing setup network; ensure actual Server uses the same network via a reviewed Compose override. `JDBC_TEST_SETUP_IMAGE` is an advanced locally built **current-revision** image override; it is not a promised public image or a standard-build verification.
 

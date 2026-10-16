@@ -35,13 +35,7 @@
 ./jdbc-test docker --bundled-pg --stop
 ```
 
-首次构建 setup/应用镜像并提示确认**新装**。检查实际 Compose project/路径/卷和本地数据；恢复场景不能确认 NEW。复用现有初始化器自动生成 **32 随机字节十六进制 PG 密码**及独立 **32 随机字节 Base64 Master Key**，保存到源码根目录 `.env`，PG 与 Server 读取同一个密码。不需复制秘密。随后检查配置，执行 Compose 并等待健康/就绪；正式 Server 启动执行 migration。
-
-**实际新装提示 / 交互输入：**
-
-```text
-For a confirmed NEW empty platform type NEW; for existing data/recovery press Enter: NEW
-```
+首次构建 setup/应用镜像，检查实际 Compose project/路径/卷和本地数据。全新空平台检查通过后，无需交互确认，初始化器自动生成 **32 随机字节十六进制 PG 密码**及独立 **32 随机字节 Base64 Master Key**，保存到源码根目录 `.env`，PG 与 Server 读取同一个密码。不需复制秘密。随后检查配置，执行 Compose 并等待健康/就绪；正式 Server 启动执行 migration。
 
 默认数据库/用户 `jdbc_test`，容器 PG 主机 `postgres:5432`。连接地址由 `docker-compose.yml` 决定，不是用户填写外部 URL。以后保留原实际 `.env`、project 名称和卷。创建独立安装可明确使用 `--project NAME`。
 
@@ -70,7 +64,7 @@ Existing platform database username: jdbc_test
 Existing database password (hidden):
 ```
 
-统一入口先问 NEW，再问以上字段；URL 输入原始地址，不带 `SPRING_DATASOURCE_URL=` 前缀或 Shell 引号，密码隐藏输入。只读认证并检查空状态后，只生成 Master Key，保存源码根目录 `.env`，不改变客户账号密码。已有私有 `.env` 仅填三项且 Key 为空时，统一入口检查 project、数据库/数据目录为空，要求确认 NEW 后只补 Key。已有状态而缺失 Key 必须停止恢复。
+URL 输入原始地址，不带 `SPRING_DATASOURCE_URL=` 前缀或 Shell 引号，密码隐藏输入。只读认证并检查空状态后，只生成 Master Key，保存源码根目录 `.env`，不改变客户账号密码。已有私有 `.env` 仅填三项且 Key 为空时，统一入口检查 project、数据库/数据目录为空，检查通过后自动补 Key，无需交互确认。已有状态而缺失 Key 必须停止恢复。
 
 Linux 宿主机 PG 使用 **`./jdbc-test docker --external-pg --host-pg`**，停止时也保留此选项并追加 `--stop`。正式启动运行 migration。容器 URL 与源码 dev URL 可能不同，分别维护各自环境，不能自动乱改地址。
 
@@ -90,7 +84,7 @@ cp -n .env.example .env
 # 下次使用相同配置/Key，仍只执行 ./jdbc-test start。
 ```
 
-PG 在运行机器本机时填 `jdbc:postgresql://localhost:5432/jdbc_test`，替换实际主机/端口/库名/用户。这里是**解压后的部署包 `.env`**，不是源码配置。入口保护本地文件，只读认证 PG，检查新装状态；仅缺 Key 时要求确认 `NEW`，随后把独立 Key 保存同一文件，检查产物/端口，启动 Server、等待 health/Catalog 并提供生产页面。正式启动运行平台库 migration，应用文件默认部署包 **`data/`**。已有数据必须原 Key；停止不删除配置/PG/数据。
+PG 在运行机器本机时填 `jdbc:postgresql://localhost:5432/jdbc_test`，替换实际主机/端口/库名/用户。这里是**解压后的部署包 `.env`**，不是源码配置。入口保护本地文件，只读认证 PG，检查新装状态；全新空平台缺 Key 时自动生成并保存到同一文件，无需交互确认，随后检查产物/端口，启动 Server、等待 health/Catalog 并提供生产页面。正式启动运行平台库 migration，应用文件默认部署包 **`data/`**。已有数据必须原 Key；停止不删除配置/PG/数据。
 
 ### Windows 替代命令集中展示
 
@@ -139,7 +133,7 @@ if (-not (Test-Path '.env')) { Copy-Item .env.example .env }
 - 空字段是配置准备状态；拒绝 NUL/control/tab/换行/Unicode 行分隔符、非法 UTF-8 和重复变量，不静默 trim。
 - 旧工具生成且以 `# Compose dotenv only;` 开头的文件按旧 Compose 编码解码一次。Docker 入口从字面值源生成私有临时 Compose 编码并在操作后删除。特殊密码时**不能把新字面值 `.env` 直接交给旧 Compose**。
 
-不能 `source`/`eval` `.env` 或 Java `.properties`；它们不是 Shell 脚本，读取规则不同。模板含空秘密，不能直接运行。配置和数据保护权限，Git/构建上下文/归档排除私有内容。Key 仅运行时确认全新空平台后生成，绝不烘焙进镜像。配置、数据/PG 备份保持私有，不分享实际 `.env`、环境 dump、`docker inspect` 或展开后的 Compose 配置。
+不能 `source`/`eval` `.env` 或 Java `.properties`；它们不是 Shell 脚本，读取规则不同。模板含空秘密，不能直接运行。配置和数据保护权限，Git/构建上下文/归档排除私有内容。Key 仅运行时全新空平台检查通过后自动生成，绝不烘焙进镜像。配置、数据/PG 备份保持私有，不分享实际 `.env`、环境 dump、`docker inspect` 或展开后的 Compose 配置。
 
 ### 已有 properties / 环境配置兼容
 
@@ -149,7 +143,7 @@ if (-not (Test-Path '.env')) { Copy-Item .env.example .env }
 
 ### Docker 高级配置
 
-统一入口支持 `--project`、`--port`、`--host-pg`、`--new-install`（明确新装确认）、`--stop`。 CLI `--port` 对已有文件仅覆盖本次操作；长期修改请编辑 `.env` 保存的端口（首次 init 会保存选定端口）。
+统一入口支持 `--project`、`--port`、`--host-pg`、`--new-install`（仅兼容旧命令，无需填写，也不能绕过状态检查）、`--stop`。 CLI `--port` 对已有文件仅覆盖本次操作；长期修改请编辑 `.env` 保存的端口（首次 init 会保存选定端口）。
 
 始终选择明确 PG 模式，拒绝模式/project 冲突，不改 URL。自定义网络/Compose 存储必须按原 project/配置恢复和审查；默认入口无法推断已移动/更名的历史部署。`JDBC_TEST_SETUP_NETWORK` 选择已有 setup 网络，实际 Server 也需通过审查后的 Compose override 加入同一网络。`JDBC_TEST_SETUP_IMAGE` 仅为高级用户指定本地构建的**当前版本**镜像，不是公共镜像承诺，也不能作为标准构建通过证明。
 

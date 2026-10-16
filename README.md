@@ -12,7 +12,7 @@ Prepare **JDK21, Node >=22.12/npm** and a dedicated, already-created **platform 
 
 1. Copy **`.env.example` → `.env` only if `.env` is absent**. Keep any existing configuration/Key.
 2. Open that actual **source-root `.env`** in your local editor. Set **`SPRING_DATASOURCE_URL`**, **`SPRING_DATASOURCE_USERNAME`** and **`SPRING_DATASOURCE_PASSWORD`** to your platform's full JDBC URL, login and existing password. Example URL: `jdbc:postgresql://localhost:5432/jdbc_test`; replace host/port/database, include database name and keep credentials out of the URL. New platform: leave `JDBC_TEST_MASTER_KEY` empty; existing platform: keep the original Key.
-3. Execute **`./jdbc-test dev`**, confirm `NEW` only for a new empty platform, then open the printed address. The tool safely saves the Key, builds Java/Worker, installs frontend dependencies if needed and starts source backend + Vite. Ctrl+C stops this launch; later run the same command with original `.env`/Key/data.
+3. Execute **`./jdbc-test dev`**, then open the printed address. For a new empty platform the tool automatically saves the Key after state checks, builds Java/Worker, installs frontend dependencies if needed and starts source backend + Vite. Ctrl+C stops this launch; later run the same command with original `.env`/Key/data.
 
 **Terminal commands — Linux/macOS, source root (edit between copy and dev):**
 
