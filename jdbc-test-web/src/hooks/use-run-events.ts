@@ -50,6 +50,8 @@ export function useRunEvents(id: string, run: Run | undefined) {
       )
         return;
       const body = data;
+      const runStatus = event.type === "run.status" && status(body.status)
+        ? body.status : undefined;
       const terminalStatus =
         event.type === "run.finished"
           ? "SUCCEEDED"
@@ -77,7 +79,7 @@ export function useRunEvents(id: string, run: Run | undefined) {
         if (event.type === "run.cleanup" && record(body.cleanupEvidence))
           next.cleanupEvidence = body.cleanupEvidence as unknown as Run["cleanupEvidence"];
         if (event.type === "run.issue") next.executionIssues = [...(previous.executionIssues ?? []), body];
-        if (status(body.status)) next.status = body.status;
+        if (runStatus) next.status = runStatus;
         if (terminalStatus) next.status = terminalStatus;
         for (const key of [
           "completedCases",
@@ -107,7 +109,7 @@ export function useRunEvents(id: string, run: Run | undefined) {
       });
       if (event.type === "case.finished")
         void client.invalidateQueries({ queryKey: runsKeys.results(id) });
-      if (terminalStatus || (status(body.status) && isTerminal(body.status))) {
+      if (terminalStatus || (runStatus && isTerminal(runStatus))) {
         source.close();
         void client.invalidateQueries({ queryKey: runsKeys.all });
       }

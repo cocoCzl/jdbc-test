@@ -42,9 +42,9 @@ export default function Drivers() {
     mutationFn: driversApi.validate,
     onSuccess: () => {
       toast.success(t("ui.driverValidated"));
-      void client.invalidateQueries({ queryKey: driversKeys.all });
     },
     onError: (error) => toast.error(errorMessage(error)),
+    onSettled: () => void client.invalidateQueries({ queryKey: driversKeys.all }),
   });
   const remove = useMutation({
     mutationFn: () => driversApi.delete(deleting!.id),

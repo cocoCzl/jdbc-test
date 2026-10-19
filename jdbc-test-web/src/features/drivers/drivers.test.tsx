@@ -186,6 +186,26 @@ describe("Driver UI", () => {
     );
     expect(document.body.textContent).not.toMatch(/storageKey|workspacePath/);
   });
+  it.each([
+    ["/drivers", "Validate"],
+    ["/drivers/driver-1", "Validate driver"],
+  ])("refreshes the persisted invalid status after failed validation on %s", async (route, label) => {
+    const user = userEvent.setup();
+    let invalid = false;
+    mockApi((url) => {
+      if (url.pathname.endsWith("/validate")) {
+        invalid = true;
+        return problem("DRIVER_VALIDATION_FAILED", 422);
+      }
+      const current = { ...driver, status: invalid ? "INVALID" : "VALIDATED" };
+      if (url.pathname === "/api/drivers") return json(page([current]));
+      if (url.pathname === "/api/drivers/driver-1") return json(current);
+      return undefined;
+    });
+    renderPage(route);
+    await user.click(await screen.findByRole("button", { name: label }));
+    expect(await screen.findByText("Invalid", { exact: true })).toBeVisible();
+  });
   it("shows companion dependency warnings without claiming complete compatibility", async () => {
     const user = userEvent.setup();
     mockApi((url) => url.pathname.endsWith("/validate") ? json({

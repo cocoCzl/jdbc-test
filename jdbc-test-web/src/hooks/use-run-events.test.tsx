@@ -96,6 +96,36 @@ describe("EventSource lifecycle", () => {
       queryKey: runsKeys.results(run.id),
     });
   });
+  it("keeps live run updates after a failed case until the run itself finishes", () => {
+    const { source, client } = setup();
+    act(() => {
+      source.emit("case.finished", {
+        runId: run.id,
+        scenarioId: "statement.execute",
+        status: "FAILED",
+      });
+      source.emit("run.progress", {
+        runId: run.id,
+        completedCases: 1,
+        failed: 1,
+      });
+    });
+    expect(source.closed).toBe(false);
+    expect(client.getQueryData(runsKeys.detail(run.id))).toMatchObject({
+      status: "RUNNING", completedCases: 1, failed: 1,
+    });
+    act(() => source.emit("run.status", {
+      runId: run.id, status: "GENERATING_REPORT",
+    }));
+    expect(client.getQueryData(runsKeys.detail(run.id))).toMatchObject({
+      status: "GENERATING_REPORT",
+    });
+    act(() => source.emit("run.failed", { runId: run.id }));
+    expect(source.closed).toBe(true);
+    expect(client.getQueryData(runsKeys.detail(run.id))).toMatchObject({
+      status: "FAILED", completedCases: 1, failed: 1,
+    });
+  });
   it.each([
     ["run.finished", "SUCCEEDED"],
     ["run.failed", "FAILED"],

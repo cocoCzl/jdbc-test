@@ -115,9 +115,9 @@ export default function DriverDetail() {
     onSuccess: (result) => {
       if (result.warnings?.length) toast.warning(t("ui.driverValidatedWithWarnings"));
       else toast.success(t("ui.driverValidated"));
-      void client.invalidateQueries({ queryKey: driversKeys.all });
     },
     onError: (error) => toast.error(errorMessage(error)),
+    onSettled: () => void client.invalidateQueries({ queryKey: driversKeys.all }),
   });
   const remove = useMutation({
     mutationFn: () => driversApi.delete(id),
