@@ -7,7 +7,6 @@ import com.jdbctest.extension.RequiresFeature;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.sql.Connection;
-import java.sql.SQLFeatureNotSupportedException;
 import java.util.logging.Logger;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.*;
@@ -96,8 +95,6 @@ class DataSourceTest {
             } finally {
                 ds.setLogWriter(original);
             }
-        } catch (SQLFeatureNotSupportedException e) {
-            org.junit.jupiter.api.Assumptions.abort("Driver DataSource reports unsupported API");
         }
     }
 
@@ -106,12 +103,9 @@ class DataSourceTest {
     @DisplayName("getParentLogger 获取父 Logger")
     void testGetParentLogger() throws Exception {
         DataSource ds = getDataSource();
-        try {
-            Logger logger = ds.getParentLogger();
-            assertNotNull(logger, "getParentLogger 应返回有效 Logger");
-        } catch (SQLFeatureNotSupportedException ignore) {
-            org.junit.jupiter.api.Assumptions.abort("Driver DataSource reports unsupported API");
-        }
+        Logger logger = com.jdbctest.extension.JdbcContracts.optional(
+            "CommonDataSource.getParentLogger", ds::getParentLogger);
+        assertNotNull(logger, "getParentLogger 应返回有效 Logger");
     }
 
     @Test

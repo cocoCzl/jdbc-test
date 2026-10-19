@@ -98,19 +98,26 @@ public final class TestCatalog {
             String scenarioId = text(item, "scenario_id");
             String sourceClass = text(item, "source_class");
             String sourceMethod = text(item, "source_method");
-            SourceMetadata sourceMetadata = sourceRoot == null
-                ? readRuntimeMetadata(sourceClass, sourceMethod)
-                : readSourceMetadata(sourceRoot, sourceClass, sourceMethod);
+            if (sourceRoot != null) {
+                var metadata = readSourceMetadata(sourceRoot, sourceClass, sourceMethod);
+                if (!metadata.requiredCapabilities().equals(strings(item, "required_capabilities"))) {
+                    throw new IllegalArgumentException("Scenario feature metadata drift: " + scenarioId);
+                }
+            }
             TestModule module = moduleFor(scenarioId);
             descriptors.add(new TestCaseDescriptor(
                 scenarioId,
                 module,
-                sourceMetadata.requiredCapabilities().isEmpty() ? TestProfile.CORE
-                    : TestProfile.FULL,
+                "core".equals(text(item, "category")) ? TestProfile.CORE : TestProfile.FULL,
                 text(item, "contract"),
                 sourceClass,
                 sourceMethod,
-                sourceMetadata.requiredCapabilities()
+                strings(item, "required_capabilities"),
+                TestCategory.valueOf(text(item, "test_category")),
+                strings(item, "applicable_adapters"),
+                text(item, "jdbc_version"),
+                strings(item, "execution_prerequisites"),
+                text(item, "unsupported_policy")
             ));
         }
         descriptors.sort(Comparator.comparing(TestCaseDescriptor::scenarioId));
@@ -122,40 +129,31 @@ public final class TestCatalog {
     }
 
     public List<TestModule> modules() {
-        return List.copyOf(modules.values());
+        return modules.values().stream().sorted(Comparator.comparing(TestModule::id)).toList();
     }
 
     public List<TestCaseDescriptor> select(TestSelection selection) {
-        Objects.requireNonNull(selection, "selection");
-        validateNames(selection);
-        return descriptors.stream()
-            .filter(
-                item -> selection.profile() == TestProfile.FULL
-                    || item.profile() == TestProfile.CORE)
-            .filter(item -> selection.includedModules().isEmpty()
-                || selection.includedModules().contains(item.module().id()))
-            .filter(item -> selection.includedScenarios().isEmpty()
-                || selection.includedScenarios().contains(item.scenarioId()))
-            .filter(item -> !selection.excludedScenarios().contains(item.scenarioId()))
-            .toList();
+        return select(selection, null);
     }
 
-    private void validateNames(TestSelection selection) {
-        for (String module : selection.includedModules()) {
-            if (!modules.containsKey(module)) {
-                throw new IllegalArgumentException("Unknown test module: " + module);
-            }
-        }
-        validateScenarioNames(selection.includedScenarios());
-        validateScenarioNames(selection.excludedScenarios());
+    public List<TestCaseDescriptor> select(TestSelection selection, String adapterId) {
+        Set<String> ids = Set.copyOf(ScenarioSelection.resolve(descriptors.stream()
+            .map(TestCaseDescriptor::selectionEntry).toList(), selection, adapterId));
+        return descriptors.stream().filter(item -> ids.contains(item.scenarioId())).toList();
     }
 
-    private void validateScenarioNames(Set<String> scenarioIds) {
-        for (String scenarioId : scenarioIds) {
-            if (!byScenarioId.containsKey(scenarioId)) {
-                throw new IllegalArgumentException("Unknown scenario: " + scenarioId);
-            }
+    public String version() {
+        try {
+            var digest = java.security.MessageDigest.getInstance("SHA-256");
+            return java.util.HexFormat.of().formatHex(digest.digest(descriptors.toString()
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException exception) {
+            throw new IllegalStateException(exception);
         }
+    }
+
+    private static List<String> strings(Map<?, ?> item, String key) {
+        return asList(item.get(key), key).stream().map(String.class::cast).toList();
     }
 
     private static SourceMetadata readSourceMetadata(Path sourceRoot, String className,
@@ -192,44 +190,6 @@ public final class TestCatalog {
             throw new IllegalStateException("Unable to read scenario source: " + sourceFile,
                 exception);
         }
-    }
-
-    private static SourceMetadata readRuntimeMetadata(String className, String methodName) {
-        try {
-            ClassLoader loader = Thread.currentThread().getContextClassLoader();
-            Class<?> testClass = Class.forName(className, false, loader);
-            LinkedHashSet<String> capabilities = new LinkedHashSet<>();
-            capabilities.addAll(readFeatureAnnotation(testClass));
-            var method = java.util.Arrays.stream(testClass.getDeclaredMethods())
-                .filter(candidate -> candidate.getName().equals(methodName))
-                .findFirst()
-                .orElseThrow(() -> new NoSuchMethodException(methodName));
-            capabilities.addAll(readFeatureAnnotation(method));
-            return new SourceMetadata(List.copyOf(capabilities));
-        } catch (ReflectiveOperationException exception) {
-            throw new IllegalArgumentException(
-                "Packaged scenario source is unavailable: " + className + "#" + methodName,
-                exception);
-        }
-    }
-
-    private static List<String> readFeatureAnnotation(java.lang.reflect.AnnotatedElement element) {
-        for (var annotation : element.getDeclaredAnnotations()) {
-            if (!annotation.annotationType().getName()
-                .equals("com.jdbctest.extension.RequiresFeature")) {
-                continue;
-            }
-            try {
-                Object value = annotation.annotationType().getMethod("value").invoke(annotation);
-                if (value instanceof String[] features) {
-                    return List.of(features);
-                }
-            } catch (ReflectiveOperationException exception) {
-                throw new IllegalStateException("Unable to read RequiresFeature metadata",
-                    exception);
-            }
-        }
-        return List.of();
     }
 
     private static List<String> annotationValues(String source) {

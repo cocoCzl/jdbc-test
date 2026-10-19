@@ -14,8 +14,9 @@ import java.util.List;
 import java.util.Locale;
 import org.junit.jupiter.api.extension.*;
 
-public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, AfterEachCallback,
-    ParameterResolver, ExecutionCondition {
+public class JdbcTestExtension implements BeforeAllCallback, BeforeEachCallback, AfterAllCallback,
+    AfterEachCallback, InvocationInterceptor, AfterTestExecutionCallback, ParameterResolver,
+    ExecutionCondition {
 
     private static final ExtensionContext.Namespace ROOT_NAMESPACE =
         ExtensionContext.Namespace.create(JdbcTestExtension.class);
@@ -24,26 +25,107 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
 
     @Override
     public void beforeAll(ExtensionContext context) throws Exception {
-        Config config = ensureInitialized();
+        ensureInitialized();
         registerShutdownHook(context);
+    }
 
-        Class<?> testClass = context.getRequiredTestClass();
-        UseSqlScripts annotation = testClass.getAnnotation(UseSqlScripts.class);
+    @Override
+    public void beforeEach(ExtensionContext context) {
+        enterPhase(context, "PREPARATION");
+        Config config = ensureInitialized();
+        if (requiredFeatures(context.getRequiredTestClass(), context.getRequiredTestMethod())
+            .contains("sqlxml") && OracleDriverDependencies.appliesTo(config.db.getDriverClass())
+            && !OracleDriverDependencies.xmlAvailable(JdbcContext.driverClassLoader())) {
+            throw new ExecutionPrerequisiteException(
+                "ORACLE_XML_MISSING: SQLXML requires xdb.jar and xmlparserv2.jar", null);
+        }
+        UseSqlScripts annotation = context.getRequiredTestMethod().getAnnotation(UseSqlScripts.class);
+        if (annotation == null) {
+            annotation = context.getRequiredTestClass().getAnnotation(UseSqlScripts.class);
+        }
         if (annotation == null) {
             return;
         }
-
-        String adapterId = config.db.assetId;
-
-        for (String ddlFile : annotation.ddl()) {
-            Path path = resolvePath(config.ddl.basePath, adapterId, ddlFile);
-            executeSqlFile(context, path);
+        var store = context.getParent().orElseThrow().getStore(ROOT_NAMESPACE);
+        for (String ddl : annotation.ddl()) {
+            prepare(context, store, resolvePath(config.ddl.basePath, config.db.assetId, ddl));
         }
-
-        for (String dmlFile : annotation.dml()) {
-            Path path = resolvePath(config.dml.basePath, adapterId, dmlFile);
-            executeSqlFile(context, path);
+        for (String dml : annotation.dml()) {
+            prepare(context, store, resolvePath(config.dml.basePath, config.db.assetId, dml));
         }
+        for (String check : annotation.checks()) {
+            try (Connection connection = fixtureConnection();
+                Statement statement = connection.createStatement()) {
+                statement.execute(JdbcContext.sql(check));
+            } catch (SQLException error) {
+                throw new ExecutionPrerequisiteException("FIXTURE_SHAPE_UNAVAILABLE", error);
+            }
+        }
+    }
+
+    private void prepare(ExtensionContext context, ExtensionContext.Store store, Path path) {
+        Object previous = store.get(path.toString());
+        if (previous instanceof PreparationFailure failure) {
+            throw new ExecutionPrerequisiteException("FIXTURE_BLOCKED: " + path.getFileName(),
+                failure.error(), path.toString(), failure.method());
+        }
+        if (Boolean.TRUE.equals(previous)) {
+            return;
+        }
+        try {
+            executeSqlFile(context, path);
+            store.put(path.toString(), Boolean.TRUE);
+        } catch (IOException | ExecutionPrerequisiteException error) {
+            store.put(path.toString(), new PreparationFailure(error,
+                context.getRequiredTestClass().getName() + "#" + context.getRequiredTestMethod().getName()));
+            throw new ExecutionPrerequisiteException("FIXTURE_UNAVAILABLE: " + path.getFileName(),
+                error, path.toString(), null);
+        }
+    }
+
+    private record PreparationFailure(Throwable error, String method) {
+    }
+
+    private Connection fixtureConnection() {
+        try {
+            return JdbcContext.getConnection();
+        } catch (SQLException error) {
+            throw new ParameterResolutionException("Target fixture connection failed",
+                new TargetConnectionException(error));
+        }
+    }
+
+    @Override
+    public void interceptTestMethod(Invocation<Void> invocation,
+        ReflectiveInvocationContext<java.lang.reflect.Method> invocationContext,
+        ExtensionContext context) throws Throwable {
+        enterPhase(context, "EXECUTION");
+        invocation.proceed();
+    }
+
+    @Override
+    public void afterTestExecution(ExtensionContext context) {
+        context.getExecutionException().ifPresent(error ->
+            context.publishReportEntry("jdbc.failurePhase", "EXECUTION"));
+        enterPhase(context, "CLEANUP");
+    }
+
+    private record Phase(String name, long started) {
+    }
+
+    private static void finishPhase(ExtensionContext context) {
+        var store = context.getStore(ROOT_NAMESPACE);
+        Phase phase = store.remove("phase", Phase.class);
+        if (phase != null) {
+            context.publishReportEntry("jdbc.phaseDurationMs." + phase.name(),
+                Long.toString((System.nanoTime() - phase.started()) / 1_000_000));
+        }
+    }
+
+    private static void enterPhase(ExtensionContext context, String name) {
+        finishPhase(context);
+        context.getStore(ROOT_NAMESPACE).put("phase", new Phase(name, System.nanoTime()));
+        context.publishReportEntry("jdbc.phase", name);
     }
 
     @Override
@@ -53,7 +135,8 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
 
     @Override
     public ConditionEvaluationResult evaluateExecutionCondition(ExtensionContext context) {
-        ensureInitialized();
+        Config config = ConfigLoader.load();
+        FeatureProfile.load(config.db.dataSources.capabilities(config.adapter.capabilities));
 
         Class<?> testClass = context.getRequiredTestClass();
 
@@ -77,17 +160,19 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
     static ConditionEvaluationResult checkFeatures(List<String> required) {
         List<String> missing = new ArrayList<>();
         for (String feature : required) {
-            if (!FeatureProfile.supports(feature)) {
+            if (java.util.Set.of("data_source", "connection_pool", "xa_data_source").contains(feature)
+                && !FeatureProfile.supports(feature)) {
                 missing.add(feature);
             }
         }
         if (!missing.isEmpty()) {
             String reason = String.format(
-                "Execution capability disabled (adapter declaration or unconfigured DataSource provider): %s",
+                "PREREQUISITE_MISSING: unconfigured driver Provider: %s",
                 String.join(", ", missing));
             return ConditionEvaluationResult.disabled(reason);
         }
-        return ConditionEvaluationResult.enabled("所需能力全部支持");
+        return ConditionEvaluationResult.enabled(
+            "Standard capabilities require observation; prerequisites configured");
     }
 
     private Config ensureInitialized() {
@@ -145,17 +230,28 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
                 .put(extensionContext.getRequiredTestMethod().getName() + "_conn", conn);
             return conn;
         } catch (SQLException e) {
-            throw new ParameterResolutionException("无法获取数据库连接", e);
+            throw new ParameterResolutionException("Target connection failed",
+                e instanceof TargetConnectionException ? e : new TargetConnectionException(e));
         }
     }
 
     @Override
     public void afterEach(ExtensionContext context) throws Exception {
-        Connection conn = (Connection) context.getStore(
+        Phase phase = context.getStore(ROOT_NAMESPACE).get("phase", Phase.class);
+        if (phase != null && !"CLEANUP".equals(phase.name())) {
+            context.getExecutionException().ifPresent(error ->
+                context.publishReportEntry("jdbc.failurePhase", phase.name()));
+            enterPhase(context, "CLEANUP");
+        }
+        try {
+            Connection conn = (Connection) context.getStore(
                 ExtensionContext.Namespace.create(context.getRequiredTestClass()))
-            .remove(context.getRequiredTestMethod().getName() + "_conn");
-        if (conn != null && !conn.isClosed()) {
-            conn.close();
+                .remove(context.getRequiredTestMethod().getName() + "_conn");
+            if (conn != null && !conn.isClosed()) {
+                conn.close();
+            }
+        } finally {
+            finishPhase(context);
         }
     }
 
@@ -181,13 +277,15 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
         } else {
             String name = path.toString().replace('\\', '/');
             if (!name.startsWith("classpath:")) {
-                throw new RuntimeException("SQL 文件不存在: " + path.toAbsolutePath());
+                throw new ExecutionPrerequisiteException(
+                    "SQL resource missing: " + path.toAbsolutePath(), null);
             }
             String resource = name.substring("classpath:".length());
             try (var input = Thread.currentThread().getContextClassLoader()
                 .getResourceAsStream(resource)) {
                 if (input == null) {
-                    throw new RuntimeException("SQL classpath 资源不存在: " + resource);
+                    throw new ExecutionPrerequisiteException(
+                        "SQL classpath resource missing: " + resource, null);
                 }
                 content = new String(input.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
             }
@@ -198,7 +296,7 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
             : hasSlashBatches ? splitBySlash(content)
                 : splitBySemicolon(content);
 
-        try (Connection conn = JdbcContext.getConnection();
+        try (Connection conn = fixtureConnection();
             Statement stmt = conn.createStatement()) {
 
             for (String sql : statements) {
@@ -210,12 +308,12 @@ public class JdbcTestExtension implements BeforeAllCallback, AfterAllCallback, A
                 try {
                     executeManagedStatement(stmt, JdbcContext.objects(), trimmed);
                 } catch (SQLException e) {
-                    throw new RuntimeException("SQL initialization failed: " + path.getFileName(),
-                        e);
+                    throw new ExecutionPrerequisiteException(
+                        "SQL initialization failed: " + path.getFileName(), e);
                 }
             }
         } catch (SQLException e) {
-            throw new RuntimeException("执行 SQL 文件时连接异常: " + path, e);
+            throw new ParameterResolutionException("Fixture connection operation failed", e);
         }
     }
 

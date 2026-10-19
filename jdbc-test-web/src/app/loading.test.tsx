@@ -38,6 +38,8 @@ describe("Resource loading and preserved history",()=>{
   let signal:AbortSignal|null|undefined;
   mockApi((url,options)=>url.pathname==='/api/test-catalog'?new Promise<Response>((_,reject)=>{signal=options.signal;signal?.addEventListener('abort',()=>reject(signal?.reason));}):undefined);
   const {router}=renderPage('/runs/new');expect(await screen.findByRole('radio',{name:connection.name})).toBeVisible();
+  await userEvent.setup().click(screen.getByRole('radio',{name:connection.name}));
+  await waitFor(()=>expect(signal).toBeDefined());
   await act(()=>router.navigate('/drivers'));await screen.findByRole('heading',{name:'Driver packages'});await waitFor(()=>expect(signal?.aborted).toBe(true));
  });
  it("keeps the title and offers retry after a cold read fails",async()=>{

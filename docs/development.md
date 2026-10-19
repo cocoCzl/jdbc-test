@@ -289,10 +289,11 @@ These are external test inputs, not application/POM dependencies, and are never 
 Before namespace/fixture creation, Oracle execution preflight reads `NLS_DATABASE_PARAMETERS`
 (SELECT only) and tests both database and national charset conversions using the isolated driver.
 An unreadable/missing charset or failed conversion stops preflight with
-`ORACLE_CHARSET_PREFLIGHT_FAILED`; the cause is retained. Worker selections requiring enabled
-`sqlxml` also reject missing XML components with `ORACLE_XML_MISSING` before writes. Hand-written
-Suite runtime configs can request this same XML preflight with `preflight.require_sqlxml: true`;
-the default is false. The Python CLI does not infer this flag from its selection. Ordinary
+`ORACLE_CHARSET_PREFLIGHT_FAILED`; the cause is retained. XML components are checked only during
+preparation of selected SQLXML methods. Missing components yield `ORACLE_XML_MISSING` as a scenario
+prerequisite failure without blocking independent standard cases. The legacy
+`preflight.require_sqlxml` field remains parseable but no longer triggers global XML rejection;
+this check does not depend on the `sqlxml` capability boolean. Ordinary
 connection probes still run no SQL. These checks target Oracle's
 `oracle.jdbc.*` implementation; other drivers retain existing behavior. Test failures caused by a
 missing dependency must not be reported as database compatibility failures.
@@ -438,7 +439,29 @@ Read module and profile counts from the current catalog; CUSTOM selects modules/
 
 Normal states: `QUEUED → PREPARING → RUNNING → GENERATING_REPORT → SUCCEEDED`. Failure, cancellation and recovery end in `FAILED`, `CANCELLED`, `INTERRUPTED`. A local FIFO scheduler limits concurrent Workers; workspaces are `<data-dir>/runs/<run-id>`. Run row locks protect terminal states against late results/cancel races. Timeout gives `FAILED / RUN_TIMEOUT`; a slot stays occupied until process cleanup finishes.
 
-Server checks events, report entries and counts before success. Invalid/inconsistent reports fail with `REPORT_INCONSISTENT`; FAILED/ABORTED results yield `WORKER_EXECUTION_FAILED` even with exit code 0. The report DTO is `{summary, failures}`. Protocol v2 raw JSON can be reconstructed from persisted evidence, with `source` and `workerReportValidated` identifying that boundary. See [Execution safety](execution-safety.md) for accounting rules.
+Server checks events, report entries and counts before success. Invalid/inconsistent reports fail with `REPORT_INCONSISTENT`; FAILED/ABORTED results other than explicitly permitted unsupported outcomes yield `WORKER_EXECUTION_FAILED` even with exit code 0. The report DTO is `{summary, failures}`. Protocol v2 raw JSON can be reconstructed from persisted evidence, with `source` and `workerReportValidated` identifying that boundary. See [Execution safety](execution-safety.md) for accounting rules.
+
+### Test scope and execution semantics (selection version 2)
+
+The actual chain is inventory → Worker `--describe-catalog` → RunCatalogService → target catalog API → New Run → shared ScenarioSelection → frozen scenario rows/executionInput → isolated Worker → JUnit extension → CASE events → persistence/report. Server never loads suite classes; catalog discovery never loads proprietary classes.
+
+There are currently 270 implemented scenarios in 17 modules, all STANDARD_JDBC, covering the existing connection/transaction, statements/batches/keys, ResultSet, metadata, savepoint, standard LOB/XML/array, RowSet and DataSource/pool/XA scenarios. This is **not every JDBC API**. No real VENDOR_EXTENSION scenario currently invokes proprietary APIs. The inventory's test_category and explicit applicable_adapters support extensions, verified with fixtures; module names, dialect and capability booleans do not determine ownership. jdbc_version records the test's JDBC runtime baseline; execution_prerequisites records Provider and SQL assets. Unsupported optional APIs still require observation.
+
+New Run defaults to all applicable tests after choosing a connection and driver. Modules start collapsed and show selected/total with mixed checkboxes. Expand to change individual cases, or search names/stable IDs. Select all, clear, restore defaults and module checkboxes affect the entire set regardless of search. Refresh preserves partial selections. Target changes preserve remaining selections, select newly applicable cases and explain removed items. Cache keys contain connection, adapter and driver. Review shows selections/exclusions and known missing Providers; SQL, permissions and companion JARs are checked during preparation. Empty selections cannot submit.
+
+Compatibility: explicit CORE keeps the existing 153 IDs, maintained through inventory category: core rather than feature annotations. FULL means all applicable scenarios. CUSTOM requires a module or included ID. Modules intersect includeScenarios; excludeScenarios wins last. Empty FULL/CORE lists add no filter; CUSTOM with empty modules and nonempty includes means that exact ID set. Unknown, deleted or inapplicable IDs and a final empty set are rejected. A stale supplied catalogVersion yields CATALOG_CHANGED. No separate copy/rerun endpoint exists; clients must review current IDs when resubmitting history.
+
+New runs reuse executionInput and selected scenario rows. They freeze the catalog content hash, semantics version, selection basis/exclusions, final metadata including category/JDBC version/source class/method/contract, existing adapter/driver/Provider snapshots and budget. Worker uses frozen metadata instead of reapplying current CORE membership. A missing historical class/method is explicitly unavailable and never replaced. Legacy tasks/reports retain original semantics when evidence is absent. Protocol remains 2; deploy Server/Worker together.
+
+Gate audit: A comprises all current capability declarations except the three Provider flags (savepoints, callable statements, advanced types, LOB/XML/RowSet, metadata, result sets, keys, cancellation/timeouts, client info, request/sharding, java_time and related operations). Declarations remain evidence; false does not disable standard verification. B comprises configured data_source/connection_pool/xa_data_source Providers, SQL assets/object shapes, privileges and Oracle XML companion JARs. Missing prerequisites are explicit, including an absent configured Provider class in the selected driver package. Provider constructor/setter and actual interface failures are not blanket-converted into missing prerequisites. C has no explicit predecessor-test graph today; a failed shared fixture blocks only cases using it, preserving its cause, resource and originating scenario ID. D uses explicit adapter applicability; no production vendor scenarios exist yet.
+
+UseSqlScripts is prepared lazily before a selected method and shared within its class. An empty method annotation overrides class scripts. Connection, metadata and in-memory XML methods that need no table avoid unrelated DDL. Array fixture shape is checked; Oracle's legacy JSON/VARCHAR substitutes cannot masquerade as executed array tests. Kingbase's PostgreSQL assets remain candidate inputs. Preparation failures retain SQLState/vendor codes. Failure to obtain the injected scenario connection is CONNECTION_FAILURE in PREPARATION, preserving authentication/connection errors even after a JUnit execution callback; it is not a missing prerequisite or contract invocation. Calls made by the test body retain their own contract context. SQL inside a test body retains its contract interpretation. Public assertions are not relaxed. Holdability is exercised even if supportsResultSetHoldability returns false, and that declaration is recorded and compared with actual behavior.
+
+PASSED/FAILED/SKIPPED/ABORTED remain execution statuses. New conclusions distinguish CONFORMS, CONTRACT_VIOLATION, UNSUPPORTED_ALLOWED, UNSUPPORTED_REQUIRED, PREREQUISITE_UNMET, BLOCKED_PREREQUISITE, TIMEOUT, CONNECTION_FAILURE, PLATFORM_ERROR and NOT_EVALUATED, with phase, category, duration, sanitized exception/SQLState/vendor code, declarations and observations. JdbcContracts.optional accepts SQLFeatureNotSupportedException only around specific permitted factory/logger calls: Connection.createBlob/createClob/createSQLXML and CommonDataSource.getParentLogger. Subsequent object operations retain their assertions. Allowed unsupported is ABORTED plus contractConforms=true, never PASSED, and remains visibly unsupported. JdbcContracts.required currently scopes Connection.getAutoCommit: its explicit unsupported response violates that required API contract. Unscoped SQLFeatureNotSupportedException remains NOT_EVALUATED with its original error and no inferred compliance. Ordinary SQLException, SQLState and error text never establish unsupported permission. Preparation SQL without a known prerequisite marker also remains NOT_EVALUATED. Per-case phaseDurationsMs measures preparation including injected connection acquisition, the method body and connection cleanup; class-level owned-object cleanup is separate cleanupEvidence. Historical reports receive no invented conclusions.
+
+Reports show catalog, selected, invoked contracts, user exclusions, not-run/incomplete counts and separate contract conclusions. Missing prerequisites, skips and timeouts are not passes. Raw JSON includes selection provenance and case evidence; unstarted cases retain the run termination reason. Adapter maturity is independent of driver contract compliance and does not automatically decrease when a reliable adapter exposes a real driver defect.
+
+Optional task budgetSeconds is bounded to 60–7200; UI defaults to 1800. Older API clients retain the configured server budget, now frozen. Preparation, tests and cleanup share the budget. JUnit applies a default 60000ms timeout to the test method body only, using SAME_THREAD; explicit @Timeout takes precedence. Discovery, before/after callbacks, preparation and cleanup are outside that method limit and remain bounded by the shared task budget. JUnit interrupts the method thread at its limit; it cannot force a JDBC call to return. If interruption is ignored, no following method or cleanup runs concurrently: the Worker exits at the task budget, with incomplete cleanup reported as unknown. The Server allows 5 seconds for Worker exit before its configured termination grace (2 seconds by default), then forcibly terminates the Worker if needed. This is not a hard per-case process kill or a promise to continue after an unresponsive call. Unreached cases remain NOT_RUN; unfinished started cases remain INCOMPLETE. CLI timeout_ms retains per-method meaning, core/full and class/method filters remain, stable IDs are also accepted, and an empty filtered set is rejected. CLI execution and reports share the same selector; USER_EXCLUDED identifies unselected cases and NOT_APPLICABLE identifies unrelated extensions. Without PyYAML, explicit CORE membership is still read from the inventory; future vendor extensions require PyYAML to interpret applicability. New CLI reports carry outcome_semantics_version=2 and no longer let false declarations override observations; legacy XML without reliable phase evidence preserves ordinary SQL errors as NOT_EVALUATED rather than guessing a platform cause; stored historical JSON is unchanged.
 
 ## Worker protocol
 
@@ -491,7 +514,7 @@ Events include `RUN_STARTED`, `MODULE_STARTED`, `CASE_STARTED`, `CASE_FINISHED`,
    module level. Exact scenario selection is
    available through the existing run API (`profile: "CUSTOM"`, `modules: []`, `includeScenarios`
    containing the intended catalog IDs) or Worker selection (`profile: "FULL"`, `includeScenarios`). Module
-   selections, default CORE and full profiles include additional, unqualified cases; the initial
+   selections and the new default full selection include additional, unqualified cases; the initial
    broader trial timed out. Inspect metadata and cleanup evidence, not just validation status or
    `acceptsURL`.
 
@@ -522,11 +545,7 @@ their setup/cleanup have passed. Other modes, builds, privileges and scripts nee
 The generic API/UI still permits selecting broader scenarios; the candidate warning is not a
 runtime version/mode gate.
 
-The manifest's capability booleans are scenario execution gates. `savepoint`, `parameter_metadata`,
-`generated_keys` and `java_time` enable candidate assessment; true does not certify an entire feature.
-Other flags are false to leave unqualified feature groups disabled, **not** to assert that Kingbase
-lacks those features. In particular CallableStatement, arrays, LOB, XML, rowsets, DataSource,
-connection pooling and XA have not been qualified. No DataSource implementation is guessed.
+The manifest's capability booleans remain historical declarations; false no longer disables standard tests. Unqualified SQL/API groups are exercised or explicitly report missing preparation, without certifying database capability. CallableStatement, arrays, LOB, XML, rowsets, DataSource, pooling and XA remain unqualified on this candidate. No DataSource implementation is guessed.
 
 Identity preflight requires the observed, anchored names `^KingbaseES$` and
 `^Kingbase8 JDBC Driver$`. Ordinary PostgreSQL or unrelated drivers cannot pass those checks. No
@@ -655,8 +674,8 @@ The test-only nested-menu/tooltip/toast fixture runs with `PLAYWRIGHT_CHANNEL=ch
 ### Testing driver-owned DataSource implementations
 
 Driver upload and **Edit metadata** expose optional standard DataSource implementations. Supply classes
-from the uploaded JARs; configuring an interface enables its FULL-profile cases. Unconfigured
-interfaces are skipped, not passed. The platform's connection facade is tested only as infrastructure.
+from the uploaded JARs; its standard cases are always present and selected by default. Unconfigured
+interfaces report unmet execution prerequisites, not passes. The platform's connection facade is tested only as infrastructure.
 Queued runs freeze these definitions and include them in reports. No vendor class is inferred.
 
 CLI/runtime YAML uses `db.data_sources` with the same definitions as API `dataSources`:

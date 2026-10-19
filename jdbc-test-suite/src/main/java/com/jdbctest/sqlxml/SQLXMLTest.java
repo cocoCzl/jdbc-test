@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.jdbctest.config.ConfigLoader;
 import com.jdbctest.extension.JdbcContext;
+import com.jdbctest.extension.JdbcContracts;
 import com.jdbctest.extension.JdbcTestExtension;
 import com.jdbctest.extension.RequiresFeature;
 import com.jdbctest.extension.UseSqlScripts;
@@ -58,7 +59,7 @@ class SQLXMLTest {
         try (PreparedStatement ps = conn.prepareStatement(
             JdbcContext.sql("INSERT INTO {{sqlxml_test}} (name, xml_data) VALUES (?, ?)"))) {
             ps.setString(1, "setSQLXML测试");
-            SQLXML xml = conn.createSQLXML();
+            SQLXML xml = JdbcContracts.optional("Connection.createSQLXML", conn::createSQLXML);
             try {
                 xml.setString(xmlContent);
                 ps.setSQLXML(2, xml);
@@ -91,8 +92,9 @@ class SQLXMLTest {
     @Test
     @Order(4)
     @DisplayName("SQLXML.setString 设置字符串")
+    @UseSqlScripts
     void testSetString(Connection conn) throws SQLException {
-        SQLXML xml = conn.createSQLXML();
+        SQLXML xml = JdbcContracts.optional("Connection.createSQLXML", conn::createSQLXML);
         try {
             xml.setString("<test>hello</test>");
             if (!isOracle()) {
@@ -127,8 +129,9 @@ class SQLXMLTest {
     @Test
     @Order(6)
     @DisplayName("SQLXML.setResult 设置 Result")
+    @UseSqlScripts
     void testSetResult(Connection conn) throws SQLException {
-        SQLXML xml = conn.createSQLXML();
+        SQLXML xml = JdbcContracts.optional("Connection.createSQLXML", conn::createSQLXML);
         try {
             Result result = xml.setResult(StreamResult.class);
             assertNotNull(result, "setResult 应返回非空");
@@ -142,7 +145,7 @@ class SQLXMLTest {
     @DisplayName("SQLXML 读写完整流程")
     void testSnapshotScrap(Connection conn) throws SQLException, IOException {
         String inputXml = "<person><name>测试员</name><score>100</score></person>";
-        SQLXML xml = conn.createSQLXML();
+        SQLXML xml = JdbcContracts.optional("Connection.createSQLXML", conn::createSQLXML);
         try {
             // 写入
             xml.setString(inputXml);

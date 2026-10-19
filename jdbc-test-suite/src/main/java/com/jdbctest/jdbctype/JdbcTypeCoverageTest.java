@@ -3,6 +3,7 @@ package com.jdbctest.jdbctype;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.jdbctest.extension.JdbcContracts;
 import com.jdbctest.extension.JdbcTestExtension;
 import com.jdbctest.extension.RequiresFeature;
 import java.sql.Connection;
@@ -37,7 +38,7 @@ class JdbcTypeCoverageTest {
     @Test
     @RequiresFeature("sqlxml")
     void testSqlXmlApi(Connection connection) throws SQLException {
-        SQLXML xml = connection.createSQLXML();
+        SQLXML xml = JdbcContracts.optional("Connection.createSQLXML", connection::createSQLXML);
         assertNotNull(xml);
         xml.free();
     }

@@ -91,7 +91,7 @@ public record DataSourceProviders(Provider dataSource, Provider connectionPoolDa
     }
 
     /**
-     * Configuring an interface explicitly requests its standard API tests.
+     * Provider presence is an execution prerequisite, not proof of JDBC API support.
      */
     public Map<String, Boolean> capabilities(Map<String, Boolean> adapter) {
         Map<String, Boolean> result = new LinkedHashMap<>(adapter);

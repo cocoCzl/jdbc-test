@@ -19,6 +19,9 @@ final class WorkerExecutionEvidence implements TestExecutionListener {
     private final Map<String, Map<String, Object>> results = new LinkedHashMap<>();
     private final List<Map<String, Object>> issues = new ArrayList<>();
     private TestPlan plan;
+    private final Map<String, Map<String, String>> observations = new LinkedHashMap<>();
+    private final Map<String, Boolean> declarations;
+
     private Map<String, Object> cleanup = Map.of("status", "UNKNOWN", "phase", "NOT_RECORDED");
 
     synchronized void recordCleanup(Map<String, Object> value) {
@@ -33,9 +36,28 @@ final class WorkerExecutionEvidence implements TestExecutionListener {
 
     WorkerExecutionEvidence(String runId, List<TestCaseDescriptor> selected,
         WorkerEventWriter events) {
+        this(runId, selected, events, Map.of());
+    }
+
+    WorkerExecutionEvidence(String runId, List<TestCaseDescriptor> selected,
+        WorkerEventWriter events, Map<String, Boolean> declarations) {
         this.runId = runId;
         this.events = events;
+        this.declarations = Map.copyOf(declarations);
         selected.forEach(item -> methods.put(item.sourceClass() + "#" + item.sourceMethod(), item));
+    }
+
+    synchronized void recordUnavailable(TestCaseDescriptor item, Throwable error) {
+        Map<String, Object> row = fields(item);
+        row.put("status", "SKIPPED");
+        row.put("durationMs", 0);
+        row.put("phase", "DISCOVERY");
+        row.put("contractInvoked", false);
+        row.put("conclusion", "PREREQUISITE_UNMET");
+        row.put("skipSource", "SCENARIO_CLASS_OR_API_UNAVAILABLE");
+        row.putAll(failure(error));
+        results.put(item.scenarioId(), row);
+        events.write("CASE_FINISHED", runId, row);
     }
 
     @Override
@@ -57,6 +79,16 @@ final class WorkerExecutionEvidence implements TestExecutionListener {
         }
         started.put(item.scenarioId(), System.nanoTime());
         events.write("CASE_STARTED", runId, fields(item));
+    }
+
+    @Override
+    public synchronized void reportingEntryPublished(TestIdentifier id,
+        org.junit.platform.engine.reporting.ReportEntry entry) {
+        TestCaseDescriptor item = descriptor(id);
+        if (item != null) {
+            observations.computeIfAbsent(item.scenarioId(), key -> new LinkedHashMap<>())
+                .putAll(entry.getKeyValuePairs());
+        }
     }
 
     @Override
@@ -96,7 +128,52 @@ final class WorkerExecutionEvidence implements TestExecutionListener {
         row.put("durationMs",
             (System.nanoTime() - started.getOrDefault(item.scenarioId(), System.nanoTime()))
                 / 1_000_000);
-        result.getThrowable().ifPresent(error -> row.putAll(failure(error)));
+        Throwable error = result.getThrowable().orElse(null);
+        if (error != null) {
+            row.putAll(failure(error));
+        }
+        row.put("observations", observations.getOrDefault(item.scenarioId(), Map.of()));
+        var observed = observations.getOrDefault(item.scenarioId(), Map.of());
+        String phase = isPrerequisite(error)
+            || hasCause(error, com.jdbctest.extension.TargetConnectionException.class)
+            ? "PREPARATION"
+            : observed.getOrDefault("jdbc.failurePhase", error == null ? "EXECUTION"
+                : observed.getOrDefault("jdbc.phase", "EXECUTION"));
+        row.putAll(conclusion(result.getStatus(), error, phase));
+        row.put("phase", phase);
+        row.put("contractInvoked", !isPrerequisite(error)
+            && !hasCause(error, com.jdbctest.extension.TargetConnectionException.class)
+            && ("EXECUTION".equals(phase)
+                || observed.containsKey("jdbc.phaseDurationMs.EXECUTION")));
+        Map<String, Long> durations = new LinkedHashMap<>();
+        observed.forEach((name, duration) -> {
+            if (name.startsWith("jdbc.phaseDurationMs.")) {
+                durations.put(name.substring("jdbc.phaseDurationMs.".length()),
+                    Long.parseLong(duration));
+            }
+        });
+        row.put("phaseDurationsMs", durations);
+        if (isPrerequisite(error)) {
+            Throwable cause = error;
+            for (int depth = 0; cause != null && depth < 10
+                && !(cause instanceof com.jdbctest.extension.ExecutionPrerequisiteException); depth++) {
+                cause = cause.getCause();
+            }
+            if (cause instanceof com.jdbctest.extension.ExecutionPrerequisiteException prerequisite) {
+                row.put("prerequisite", Objects.toString(prerequisite.prerequisite(), ""));
+                TestCaseDescriptor blocker = methods.get(prerequisite.blockedBy());
+                if (blocker != null) {
+                    row.put("blockedByScenario", blocker.scenarioId());
+                }
+            }
+        }
+        Map<String, Boolean> declared = new LinkedHashMap<>();
+        item.requiredCapabilities().forEach(feature -> {
+            if (declarations.containsKey(feature)) {
+                declared.put(feature, declarations.get(feature));
+            }
+        });
+        row.put("declaredCapabilities", declared);
         results.put(item.scenarioId(), row);
         events.write("CASE_FINISHED", runId, row);
     }
@@ -118,9 +195,74 @@ final class WorkerExecutionEvidence implements TestExecutionListener {
             row.put("durationMs", 0);
             row.put("message", CredentialSanitizer.sanitize(reason));
             row.put("skipSource", id.getUniqueId());
+            row.put("phase", "SELECTION");
+            row.put("contractInvoked", false);
+            row.put("conclusion", reason.startsWith("PREREQUISITE_MISSING:")
+                ? "PREREQUISITE_UNMET" : "NOT_EVALUATED");
             results.put(item.scenarioId(), row);
             events.write("CASE_FINISHED", runId, row);
         }
+    }
+
+    private static boolean isPrerequisite(Throwable error) {
+        return hasCause(error, com.jdbctest.extension.ExecutionPrerequisiteException.class);
+    }
+
+    private static boolean hasCause(Throwable error, Class<? extends Throwable> type) {
+        for (int depth = 0; error != null && depth < 10; depth++, error = error.getCause()) {
+            if (type.isInstance(error)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static Map<String, Object> conclusion(TestExecutionResult.Status status, Throwable error) {
+        return conclusion(status, error, "EXECUTION");
+    }
+
+    static Map<String, Object> conclusion(TestExecutionResult.Status status, Throwable error,
+        String phase) {
+        String value;
+        Boolean conforms = null;
+        if (hasCause(error, com.jdbctest.extension.TargetConnectionException.class)) {
+            value = "CONNECTION_FAILURE";
+        } else if (isPrerequisite(error)) {
+            Throwable cause = error;
+            for (int depth = 0; cause != null && depth < 10
+                && !(cause instanceof com.jdbctest.extension.ExecutionPrerequisiteException);
+                depth++) {
+                cause = cause.getCause();
+            }
+            value = cause instanceof com.jdbctest.extension.ExecutionPrerequisiteException missing
+                && missing.blockedBy() != null ? "BLOCKED_PREREQUISITE" : "PREREQUISITE_UNMET";
+        } else if (hasCause(error, com.jdbctest.extension.JdbcContracts.UnsupportedAllowedException.class)) {
+            value = "UNSUPPORTED_ALLOWED";
+            conforms = true;
+        } else if (hasCause(error, java.util.concurrent.TimeoutException.class)) {
+            value = "TIMEOUT";
+        } else if (hasCause(error,
+            com.jdbctest.extension.JdbcContracts.UnsupportedRequiredException.class)) {
+            value = "UNSUPPORTED_REQUIRED";
+            conforms = false;
+        } else if (hasCause(error, java.sql.SQLFeatureNotSupportedException.class)
+            || !"EXECUTION".equals(phase) && hasCause(error, SQLException.class)) {
+            value = "NOT_EVALUATED";
+        } else if (status == TestExecutionResult.Status.SUCCESSFUL) {
+            value = "CONFORMS";
+            conforms = true;
+        } else if (hasCause(error, AssertionError.class) || hasCause(error, SQLException.class)) {
+            value = "CONTRACT_VIOLATION";
+            conforms = false;
+        } else {
+            value = status == TestExecutionResult.Status.ABORTED ? "NOT_EVALUATED" : "PLATFORM_ERROR";
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("conclusion", value);
+        if (conforms != null) {
+            result.put("contractConforms", conforms);
+        }
+        return result;
     }
 
     static Map<String, Object> failure(Throwable error) {
@@ -155,6 +297,10 @@ final class WorkerExecutionEvidence implements TestExecutionListener {
         fields.put("moduleId", item.module().id());
         fields.put("module", item.module().id());
         fields.put("displayName", item.contract());
+        fields.put("category", item.category().name());
+        fields.put("jdbcVersion", item.jdbcVersion());
+        fields.put("unsupportedPolicy", item.unsupportedPolicy());
+        fields.put("requiredCapabilities", item.requiredCapabilities());
         return fields;
     }
 
@@ -182,7 +328,8 @@ final class WorkerExecutionEvidence implements TestExecutionListener {
             return "NO_TESTS_EXECUTED";
         }
         if (results.values().stream()
-            .anyMatch(row -> Set.of("FAILED", "ABORTED").contains(row.get("status")))) {
+            .anyMatch(row -> Set.of("FAILED", "ABORTED").contains(row.get("status"))
+                && !"UNSUPPORTED_ALLOWED".equals(row.get("conclusion")))) {
             return "TEST_FAILURE";
         }
         return "SUCCESS".equals(cleanup.get("status")) ? "COMPLETED" : "CLEANUP_FAILURE";

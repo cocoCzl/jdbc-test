@@ -46,37 +46,14 @@ describe("New Run wizard", () => {
     const body = JSON.parse(api.mock.calls.find(([, options]) => options?.method === "POST")![1]!.body as string);
     expect(body.password).toBe("");
   });
-  it.each([
-    ["Core", 136],
-    ["Full", 202],
-  ])(
-    "loads %s and its scenario count from the catalog",
-    async (profile, count) => {
-      const user = userEvent.setup();
-      mockApi();
-      renderPage("/runs/new");
-      await chooseConnectionAndDriver(user);
-      await user.click(
-        screen.getByRole("button", {
-          name: new RegExp(`${profile} ${count} scenarios`),
-        }),
-      );
-      expect(screen.getByText(`${count} scenarios selected`)).toBeVisible();
-    },
-  );
-  it("uses changed server catalog counts rather than hardcoded profile totals", async () => {
+  it("defaults to every implemented applicable scenario and uses case-level catalog data", async () => {
     const user = userEvent.setup();
-    mockApi((url) =>
-      url.pathname === "/api/test-catalog"
-        ? json({
-            ...catalog,
-            profiles: [{ id: "CORE", name: "Core", scenarioCount: 137 }],
-          })
-        : undefined,
-    );
+    mockApi();
     renderPage("/runs/new");
     await chooseConnectionAndDriver(user);
-    expect(screen.getByText("137 scenarios")).toBeVisible();
+    expect(await screen.findByText("40 scenarios selected")).toBeVisible();
+    expect(screen.getByRole("checkbox", { name: "Connection" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Statement" })).toBeChecked();
   });
   it("selects Custom Statement, requires consent and creates immediately", async () => {
     const user = userEvent.setup();
@@ -87,10 +64,7 @@ describe("New Run wizard", () => {
     );
     const { router } = renderPage("/runs/new");
     await chooseConnectionAndDriver(user);
-    await user.click(screen.getByRole("button", { name: /Custom Choose/ }));
-    await user.click(
-      screen.getByRole("checkbox", { name: "Statement 23 scenarios" }),
-    );
+    await user.click(screen.getByRole("checkbox", { name: "Connection" }));
     expect(screen.getByText("23 scenarios selected")).toBeVisible();
     await user.click(screen.getByRole("button", { name: /^Next:/ }));
     expect(
@@ -105,27 +79,21 @@ describe("New Run wizard", () => {
       api.mock.calls.find(([, options]) => options?.method === "POST")![1]!
         .body as string,
     );
-    expect(input).toEqual({
-      connectionId: connection.id,
-      driverId: connection.defaultDriver!.id,
-      profile: "CUSTOM",
-      modules: ["statement"],
-      destructiveConsent: true,
-    });
+    expect(input).toMatchObject({ connectionId: connection.id, driverId: connection.defaultDriver!.id,
+      profile: "CUSTOM", modules: [], destructiveConsent: true, catalogVersion: "fixture-v2", budgetSeconds: 1800 });
+    expect(input.includeScenarios).toEqual(catalog.scenarios.filter(item => item.moduleId === "statement").map(item => item.id));
+    expect(input.excludeScenarios).toHaveLength(17);
   });
   it("selects Custom Connection using the catalog count 17", async () => {
     const user = userEvent.setup();
     mockApi();
     renderPage("/runs/new");
     await chooseConnectionAndDriver(user);
-    await user.click(screen.getByRole("button", { name: /Custom Choose/ }));
-    await user.click(
-      screen.getByRole("checkbox", { name: "Connection 17 scenarios" }),
-    );
+    await user.click(screen.getByRole("checkbox", { name: "Statement" }));
     expect(screen.getByText("17 scenarios selected")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Select all" }));
+    await user.click(screen.getByRole("button", { name: "Select all tests" }));
     expect(screen.getByText("40 scenarios selected")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Clear all" }));
+    await user.click(screen.getByRole("button", { name: "Clear all tests" }));
     expect(screen.getByRole("button", { name: /^Next:/ })).toBeDisabled();
   });
   it("keeps temporary passwords out of URL, storage and query/mutation variables", async () => {
@@ -244,7 +212,7 @@ describe("Run detail / results / report", () => {
             SKIPPED: "Skipped",
             ABORTED: "Aborted",
           }[status],
-          { selector: "td span", exact: true },
+          { selector: "td span" },
         ),
       ).toBeVisible();
       if (status === "ABORTED") {

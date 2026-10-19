@@ -3,6 +3,7 @@ package com.jdbctest.extension;
 import java.util.Collections;
 import java.util.Map;
 
+/** Legacy adapter declarations; a true value does not establish observed JDBC support. */
 public class FeatureProfile {
 
     private static volatile Map<String, Boolean> features = Collections.emptyMap();

@@ -1,8 +1,10 @@
+import { TestSelection } from "./test-selection";
+import { useTestSelection, missingPrerequisites } from "./test-selection-state";
 import { Card } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { adaptersApi, adapterKeys } from "@/api/adapters";
 import { AdapterDetails } from "@/features/connections/adapter-details";
-import { moduleName, profileName } from "@/lib/presentation";
+import { profileName } from "@/lib/presentation";
 import { t } from "i18next";
 import { useTranslation } from "react-i18next";
 import { JdbcUrl } from "@/components/jdbc-url";
@@ -19,7 +21,7 @@ import { connectionsApi, connectionsKeys } from "@/api/connections";
 import { driversApi, driversKeys } from "@/api/drivers";
 import { catalogApi, catalogKeys } from "@/api/catalog";
 import { runsApi, runsKeys } from "@/api/runs";
-import type { Connection, CreateRun, DriverSummary } from "@/types/api";
+import type { Connection, DriverSummary } from "@/types/api";
 import { DriverSelect } from "@/features/drivers/driver-select";
 import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/data-table";
@@ -47,8 +49,7 @@ export default function NewRun() {
   const [adapterFilter, setAdapterFilter] = useState("");
   const [connection, setConnection] = useState<Connection | null>(null);
   const [driver, setDriver] = useState<DriverSummary | null>(null);
-  const [profile, setProfile] = useState<CreateRun["profile"]>("CORE");
-  const [modules, setModules] = useState<string[]>([]);
+  const [budgetSeconds, setBudgetSeconds] = useState(1800);
   const [consent, setConsent] = useState(false);
   const [differentPassword, setDifferentPassword] = useState(false);
   const [password, setPassword] = useState("");
@@ -69,13 +70,20 @@ export default function NewRun() {
     queryFn: ({ signal }) => connectionsApi.get(presetId!, signal),
     enabled: !!presetId,
   });
-  const catalog = useQuery({
-    queryKey: catalogKeys.all,
-    queryFn: ({ signal }) => catalogApi.get(signal),
-    staleTime: 300_000,
-  });
   const chosen = connection ?? preset.data ?? null;
   const chosenDriver = driver ?? chosen?.defaultDriver ?? null;
+  const catalog = useQuery({
+    queryKey: catalogKeys.target(chosen?.id ?? "", chosen?.adapterId ?? "", chosenDriver?.id ?? ""),
+    queryFn: ({ signal }) => catalogApi.get(signal, chosen?.adapterId),
+    enabled: !!chosen && !!chosenDriver,
+    staleTime: 300_000,
+  });
+  const selection = useTestSelection(catalog.data);
+  const selectedIds = [...selection.selected];
+  const selectionCount = selectedIds.length;
+  const excludedIds = catalog.data?.scenarios.filter(item => !selection.selected.has(item.id)).map(item => item.id) ?? [];
+  const profile = excludedIds.length ? "CUSTOM" : "FULL";
+  const budgetValid = Number.isInteger(budgetSeconds) && budgetSeconds >= 60 && budgetSeconds <= 7200;
   const outsideFilter = !!chosen && !!adapterFilter && chosen.adapterId !== adapterFilter;
   const chosenAdapter = adapters.data?.find((item) => item.id === chosen?.adapterId);
   const driverDetail = useQuery({
@@ -91,7 +99,11 @@ export default function NewRun() {
         connectionId: chosen!.id,
         driverId: chosenDriver!.id,
         profile,
-        modules: profile === "CUSTOM" ? modules : [],
+        modules: [],
+        includeScenarios: selectedIds,
+        excludeScenarios: excludedIds,
+        catalogVersion: catalog.data?.catalogVersion,
+        budgetSeconds,
         destructiveConsent: consent,
         ...(emptyPassword ? { password: "" } : needsPassword ? { password } : {}),
       }),
@@ -120,20 +132,14 @@ export default function NewRun() {
         }}
       />
     );
-  const selectionCount =
-    profile === "CUSTOM"
-      ? catalog.data?.modules
-          .filter((module) => modules.includes(module.id))
-          .reduce((total, module) => total + module.scenarioCount, 0)
-      : catalog.data?.profiles.find((item) => item.id === profile)
-          ?.scenarioCount;
+  const unmet = catalog.data?.scenarios.filter(item => selection.selected.has(item.id) && missingPrerequisites(item, driverDetail.data?.dataSources).length) ?? [];
   const continueAllowed =
     step === 0
       ? !!chosen && !outsideFilter
       : step === 1
         ? chosenDriver?.status === "VALIDATED" && (!needsPassword || !!password || emptyPassword)
         : step === 2
-          ? !!catalog.data && (profile !== "CUSTOM" || modules.length > 0)
+          ? !!catalog.data && selectionCount > 0 && budgetValid
           : false;
   return (
     <div className="mx-auto max-w-5xl">
@@ -302,94 +308,14 @@ export default function NewRun() {
           <>
             <h2 className="mb-3 text-xl font-semibold">
               {t("ui.defineYourTestSelection")}</h2>
-            <div className="mb-6 grid gap-4 sm:grid-cols-3">
-              {[
-                ...catalog.data.profiles.filter(
-                  (item) => item.id === "CORE" || item.id === "FULL",
-                ),
-                { id: "CUSTOM", name: "Custom", scenarioCount: undefined },
-              ].map((item) => (
-                <button
-                  key={item.id}
-                  aria-pressed={profile === item.id}
-                  className={cn(
-                    "step-card",
-                    profile === item.id && "border-primary bg-accent",
-                  )}
-                  onClick={() => setProfile(item.id as CreateRun["profile"])}
-                >
-                  <h3 className="font-semibold">{profileName(item.id, item.name)}</h3>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    {item.scenarioCount != null
-                      ? plural(item.scenarioCount, "scenario")
-                      : t("ui.chooseIndividualModules")}
-                  </p>
-                </button>
-              ))}
-            </div>
-            {profile === "CUSTOM" ? (
-              <>
-                <div className="mb-4 flex items-center justify-between">
-                  <h3 className="font-medium">
-                    {t("ui.modules")}{" "}
-                    <span className="text-muted-foreground">
-                      ({catalog.data?.modules.length})
-                    </span>
-                  </h3>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        setModules(catalog.data!.modules.map((item) => item.id))
-                      }
-                    >
-                      {t("ui.selectAll")}</Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setModules([])}
-                    >
-                      {t("ui.clearAll")}</Button>
-                  </div>
-                </div>
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  {catalog.data?.modules.map((item) => (
-                    <label
-                      key={item.id}
-                      className={cn(
-                        "step-card flex cursor-pointer items-start gap-3",
-                        modules.includes(item.id) &&
-                          "border-primary bg-accent",
-                      )}
-                    >
-                      <input
-                        type="checkbox"
-                        aria-label={`${moduleName(item.id, item.name)} ${plural(item.scenarioCount, "scenario")}`}
-                        className="mt-1 size-4 accent-primary"
-                        checked={modules.includes(item.id)}
-                        onChange={(event) =>
-                          setModules((previous) =>
-                            event.target.checked
-                              ? [...previous, item.id]
-                              : previous.filter((value) => value !== item.id),
-                          )
-                        }
-                      />
-                      <span>
-                        <span className="block font-medium">{moduleName(item.id, item.name)}</span>
-                        <span className="mt-1 block text-xs text-muted-foreground">
-                          {plural(item.scenarioCount, "scenario")}
-                        </span>
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                {t("wizard.selection", {profile: profileName(profile)})}</p>
-            )}
+            <TestSelection catalog={catalog.data} selected={selection.selected} onChange={selection.setSelected} />
+            {selection.removed ? <p role="status" className="mt-3 text-sm">{t("selection.removed", { count: selection.removed })}</p> : null}
+            <label className="mt-5 block text-sm">{t("selection.budget")}
+              <input type="number" min={60} max={7200} step={1} value={budgetSeconds}
+                className="mx-3 w-28 rounded-md border bg-background p-2"
+                onChange={event => setBudgetSeconds(Number(event.target.value))} />
+            </label>
+            <p className="mt-2 text-xs text-muted-foreground">{t("selection.budgetHint")}</p>
             <p className="mt-5 text-sm font-semibold" aria-live="polite">
               {t("wizard.selectedCount", {countText: selectionCount == null ? t("ui.scenariosInline") : plural(selectionCount, "scenario")})}</p>
           </>
@@ -424,14 +350,16 @@ export default function NewRun() {
                 <p className="mt-3 break-words font-semibold">
                   {profileName(profile)} · {selectionCount == null ? t("ui.scenariosInline") : plural(selectionCount, "scenario")}</p>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  {profile === "CUSTOM"
-                    ? catalog.data?.modules
-                        .filter((item) => modules.includes(item.id))
-                        .map((item) => moduleName(item.id, item.name))
-                        .join(", ")
-                    : t("ui.allModulesIncludedByThisProfile")}
+                  {t("selection.review", { selected: selectionCount, excluded: excludedIds.length, total: catalog.data?.scenarios.length ?? 0 })}
+
                 </p>
               </div>
+            </div>
+            <div className="my-4 text-sm" role="status">
+              <p>{t("selection.conditions", { count: unmet.length })}</p>
+              {unmet.length ? <details className="mt-2"><summary>{t("selection.showConditions")}</summary>
+                <ul className="mt-2 max-h-48 overflow-auto">{unmet.map(item => <li key={item.id} className="break-words font-mono text-xs">{item.id}: {missingPrerequisites(item, driverDetail.data?.dataSources).join(", ")}</li>)}</ul>
+              </details> : null}
             </div>
             <div className="mt-4 rounded-xl border border-warning/30 bg-warning/5 p-4">
               <h3 className="flex items-center gap-2 font-semibold text-warning">
@@ -481,6 +409,9 @@ export default function NewRun() {
             disabled={
               create.isPending ||
               !consent ||
+              selectionCount === 0 ||
+              !catalog.data ||
+              !budgetValid ||
               chosenDriver?.status !== "VALIDATED" ||
               (needsPassword && !password && !emptyPassword)
             }

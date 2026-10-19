@@ -72,16 +72,30 @@ final class RunCatalogService {
             for (JsonNode node : event.path("scenarios")) {
                 scenarios.add(
                     new Scenario(node.path("id").asString(), node.path("moduleId").asString(),
-                        node.path("displayName").asString(), node.path("profile").asString()));
+                        node.path("displayName").asString(), node.path("profile").asString(),
+                        node.path("category").asString("STANDARD_JDBC"),
+                        strings(node.path("applicableAdapters")),
+                        node.path("jdbcVersion").asString("UNKNOWN"),
+                        strings(node.path("executionPrerequisites")),
+                        strings(node.path("requiredCapabilities")),
+                        node.path("sourceClass").asString("fixture.Unknown"),
+                        node.path("sourceMethod").asString("unknown"),
+                        node.path("unsupportedPolicy").asString("REQUIRED")));
             }
             return new Catalog(List.copyOf(profiles), List.copyOf(modules), List.copyOf(scenarios),
-                event.path("totalScenarioCount").asInt());
+                event.path("totalScenarioCount").asInt(), event.path("catalogVersion").asString("legacy"));
         } catch (IOException | InterruptedException exception) {
             if (exception instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
             }
             throw unavailable();
         }
+    }
+
+    private static List<String> strings(JsonNode node) {
+        List<String> values = new ArrayList<>();
+        node.forEach(item -> values.add(item.asString()));
+        return List.copyOf(values);
     }
 
     private JsonNode read(String line) {
@@ -98,8 +112,12 @@ final class RunCatalogService {
     }
 
     record Catalog(List<Profile> profiles, List<Module> modules, List<Scenario> scenarios,
-        int totalScenarioCount) {
+        int totalScenarioCount, String catalogVersion) {
 
+        Catalog(List<Profile> profiles, List<Module> modules, List<Scenario> scenarios,
+            int totalScenarioCount) {
+            this(profiles, modules, scenarios, totalScenarioCount, "legacy");
+        }
     }
 
     record Profile(String id, String name, int scenarioCount) {
@@ -111,7 +129,29 @@ final class RunCatalogService {
 
     }
 
-    record Scenario(String id, String moduleId, String displayName, String profile) {
+    record Scenario(String id, String moduleId, String displayName, String profile,
+        String category, List<String> applicableAdapters, String jdbcVersion,
+        List<String> executionPrerequisites, List<String> requiredCapabilities,
+        String sourceClass, String sourceMethod, String unsupportedPolicy) {
+
+        Scenario(String id, String moduleId, String displayName, String profile) {
+            this(id, moduleId, displayName, profile, "STANDARD_JDBC", List.of(), "UNKNOWN",
+                List.of(), List.of(), "fixture.Unknown", "unknown", "REQUIRED");
+        }
+
+        com.jdbctest.catalog.TestCaseDescriptor descriptor(Module module) {
+            return new com.jdbctest.catalog.TestCaseDescriptor(id,
+                new com.jdbctest.catalog.TestModule(module.id(), module.name(),
+                    module.description() == null ? module.name() : module.description()),
+                com.jdbctest.catalog.TestProfile.valueOf(profile), displayName, sourceClass,
+                sourceMethod, requiredCapabilities, com.jdbctest.catalog.TestCategory.valueOf(category),
+                applicableAdapters, jdbcVersion, executionPrerequisites, unsupportedPolicy);
+        }
+
+        com.jdbctest.catalog.ScenarioSelection.Entry selectionEntry() {
+            return new com.jdbctest.catalog.ScenarioSelection.Entry(id, moduleId, profile,
+                com.jdbctest.catalog.TestCategory.valueOf(category), applicableAdapters);
+        }
 
     }
 }

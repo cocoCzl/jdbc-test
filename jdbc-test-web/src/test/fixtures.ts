@@ -81,8 +81,12 @@ export const catalog: Catalog = {
       coreScenarioCount: 23,
     },
   ],
-  scenarios: [],
-  totalScenarioCount: 202,
+  scenarios: [
+    ...Array.from({ length: 17 }, (_, i) => ({ id: `connection.case_${i}`, moduleId: "connection", displayName: `Connection case ${i}`, profile: "CORE", category: "STANDARD_JDBC" as const })),
+    ...Array.from({ length: 23 }, (_, i) => ({ id: `statement.case_${i}`, moduleId: "statement", displayName: `Statement case ${i}`, profile: "FULL", category: "STANDARD_JDBC" as const })),
+  ],
+  catalogVersion: "fixture-v2",
+  totalScenarioCount: 40,
 };
 export const run: Run = {
   id: "run-1",

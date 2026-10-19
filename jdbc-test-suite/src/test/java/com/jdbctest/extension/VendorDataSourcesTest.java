@@ -49,13 +49,28 @@ class VendorDataSourcesTest {
     void rejectsMissingProviderWrongInterfaceAndCredentialOverrides() {
         Config.DbConfig config = config();
         config.dataSources = DataSourceProviders.empty();
-        assertThrows(IllegalStateException.class, () -> VendorDataSources.dataSource(config));
+        assertThrows(ExecutionPrerequisiteException.class, () -> VendorDataSources.dataSource(config));
         var wrong = new DataSourceProviders.Provider(String.class.getName(), null, null, null);
         config.dataSources = new DataSourceProviders(wrong, null, null);
         assertThrows(IllegalStateException.class, () -> VendorDataSources.dataSource(config));
         Config.DbConfig collision = config();
         collision.properties = Map.of("secret", "override");
         assertThrows(IllegalStateException.class, () -> VendorDataSources.dataSource(collision));
+    }
+
+    @Test
+    void absentProviderArtifactIsAPrerequisiteButActualProviderCallsKeepTheirErrors()
+        throws Exception {
+        Config.DbConfig config = config();
+        var missing = new DataSourceProviders.Provider("fixture.absent.Provider", "url",
+            "user", "password");
+        config.dataSources = new DataSourceProviders(missing, null, null);
+        var error = assertThrows(ExecutionPrerequisiteException.class,
+            () -> VendorDataSources.dataSource(config));
+        assertInstanceOf(ClassNotFoundException.class, error.getCause());
+        assertEquals("fixture.absent.Provider", error.prerequisite());
+        DataSource source = VendorDataSources.dataSource(config());
+        assertThrows(SQLFeatureNotSupportedException.class, source::getConnection);
     }
 
     @Test

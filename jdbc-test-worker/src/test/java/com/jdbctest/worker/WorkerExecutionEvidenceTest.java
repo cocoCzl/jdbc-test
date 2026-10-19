@@ -4,10 +4,13 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jdbctest.catalog.*;
+import com.jdbctest.extension.ExecutionPrerequisiteException;
+import com.jdbctest.extension.JdbcContracts;
 import java.io.*;
 import java.util.*;
 import org.junit.jupiter.api.*;
 import org.junit.platform.engine.discovery.DiscoverySelectors;
+import org.junit.platform.engine.TestExecutionResult;
 import org.junit.platform.launcher.core.*;
 
 class WorkerExecutionEvidenceTest {
@@ -38,6 +41,45 @@ class WorkerExecutionEvidenceTest {
 
         @Test
         void second() {
+        }
+    }
+
+    static class MissingConnection {
+
+        @Test
+        void first(org.junit.jupiter.api.TestReporter reporter) {
+            reporter.publishEntry("jdbc.phase", "EXECUTION");
+            throw new org.junit.jupiter.api.extension.ParameterResolutionException(
+                "JUnit connection parameter wrapper", new com.jdbctest.extension.TargetConnectionException(
+                    new java.sql.SQLException("fixture authentication failure", "28000", 8)));
+        }
+
+        @Test
+        void second() {
+        }
+    }
+
+    static class CleanupFailure {
+
+        @Test
+        void first(org.junit.jupiter.api.TestReporter reporter) {
+            reporter.publishEntry("jdbc.phaseDurationMs.PREPARATION", "2");
+            reporter.publishEntry("jdbc.phaseDurationMs.EXECUTION", "3");
+        }
+
+        @AfterEach
+        void cleanup(org.junit.jupiter.api.TestReporter reporter) throws java.sql.SQLException {
+            reporter.publishEntry("jdbc.phase", "CLEANUP");
+            reporter.publishEntry("jdbc.phaseDurationMs.CLEANUP", "4");
+            throw new java.sql.SQLException("fixture cleanup failure", "08006");
+        }
+    }
+
+    static class BodyConnectionFailure {
+
+        @Test
+        void first() throws java.sql.SQLException {
+            throw new java.sql.SQLException("fixture tested getConnection failed", "28000", 8);
         }
     }
 
@@ -80,6 +122,86 @@ class WorkerExecutionEvidenceTest {
             .selectors(DiscoverySelectors.selectClass(fixture)).build();
         LauncherFactory.create().execute(request, evidence);
         return evidence;
+    }
+
+    @Test
+    void conclusionsSeparateOptionalUnsupportedRequiredUnsupportedFixturesAndTimeouts() {
+        var unsupported = new java.sql.SQLFeatureNotSupportedException(
+            "fixture unsupported", "0A000", 7);
+        var unknown = WorkerExecutionEvidence.conclusion(TestExecutionResult.Status.FAILED, unsupported);
+        assertEquals("NOT_EVALUATED", unknown.get("conclusion"));
+        assertFalse(unknown.containsKey("contractConforms"));
+        Throwable required = assertThrows(JdbcContracts.UnsupportedRequiredException.class,
+            () -> JdbcContracts.required("Connection.getAutoCommit", () -> { throw unsupported; }));
+        assertEquals("UNSUPPORTED_REQUIRED", WorkerExecutionEvidence.conclusion(
+            TestExecutionResult.Status.FAILED, required).get("conclusion"));
+        Throwable optional = assertThrows(JdbcContracts.UnsupportedAllowedException.class,
+            () -> JdbcContracts.optional("Connection.createBlob", () -> {
+                throw unsupported;
+            }));
+        var allowed = WorkerExecutionEvidence.conclusion(
+            TestExecutionResult.Status.ABORTED, optional);
+        assertEquals("UNSUPPORTED_ALLOWED", allowed.get("conclusion"));
+        assertEquals(true, allowed.get("contractConforms"));
+        var missing = WorkerExecutionEvidence.conclusion(TestExecutionResult.Status.ABORTED,
+            new ExecutionPrerequisiteException("FIXTURE_UNAVAILABLE: fixture.sql", unsupported));
+        assertEquals("PREREQUISITE_UNMET", missing.get("conclusion"));
+        assertFalse(missing.containsKey("contractConforms"));
+        assertEquals("TIMEOUT", WorkerExecutionEvidence.conclusion(TestExecutionResult.Status.FAILED,
+            new java.util.concurrent.TimeoutException()).get("conclusion"));
+        assertEquals("CONTRACT_VIOLATION", WorkerExecutionEvidence.conclusion(
+            TestExecutionResult.Status.FAILED,
+            new java.sql.SQLException("fixture syntax", "42000")).get("conclusion"));
+    }
+
+    @Test
+    void preparationSqlAndWrappedDependencyFailuresDoNotBecomeDriverFailures() {
+        var sql = new java.sql.SQLFeatureNotSupportedException("fixture connection unavailable");
+        var preparation = WorkerExecutionEvidence.conclusion(TestExecutionResult.Status.FAILED,
+            sql, "PREPARATION");
+        assertEquals("NOT_EVALUATED", preparation.get("conclusion"));
+        assertFalse(preparation.containsKey("contractConforms"));
+        var blocked = new IllegalStateException("JUnit wrapper",
+            new ExecutionPrerequisiteException("FIXTURE_BLOCKED: fixture.sql", sql,
+                "fixture.sql", "fixture.Setup#first"));
+        assertEquals("BLOCKED_PREREQUISITE", WorkerExecutionEvidence.conclusion(
+            TestExecutionResult.Status.ABORTED, blocked).get("conclusion"));
+        assertEquals("PLATFORM_ERROR", WorkerExecutionEvidence.conclusion(
+            TestExecutionResult.Status.FAILED, new IllegalStateException("platform setup"),
+            "PREPARATION").get("conclusion"));
+    }
+
+    @Test
+    void connectionParameterFailureRemainsPreparationEvenAfterExecutionCallback() {
+        var row = execute(MissingConnection.class).results().stream()
+            .filter(item -> item.get("scenarioId").equals("fixture.first")).findFirst().orElseThrow();
+        assertEquals("PREPARATION", row.get("phase"));
+        assertEquals(false, row.get("contractInvoked"));
+        assertEquals("CONNECTION_FAILURE", row.get("conclusion"));
+        assertEquals("28000", row.get("sqlState"));
+        assertEquals(8, row.get("vendorCode"));
+        assertFalse(row.containsKey("contractConforms"));
+    }
+
+    @Test
+    void cleanupFailurePreservesInvocationAndStageDurationsWithoutClaimingContractFailure() {
+        var row = execute(CleanupFailure.class).results().getFirst();
+        assertEquals("CLEANUP", row.get("phase"));
+        assertEquals(true, row.get("contractInvoked"));
+        assertEquals("NOT_EVALUATED", row.get("conclusion"));
+        assertEquals(Map.of("PREPARATION", 2L, "EXECUTION", 3L, "CLEANUP", 4L),
+            row.get("phaseDurationsMs"));
+        assertFalse(row.containsKey("contractConforms"));
+    }
+
+    @Test
+    void connectionFailureInTheTestBodyIsAnExecutedContractRatherThanMissingPreparation() {
+        var row = execute(BodyConnectionFailure.class).results().getFirst();
+        assertEquals("EXECUTION", row.get("phase"));
+        assertEquals(true, row.get("contractInvoked"));
+        assertEquals("CONTRACT_VIOLATION", row.get("conclusion"));
+        assertEquals(false, row.get("contractConforms"));
+        assertEquals("28000", row.get("sqlState"));
     }
 
     @Test

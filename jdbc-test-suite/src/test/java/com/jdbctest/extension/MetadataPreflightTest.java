@@ -96,7 +96,7 @@ class MetadataPreflightTest {
     }
 
     @Test
-    void oracleDependencyFailurePrecedesNamespaceAndFixtureWrites() throws Exception {
+    void oracleCharsetFailureStillPrecedesNamespaceAndFixtureWrites() throws Exception {
         for (boolean sqlxml : new boolean[] {true, false}) {
             Config config = config();
             // Custom adapter IDs must still use the declared Oracle dialect.
@@ -126,14 +126,10 @@ class MetadataPreflightTest {
                 var error = assertThrows(IllegalStateException.class,
                     () -> JdbcContext.init(config));
                 assertEquals("ADAPTER_PREFLIGHT_FAILED", error.getMessage());
-                assertTrue(error.getCause().getMessage().contains(sqlxml
-                    ? "ORACLE_XML_MISSING" : "ORACLE_CHARSET_PREFLIGHT_FAILED"));
+                assertTrue(error.getCause().getMessage().contains("ORACLE_CHARSET_PREFLIGHT_FAILED"));
                 assertEquals("REJECTED", JdbcContext.metadataEvidence().get("status"));
                 verify(statement, never()).execute(anyString());
                 verify(connection, never()).prepareStatement(anyString());
-                if (sqlxml) {
-                    verify(connection, never()).createStatement();
-                }
             } finally {
                 JdbcContext.shutdown();
             }

@@ -33,6 +33,7 @@ class DatabaseMetaDataTest {
     @Test
     @Order(1)
     @DisplayName("getDatabaseProductName 获取数据库产品名")
+    @UseSqlScripts
     void testGetDatabaseProductName(Connection conn) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
         assertNotNull(meta.getDatabaseProductName());
@@ -42,6 +43,7 @@ class DatabaseMetaDataTest {
     @Test
     @Order(2)
     @DisplayName("getDatabaseProductVersion 获取数据库版本")
+    @UseSqlScripts
     void testGetDatabaseProductVersion(Connection conn) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
         assertNotNull(meta.getDatabaseProductVersion());
@@ -51,6 +53,7 @@ class DatabaseMetaDataTest {
     @Test
     @Order(3)
     @DisplayName("getDriverName 获取驱动名")
+    @UseSqlScripts
     void testGetDriverName(Connection conn) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
         assertNotNull(meta.getDriverName());
@@ -60,6 +63,7 @@ class DatabaseMetaDataTest {
     @Test
     @Order(4)
     @DisplayName("getDriverVersion 获取驱动版本")
+    @UseSqlScripts
     void testGetDriverVersion(Connection conn) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
         assertNotNull(meta.getDriverVersion());
@@ -69,6 +73,7 @@ class DatabaseMetaDataTest {
     @Test
     @Order(5)
     @DisplayName("getURL 获取连接 URL")
+    @UseSqlScripts
     void testGetURL(Connection conn) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
         String url = meta.getURL();
@@ -79,6 +84,7 @@ class DatabaseMetaDataTest {
     @Test
     @Order(6)
     @DisplayName("getUserName 获取用户名")
+    @UseSqlScripts
     void testGetUserName(Connection conn) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
         assertNotNull(meta.getUserName());
@@ -185,6 +191,7 @@ class DatabaseMetaDataTest {
     @Test
     @Order(10)
     @DisplayName("getSchemas 获取 Schema 信息")
+    @UseSqlScripts
     void testGetSchemas(Connection conn) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
         try (ResultSet schemas = meta.getSchemas()) {
@@ -198,6 +205,7 @@ class DatabaseMetaDataTest {
     @Test
     @Order(11)
     @DisplayName("getCatalogs 获取 Catalog 信息")
+    @UseSqlScripts
     void testGetCatalogs(Connection conn) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
         try (ResultSet catalogs = meta.getCatalogs()) {
@@ -208,6 +216,7 @@ class DatabaseMetaDataTest {
     @Test
     @Order(12)
     @DisplayName("getJDBCMajorVersion 和 getJDBCMinorVersion")
+    @UseSqlScripts
     void testJDBCVersion(Connection conn) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
         assertTrue(meta.getJDBCMajorVersion() >= 4);
@@ -217,6 +226,7 @@ class DatabaseMetaDataTest {
     @Test
     @Order(13)
     @DisplayName("getDatabaseMajorVersion 和 getDatabaseMinorVersion")
+    @UseSqlScripts
     void testDatabaseVersion(Connection conn) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
         assertTrue(meta.getDatabaseMajorVersion() > 0);
@@ -225,6 +235,7 @@ class DatabaseMetaDataTest {
     @Test
     @Order(14)
     @DisplayName("getMaxConnections 获取最大连接数")
+    @UseSqlScripts
     void testGetMaxConnections(Connection conn) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
         int maxConns = meta.getMaxConnections();
@@ -234,6 +245,7 @@ class DatabaseMetaDataTest {
     @Test
     @Order(15)
     @DisplayName("supportsTransactions 检查事务支持")
+    @UseSqlScripts
     void testSupportsTransactions(Connection conn) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
         assertTrue(meta.supportsTransactions(), "应支持事务");
@@ -242,6 +254,7 @@ class DatabaseMetaDataTest {
     @Test
     @Order(16)
     @DisplayName("supportsBatchUpdates 检查批处理支持")
+    @UseSqlScripts
     void testSupportsBatchUpdates(Connection conn) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
         assertTrue(meta.supportsBatchUpdates(), "应支持批处理");
@@ -250,6 +263,7 @@ class DatabaseMetaDataTest {
     @Test
     @Order(17)
     @DisplayName("supportsSavepoints 检查保存点支持")
+    @UseSqlScripts
     void testSupportsSavepoints(Connection conn) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
         assertTrue(meta.supportsSavepoints(), "应支持保存点");
@@ -258,6 +272,7 @@ class DatabaseMetaDataTest {
     @Test
     @Order(18)
     @DisplayName("getTypeInfo 获取类型信息")
+    @UseSqlScripts
     void testGetTypeInfo(Connection conn) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
         try (ResultSet types = meta.getTypeInfo()) {
@@ -273,6 +288,7 @@ class DatabaseMetaDataTest {
     @Test
     @Order(19)
     @DisplayName("getProcedures 获取存储过程/函数信息")
+    @UseSqlScripts
     void testGetProcedures(Connection conn) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
         String schema = getSchema(conn);
@@ -285,6 +301,7 @@ class DatabaseMetaDataTest {
     @Test
     @Order(20)
     @DisplayName("getSQLKeywords 获取 SQL 关键字")
+    @UseSqlScripts
     void testGetSQLKeywords(Connection conn) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
         String keywords = meta.getSQLKeywords();
@@ -294,6 +311,7 @@ class DatabaseMetaDataTest {
     @Test
     @Order(21)
     @DisplayName("getIdentifierQuoteString 获取标识符引号")
+    @UseSqlScripts
     void testGetIdentifierQuoteString(Connection conn) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
         String quote = meta.getIdentifierQuoteString();
@@ -305,6 +323,7 @@ class DatabaseMetaDataTest {
     @Test
     @Order(22)
     @DisplayName("getSearchStringEscape 获取转义字符")
+    @UseSqlScripts
     void testGetSearchStringEscape(Connection conn) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
         assertNotNull(meta.getSearchStringEscape());
@@ -313,6 +332,7 @@ class DatabaseMetaDataTest {
     @Test
     @Order(23)
     @DisplayName("supportsMultipleResultSets 检查多结果集支持")
+    @UseSqlScripts
     void testSupportsMultipleResultSets(Connection conn) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
         assertNotNull(meta);

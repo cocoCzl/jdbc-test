@@ -9,7 +9,7 @@ public record ExecutionAccounting(int selected, int started, int completed, int 
     List<Scenario> scenarios) {
 
     public record Scenario(String scenarioId, String moduleId, String state, Instant startedAt,
-        Instant finishedAt) {
+        Instant finishedAt, String notExecutedReason) {
 
     }
 
@@ -25,7 +25,10 @@ public record ExecutionAccounting(int selected, int started, int completed, int 
                     : item.getExecutionStartedAt() != null
                         ? (terminal ? "INCOMPLETE" : "RUNNING")
                         : (terminal ? "NOT_RUN" : "PENDING"),
-                item.getExecutionStartedAt(), item.getExecutionFinishedAt())).toList();
+                item.getExecutionStartedAt(), item.getExecutionFinishedAt(),
+                item.getResultStatus() == null && terminal ?
+                    run.getFailureReason() == null ? "CONTAINER_OR_EXECUTION_FAILURE" : run.getFailureReason()
+                    : null)).toList();
         int started = (int) rows.stream().filter(row -> row.startedAt() != null).count();
         return new ExecutionAccounting(rows.size(), started, run.getCompletedCases(),
             run.getPassed(),

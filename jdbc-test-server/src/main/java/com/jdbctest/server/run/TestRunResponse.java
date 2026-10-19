@@ -14,7 +14,9 @@ public record TestRunResponse(UUID id, TestRunStatus status, String profile,
     Long durationMs, String failureReason, ExecutionAccounting accounting,
     java.util.Map<String, Object> executionScope,
     java.util.List<java.util.Map<String, Object>> executionIssues,
-    java.util.Map<String, Object> cleanupEvidence) {
+    java.util.Map<String, Object> cleanupEvidence,
+    java.util.Map<String, Object> selectionSnapshot,
+    java.util.Map<String, Long> contractSummary) {
 
     public record ConnectionSnapshot(String name, String databaseType, String adapterId,
         String jdbcUrl) {

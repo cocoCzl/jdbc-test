@@ -5,5 +5,6 @@ package com.jdbctest.catalog;
  */
 public enum TestProfile {
     CORE,
-    FULL
+    FULL,
+    CUSTOM
 }

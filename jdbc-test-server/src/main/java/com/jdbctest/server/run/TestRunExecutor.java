@@ -118,7 +118,7 @@ final class TestRunExecutor {
                     terminateQuietly(actual);
                 }
             });
-            boolean exited = process.waitFor(execution.getRunTimeout().toMillis(),
+            boolean exited = process.waitFor(budgetMillis(input) + 5_000L,
                 TimeUnit.MILLISECONDS);
             if (!exited) {
                 fail(runId, "RUN_TIMEOUT");
@@ -218,12 +218,16 @@ final class TestRunExecutor {
             return new RunInput(runId, run.getDriverClassSnapshot(), paths,
                 frozen.path("jdbcUrl").asString(), frozen.path("username").asString(),
                 run.getAdapterIdSnapshot(), password,
-                "CUSTOM".equals(run.getProfile()) ? "FULL" : run.getProfile(),
+                "FULL",
                 scenarios.stream().map(TestRunSelectedScenarioEntity::getModuleId)
                     .collect(java.util.stream.Collectors.toSet()).stream().toList(),
                 scenarios.stream().map(TestRunSelectedScenarioEntity::getScenarioId).toList(),
                 frozen);
         });
+    }
+
+    private long budgetMillis(RunInput input) {
+        return input.frozen().path("budgetMs").asLong(execution.getRunTimeout().toMillis());
     }
 
     private Process start(RunInput input, Path workspace) throws IOException, InterruptedException {
@@ -246,8 +250,14 @@ final class TestRunExecutor {
                 "selection",
                 Map.of("profile", input.profile(), "modules", input.modules(), "includeScenarios",
                     input.scenarios(), "excludeScenarios", List.of()), "workspace",
-                workspace.toString(), "timeoutMs", execution.getRunTimeout().toMillis()));
+                workspace.toString(), "timeoutMs", budgetMillis(input)));
         request.put("protocolVersion", 2);
+        if (input.frozen().has("selection") && !"legacy".equals(
+            input.frozen().path("selection").path("catalogVersion").asString())) {
+            request.put("catalogVersion", input.frozen().path("selection").path("catalogVersion"));
+            request.put("frozenScenarios", input.frozen().path("selection").path("selectedMetadata"));
+        }
+        request.put("caseTimeoutMs", input.frozen().path("caseTimeoutMs").asLong(60_000L));
         if (input.frozen().has("adapterExecution")) {
             request.put("adapterExecution", input.frozen().path("adapterExecution"));
         }
@@ -519,7 +529,9 @@ final class TestRunExecutor {
             JsonNode reportCases = report.path("scenario_results");
             boolean failed = cases.stream().anyMatch(
                 item -> item.getStatus() == TestCaseResultStatus.FAILED
-                    || item.getStatus() == TestCaseResultStatus.ABORTED);
+                    || item.getStatus() == TestCaseResultStatus.ABORTED
+                    && (item.getExecutionEvidence() == null || !"UNSUPPORTED_ALLOWED".equals(
+                        mapper.readTree(item.getExecutionEvidence()).path("conclusion").asString())));
             var selection = selected.findByRun_IdOrderByScenarioId(runId);
             java.util.Set<String> chosen = selection.stream()
                 .map(TestRunSelectedScenarioEntity::getScenarioId)

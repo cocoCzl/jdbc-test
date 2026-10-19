@@ -32,11 +32,18 @@ public final class VendorDataSources {
         com.jdbctest.catalog.DataSourceProviders.Provider provider, Class<T> contract)
         throws Exception {
         if (provider == null) {
-            throw new IllegalStateException("Configure a driver-owned " + contract.getSimpleName()
-                + " implementation in db.data_sources");
+            throw new ExecutionPrerequisiteException("Configure a driver-owned "
+                + contract.getSimpleName() + " implementation in db.data_sources", null);
         }
-        Object source = Class.forName(provider.className(), true, JdbcContext.driverClassLoader())
-            .getDeclaredConstructor().newInstance();
+        java.lang.reflect.Constructor<?> constructor;
+        try {
+            constructor = Class.forName(provider.className(), false, JdbcContext.driverClassLoader())
+                .getDeclaredConstructor();
+        } catch (ClassNotFoundException | NoClassDefFoundError error) {
+            throw new ExecutionPrerequisiteException("PROVIDER_CLASS_UNAVAILABLE", error,
+                provider.className(), null);
+        }
+        Object source = constructor.newInstance();
         if (!contract.isInstance(source)) {
             throw new IllegalStateException(
                 "Configured provider must implement " + contract.getName());

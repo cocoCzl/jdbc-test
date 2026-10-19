@@ -15,7 +15,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 @RequiresFeature("array_type")
 @UseSqlScripts(
     ddl = {"advancedtype_ddl.sql"},
-    dml = {"advancedtype_dml.sql"}
+    dml = {"advancedtype_dml.sql"},
+    checks = "SELECT int_array, text_array FROM {{array_test}} WHERE 1 = 0"
 )
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class AdvancedTypeTest {

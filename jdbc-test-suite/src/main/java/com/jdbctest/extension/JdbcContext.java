@@ -169,8 +169,7 @@ public final class JdbcContext {
             if (config.db.isDialect("oracle")
                 && OracleDriverDependencies.appliesTo(config.db.getDriverClass())) {
                 OracleDriverDependencies.preflight(connection, driverClassLoader(),
-                    config.preflight != null && config.preflight.requireSqlxml
-                        && FeatureProfile.supports("sqlxml"));
+                    false);
             }
             evidence.put("status", "MATCHED");
             metadataEvidence = Map.copyOf(evidence);
@@ -280,8 +279,7 @@ public final class JdbcContext {
         if (dataSource == null) {
             throw new IllegalStateException("数据源未初始化");
         }
-        Connection connection = dataSource.getConnection();
-        return connection;
+        return dataSource.getConnection();
     }
 
     private static void executeRaw(String sql) {

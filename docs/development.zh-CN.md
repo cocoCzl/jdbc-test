@@ -253,10 +253,9 @@ Oracle 驱动包可能需要配套组件。对 `oracle.jdbc.*` 驱动，验证�
 
 Oracle 执行预检在命名空间/夹具创建前，只读查询 `NLS_DATABASE_PARAMETERS`，并使用隔离驱动
 验证数据库及国家字符集的实际转换。读取失败、信息缺失或转换失败以
-`ORACLE_CHARSET_PREFLIGHT_FAILED` 停止并保留原因。Worker 实际选中的场景需要已启用的
-`sqlxml` 时，也会在写入前以 `ORACLE_XML_MISSING` 拒绝缺少 XML 组件的包。
-手工 Suite 运行配置可用 `preflight.require_sqlxml: true` 请求相同 XML 预检，默认仍为 false；
-Python CLI 尚不根据场景选择推导此标记。
+`ORACLE_CHARSET_PREFLIGHT_FAILED` 停止并保留原因。XML 组件只在实际选中的 SQLXML 方法准备时检查，
+缺少时该用例以 `ORACLE_XML_MISSING` 报告执行前提不足，不阻止其他标准用例。
+旧 `preflight.require_sqlxml` 字段保留解析兼容，但不再触发全局 XML 拒绝；不依赖 `sqlxml` 能力布尔值。
 普通连接探测继续不执行 SQL。这些检查针对 Oracle 的 `oracle.jdbc.*` 实现，其他驱动保留现有行为。
 缺依赖导致的失败不能被解释为数据库兼容性失败。
 
@@ -381,7 +380,29 @@ CLI 可通过 `db.driver` 指定其他固定版本（`kind: "maven"`、`coordina
 
 正常状态：`QUEUED → PREPARING → RUNNING → GENERATING_REPORT → SUCCEEDED`。失败、取消和恢复分别进入 `FAILED`、`CANCELLED`、`INTERRUPTED`。本地 FIFO 调度器限制并发 Worker，工作目录为 `<data-dir>/runs/<run-id>`。任务行锁防止迟到结果与取消竞态覆盖终态。超时为 `FAILED / RUN_TIMEOUT`，进程清理完成前仍占用调度名额。
 
-Server 在成功前核对事件、报告条目和数量。报告无效或不一致时返回 `REPORT_INCONSISTENT`；即使退出码为 0，FAILED/ABORTED 结果仍导致 `WORKER_EXECUTION_FAILED`。报告 DTO 为 `{summary, failures}`。协议 v2 可从持久证据重建原始 JSON，通过 `source` 和 `workerReportValidated` 标明边界。统计规则见[执行安全](execution-safety.zh-CN.md)。
+Server 在成功前核对事件、报告条目和数量。报告无效或不一致时返回 `REPORT_INCONSISTENT`；除明确允许的不支持外，即使退出码为 0，FAILED/ABORTED 结果仍导致 `WORKER_EXECUTION_FAILED`。报告 DTO 为 `{summary, failures}`。协议 v2 可从持久证据重建原始 JSON，通过 `source` 和 `workerReportValidated` 标明边界。统计规则见[执行安全](execution-safety.zh-CN.md)。
+
+### 测试范围与执行语义（选择版本 2）
+
+实际链路为版本化场景清单 → Worker `--describe-catalog` → `RunCatalogService` → 目标目录 API → 新建任务 → `ScenarioSelection` 统一解析 → 冻结场景表和 executionInput → 隔离 Worker → JUnit 扩展 → CASE 事件 → 持久化与报告。Server 不加载测试类，目录扫描也不加载厂商类。
+
+当前实现 270 项、17 个模块，均为 `STANDARD_JDBC`；覆盖现有连接/事务、Statement/PreparedStatement/CallableStatement、ResultSet、元数据、保存点、标准 LOB/XML/数组、RowSet、DataSource/池/XA 场景，**并非全部 JDBC 接口**。目前没有真正调用专有 API 的 `VENDOR_EXTENSION` 用例。扩展机制使用清单中的 `test_category` 和显式 `applicable_adapters`，通过测试夹具验证；不能从模块、方言或能力猜测。标准测试适用于所有适配器，Blob/Clob 仍属标准测试。`jdbc_version` 标注该测试的 JDBC 运行基线，`execution_prerequisites` 标注 Provider 与 SQL 资产，实际准备阶段会核实条件；驱动不实现可选 API 的响应仍需实测。
+
+新建任务在选择连接、驱动后默认全选适用目录。模块默认折叠，复选框显示全部/部分选择，展开后按用例调整；支持名称/稳定 ID 搜索。全选、清空、恢复默认及模块复选框作用于全部用例，不仅是搜索结果。刷新目录保留部分选择；切换目标保留仍适用项，新出现的适用项默认选中，移除不适用项并提示。缓存键包含连接、适配器和驱动。核对页列出已选/排除数及已知 Provider 缺失项；其他 SQL/权限/JAR 条件在执行前检查。全不选无法提交。
+
+兼容规则：旧 API 显式 CORE 保留原有 153 项清单，成员由清单的 `category: core` 显式维护，不再由注解推断；FULL 是全部适用测试。CUSTOM 用于编辑后的选择，不能三个选择列表全空。模块和 includeScenarios 取交集，再应用 excludeScenarios（排除优先）；FULL/CORE 中空列表表示不增加该过滤，CUSTOM 空模块但非空 include 表示精确用例集合。未知/已删除/目标不适用的 ID 均拒绝，最终空集合拒绝。页面全不选不会提交为 FULL。带旧 catalogVersion 的新建/复制/重跑请求返回 CATALOG_CHANGED；当前没有独立复制/重跑接口，调用方需重新核对当前目录及 ID。
+
+新任务沿用 executionInput 和所选场景表：保存目录内容哈希、选择语义版本、原始选择依据、用户排除项、最终用例元数据（类别、版本、类/方法映射、契约）、适配器/驱动/Provider 和预算。Worker 执行冻结元数据，不用当前 CORE 成员重新裁剪；缺失的旧测试类/方法明确记录条件不足，不替换用例。旧任务缺少这些信息时不反推；协议仍为 2，Server/Worker 要配套部署。
+
+能力审计：A 类为除 Provider 三项以外的全部现有 capability 声明（保存点、可调用语句、数组/REF/STRUCT/ROWID/XML/RowSet、LOB、参数元数据、可滚动/可更新结果、生成键、多结果、取消、超时、ClientInfo、request/sharding、java_time 等），保留声明作为证据，false 不再通用禁用。B 类为 data_source、connection_pool、xa_data_source 的实际 Provider 配置，以及 SQL 资产/对象形状、权限、Oracle XML 配套 JAR；缺失呈现 PREREQUISITE_UNMET，包括所选驱动包找不到已配置的 Provider 类；不把构造器、属性设置及实际接口调用的所有错误都包装成前提不足。C 类目前没有显式前置用例依赖图；已失败的共享 SQL 准备会阻塞依赖该资源的后续用例，并保留原始异常、准备路径及阻塞用例 ID。D 类改由显式扩展适用范围表达，目前无实际扩展用例。
+
+`@UseSqlScripts` 延迟到选中方法的 beforeEach；同类共享成功准备，失败只影响依赖同一资产的用例。方法上的空注解取消类级准备；连接、元数据、内存 SQLXML API 等不需要表的方法不执行无关 DDL。数组夹具验证实际列形状，Oracle 以 JSON/VARCHAR 替代数组的旧 SQL 不会冒充数组 API 测试已运行。Kingbase 的 PostgreSQL SQL 仍仅为候选输入，失败保留 SQLState/厂商码并标明准备阶段。获取注入连接的实际认证或连接失败记录为 PREPARATION 阶段的 CONNECTION_FAILURE，保留原始错误，不归为平台前提不足；即使 JUnit 已发布执行回调，也不计契约调用。测试体中的 SQL 仍按原契约判定，不把所有 SQL 错误归为环境问题。公共断言未放宽；holdability 用例实测并记录 supports 声明是否一致。
+
+执行状态 PASSED/FAILED/SKIPPED/ABORTED 与新增结论分开。CONFORMS、CONTRACT_VIOLATION、UNSUPPORTED_ALLOWED、UNSUPPORTED_REQUIRED、PREREQUISITE_UNMET、BLOCKED_PREREQUISITE、TIMEOUT、CONNECTION_FAILURE、PLATFORM_ERROR、NOT_EVALUATED 保留类别、阶段、耗时、脱敏异常/SQLState/厂商码、声明及观察。只在特定 API 调用处通过 `JdbcContracts.optional` 接受 SQLFeatureNotSupportedException：Connection.createBlob/createClob/createSQLXML 和 CommonDataSource.getParentLogger；后续对象操作仍使用原断言。允许不支持记录 ABORTED + contractConforms=true，不计 PASSED，并明确展示功能不支持。`JdbcContracts.required` 当前明确约束 Connection.getAutoCommit，不支持该必需 API 记录为违反契约。未经具体调用确认的 SQLFeatureNotSupportedException 保留 NOT_EVALUATED、原始错误及未确定结论，不自动算符合契约；普通 SQLException、SQLState 或错误文本也不能证明允许不支持。无明确前提标记的准备阶段 SQL 错误同样保留 NOT_EVALUATED。逐用例 phaseDurationsMs 记录准备（包含注入连接获取）、方法主体和连接清理耗时；类级对象清理另见 cleanupEvidence。旧报告不补造这些结论。
+
+报告分别展示目录数、选中数、实际契约调用数、用户排除、未执行/未完成及各类结论；Provider 跳过/准备不足/超时不计通过。原始 JSON 保留冻结选择及逐用例证据，未开始项以任务终止原因解释。适配器状态表示平台适配成熟度，与驱动的契约结果独立；不因真实驱动缺陷自动降级适配器。
+
+任务级 budgetSeconds 可选 60–7200 秒；页面默认 1800 秒，旧 API 未提供时沿用服务配置并冻结。准备、用例、清理共享总预算；JUnit 的单用例默认 60000ms 仅约束测试方法体，采用 SAME_THREAD，显式 @Timeout 优先；目录发现、前后回调、准备及清理不在该方法期限内，仍受任务总预算约束。方法到期后 JUnit 中断当前线程，但不能强制 JDBC 调用返回。若调用忽略中断，同一执行线程不会继续后续方法，也不会并发清理；Worker 在任务预算到期后退出，未完成的清理记录未知。Server 保留 5 秒退出余量，再按配置的终止宽限（默认 2 秒）结束 Worker，必要时强制终止该进程。这不是 60 秒后强杀单个用例，也不保证遇到无响应调用后继续执行。未到达的用例保留 NOT_RUN，已开始未结束保留 INCOMPLETE。CLI 的 timeout_ms 继续表示单方法默认期限，未迁移成任务预算；core/full 名称和类/方法过滤保留，同时接受稳定 ID，过滤后为空直接拒绝。CLI 执行和报告共用筛选函数，报告以 USER_EXCLUDED 区分未选用例，以 NOT_APPLICABLE 区分无关扩展；无 PyYAML 时仍从清单读取显式 CORE 成员，未来存在扩展时要求 PyYAML 解析适用范围。新 CLI 报告带 outcome_semantics_version=2，不再以 false 声明覆盖实际结果；旧 XML 缺少可靠阶段证据时，普通 SQL 错误保留 NOT_EVALUATED，不猜测为平台原因。历史 JSON 不重解释。
 
 ## Worker 协议
 
@@ -415,9 +436,9 @@ Server 在加载目录和每次执行前检查协议版本。版本不匹配时�
 
 新增驱动时选择 KingbaseES，预设建议厂商 `Kingbase`、驱动类 `com.kingbase8.Driver`、URL 协议前缀 `jdbc:kingbase8:`。字段仍可编辑，主动清空或手动修改不会被切换预设覆盖；恢复默认值只影响这三个字段，不推断驱动版本。上传自己的 JAR，清空驱动类可使用原有 SPI 发现和多候选选择，再执行驱动校验。
 
-新增连接选择 `KingbaseES · 候选` 适配器及已校验的 Kingbase 驱动包，填写实际 `jdbc:kingbase8://host:4321/test` 地址，凭据单独填写。预先创建并授权专用测试 schema，填写执行数据库/schema、明确破坏性测试授权后运行；不使用业务 schema。适配器使用已有 schema，不自动创建或删除它。页面按模块选择不能精确重现 20 项子集；需使用运行 API 的 `CUSTOM` / `includeScenarios` 或 Worker 的场景选择。
+新增连接选择 `KingbaseES · 候选` 适配器及已校验的 Kingbase 驱动包，填写实际 `jdbc:kingbase8://host:4321/test` 地址，凭据单独填写。预先创建并授权专用测试 schema，填写执行数据库/schema、明确破坏性测试授权后运行；不使用业务 schema。适配器使用已有 schema，不自动创建或删除它。页面现在可按稳定 ID 搜索并精确勾选 20 项历史子集；API 可使用 `CUSTOM` / `includeScenarios`。默认全选会包含尚未验证的场景。
 
-`DbType.KINGBASE` 是独立产品，`DriverPreset` 是表单建议。`SqlDialect.POSTGRESQL` 复用 schema 选择与验证、双引号、非 Oracle 的小写标识符处理及索引清理语法；没有替换 Kingbase 驱动或协议。观察到的 oracle 模式不等于本项目 Oracle 方言的强制大写语义。`assets.directory=postgresql` 仅提供候选测试输入，未确认整套 PostgreSQL SQL 都兼容。能力布尔值是场景开关：true 启用候选断言，false 保留未确认组不执行，均非数据库能力认证。
+`DbType.KINGBASE` 是独立产品，`DriverPreset` 是表单建议。`SqlDialect.POSTGRESQL` 复用 schema 选择与验证、双引号、非 Oracle 的小写标识符处理及索引清理语法；没有替换 Kingbase 驱动或协议。观察到的 oracle 模式不等于本项目 Oracle 方言的强制大写语义。`assets.directory=postgresql` 仅提供候选测试输入，未确认整套 PostgreSQL SQL 都兼容。能力布尔值保留为历史声明，不再禁用标准测试；尚未验证的 SQL/API 会实测或明确报告准备不足，均非数据库能力认证。
 
 适配器的 `driver.source=local-drivers/kingbase` 用于 CLI 本地解析；Web/Server 使用选中的上传包，通过隔离 Worker 加载。普通构建不需要私有 JAR，不加入全局 classpath、不推断 Maven 坐标。身份要求 `^KingbaseES$` / `^Kingbase8 JDBC Driver$`，版本范围为空表示没有已确认边界，不能视为支持所有版本。
 
@@ -477,7 +498,7 @@ CPA Keeper 白色 UI 基础层固定引用上游 [`2c09d65d6a90b1dc9802fe7b26704
 ### 测试驱动自身的 DataSource 实现
 
 上传驱动及“编辑元数据”中可配置 DataSource、ConnectionPoolDataSource、XADataSource 的实现类。
-实现类须来自上传的驱动 JAR；配置后启用 FULL 配置中的对应接口用例，留空则明确跳过，不计为通过。
+实现类须来自上传的驱动 JAR；对应接口用例始终在标准目录中默认选中；缺少配置呈现执行前提不足，不计为通过。
 平台连接包装层仅由框架单元测试验证。任务入队时冻结实现类配置，报告包含此配置，不根据厂商推断类名。
 
 CLI/运行 YAML 的 `db.data_sources` 对应 API 的 `dataSources`：

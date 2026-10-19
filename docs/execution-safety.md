@@ -30,7 +30,7 @@ Hard stops can leave `CREATING`, `CREATED`, `DROPPING` or `UNKNOWN` entries. Ter
 
 ## Capabilities and result accounting
 
-CLI and Worker share official adapter declarations. All 34 managed capabilities must be boolean. Missing/invalid declarations fail configuration; `false` causes an explicit sourced skip, while `true` enables a test and does not prove compatibility. DataSource interface capabilities come from explicitly configured driver-owned providers; all other capabilities remain manifest-driven. FULL selects 270 scenarios.
+CLI and Worker retain validated boolean declarations, but false no longer disables standard capability verification. Missing Providers, fixture preparation and companion JARs are separate execution prerequisites. FULL defaults to all current 270 standard cases; no real vendor extension exists yet. CORE explicitly maintains the legacy 153 IDs; CUSTOM supports exact selection. Execution status and contract conclusions are separate, permitted unsupported requires a specific API contract, and historical reports are unchanged. See [selection semantics](development.md#test-scope-and-execution-semantics-selection-version-2).
 
 New runs use `protocolVersion: 2` and `report_schema_version: 2.0.0`; deploy Server/Worker together. Flyway V5–V8 are additive; V7 stores cleanup/termination evidence and V8 stores observed metadata. Legacy runs keep original outcomes without invented starts or v2 evidence.
 
@@ -56,11 +56,11 @@ The 2026-10-07 checkpoint used production Web → REST → external-driver Worke
 | PostgreSQL 15.2 / pgjdbc 42.7.2 | 17 passed | 23 passed | 136 passed | 198 passed, 4 skipped |
 | Oracle 19.3 / ojdbc11 21.13 | 17 passed | 23 passed | 136 passed | 189 passed, 13 skipped |
 
-Selections overlap. A disabled capability is a configuration reason, not evidence of absent database support; inspect per-scenario reasons in Results or raw JSON. These results cover local production JAR deployment, not Docker image acceptance, other driver versions or release authorization. Disposable-container regressions do not replace acceptance on actual target combinations. No real targets participate in default Maven/CI tests.
+These historical selections overlap and used the previous static-gate semantics. Historical skips are not evidence of absent database support; inspect their original reasons in Results/raw JSON. These results cover local production JAR deployment, not Docker image acceptance, other driver versions or release authorization. Disposable-container regressions do not replace acceptance on actual target combinations. No real targets participate in default Maven/CI tests.
 
 ## KingbaseES candidate observations
 
-The adapter remains candidate with `validated_combinations=[]`; full CORE has not passed. Limited observations apply only to server V009R002C016, oracle mode, JDBC database version 12.1 and driver declaration V008R006B0001, without qualification of other builds, modes or drivers.
+The adapter remains candidate with `validated_combinations=[]`; full CORE has not completed validation and previously reached the task budget. Limited observations apply only to server V009R002C016, oracle mode, JDBC database version 12.1 and driver declaration V008R006B0001, without qualification of other builds, modes or drivers.
 
 The trial used a standalone harness invoking the isolated Worker, bypassing Server scheduling and persistence. Its results were not automatically stored in platform PostgreSQL. Per-case reports, phase timings and diagnostics stay local and are not committed adapter resources. Normal platform tasks persist case results and run state through Server; original reports and ownership ledgers also use the local runtime directory.
 

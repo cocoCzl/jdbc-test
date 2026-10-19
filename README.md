@@ -45,18 +45,16 @@ To run the website without source development, choose [Deployment](docs/deployme
 
 ## Database support
 
-| Database | Adapter ID | Status | Verified scope |
-|---|---|---|---|
-| PostgreSQL | `postgresql` | Official | PostgreSQL 15.2 / pgjdbc 42.7.2 |
-| MySQL | `mysql` | Official | MySQL 8.0.30 / Connector/J 8.3.0 |
-| Oracle | `oracle` | Official | Oracle 19.3 / ojdbc11 21.13 |
-| GaussDB | `gaussdb` | Candidate | Awaiting real-instance validation |
-| SQL Server | `sqlserver` | Candidate | Awaiting real-instance validation |
-| KingbaseES | `kingbase` | Candidate | Limited tests: V009R002C016, oracle mode, JDBC database version 12.1 / driver V008R006B0001; full CORE not passed |
+| Database | Adapter ID | Status |
+|---|---|---|
+| PostgreSQL | `postgresql` | Official |
+| MySQL | `mysql` | Official |
+| Oracle | `oracle` | Official |
+| GaussDB | `gaussdb` | Candidate |
+| SQL Server | `sqlserver` | Candidate |
+| KingbaseES | `kingbase` | Candidate |
 
-Official status applies to the recorded combinations, not every version. Driver presets assist upload; they do not establish database compatibility. Other products can use local declarative adapters.
-
-See [verified combinations](docs/execution-safety.md#verified-combinations) and [KingbaseES candidate observations](docs/execution-safety.md#kingbasees-candidate-observations) for results and limits.
+Adapter status describes platform integration maturity. JDBC results describe the tested database/driver combination. Other products can use local declarative adapters.
 
 ## Development requirements
 
@@ -86,7 +84,7 @@ python3 scripts/runner.py compare \
   --current report/postgresql_YYYY-MM-DD_HH-MM-SS/report.json
 ```
 
-`report.json` is authoritative; Markdown/HTML are derived. New compatibility failures, environment/preflight errors, incomplete adapters and cleanup failures yield a nonzero exit code. Explicit capability skips and reviewed known differences do not block.
+`report.json` is authoritative; Markdown/HTML are derived. New compatibility failures, environment/preflight errors, incomplete adapters and cleanup failures yield a nonzero exit code. Explicitly permitted unsupported responses and reviewed known differences remain distinct from failures.
 
 ## Examples and custom adapters
 
@@ -108,7 +106,7 @@ The default CLI `test_profile=full` selects the JDBC 4.3 baseline: connections/t
 {"test_profile": "core", "test_filter": {"timeout_ms": 60000}}
 ```
 
-Optional APIs follow adapter capability declarations: `false` gives a sourced `known_unsupported` skip; `true` enables assertions. A skip does not prove lack of database support. View stable IDs with `python3 scripts/runner.py coverage --profile full`; narrow selection with `test_filter.include_tests` / `exclude_tests`. Shared-connection stress (`concurrency.enabled=true`) is rejected.
+New Run defaults to all applicable tests, with module and individual exclusions. Static false declarations no longer disable standard verification. Missing Providers/SQL preparation are prerequisites; permitted unsupported requires an observed response allowed by the specific API. CORE explicitly retains 153 legacy IDs; FULL covers 270 implemented standard cases, with no real vendor extensions yet, rather than every JDBC API. View stable IDs with `python3 scripts/runner.py coverage --profile full`; narrow selection with `test_filter.include_tests` / `exclude_tests`. Shared-connection stress (`concurrency.enabled=true`) is rejected.
 
 ## Build the CLI archive
 

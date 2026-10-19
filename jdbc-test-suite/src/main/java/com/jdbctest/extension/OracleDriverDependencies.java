@@ -82,7 +82,7 @@ public final class OracleDriverDependencies {
         }
     }
 
-    private static boolean xmlAvailable(ClassLoader loader) {
+    public static boolean xmlAvailable(ClassLoader loader) {
         return available(loader, "oracle.xdb.XMLType")
             && available(loader, "oracle.xml.parser.v2.DOMParser");
     }

@@ -17,6 +17,7 @@ import tools.jackson.databind.ObjectMapper;
 public final class WorkerProcessRunner {
 
     private static final int DIAGNOSTIC_LIMIT = 64 * 1024;
+    private static final int CATALOG_LIMIT = 1024 * 1024;
     private final DriverWorkerProperties properties;
     private final ObjectMapper mapper;
 
@@ -34,7 +35,8 @@ public final class WorkerProcessRunner {
         String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
         Process process = new ProcessBuilder(java, "-jar", worker.toAbsolutePath().toString(),
             mode).start();
-        ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+        ByteArrayOutputStream stdout = "--describe-catalog".equals(mode)
+            ? new CatalogCapture() : new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
         Thread stdoutReader = Thread.ofVirtual()
             .start(() -> drain(process.getInputStream(), stdout));
@@ -97,17 +99,22 @@ public final class WorkerProcessRunner {
     }
 
     private static void drain(java.io.InputStream input, ByteArrayOutputStream captured) {
+        int limit = captured instanceof CatalogCapture ? CATALOG_LIMIT : DIAGNOSTIC_LIMIT;
         try (input) {
             byte[] bytes = new byte[4096];
             int count;
             while ((count = input.read(bytes)) >= 0) {
-                int remaining = DIAGNOSTIC_LIMIT - captured.size();
+                int remaining = limit - captured.size();
                 if (remaining > 0) {
                     captured.write(bytes, 0, Math.min(count, remaining));
                 }
             }
         } catch (IOException ignored) {
         }
+    }
+
+    private static final class CatalogCapture extends ByteArrayOutputStream {
+
     }
 
     public record Result(int exitCode, boolean timedOut, String stdout, String stderr) {

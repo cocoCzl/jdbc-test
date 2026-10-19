@@ -13,8 +13,24 @@ public record TestCaseDescriptor(
     String contract,
     String sourceClass,
     String sourceMethod,
-    List<String> requiredCapabilities
+    List<String> requiredCapabilities,
+    TestCategory category,
+    List<String> applicableAdapters,
+    String jdbcVersion,
+    List<String> executionPrerequisites,
+    String unsupportedPolicy
 ) {
+
+    public TestCaseDescriptor(String scenarioId, TestModule module, TestProfile profile,
+        String contract, String sourceClass, String sourceMethod, List<String> capabilities) {
+        this(scenarioId, module, profile, contract, sourceClass, sourceMethod, capabilities,
+            TestCategory.STANDARD_JDBC, List.of(), "4.0", List.of(), "REQUIRED");
+    }
+
+    public ScenarioSelection.Entry selectionEntry() {
+        return new ScenarioSelection.Entry(scenarioId, module.id(), profile.name(), category,
+            applicableAdapters);
+    }
 
     public TestCaseDescriptor {
         requireText(scenarioId, "scenarioId");
@@ -25,6 +41,18 @@ public record TestCaseDescriptor(
         requireText(sourceMethod, "sourceMethod");
         requiredCapabilities = List.copyOf(
             Objects.requireNonNull(requiredCapabilities, "requiredCapabilities"));
+        Objects.requireNonNull(category, "category");
+        applicableAdapters = List.copyOf(applicableAdapters);
+        executionPrerequisites = List.copyOf(executionPrerequisites);
+        if (category == TestCategory.VENDOR_EXTENSION && applicableAdapters.isEmpty()) {
+            throw new IllegalArgumentException("Vendor extensions require explicit adapters");
+        }
+        if (category == TestCategory.STANDARD_JDBC && !applicableAdapters.isEmpty()) {
+            throw new IllegalArgumentException("Standard JDBC applies to every adapter");
+        }
+        if (!List.of("REQUIRED", "OPTIONAL").contains(unsupportedPolicy)) {
+            throw new IllegalArgumentException("Invalid unsupported policy");
+        }
     }
 
     private static void requireText(String value, String field) {

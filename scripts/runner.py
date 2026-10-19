@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 import copy
-import fnmatch
 import html
 import json
 import os
@@ -30,6 +29,7 @@ from compatibility_v1 import (
     build_scenario_inventory,
     build_v1_report,
     load_v1_report,
+    select_scenarios,
 )
 
 
@@ -438,7 +438,7 @@ def _run_maven(runtime: dict[str, Any], runtime_path: Path, driver_classpath: li
         raise ValueError("test_filter.timeout_ms 必须大于 0")
     command.append(f"-Djunit.jupiter.execution.timeout.default={timeout_ms} ms")
 
-    patterns = _profile_test_patterns(profile, includes, excludes)
+    patterns = _profile_test_patterns(profile, includes, excludes, runtime["db"]["adapter_id"])
     if patterns:
         command.append(f"-Dtest={','.join(patterns)}")
     started = datetime.now(timezone.utc)
@@ -454,36 +454,21 @@ def _run_maven(runtime: dict[str, Any], runtime_path: Path, driver_classpath: li
     }
 
 
-def _profile_test_patterns(profile: str, includes: list[str], excludes: list[str]) -> list[str]:
+def _profile_test_patterns(profile: str, includes: list[str], excludes: list[str], adapter_id: str | None = None) -> list[str]:
     """Return Surefire selectors for a profile while preserving filter semantics.
 
     Full without filters intentionally returns an empty selector, so local unit
     tests continue to run alongside reportable database scenarios.
     """
-    if profile == "full" and not includes and not excludes:
+    inventory = list(build_scenario_inventory(PROJECT_ROOT).values())
+    applicable = [item for item in inventory if item.test_category == "STANDARD_JDBC"
+                  or adapter_id in item.applicable_adapters]
+    if profile == "full" and not includes and not excludes and len(applicable) == len(inventory):
         return []
-    if profile not in {"core", "full"}:
-        raise ValueError("test_profile 必须是 core 或 full")
-    selected = build_scenario_inventory(PROJECT_ROOT).values()
-    if profile == "core":
-        selected = [item for item in selected if item.category == ScenarioCategory.CORE]
-
-    def matches(patterns: list[str], scenario: Any) -> bool:
-        candidates = (
-            scenario.class_name,
-            scenario.class_name.rsplit(".", 1)[-1],
-            f"{scenario.class_name}#{scenario.method_name}",
-            f"{scenario.class_name.rsplit('.', 1)[-1]}#{scenario.method_name}",
-        )
-        return any(fnmatch.fnmatch(candidate, pattern) for pattern in patterns for candidate in candidates)
-
-    result = []
-    for scenario in selected:
-        if includes and not matches(includes, scenario):
-            continue
-        if excludes and matches(excludes, scenario):
-            continue
-        result.append(f"{scenario.class_name}#{scenario.method_name}")
+    result = [f"{item.class_name}#{item.method_name}"
+              for item in select_scenarios(inventory, profile, includes, excludes, adapter_id)]
+    if not result:
+        raise ValueError("Test selection resolved to no scenarios; refusing an unfiltered run")
     return result
 
 
@@ -522,7 +507,7 @@ def _parse_surefire_reports() -> tuple[list[dict[str, Any]], dict[str, str]]:
             elif failure is not None:
                 case.update(status="failure", error_message=failure.get("message", ""), error_type=failure.get("type", ""), error_text=failure.text or "")
             elif skipped is not None:
-                case.update(status="skipped", skip_reason=skipped.get("message", "") or skipped.text or "")
+                case.update(status="skipped", skip_reason=skipped.get("message", "") or skipped.text or "", error_type=skipped.get("type", ""), error_text=skipped.text or "")
             else:
                 case["status"] = "passed"
             suite["testcases"].append(case)

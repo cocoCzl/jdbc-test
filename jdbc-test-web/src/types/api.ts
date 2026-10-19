@@ -142,15 +142,22 @@ export interface CatalogModule {
   scenarioCount: number;
   coreScenarioCount: number;
 }
+export interface CatalogScenario {
+  id: string;
+  moduleId: string;
+  displayName: string;
+  profile: string;
+  category?: "STANDARD_JDBC" | "VENDOR_EXTENSION";
+  applicableAdapters?: string[];
+  jdbcVersion?: string;
+  executionPrerequisites?: string[];
+  requiredCapabilities?: string[];
+}
 export interface Catalog {
+  catalogVersion?: string;
   profiles: { id: string; name: string; scenarioCount: number }[];
   modules: CatalogModule[];
-  scenarios: {
-    id: string;
-    moduleId: string;
-    displayName: string;
-    profile: string;
-  }[];
+  scenarios: CatalogScenario[];
   totalScenarioCount: number;
 }
 export interface ExecutionAccounting {
@@ -165,6 +172,8 @@ export interface CleanupEvidence {
   retainedObjects?: Record<string, unknown>[];
 }
 export interface Run {
+  selectionSnapshot?: { catalogVersion?: string; catalogCount?: number; userExcluded?: string[]; budgetMs?: number; caseTimeoutMs?: number };
+  contractSummary?: Record<string, number> | null;
   cleanupEvidence?: CleanupEvidence;
   accounting?: ExecutionAccounting | null;
   executionScope?: { database?: string | null; schema?: string | null } | null;
@@ -205,10 +214,15 @@ export interface CreateRun {
   driverId: string;
   profile: "CORE" | "FULL" | "CUSTOM";
   modules: string[];
+  includeScenarios?: string[];
+  excludeScenarios?: string[];
+  catalogVersion?: string;
+  budgetSeconds?: number;
   destructiveConsent: boolean;
   password?: string;
 }
 export interface CaseResult {
+  executionEvidence?: { conclusion?: string; contractConforms?: boolean; phase?: string; contractInvoked?: boolean; declaredCapabilities?: Record<string, boolean>; observations?: Record<string, string>; sqlState?: string; vendorCode?: number };
   id: string;
   scenarioId: string;
   moduleId: string;

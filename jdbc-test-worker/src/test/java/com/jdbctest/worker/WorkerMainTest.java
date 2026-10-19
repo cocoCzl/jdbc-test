@@ -55,6 +55,28 @@ class WorkerMainTest {
     }
 
     @Test
+    void frozenMetadataRetainsItsIdentityWithoutConsultingTheCurrentCatalog() {
+        var frozen = new com.jdbctest.catalog.TestCaseDescriptor("fixture.original",
+            new com.jdbctest.catalog.TestModule("fixture", "Fixture", "Frozen fixture"),
+            com.jdbctest.catalog.TestProfile.FULL, "original contract", "fixture.Original",
+            "original", List.of());
+        var request = new WorkerRunRequest(2, "fixture", null,
+            new WorkerRunRequest.ConnectionRequest("jdbc:fixture:test", "", "",
+                java.util.Map.of(), "postgresql"),
+            new WorkerRunRequest.SelectionRequest("FULL", List.of(),
+                List.of("fixture.original"), List.of()),
+            "unused", 1000L, null, null, java.util.Map.of(), true, null, "old-catalog", 100L,
+            List.of(frozen));
+        var result = WorkerMain.resolveScenarios(request, null,
+            new com.jdbctest.catalog.TestSelection(com.jdbctest.catalog.TestProfile.FULL,
+                java.util.Set.of(), java.util.Set.of("fixture.original"), java.util.Set.of()));
+        assertEquals(List.of(frozen), result);
+        assertThrows(IllegalArgumentException.class, () -> WorkerMain.resolveScenarios(request, null,
+            new com.jdbctest.catalog.TestSelection(com.jdbctest.catalog.TestProfile.FULL,
+                java.util.Set.of(), java.util.Set.of("fixture.replacement"), java.util.Set.of())));
+    }
+
+    @Test
     void catalogSmokeLoadsPackagedScenarios() {
         assertEquals(0, new WorkerMain().run(new String[] {"--catalog-smoke"}));
     }

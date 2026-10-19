@@ -45,18 +45,16 @@ if (-not (Test-Path '.env')) { Copy-Item .env.example .env }
 
 ## 数据库接入列表
 
-| 数据库 | 适配器 ID | 状态 | 已验证范围 |
-|---|---|---|---|
-| PostgreSQL | `postgresql` | 正式 | PostgreSQL 15.2 / pgjdbc 42.7.2 |
-| MySQL | `mysql` | 正式 | MySQL 8.0.30 / Connector/J 8.3.0 |
-| Oracle | `oracle` | 正式 | Oracle 19.3 / ojdbc11 21.13 |
-| GaussDB | `gaussdb` | 候选 | 等待真实实例验证 |
-| SQL Server | `sqlserver` | 候选 | 等待真实实例验证 |
-| KingbaseES（金仓） | `kingbase` | 候选 | V009R002C016、oracle 模式、JDBC 数据库版本 12.1 / 驱动 V008R006B0001 的有限测试；完整 CORE 未通过 |
+| 数据库 | 适配器 ID | 状态 |
+|---|---|---|
+| PostgreSQL | `postgresql` | 正式 |
+| MySQL | `mysql` | 正式 |
+| Oracle | `oracle` | 正式 |
+| GaussDB | `gaussdb` | 候选 |
+| SQL Server | `sqlserver` | 候选 |
+| KingbaseES（金仓） | `kingbase` | 候选 |
 
-正式状态仅对应已记录组合，不代表所有版本。驱动预设用于辅助上传，不代表数据库兼容性已验证。其他产品可以通过本地声明式适配器接入。
-
-具体结果与边界见[已验证组合](docs/execution-safety.zh-CN.md#已验证组合)及 [KingbaseES 候选验证](docs/execution-safety.zh-CN.md#kingbasees-候选验证)。
+适配器状态表示平台接入成熟度，JDBC 结果表示被测数据库与驱动组合的实际行为。其他产品可以通过本地声明式适配器接入。
 
 ## 开发环境
 
@@ -86,7 +84,7 @@ python3 scripts/runner.py compare \
   --current report/postgresql_YYYY-MM-DD_HH-MM-SS/report.json
 ```
 
-`report.json` 是权威格式，Markdown/HTML 由它派生。新增兼容性失败、环境/预检错误、适配包不完整或清理失败返回非零退出码；明确的能力跳过和审核后的已知差异不阻断。
+`report.json` 是权威格式，Markdown/HTML 由它派生。新增兼容性失败、环境/预检错误、适配包不完整或清理失败返回非零退出码；契约明确允许的实测不支持与审核后的已知差异单独呈现，不当作契约失败。
 
 ## 示例与自定义适配包
 
@@ -108,7 +106,7 @@ CLI 默认 `test_profile=full` 选择 JDBC 4.3 基线：连接/事务、Statemen
 {"test_profile": "core", "test_filter": {"timeout_ms": 60000}}
 ```
 
-可选 API 由适配能力声明控制：`false` 产生带来源的 `known_unsupported` 跳过，`true` 启用断言。跳过不证明数据库缺少支持。执行 `python3 scripts/runner.py coverage --profile full` 查看稳定 ID，通过 `test_filter.include_tests` / `exclude_tests` 缩小范围。共享连接压测（`concurrency.enabled=true`）会被拒绝。
+新建任务默认选中全部适用用例，可按模块或单用例取消。标准能力不再由静态 false 声明禁用；缺少 Provider/SQL 准备属于执行前提不足。只有具体 API 契约允许且实测不支持时才报告允许不支持。CORE 保留显式维护的旧 153 项，FULL 当前覆盖 270 项已实现的标准用例，尚无真实厂商扩展，并非所有 JDBC 接口。执行 `python3 scripts/runner.py coverage --profile full` 查看稳定 ID，通过 `test_filter.include_tests` / `exclude_tests` 缩小范围。共享连接压测（`concurrency.enabled=true`）会被拒绝。
 
 ## 构建 CLI 发布包
 

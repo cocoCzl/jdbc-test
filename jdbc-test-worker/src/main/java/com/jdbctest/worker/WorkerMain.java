@@ -96,7 +96,10 @@ public final class WorkerMain {
         }
         List<TestCaseDescriptor> selected;
         try {
-            selected = catalog.select(selection);
+            selected = resolveScenarios(request, catalog, selection);
+            if (selected.isEmpty()) {
+                throw new IllegalArgumentException("Selection resolved to no scenarios");
+            }
         } catch (Exception exception) {
             return fail(request.runId(), INVALID_REQUEST, "SELECTION_FAILURE", exception);
         }
@@ -359,12 +362,24 @@ public final class WorkerMain {
                     module.description(),
                     "scenarioCount", full, "coreScenarioCount", core));
             }
-            List<Map<String, Object>> scenarios = catalog.testCases().stream()
-                .map(item -> Map.<String, Object>of(
-                    "id", item.scenarioId(), "moduleId", item.module().id(), "displayName",
-                    item.contract(), "profile", item.profile().name())).toList();
+            List<Map<String, Object>> scenarios = catalog.testCases().stream().map(item -> {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("id", item.scenarioId());
+                row.put("moduleId", item.module().id());
+                row.put("displayName", item.contract());
+                row.put("profile", item.profile().name());
+                row.put("category", item.category().name());
+                row.put("applicableAdapters", item.applicableAdapters());
+                row.put("jdbcVersion", item.jdbcVersion());
+                row.put("executionPrerequisites", item.executionPrerequisites());
+                row.put("requiredCapabilities", item.requiredCapabilities());
+                row.put("sourceClass", item.sourceClass());
+                row.put("sourceMethod", item.sourceMethod());
+                row.put("unsupportedPolicy", item.unsupportedPolicy());
+                return row;
+            }).toList();
             events.write("CATALOG_DESCRIBED", "catalog",
-                Map.of("profiles", profiles, "modules", modules,
+                Map.of("catalogVersion", catalog.version(), "profiles", profiles, "modules", modules,
                     "protocolVersion", 2, "scenarios", scenarios, "totalScenarioCount",
                     catalog.testCases().size()));
             return SUCCESS;
@@ -381,6 +396,8 @@ public final class WorkerMain {
         for (TestCaseDescriptor descriptor : selected) {
             descriptors.put(key(descriptor.sourceClass(), descriptor.sourceMethod()), descriptor);
         }
+        WorkerExecutionEvidence listener = new WorkerExecutionEvidence(request.runId(), selected,
+            events, request.capabilities());
         LauncherDiscoveryRequestBuilder builder = LauncherDiscoveryRequestBuilder.request();
         Set<String> selectedClasses = new java.util.LinkedHashSet<>();
         Set<String> selectedMethods = new java.util.LinkedHashSet<>();
@@ -391,14 +408,11 @@ public final class WorkerMain {
                 var method = java.util.Arrays.stream(testClass.getDeclaredMethods())
                     .filter(candidate -> candidate.getName().equals(item.sourceMethod()))
                     .findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException(
-                        "Scenario method does not exist: " + item.scenarioId()));
+                    .orElseThrow(() -> new NoSuchMethodException(item.scenarioId()));
                 selectedClasses.add(item.sourceClass());
                 selectedMethods.add(key(item.sourceClass(), item.sourceMethod()));
-            } catch (ReflectiveOperationException exception) {
-                throw new IllegalArgumentException(
-                    "Scenario class is unavailable: " + item.sourceClass(),
-                    exception);
+            } catch (ReflectiveOperationException | LinkageError exception) {
+                listener.recordUnavailable(item, exception);
             }
         }
         for (String className : selectedClasses) {
@@ -424,9 +438,10 @@ public final class WorkerMain {
             return FilterResult.included("container");
         });
         builder.configurationParameter("junit.jupiter.execution.parallel.enabled", "false");
+        builder.configurationParameter("junit.jupiter.execution.timeout.test.method.default",
+            (request.caseTimeoutMs() == null ? 60_000L : request.caseTimeoutMs()) + " ms");
+        builder.configurationParameter("junit.jupiter.execution.timeout.thread.mode.default", "SAME_THREAD");
         LauncherDiscoveryRequest discovery = builder.build();
-        WorkerExecutionEvidence listener = new WorkerExecutionEvidence(request.runId(), selected,
-            events);
         var executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
             new ArrayBlockingQueue<>(1),
             Thread.ofPlatform().daemon(true).name("jdbc-test-worker").factory(),
@@ -512,8 +527,8 @@ public final class WorkerMain {
         config.put("adapter", Map.of("id", adapterId, "capabilities",
             com.jdbctest.catalog.AdapterExecutionConfig.validateCapabilities(
                 request.capabilities())));
-        config.put("preflight", Map.of("require_sqlxml", TestCatalog.loadDefault()
-            .select(toSelection(request.selection())).stream()
+        config.put("preflight", Map.of("require_sqlxml", resolveScenarios(request,
+            TestCatalog.loadDefault(), toSelection(request.selection())).stream()
             .anyMatch(test -> test.requiredCapabilities().contains("sqlxml"))));
         config.put("test_filter", Map.of("timeout_ms", timeoutMillis(request)));
         Files.writeString(path, mapper.writeValueAsString(config), StandardCharsets.UTF_8);
@@ -522,6 +537,21 @@ public final class WorkerMain {
                 Set.of(PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE));
         } catch (UnsupportedOperationException ignored) {
         }
+    }
+
+    static List<TestCaseDescriptor> resolveScenarios(WorkerRunRequest request, TestCatalog catalog,
+        TestSelection selection) {
+        if (request.frozenScenarios() == null) {
+            return catalog.select(selection, request.connection().adapterId());
+        }
+        var frozen = request.frozenScenarios();
+        var ids = com.jdbctest.catalog.ScenarioSelection.resolve(frozen.stream()
+            .map(TestCaseDescriptor::selectionEntry).toList(), selection, request.connection().adapterId());
+        if (Set.copyOf(ids).size() != frozen.size()
+            || !Set.copyOf(ids).equals(selection.includedScenarios())) {
+            throw new IllegalArgumentException("Frozen selection does not match requested IDs");
+        }
+        return List.copyOf(frozen);
     }
 
     private static TestSelection toSelection(WorkerRunRequest.SelectionRequest request) {
@@ -573,6 +603,10 @@ public final class WorkerMain {
         }
         if (blank(request.connection().jdbcUrl())) {
             throw new IllegalArgumentException("connection.jdbcUrl is required");
+        }
+        if (request.caseTimeoutMs() != null
+            && (request.caseTimeoutMs() < 1 || request.caseTimeoutMs() > 300_000)) {
+            throw new IllegalArgumentException("caseTimeoutMs must be between 1 and 300000");
         }
         if (request.timeoutMs() != null && request.timeoutMs() <= 0) {
             throw new IllegalArgumentException("timeoutMs must be positive");

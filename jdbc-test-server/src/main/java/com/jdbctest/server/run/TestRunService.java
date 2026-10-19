@@ -39,13 +39,15 @@ final class TestRunService {
     private final RunCatalogService catalog;
     private final TransactionTemplate transactions;
     private final TestRunScheduler scheduler;
+    private final ExecutionProperties executionProperties;
 
     TestRunService(TestRunRepository runs, TestRunSelectedScenarioRepository selected,
         TestRunModuleRepository modules, TestRunCredentialRepository credentials,
         TestCaseResultRepository results, DatabaseConnectionProfileRepository connections,
         JdbcDriverPackageRepository drivers,
         CredentialEncryptionService encryption, RunCatalogService catalog,
-        TransactionTemplate transactions, TestRunScheduler scheduler) {
+        TransactionTemplate transactions, TestRunScheduler scheduler,
+        ExecutionProperties executionProperties) {
         this.runs = runs;
         this.selected = selected;
         this.modules = modules;
@@ -57,6 +59,7 @@ final class TestRunService {
         this.catalog = catalog;
         this.transactions = transactions;
         this.scheduler = scheduler;
+        this.executionProperties = executionProperties;
     }
 
     TestRunResponse create(CreateTestRunRequest request) {
@@ -101,7 +104,8 @@ final class TestRunService {
                 throw problem(HttpStatus.UNPROCESSABLE_CONTENT, "EXECUTION_SCOPE_REQUIRED",
                     exception.getMessage());
             }
-            ResolvedSelection selection = resolve(request, catalog.catalog());
+            var source = catalog.catalog();
+            ResolvedSelection selection = resolve(request, source, connection.getAdapterId());
             String password =
                 request.password() == null ? encryption.decrypt(connection.getEncryptedPassword())
                     : request.password();
@@ -124,6 +128,34 @@ final class TestRunService {
                 "j" + UUID.randomUUID().toString().replace("-", "").substring(0, 20));
             execution.put("adapterExecution", adapterExecution);
             execution.put("dataSources", driver.getDataSources().toMap());
+            execution.put("selection", java.util.Map.of(
+                "catalogVersion", source.catalogVersion(), "semanticsVersion", 2,
+                "profile", selection.profile(), "modules", names(request.modules()),
+                "includeScenarios", names(request.includeScenarios()),
+                "excludeScenarios", names(request.excludeScenarios()),
+                "catalogCount", source.scenarios().stream()
+                    .filter(item -> item.selectionEntry().appliesTo(connection.getAdapterId())).count(),
+                "notApplicable", source.scenarios().stream()
+                    .filter(item -> !item.selectionEntry().appliesTo(connection.getAdapterId()))
+                    .map(RunCatalogService.Scenario::id).toList(),
+                "userExcluded", source.scenarios().stream()
+                    .filter(item -> item.selectionEntry().appliesTo(connection.getAdapterId()))
+                    .map(RunCatalogService.Scenario::id)
+                    .filter(id -> selection.scenarios().stream()
+                        .noneMatch(item -> item.id().equals(id)))
+                    .toList(), "selectedMetadata", selection.scenarios().stream()
+                    .map(item -> item.descriptor(source.modules().stream()
+                        .filter(module -> module.id().equals(item.moduleId()))
+                        .findFirst().orElseThrow())).toList()));
+            if (request.budgetSeconds() != null
+                && (request.budgetSeconds() < 60 || request.budgetSeconds() > 7200)) {
+                throw problem(HttpStatus.UNPROCESSABLE_CONTENT, "INVALID_BUDGET",
+                    "Budget must be between 60 and 7200 seconds");
+            }
+            execution.put("budgetMs", request.budgetSeconds() == null
+                ? executionProperties.getRunTimeout().toMillis() : request.budgetSeconds() * 1000L);
+            execution.put("caseTimeoutMs", 60_000L);
+
             execution.put("capabilities",
                 driver.getDataSources().capabilities(adapterExecution.capabilities()));
             run.freezeExecutionInput(
@@ -244,46 +276,32 @@ final class TestRunService {
     }
 
     private ResolvedSelection resolve(CreateTestRunRequest request,
-        RunCatalogService.Catalog source) {
-        String profile = request.profile().trim().toUpperCase();
-        if (!Set.of("CORE", "FULL", "CUSTOM").contains(profile)) {
-            throw problem(HttpStatus.UNPROCESSABLE_CONTENT, "INVALID_SELECTION",
-                "Unknown test profile");
+        RunCatalogService.Catalog source, String adapterId) {
+        if (request.catalogVersion() != null
+            && !request.catalogVersion().equals(source.catalogVersion())) {
+            throw problem(HttpStatus.CONFLICT, "CATALOG_CHANGED",
+                "The test catalog changed; refresh and review the selection");
         }
-        Set<String> knownModules = source.modules().stream().map(RunCatalogService.Module::id)
-            .collect(java.util.stream.Collectors.toSet());
-        Set<String> knownScenarios = source.scenarios().stream().map(RunCatalogService.Scenario::id)
-            .collect(java.util.stream.Collectors.toSet());
-        Set<String> includeModules = names(request.modules());
-        Set<String> include = names(request.includeScenarios());
-        Set<String> exclude = names(request.excludeScenarios());
-        if (!knownModules.containsAll(includeModules)) {
-            throw problem(HttpStatus.UNPROCESSABLE_CONTENT, "INVALID_MODULE",
-                "Unknown test module");
+        try {
+            var selection = new com.jdbctest.catalog.TestSelection(
+                com.jdbctest.catalog.TestProfile.valueOf(request.profile().trim().toUpperCase(
+                    java.util.Locale.ROOT)), names(request.modules()),
+                names(request.includeScenarios()), names(request.excludeScenarios()));
+            var ids = Set.copyOf(com.jdbctest.catalog.ScenarioSelection.resolve(source.scenarios()
+                .stream().map(RunCatalogService.Scenario::selectionEntry).toList(), selection,
+                adapterId));
+            if (ids.isEmpty()) {
+                throw new IllegalArgumentException("Selection resolved to no scenarios");
+            }
+            var rows = source.scenarios().stream().filter(item -> ids.contains(item.id()))
+                .sorted(Comparator.comparing(RunCatalogService.Scenario::id)).toList();
+            var resolvedModules = source.modules().stream()
+                .filter(item -> rows.stream().anyMatch(row -> row.moduleId().equals(item.id())))
+                .toList();
+            return new ResolvedSelection(selection.profile().name(), rows, resolvedModules);
+        } catch (IllegalArgumentException exception) {
+            throw problem(HttpStatus.UNPROCESSABLE_CONTENT, "INVALID_SELECTION", exception.getMessage());
         }
-        if (!knownScenarios.containsAll(include) || !knownScenarios.containsAll(exclude)) {
-            throw problem(HttpStatus.UNPROCESSABLE_CONTENT, "INVALID_SCENARIO",
-                "Unknown test scenario");
-        }
-        if ("CUSTOM".equals(profile) && includeModules.isEmpty() && include.isEmpty()) {
-            throw problem(HttpStatus.UNPROCESSABLE_CONTENT, "INVALID_SELECTION",
-                "Custom selection requires a module or scenario");
-        }
-        boolean full = !"CORE".equals(profile);
-        List<RunCatalogService.Scenario> rows = source.scenarios().stream()
-            .filter(item -> full || "CORE".equals(item.profile()))
-            .filter(item -> includeModules.isEmpty() || includeModules.contains(item.moduleId()))
-            .filter(item -> include.isEmpty() || include.contains(item.id()))
-            .filter(item -> !exclude.contains(item.id()))
-            .sorted(Comparator.comparing(RunCatalogService.Scenario::id)).toList();
-        if (rows.isEmpty()) {
-            throw problem(HttpStatus.UNPROCESSABLE_CONTENT, "INVALID_SELECTION",
-                "Selection resolved to no scenarios");
-        }
-        List<RunCatalogService.Module> resolvedModules = source.modules().stream()
-            .filter(item -> rows.stream().anyMatch(row -> row.moduleId().equals(item.id())))
-            .toList();
-        return new ResolvedSelection(profile, rows, resolvedModules);
     }
 
     private static Set<String> names(List<String> values) {
@@ -339,7 +357,43 @@ final class TestRunService {
             run.getStartedAt(), run.getFinishedAt(), duration,
             JdbcUrlSanitizer.sanitize(run.getFailureReason()),
             ExecutionAccounting.of(run, selected.findByRun_IdOrderByScenarioId(run.getId())),
-            scopeSnapshot(run), issueSnapshot(run), cleanupSnapshot(run));
+            scopeSnapshot(run), issueSnapshot(run), cleanupSnapshot(run), selectionSnapshot(run),
+            contractSummary(run));
+    }
+
+    @SuppressWarnings("unchecked")
+    private java.util.Map<String, Object> selectionSnapshot(TestRunEntity run) {
+        if (run.getExecutionInput() == null) {
+            return java.util.Map.of();
+        }
+        var mapper = new tools.jackson.databind.ObjectMapper();
+        var frozen = mapper.readTree(run.getExecutionInput());
+        if (!frozen.has("selection")) {
+            return java.util.Map.of();
+        }
+        java.util.Map<String, Object> value = new java.util.LinkedHashMap<>(mapper.convertValue(
+            frozen.path("selection"), java.util.Map.class));
+        value.put("budgetMs", frozen.path("budgetMs").asLong());
+        value.put("caseTimeoutMs", frozen.path("caseTimeoutMs").asLong());
+        return value;
+    }
+
+    private java.util.Map<String, Long> contractSummary(TestRunEntity run) {
+        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        var mapper = new tools.jackson.databind.ObjectMapper();
+        for (var row : results.findByRun_Id(run.getId())) {
+            if (row.getExecutionEvidence() == null) {
+                continue;
+            }
+            var evidence = mapper.readTree(row.getExecutionEvidence());
+            if (evidence.has("conclusion")) {
+                counts.merge(evidence.path("conclusion").asString(), 1L, Long::sum);
+            }
+            if (evidence.path("contractInvoked").asBoolean(false)) {
+                counts.merge("EXECUTED", 1L, Long::sum);
+            }
+        }
+        return counts.isEmpty() ? null : counts;
     }
 
     @SuppressWarnings("unchecked")
@@ -418,6 +472,8 @@ final class TestRunService {
                 new tools.jackson.databind.ObjectMapper().readTree(run.getExecutionInput())
                     .path("capabilities"));
             report.put("accounting", accounting);
+            report.put("selectionSnapshot", value.selectionSnapshot());
+            report.put("contractSummary", value.contractSummary());
             report.put("summary",
                 java.util.Map.of("total", accounting.selected(), "started", accounting.started(),
                     "completed", accounting.completed(),

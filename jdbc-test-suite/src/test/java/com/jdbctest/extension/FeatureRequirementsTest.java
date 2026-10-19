@@ -20,7 +20,7 @@ class FeatureRequirementsTest {
     }
 
     @Test
-    void methodRequirementsCannotBypassDisabledClassCapabilities() throws Exception {
+    void staticCapabilityAssumptionsDoNotDisableStandardTests() throws Exception {
         var required = JdbcTestExtension.requiredFeatures(Fixture.class,
             Fixture.class.getDeclaredMethod("objects"));
         assertEquals(List.of("blobs", "clobs", "lob_objects"), required);
@@ -30,11 +30,25 @@ class FeatureRequirementsTest {
         try {
             FeatureProfile.load(declarations);
             var outcome = JdbcTestExtension.checkFeatures(required);
-            assertTrue(outcome.isDisabled());
-            assertTrue(outcome.getReason().orElseThrow().contains("blobs"));
+            assertFalse(outcome.isDisabled());
             declarations.put("blobs", true);
             FeatureProfile.load(declarations);
             assertFalse(JdbcTestExtension.checkFeatures(required).isDisabled());
+        } finally {
+            FeatureProfile.load(AdapterExecutionConfig.load("postgresql").capabilities());
+        }
+    }
+
+    @Test
+    void missingProvidersArePrerequisitesRatherThanUnsupportedFeatures() {
+        try {
+            FeatureProfile.load(com.jdbctest.catalog.DataSourceProviders.empty().capabilities(
+                AdapterExecutionConfig.load("oracle").capabilities()));
+            for (String feature : List.of("data_source", "connection_pool", "xa_data_source")) {
+                var outcome = JdbcTestExtension.checkFeatures(List.of(feature));
+                assertTrue(outcome.isDisabled());
+                assertTrue(outcome.getReason().orElseThrow().startsWith("PREREQUISITE_MISSING:"));
+            }
         } finally {
             FeatureProfile.load(AdapterExecutionConfig.load("postgresql").capabilities());
         }

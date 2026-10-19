@@ -137,10 +137,10 @@ test("REAL PostgreSQL browser flow: external Driver → Statement/Connection →
     await page.getByRole("link", { name: "Start run", exact: true }).click();
     await page.getByRole("button", { name: /^Next:/ }).click();
     await page.getByRole("button", { name: /^Next:/ }).click();
-    await page.getByRole("button", { name: /Custom Choose/ }).click();
+    await page.getByRole("button", { name: "Clear all tests" }).click();
     await page
       .getByRole("checkbox", {
-        name: `${module} ${count} scenarios`,
+        name: module,
         exact: true,
       })
       .check();
@@ -160,9 +160,9 @@ test("REAL PostgreSQL browser flow: external Driver → Statement/Connection →
     const detail = await request.get(`/api/runs/${id}`);
     expect(detail.status()).toBe(200);
     const run = (await detail.json()) as Run;
-    // The bundled PG declaration disables only this selected multi-result scenario.
-    // Additional/unexplained skips must fail acceptance, not become a permissive allowance.
-    const expectedSkippedIds = module === "Statement" ? ["statement.result_sequence"] : [];
+    // Standard tests are exercised regardless of historical capability declarations.
+    // A selected driver/SQL combination must satisfy the contract for this acceptance test.
+    const expectedSkippedIds: string[] = [];
     expect(run).toMatchObject({
       status: "SUCCEEDED",
       totalCases: count,

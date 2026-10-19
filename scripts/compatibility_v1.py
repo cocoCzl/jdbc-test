@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import fnmatch
 import platform
 import re
 import subprocess
@@ -79,6 +80,10 @@ class Scenario:
     required_capabilities: tuple[str, ...] = ()
     deprecated: bool = False
     replacement_scenario_id: str | None = None
+    test_category: str = "STANDARD_JDBC"
+    applicable_adapters: tuple[str, ...] = ()
+    jdbc_version: str = "UNKNOWN"
+    execution_prerequisites: tuple[str, ...] = ()
 
     def to_report_dict(self) -> dict[str, Any]:
         return {
@@ -88,6 +93,10 @@ class Scenario:
             "source_class": self.class_name,
             "source_method": self.method_name,
             "required_capabilities": list(self.required_capabilities),
+            "test_category": self.test_category,
+            "applicable_adapters": list(self.applicable_adapters),
+            "jdbc_version": self.jdbc_version,
+            "execution_prerequisites": list(self.execution_prerequisites),
             "deprecated": self.deprecated,
             "replacement_scenario_id": self.replacement_scenario_id,
         }
@@ -102,21 +111,30 @@ def build_scenario_inventory(project_root: Path) -> dict[tuple[str, str], Scenar
         return {
             key: Scenario(
                 scenario_id=stable_inventory[key].scenario_id,
-                category=source.category,
+                category=stable_inventory[key].category,
                 contract=stable_inventory[key].contract,
                 class_name=source.class_name,
                 method_name=source.method_name,
                 required_capabilities=source.required_capabilities,
                 deprecated=stable_inventory[key].deprecated,
                 replacement_scenario_id=stable_inventory[key].replacement_scenario_id,
+                test_category=stable_inventory[key].test_category,
+                applicable_adapters=stable_inventory[key].applicable_adapters,
+                jdbc_version=stable_inventory[key].jdbc_version,
+                execution_prerequisites=stable_inventory[key].execution_prerequisites,
             )
             for key, source in source_inventory.items()
         }
+    if inventory_path.exists() and "test_category: VENDOR_EXTENSION" in inventory_path.read_text(encoding="utf-8"):
+        raise RuntimeError("PyYAML is required to interpret vendor extension applicability")
     return discover_source_scenarios(project_root)
 
 
 def discover_source_scenarios(project_root: Path) -> dict[tuple[str, str], Scenario]:
     inventory: dict[tuple[str, str], Scenario] = {}
+    inventory_path = project_root / SCENARIO_INVENTORY_PATH
+    explicit_core = set(re.findall(r"(?m)^- scenario_id: ([^\n]+)\n  category: core$",
+                                  inventory_path.read_text(encoding="utf-8"))) if inventory_path.exists() else set()
     java_files = []
     for relative_root in REPORTABLE_TEST_ROOTS:
         java_root = project_root / relative_root
@@ -139,8 +157,8 @@ def discover_source_scenarios(project_root: Path) -> dict[tuple[str, str], Scena
 
         for method_name, method_prefix in _test_methods(text):
             required = tuple(dict.fromkeys(class_capabilities + _annotation_capabilities(method_prefix)))
-            category = ScenarioCategory.EXTENDED if required else ScenarioCategory.CORE
             scenario_id = f"{area}.{_contract_name(method_name)}"
+            category = ScenarioCategory.CORE if scenario_id in explicit_core else ScenarioCategory.EXTENDED
             replacement = DEPRECATED_SCENARIO_IDS.get(scenario_id)
             inventory[(class_name, method_name)] = Scenario(
                 scenario_id=scenario_id,
@@ -155,6 +173,24 @@ def discover_source_scenarios(project_root: Path) -> dict[tuple[str, str], Scena
 
     _validate_inventory(inventory)
     return inventory
+
+
+def select_scenarios(inventory: list[Scenario], profile: str, includes: list[str],
+                     excludes: list[str], adapter_id: str | None) -> list[Scenario]:
+    """Shared CLI execution/report selection, retaining historical class/method glob filters."""
+    if profile not in {"core", "full"}:
+        raise ValueError("test_profile 必须是 core 或 full")
+
+    def matches(patterns: list[str], scenario: Scenario) -> bool:
+        candidates = (scenario.scenario_id, scenario.class_name, scenario.class_name.rsplit(".", 1)[-1],
+                      f"{scenario.class_name}#{scenario.method_name}",
+                      f"{scenario.class_name.rsplit('.', 1)[-1]}#{scenario.method_name}")
+        return any(fnmatch.fnmatch(candidate, pattern) for pattern in patterns for candidate in candidates)
+
+    return [item for item in inventory
+            if (item.test_category == "STANDARD_JDBC" or adapter_id in item.applicable_adapters)
+            and (profile != "core" or item.category == ScenarioCategory.CORE)
+            and (not includes or matches(includes, item)) and not matches(excludes, item)]
 
 
 def load_scenario_inventory(path: Path) -> dict[tuple[str, str], Scenario]:
@@ -179,6 +215,10 @@ def load_scenario_inventory(path: Path) -> dict[tuple[str, str], Scenario]:
             required_capabilities=tuple(item.get("required_capabilities", [])),
             deprecated=item["scenario_id"] in deprecated,
             replacement_scenario_id=deprecated.get(item["scenario_id"]),
+            test_category=item.get("test_category", "STANDARD_JDBC"),
+            applicable_adapters=tuple(item.get("applicable_adapters", [])),
+            jdbc_version=item.get("jdbc_version", "UNKNOWN"),
+            execution_prerequisites=tuple(item.get("execution_prerequisites", [])),
         )
     _validate_inventory(inventory)
     return inventory
@@ -231,36 +271,77 @@ def class_setup_errors(test_suites: list[dict[str, Any]]) -> dict[str, dict[str,
     return errors
 
 
+def _exception_types(case: dict[str, Any]) -> set[str]:
+    # Only Java exception types and stack cause headers establish typed evidence.
+    # Vendor error messages and SQLState never establish permission to be unsupported.
+    types = {str(case.get("error_type", ""))}
+    for line in str(case.get("error_text", "")).splitlines():
+        match = re.match(r"^(?:Caused by: )?([\w.$]+)(?::|$)", line.strip())
+        if match:
+            types.add(match.group(1))
+    return types
+
+
+def _prerequisite_missing(case: dict[str, Any], types: set[str]) -> bool:
+    return "com.jdbctest.extension.ExecutionPrerequisiteException" in types or (
+        case.get("status") == "skipped"
+        and str(case.get("skip_reason", "")).startswith("PREREQUISITE_MISSING:"))
+
+
 def normalize_status(case: dict[str, Any], capability_declarations: dict[str, Any]) -> str:
     raw = case.get("status", "")
     category = case.get("category", "")
-    required_capabilities = case.get("required_capabilities", [])
-
-    if category == ScenarioCategory.EXTENDED.value:
-        missing, unsupported = _capability_gaps(required_capabilities, capability_declarations)
-        if missing:
-            return CompatibilityStatus.UNKNOWN_CAPABILITY.value
-        if unsupported:
-            return CompatibilityStatus.KNOWN_UNSUPPORTED.value
-        if raw == "skipped":
-            return CompatibilityStatus.CAPABILITY_DECLARATION_MISMATCH.value
-
+    types = _exception_types(case)
+    if _prerequisite_missing(case, types):
+        return CompatibilityStatus.ADAPTER_INCOMPLETE.value
+    if "com.jdbctest.extension.JdbcContracts$UnsupportedAllowedException" in types:
+        return CompatibilityStatus.KNOWN_UNSUPPORTED.value
     if category == ScenarioCategory.OBSERVATIONAL.value:
-        return (
-            CompatibilityStatus.OBSERVED.value
-            if raw == "passed"
-            else CompatibilityStatus.EXECUTION_ERROR.value
-        )
+        return (CompatibilityStatus.OBSERVED.value if raw == "passed"
+                else CompatibilityStatus.EXECUTION_ERROR.value)
+    return {"passed": CompatibilityStatus.PASSED.value,
+            "failure": CompatibilityStatus.COMPATIBILITY_FAILURE.value,
+            "error": CompatibilityStatus.EXECUTION_ERROR.value,
+            "skipped": CompatibilityStatus.SKIPPED.value}.get(raw, CompatibilityStatus.NOT_RUN.value)
 
-    if raw == "passed":
-        return CompatibilityStatus.PASSED.value
-    if raw == "failure":
-        return CompatibilityStatus.COMPATIBILITY_FAILURE.value
-    if raw == "error":
-        return CompatibilityStatus.EXECUTION_ERROR.value
-    if raw == "skipped":
-        return CompatibilityStatus.SKIPPED.value
-    return CompatibilityStatus.NOT_RUN.value
+
+def execution_conclusion(case: dict[str, Any]) -> dict[str, Any]:
+    types = _exception_types(case)
+    raw = case.get("status", "not_run")
+    result = {"execution_status": raw, "phase": "SELECTION" if raw in {"skipped", "not_run"} else "EXECUTION"}
+    if "com.jdbctest.extension.TargetConnectionException" in types:
+        conclusion = "CONNECTION_FAILURE"
+        result["phase"] = "PREPARATION"
+    elif _prerequisite_missing(case, types):
+        blocked = str(case.get("error_message") or case.get("skip_reason") or "").startswith("FIXTURE_BLOCKED:")
+        conclusion = "BLOCKED_PREREQUISITE" if blocked else "PREREQUISITE_UNMET"
+        result["phase"] = "PREPARATION"
+    elif "com.jdbctest.extension.JdbcContracts$UnsupportedAllowedException" in types:
+        conclusion = "UNSUPPORTED_ALLOWED"
+        result["contract_conforms"] = True
+        result["phase"] = "EXECUTION"
+    elif "com.jdbctest.extension.JdbcContracts$UnsupportedRequiredException" in types:
+        conclusion = "UNSUPPORTED_REQUIRED"
+        result["contract_conforms"] = False
+    elif "java.util.concurrent.TimeoutException" in types:
+        conclusion = "TIMEOUT"
+    elif "java.sql.SQLFeatureNotSupportedException" in types:
+        conclusion = "NOT_EVALUATED"
+    elif raw == "error" and "java.sql.SQLException" in types:
+        # Legacy XML lacks reliable per-case phase evidence; preserve an unknown conclusion.
+        conclusion = "NOT_EVALUATED"
+    elif raw == "passed":
+        conclusion = "CONFORMS"
+        result["contract_conforms"] = True
+    elif raw == "failure":
+        conclusion = "CONTRACT_VIOLATION"
+        result["contract_conforms"] = False
+    elif raw == "error":
+        conclusion = "PLATFORM_ERROR"
+    else:
+        conclusion = "NOT_EVALUATED"
+    result["conclusion"] = conclusion
+    return result
 
 
 def build_v1_report(
@@ -271,6 +352,11 @@ def build_v1_report(
     project_root: Path,
 ) -> dict[str, Any]:
     inventory = build_scenario_inventory(project_root)
+    filters = config.get("test_filter", {}) or {}
+    adapter_id = config.get("db", {}).get("adapter_id") or config.get("adapter", {}).get("id")
+    chosen = {item.scenario_id for item in select_scenarios(list(inventory.values()),
+              config.get("test_profile", "full"), filters.get("include_tests", []),
+              filters.get("exclude_tests", []), adapter_id)}
     enriched_cases, unmapped = enrich_test_cases(test_suites, inventory)
     setup_errors = class_setup_errors(test_suites)
     capability_declarations = load_capability_declarations(config, project_root)
@@ -287,8 +373,13 @@ def build_v1_report(
                 d.get("trust") == "official" for d in deviations):
             compatibility_status = CompatibilityStatus.KNOWN_DIFFERENCE.value
         scenario_results[case["scenario_id"]] = {
+            **execution_conclusion(case),
             "scenario_id": case["scenario_id"],
             "category": case["category"],
+            "test_category": case["test_category"],
+            "applicable_adapters": case["applicable_adapters"],
+            "jdbc_version": case["jdbc_version"],
+            "execution_prerequisites": case["execution_prerequisites"],
             "contract": case["contract"],
             "compatibility_status": compatibility_status,
             "source_class": case["source_class"],
@@ -311,8 +402,17 @@ def build_v1_report(
         raw_status = "error" if setup_error else "not_run"
         status = normalize_status({**scenario.to_report_dict(), "status": raw_status}, capability_declarations)
         scenario_results[scenario.scenario_id] = {
+            "execution_status": raw_status,
+            "phase": "PREPARATION" if setup_error else "SELECTION",
+            "conclusion": "NOT_APPLICABLE" if scenario.test_category == "VENDOR_EXTENSION"
+                and adapter_id not in scenario.applicable_adapters else "USER_EXCLUDED"
+                if scenario.scenario_id not in chosen else "PLATFORM_ERROR" if setup_error else "NOT_EVALUATED",
             "scenario_id": scenario.scenario_id,
             "category": scenario.category.value,
+            "test_category": scenario.test_category,
+            "applicable_adapters": list(scenario.applicable_adapters),
+            "jdbc_version": scenario.jdbc_version,
+            "execution_prerequisites": list(scenario.execution_prerequisites),
             "contract": scenario.contract,
             "compatibility_status": status,
             "source_class": scenario.class_name,
@@ -334,6 +434,7 @@ def build_v1_report(
 
     return {
         "report_schema_version": REPORT_SCHEMA_VERSION,
+        "outcome_semantics_version": 2,
         "compatibility_baseline_version": COMPATIBILITY_BASELINE_VERSION,
         "run_kind": run_kind.value,
         "target_outcome": target_outcome.value,
@@ -343,6 +444,10 @@ def build_v1_report(
         "scenario_results": dict(sorted(scenario_results.items())),
         "capability_profile": capability_profile,
         "coverage_summary": coverage_summary,
+        "selection_summary": {"catalog": len(inventory), "selected": len(chosen),
+                              "executed": sum(row.get("phase") == "EXECUTION" for row in scenario_results.values()),
+                              "user_excluded": sum(row.get("conclusion") == "USER_EXCLUDED" for row in scenario_results.values()),
+                              "not_applicable": sum(row.get("conclusion") == "NOT_APPLICABLE" for row in scenario_results.values())},
         "known_deviations": collect_report_known_deviations(scenario_results),
         "expired_known_deviations": collect_expired_known_deviations(config),
         "environment_cleanup_issues": collect_cleanup_issues(execution, test_suites),
@@ -722,6 +827,7 @@ def _scenario_area(simple_class: str) -> str:
         "BlobObject": "blob_clob",
         "ClobObject": "blob_clob",
         "LobPersistence": "blob_clob",
+        "JdbcTypeCoverage": "jdbc_type",
         "MetadataRelations": "database_metadata",
         "ProcedureBehavior": "callable_statement",
         "RefCursor": "callable_statement",
@@ -745,8 +851,7 @@ def _contract_name(method_name: str) -> str:
 
 def _contract_text(area: str, method_name: str, required: tuple[str, ...]) -> str:
     words = _contract_name(method_name).replace("_", " ")
-    capability = f" when capabilities {', '.join(required)} are declared" if required else ""
-    return f"{area.replace('_', ' ')} {words} follows the JDBC-facing API contract{capability}."
+    return f"{area.replace('_', ' ')} {words} follows the JDBC-facing API contract."
 
 
 def _to_snake(value: str) -> str:

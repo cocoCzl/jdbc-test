@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.jdbctest.config.ConfigLoader;
 import com.jdbctest.extension.JdbcContext;
+import com.jdbctest.extension.JdbcContracts;
 import com.jdbctest.extension.JdbcTestExtension;
 import com.jdbctest.extension.UseSqlScripts;
 import java.sql.*;
@@ -28,9 +29,9 @@ class ConnectionTest {
     @Test
     @Order(1)
     @DisplayName("获取自动提交模式")
+    @UseSqlScripts
     void testGetAutoCommit(Connection conn) throws SQLException {
-        assertDoesNotThrow(conn::getAutoCommit, "getAutoCommit 不应抛异常");
-        boolean autoCommit = conn.getAutoCommit();
+        JdbcContracts.required("Connection.getAutoCommit", conn::getAutoCommit);
         assertFalse(conn.isClosed(), "未关闭的连接 getAutoCommit 不应失败");
     }
 
@@ -89,6 +90,7 @@ class ConnectionTest {
     @Test
     @Order(5)
     @DisplayName("获取和设置事务隔离级别")
+    @UseSqlScripts
     void testTransactionIsolation(Connection conn) throws SQLException {
         int original = conn.getTransactionIsolation();
 
@@ -109,6 +111,7 @@ class ConnectionTest {
     @Test
     @Order(6)
     @DisplayName("获取和设置只读模式")
+    @UseSqlScripts
     void testReadOnly(Connection conn) throws SQLException {
         conn.setReadOnly(true);
         assertTrue(conn.isReadOnly(), "设置只读后 isReadOnly 应返回 true");
@@ -120,6 +123,7 @@ class ConnectionTest {
     @Test
     @Order(7)
     @DisplayName("创建 Statement")
+    @UseSqlScripts
     void testCreateStatement(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement()) {
             assertNotNull(stmt, "createStatement 不应返回 null");
@@ -144,6 +148,7 @@ class ConnectionTest {
     @Test
     @Order(9)
     @DisplayName("连接有效性检查")
+    @UseSqlScripts
     void testIsValid(Connection conn) throws SQLException {
         assertTrue(conn.isValid(5), "有效连接 isValid 应返回 true");
     }
@@ -151,6 +156,7 @@ class ConnectionTest {
     @Test
     @Order(10)
     @DisplayName("获取数据库元数据")
+    @UseSqlScripts
     void testGetMetaData(Connection conn) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
         assertNotNull(meta, "getMetaData 不应返回 null");
@@ -162,6 +168,7 @@ class ConnectionTest {
     @Test
     @Order(11)
     @DisplayName("获取和清空警告")
+    @UseSqlScripts
     void testWarnings(Connection conn) throws SQLException {
         conn.clearWarnings();
         SQLWarning warning = conn.getWarnings();
@@ -171,6 +178,7 @@ class ConnectionTest {
     @Test
     @Order(12)
     @DisplayName("关闭连接")
+    @UseSqlScripts
     void testClose(Connection conn) throws SQLException {
         assertFalse(conn.isClosed(), "活跃连接 isClosed 应返回 false");
         conn.close();
@@ -180,6 +188,7 @@ class ConnectionTest {
     @Test
     @Order(13)
     @DisplayName("nativeSQL 转换 SQL")
+    @UseSqlScripts
     void testNativeSql(Connection conn) throws SQLException {
         String sql = isOracle() ? "SELECT 1 FROM DUAL" : "SELECT 1";
         String nativeSql = conn.nativeSQL(sql);
@@ -190,6 +199,7 @@ class ConnectionTest {
     @Test
     @Order(14)
     @DisplayName("获取 catalog 和 schema")
+    @UseSqlScripts
     void testCatalogAndSchema(Connection conn) throws SQLException {
         assertDoesNotThrow(conn::getCatalog, "getCatalog 不应抛异常");
         assertDoesNotThrow(conn::getSchema, "getSchema 不应抛异常");
@@ -209,22 +219,25 @@ class ConnectionTest {
     @Test
     @Order(15)
     @DisplayName("获取和设置 ResultSet holdability")
-    void testHoldability(Connection conn) throws SQLException {
+    @UseSqlScripts
+    void testHoldability(Connection conn, TestReporter reporter) throws SQLException {
         int holdability = conn.getHoldability();
         assertTrue(holdability == ResultSet.HOLD_CURSORS_OVER_COMMIT
                 || holdability == ResultSet.CLOSE_CURSORS_AT_COMMIT,
             "getHoldability 应返回 JDBC 定义值");
 
         DatabaseMetaData meta = conn.getMetaData();
-        if (meta.supportsResultSetHoldability(holdability)) {
-            conn.setHoldability(holdability);
-            assertEquals(holdability, conn.getHoldability(), "设置当前 holdability 后应保持一致");
-        }
+        boolean declared = meta.supportsResultSetHoldability(holdability);
+        reporter.publishEntry("supportsResultSetHoldability", Boolean.toString(declared));
+        conn.setHoldability(holdability);
+        assertTrue(declared, "Driver declaration must agree with the observed holdability");
+        assertEquals(holdability, conn.getHoldability(), "设置当前 holdability 后应保持一致");
     }
 
     @Test
     @Order(16)
     @DisplayName("ClientInfo 读取")
+    @UseSqlScripts
     void testClientInfo(Connection conn) throws SQLException {
         assertDoesNotThrow(() -> conn.getClientInfo(), "getClientInfo 不应抛异常");
         Properties clientInfo = conn.getClientInfo();
@@ -234,6 +247,7 @@ class ConnectionTest {
     @Test
     @Order(17)
     @DisplayName("NetworkTimeout 获取和设置")
+    @UseSqlScripts
     void testNetworkTimeout(Connection conn) throws SQLException {
         int original = conn.getNetworkTimeout();
         Executor directExecutor = Runnable::run;

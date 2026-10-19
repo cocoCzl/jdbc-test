@@ -2,6 +2,7 @@ package com.jdbctest.blobclob;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.jdbctest.extension.JdbcContracts;
 import com.jdbctest.extension.JdbcTestExtension;
 import com.jdbctest.extension.RequiresFeature;
 import java.io.*;
@@ -17,7 +18,7 @@ class BlobObjectTest {
     @Test
     @DisplayName("Blob 局部写入使用 JDBC 的一基位置和源数组偏移")
     void testBlobPartialWrite(Connection connection) throws SQLException {
-        Blob blob = connection.createBlob();
+        Blob blob = JdbcContracts.optional("Connection.createBlob", connection::createBlob);
         try {
             assertEquals(5, blob.setBytes(1, new byte[] {1, 2, 3, 4, 5}));
             assertEquals(2, blob.setBytes(2, new byte[] {8, 9, 10, 11}, 1, 2));
@@ -33,7 +34,7 @@ class BlobObjectTest {
     @Test
     @DisplayName("Blob 截断保留前缀并可截断为空")
     void testBlobTruncate(Connection connection) throws SQLException {
-        Blob blob = connection.createBlob();
+        Blob blob = JdbcContracts.optional("Connection.createBlob", connection::createBlob);
         try {
             blob.setBytes(1, new byte[] {1, 2, 3, 4});
             blob.truncate(2);
@@ -49,7 +50,7 @@ class BlobObjectTest {
     @Test
     @DisplayName("Blob 拒绝负长度和非法位置")
     void testBlobInvalidBounds(Connection connection) throws SQLException {
-        Blob blob = connection.createBlob();
+        Blob blob = JdbcContracts.optional("Connection.createBlob", connection::createBlob);
         try {
             blob.setBytes(1, new byte[] {1, 2});
             // JDBC does not define one portable outcome for truncate beyond the current length.
@@ -65,7 +66,7 @@ class BlobObjectTest {
     @Test
     @DisplayName("Blob 释放后拒绝读取和修改")
     void testBlobAfterFree(Connection connection) throws SQLException {
-        Blob blob = connection.createBlob();
+        Blob blob = JdbcContracts.optional("Connection.createBlob", connection::createBlob);
         try {
             blob.setBytes(1, new byte[] {1, 2});
         } finally {
@@ -84,7 +85,7 @@ class BlobObjectTest {
         for (int i = 0; i < expected.length; i++) {
             expected[i] = (byte) (i % 251);
         }
-        Blob blob = connection.createBlob();
+        Blob blob = JdbcContracts.optional("Connection.createBlob", connection::createBlob);
         try {
             try (OutputStream stream = blob.setBinaryStream(1)) {
                 stream.write(expected);

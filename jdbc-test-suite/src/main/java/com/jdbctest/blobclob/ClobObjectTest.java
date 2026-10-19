@@ -2,6 +2,7 @@ package com.jdbctest.blobclob;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.jdbctest.extension.JdbcContracts;
 import com.jdbctest.extension.JdbcTestExtension;
 import com.jdbctest.extension.RequiresFeature;
 import java.io.*;
@@ -17,7 +18,7 @@ class ClobObjectTest {
     @Test
     @DisplayName("Clob 局部覆盖保留前后字符")
     void testClobPartialWrite(Connection connection) throws SQLException {
-        Clob clob = connection.createClob();
+        Clob clob = JdbcContracts.optional("Connection.createClob", connection::createClob);
         try {
             assertEquals(5, clob.setString(1, "abcde"));
             assertEquals(2, clob.setString(2, "01234", 1, 2));
@@ -33,7 +34,7 @@ class ClobObjectTest {
     @Test
     @DisplayName("Clob 截断按字符保留中文前缀")
     void testClobTruncateMultibyteCharacters(Connection connection) throws SQLException {
-        Clob clob = connection.createClob();
+        Clob clob = JdbcContracts.optional("Connection.createClob", connection::createClob);
         try {
             clob.setString(1, "中文字符");
             assertEquals(4, clob.length());
@@ -50,7 +51,7 @@ class ClobObjectTest {
     @Test
     @DisplayName("Clob 拒绝负长度和非法位置")
     void testClobInvalidBounds(Connection connection) throws SQLException {
-        Clob clob = connection.createClob();
+        Clob clob = JdbcContracts.optional("Connection.createClob", connection::createClob);
         try {
             clob.setString(1, "ab");
             // JDBC does not define one portable outcome for truncate beyond the current length.
@@ -66,7 +67,7 @@ class ClobObjectTest {
     @Test
     @DisplayName("Clob 释放后拒绝读取和修改")
     void testClobAfterFree(Connection connection) throws SQLException {
-        Clob clob = connection.createClob();
+        Clob clob = JdbcContracts.optional("Connection.createClob", connection::createClob);
         try {
             clob.setString(1, "ab");
         } finally {
@@ -82,7 +83,7 @@ class ClobObjectTest {
     @DisplayName("Clob 流完整保留大文本和换行")
     void testClobStreamRoundTrip(Connection connection) throws SQLException, IOException {
         String expected = "中文 abc\n".repeat(20000);
-        Clob clob = connection.createClob();
+        Clob clob = JdbcContracts.optional("Connection.createClob", connection::createClob);
         try {
             try (Writer stream = clob.setCharacterStream(1)) {
                 stream.write(expected);

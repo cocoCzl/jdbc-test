@@ -168,11 +168,10 @@ describe("Switching language preserves the workspace", () => {
     await user.click(await screen.findByRole("radio", {name: connection.name}));
     await user.click(screen.getByRole("button", {name: "Next: Choose driver"}));
     await user.click(screen.getByRole("button", {name: "Next: Select tests"}));
-    await user.click(screen.getByRole("button", {name: /Custom/}));
-    await user.click(screen.getByRole("checkbox", {name: /Statement/}));
+    await user.click(screen.getByRole("checkbox", {name: "Connection"}));
     await chooseChinese(user);
     expect(screen.getByRole("checkbox", {name: /语句（Statement）/})).toBeChecked();
-    expect(screen.getByRole("button", {name: /自定义（Custom）/})).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("checkbox", {name: /连接（Connection）/})).not.toBeChecked();
     await user.click(screen.getByRole("button", {name: "下一步：核对运行"}));
     await user.click(screen.getByRole("checkbox", {name: /我了解/}));
     await change("en");
@@ -181,7 +180,8 @@ describe("Switching language preserves the workspace", () => {
     await user.click(screen.getByRole("button", {name: "开始测试运行"}));
     await waitFor(() => expect(fetch.mock.calls.some(([,opts]) => opts?.method === "POST")).toBe(true));
     const request = fetch.mock.calls.find(([,opts]) => opts?.method === "POST")![1]!;
-    expect(JSON.parse(request.body as string)).toEqual({connectionId: connection.id, driverId: driver.id, profile: "CUSTOM", modules: ["statement"], destructiveConsent: true});
+    expect(JSON.parse(request.body as string)).toMatchObject({connectionId: connection.id, driverId: driver.id, profile: "CUSTOM", modules: [], destructiveConsent: true});
+    expect(JSON.parse(request.body as string).includeScenarios).toHaveLength(23);
   });
   it("keeps cached raw business data and a single SSE subscription while live status updates translate", async () => {
     const fetch = mockApi(url => url.pathname === "/api/runs/run-1" ? json(run) : undefined);
@@ -211,7 +211,7 @@ describe("Switching language preserves the workspace", () => {
     await change("zh-CN");
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByText("capability arrays=false; skipSource=adapter")).toBeVisible();
-    expect(within(dialog).getByText(/能力禁用属于配置/)).toBeVisible();
+    expect(within(dialog).getByText(/前提不足或历史能力门控/)).toBeVisible();
     await user.click(within(dialog).getByRole("button", {name: "关闭弹窗"}));
     expect(screen.getByLabelText("筛选结果状态")).toHaveAttribute("data-value", "SKIPPED");
     await user.click(screen.getByRole("tab", {name: "报告"}));

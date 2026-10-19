@@ -51,6 +51,8 @@ class CredentialSemanticsTest {
     TestRunService service;
     @Autowired
     TestRunCredentialRepository credentials;
+    @Autowired
+    TestRunRepository runs;
     @MockitoBean
     TestRunScheduler scheduler;
     @MockitoBean
@@ -200,6 +202,57 @@ class CredentialSemanticsTest {
             assertEquals(url, connections.findById(id).orElseThrow().getJdbcUrl());
         }
         verifyNoInteractions(worker);
+    }
+
+    @Test
+    void exactSelectionIsValidatedAndFrozenIndependentlyOfLaterCatalogChanges() throws Exception {
+        var source = new RunCatalogService.Catalog(List.of(),
+            List.of(new RunCatalogService.Module("connection", "Connection", "fixture", 2, 1)),
+            List.of(new RunCatalogService.Scenario("connection.first", "connection", "first", "CORE"),
+                new RunCatalogService.Scenario("connection.second", "connection", "second", "FULL"),
+                new RunCatalogService.Scenario("connection.oracle", "connection", "Oracle fixture", "FULL",
+                    "VENDOR_EXTENSION", List.of("oracle"), "4.0", List.of(), List.of(),
+                    "fixture.Oracle", "extension", "REQUIRED")),
+            3, "fixture-catalog-2");
+        when(catalog.catalog()).thenReturn(source);
+        var entity = new com.jdbctest.server.connection.DatabaseConnectionProfileEntity("selection",
+            "postgresql", "postgresql", "jdbc:fixture:selection", "fixture");
+        entity.setExecutionScope("fixture", "owned_scope");
+        entity.setDefaultDriver(drivers.findById(driverId).orElseThrow());
+        entity.setEncryptedPassword(encryption.encrypt("fixture"));
+        UUID connectionId = connections.save(entity).getId();
+        mvc.perform(get("/api/test-catalog").param("adapterId", "postgresql"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.scenarios.length()").value(2));
+        var request = new CreateTestRunRequest(connectionId, null, "CUSTOM", List.of("connection"),
+            List.of("connection.first", "connection.second"), List.of("connection.first"), null,
+            true, 120, "fixture-catalog-2");
+        var created = service.create(request);
+        assertEquals(1, created.totalCases());
+        var frozen = json.readTree(runs.findById(created.id()).orElseThrow().getExecutionInput());
+        assertEquals(120_000L, frozen.path("budgetMs").asLong());
+        assertEquals("connection.second", frozen.path("selection").path("selectedMetadata")
+            .get(0).path("scenarioId").asString());
+        assertEquals("connection.first", frozen.path("selection").path("excludeScenarios").get(0).asString());
+        when(catalog.catalog()).thenReturn(new RunCatalogService.Catalog(List.of(), List.of(), List.of(), 0));
+        assertEquals(1, service.get(created.id()).totalCases());
+        assertEquals(frozen, json.readTree(runs.findById(created.id()).orElseThrow().getExecutionInput()));
+        when(catalog.catalog()).thenReturn(source);
+        for (var invalid : List.of(
+            new CreateTestRunRequest(connectionId, null, "CUSTOM", List.of(), List.of(),
+                List.of(), null, true),
+            new CreateTestRunRequest(connectionId, null, "FULL", List.of(),
+                List.of("deleted.case"), List.of(), null, true),
+            new CreateTestRunRequest(connectionId, null, "FULL", List.of(),
+                List.of("connection.oracle"), List.of(), null, true),
+            new CreateTestRunRequest(connectionId, null, "FULL", List.of(), List.of(),
+                List.of("connection.first", "connection.second"), null, true))) {
+            assertEquals("INVALID_SELECTION",
+                assertThrows(RunException.class, () -> service.create(invalid)).code());
+        }
+        var stale = new CreateTestRunRequest(connectionId, null, "FULL", List.of(), List.of(),
+            List.of(), null, true, 120, "stale-catalog");
+        assertEquals("CATALOG_CHANGED", assertThrows(RunException.class, () -> service.create(stale)).code());
+        service.cleanupCredential(created.id());
     }
 
     private CreateTestRunRequest request(UUID id, String password) {

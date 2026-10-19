@@ -17,8 +17,20 @@ public record WorkerRunRequest(
     String objectPrefix,
     Map<String, Boolean> capabilities,
     Boolean destructiveConsent,
-    com.jdbctest.catalog.AdapterExecutionConfig adapterExecution
+    com.jdbctest.catalog.AdapterExecutionConfig adapterExecution,
+    String catalogVersion,
+    Long caseTimeoutMs,
+    List<com.jdbctest.catalog.TestCaseDescriptor> frozenScenarios
 ) {
+
+    public WorkerRunRequest(Integer protocolVersion, String runId, DriverRequest driver,
+        ConnectionRequest connection, SelectionRequest selection, String workspace, Long timeoutMs,
+        com.jdbctest.catalog.ExecutionScope scope, String objectPrefix,
+        Map<String, Boolean> capabilities, Boolean destructiveConsent,
+        com.jdbctest.catalog.AdapterExecutionConfig adapterExecution) {
+        this(protocolVersion, runId, driver, connection, selection, workspace, timeoutMs, scope,
+            objectPrefix, capabilities, destructiveConsent, adapterExecution, null, null, null);
+    }
 
     public WorkerRunRequest(Integer protocolVersion, String runId, DriverRequest driver,
         ConnectionRequest connection, SelectionRequest selection, String workspace, Long timeoutMs,

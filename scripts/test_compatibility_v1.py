@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 import sys
 import tempfile
@@ -9,6 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
 import runner
+import compatibility_v1
 from compatibility_v1 import (
     COMPATIBILITY_BASELINE_VERSION,
     REPORT_SCHEMA_VERSION,
@@ -23,6 +25,7 @@ from compatibility_v1 import (
     collect_cleanup_issues,
     discover_source_scenarios,
     enrich_test_cases,
+    execution_conclusion,
     generate_matrix,
     load_scenario_inventory,
     normalize_status,
@@ -120,6 +123,12 @@ class CompatibilityV1Test(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "missing reportable test methods"):
             validate_inventory_covers_source(source, incomplete)
 
+    def test_zero_dependency_core_uses_explicit_inventory_membership(self):
+        with patch.object(compatibility_v1, "yaml", None):
+            inventory = build_scenario_inventory(PROJECT_ROOT)
+        self.assertEqual(153, sum(item.category == ScenarioCategory.CORE for item in inventory.values()))
+        self.assertEqual(270, len(inventory))
+
     def test_enrich_surfaces_unmapped_test_cases(self):
         inventory = build_scenario_inventory(PROJECT_ROOT)
         suites = [
@@ -148,6 +157,26 @@ class CompatibilityV1Test(unittest.TestCase):
         self.assertEqual(1, len(unmapped))
         self.assertEqual("com.jdbctest.extension.SqlSplitterTest", unmapped[0]["class_name"])
 
+    def test_static_false_never_replaces_observed_failure_or_success(self):
+        case = {"category": "extended", "required_capabilities": ["sqlxml"]}
+        self.assertEqual("compatibility_failure", normalize_status({**case, "status": "failure"}, {"sqlxml": False}))
+        self.assertEqual("passed", normalize_status({**case, "status": "passed"}, {"sqlxml": False}))
+        self.assertEqual("adapter_incomplete", normalize_status({**case, "status": "skipped", "skip_reason": "PREREQUISITE_MISSING: Provider"}, {"sqlxml": True}))
+        self.assertEqual("known_unsupported", normalize_status({**case, "status": "skipped", "error_type": "com.jdbctest.extension.JdbcContracts$UnsupportedAllowedException"}, {"sqlxml": False}))
+
+    def test_error_text_and_sqlstate_cannot_claim_optional_support(self):
+        misleading = {"status": "error", "error_type": "java.sql.SQLException",
+                      "error_message": "JDBC permits unsupported API: Connection.createBlob", "sql_state": "0A000"}
+        self.assertEqual("execution_error", normalize_status(misleading, {}))
+        self.assertEqual("NOT_EVALUATED", execution_conclusion(misleading)["conclusion"])
+        self.assertNotIn("contract_conforms", execution_conclusion(misleading))
+        unknown = {"status": "error", "error_type": "java.sql.SQLFeatureNotSupportedException"}
+        self.assertEqual("NOT_EVALUATED", execution_conclusion(unknown)["conclusion"])
+        self.assertNotIn("contract_conforms", execution_conclusion(unknown))
+        target = {"status": "error", "error_type": "com.jdbctest.extension.TargetConnectionException"}
+        self.assertEqual("CONNECTION_FAILURE", execution_conclusion(target)["conclusion"])
+        self.assertEqual("execution_error", normalize_status(target, {}))
+
     def test_normalizes_statuses(self):
         core = {"status": "failure", "category": "core", "required_capabilities": []}
         self.assertEqual("compatibility_failure", normalize_status(core, {}))
@@ -160,14 +189,14 @@ class CompatibilityV1Test(unittest.TestCase):
             "category": "extended",
             "required_capabilities": ["sqlxml"],
         }
-        self.assertEqual("unknown_capability", normalize_status(extended_unknown, {}))
+        self.assertEqual("skipped", normalize_status(extended_unknown, {}))
 
         extended_false = {
             "status": "skipped",
             "category": "extended",
             "required_capabilities": ["sqlxml"],
         }
-        self.assertEqual("known_unsupported", normalize_status(extended_false, {"sqlxml": False}))
+        self.assertEqual("skipped", normalize_status(extended_false, {"sqlxml": False}))
 
         extended_mismatch = {
             "status": "skipped",
@@ -175,7 +204,7 @@ class CompatibilityV1Test(unittest.TestCase):
             "required_capabilities": ["sqlxml"],
         }
         self.assertEqual(
-            "capability_declaration_mismatch",
+            "skipped",
             normalize_status(extended_mismatch, {"sqlxml": True}),
         )
 
@@ -292,6 +321,11 @@ class CompatibilityV1Test(unittest.TestCase):
         self.assertEqual("diagnostic_run", report["run_kind"])
         self.assertTrue(report["target_identity_mismatch"]["mismatch"])
         self.assertEqual("evaluation_inconclusive", report["target_outcome"])
+        self.assertEqual("USER_EXCLUDED", report["scenario_results"]["statement.execute_query"]["conclusion"])
+        self.assertEqual("NOT_EVALUATED", report["scenario_results"]["connection.catalog_and_schema"]["conclusion"])
+        self.assertEqual(1, report["selection_summary"]["executed"])
+        self.assertEqual(len(runner._profile_test_patterns("full", ["ConnectionTest"], [])),
+                         report["selection_summary"]["selected"])
 
     def test_known_deviation_and_cleanup_do_not_change_status_or_outcome(self):
         config = {

@@ -158,8 +158,7 @@ test("API-mocked browser flow: upload → connection → Custom Statement → re
   await page.getByRole("link", { name: "Start run", exact: true }).click();
   await page.getByRole("button", { name: /^Next:/ }).click();
   await page.getByRole("button", { name: /^Next:/ }).click();
-  await page.getByRole("button", { name: /Custom Choose/ }).click();
-  await page.getByRole("checkbox", { name: "Statement 23 scenarios" }).check();
+  await page.getByRole("checkbox", { name: "Connection", exact: true }).uncheck();
   await expect(page.getByText("23 scenarios selected")).toBeVisible();
   await page.getByRole("button", { name: /^Next:/ }).click();
   await expect(

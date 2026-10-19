@@ -45,6 +45,12 @@ export function FailureDetail({
                 {formatDuration(result.durationMs)}
               </span>
             </div>
+            {result.executionEvidence?.conclusion ? <section className="space-y-2 text-sm">
+              <h3 className="font-semibold">{t("selection.evidence")}</h3>
+              <p>{t("selection.conclusion")}: {t(`selection.${result.executionEvidence.conclusion}`, { defaultValue: result.executionEvidence.conclusion })}</p>
+              <p>{t("selection.phase")}: {result.executionEvidence.phase ?? "—"}</p>
+              <pre className="overflow-auto whitespace-pre-wrap break-words text-xs">{JSON.stringify(result.executionEvidence, null, 2)}</pre>
+            </section> : null}
             <section>
               <h3 className="mb-2 text-sm font-medium">{result.status === "SKIPPED" ? t("skip.title") : t("ui.message")}</h3>
               {result.status === "SKIPPED" ? <p className="mb-2 text-sm text-muted-foreground">{t("skip.note")}</p> : null}
@@ -115,7 +121,7 @@ export default function Results({
       id: "ui.detail",
       get header() { return t("ui.detail"); },
       cell: ({ row }) =>
-        ["FAILED", "ABORTED", "SKIPPED"].includes(row.original.status) ? (
+        row.original.executionEvidence || ["FAILED", "ABORTED", "SKIPPED"].includes(row.original.status) ? (
           <Button
             variant="ghost"
             size="sm"

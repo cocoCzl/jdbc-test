@@ -6,7 +6,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.TYPE)
+@Target({ElementType.TYPE, ElementType.METHOD})
 public @interface UseSqlScripts {
 
     String[] ddl() default {};
@@ -14,4 +14,7 @@ public @interface UseSqlScripts {
     String[] dml() default {};
 
     String[] cleanup() default {};
+
+    /** Fixture shape checks run before the JDBC contract, using managed object placeholders. */
+    String[] checks() default {};
 }

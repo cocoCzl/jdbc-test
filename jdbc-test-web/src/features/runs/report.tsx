@@ -53,6 +53,13 @@ export default function Report({ run }: { run: Run }) {
       {summary.accounting ? <p className="mb-4 text-sm">
         {t("report.accounting", {notRun: summary.accounting.notRun, incomplete: summary.accounting.incomplete})}{summary.accounting.started === 0 ? t("ui.noScenarioExecutionWasVerifiedSkippedCases") : ""}
       </p> : null}
+      {summary.selectionSnapshot?.catalogCount != null ? <p className="mb-4 text-sm">{t("selection.coverage", {
+        total: summary.selectionSnapshot.catalogCount, selected: summary.totalCases,
+        executed: summary.contractSummary?.EXECUTED ?? 0, excluded: summary.selectionSnapshot.userExcluded?.length ?? 0,
+      })}</p> : null}
+      {summary.contractSummary ? <Card className="panel mb-4"><h2 className="mb-3 font-semibold">{t("selection.evidence")}</h2>
+        <dl className="grid gap-3 sm:grid-cols-2">{Object.entries(summary.contractSummary).filter(([key]) => key !== "EXECUTED").map(([key, count]) => <div key={key}><dt className="text-sm text-muted-foreground">{t(`selection.${key}`, { defaultValue: key })}</dt><dd>{count}</dd></div>)}</dl>
+      </Card> : null}
       <CleanupEvidence evidence={summary.cleanupEvidence} />
       {summary.executionIssues?.length ? <Card className="panel mb-4"><h2>{t("ui.executionIssues")}</h2>
         {summary.executionIssues.map((issue, index) => <p key={index} className="break-words">{String(issue.level)}: {String(issue.message ?? issue.status)}</p>)}

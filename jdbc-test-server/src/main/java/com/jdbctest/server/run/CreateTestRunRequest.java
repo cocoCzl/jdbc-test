@@ -8,6 +8,16 @@ public record CreateTestRunRequest(@NotNull UUID connectionId, UUID driverId,
     @NotNull String profile,
     List<String> modules, List<String> includeScenarios,
     List<String> excludeScenarios,
-    String password, boolean destructiveConsent) {
+    String password, boolean destructiveConsent,
+    @jakarta.validation.constraints.Min(60) @jakarta.validation.constraints.Max(7200)
+    Integer budgetSeconds,
+    String catalogVersion) {
+
+    public CreateTestRunRequest(UUID connectionId, UUID driverId, String profile,
+        List<String> modules, List<String> includeScenarios, List<String> excludeScenarios,
+        String password, boolean destructiveConsent) {
+        this(connectionId, driverId, profile, modules, includeScenarios, excludeScenarios,
+            password, destructiveConsent, null, null);
+    }
 
 }
