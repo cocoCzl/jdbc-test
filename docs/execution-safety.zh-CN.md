@@ -64,7 +64,7 @@ KingbaseES 已提升为正式平台适配，仅限服务端 V009R002C016、oracl
 
 2026-10-19 真实 FULL 任务有 270 项终态结果记录：261 项实际调用契约，另 9 项因准备直接缺失（4 项）或连带阻塞（5 项）未调用契约；原状态为 252 PASSED、9 FAILED、9 ABORTED。历史未运行/未完成计数字段均为 0，不表示全部契约均已调用。Server、隔离 Worker、平台 PostgreSQL 报告链路及后续浏览器流程已有实际验证。清理 SUCCESS，后查表/例程均为 0，专用 schema 已删除，未决 prepared transaction 为 0。最初独立 Worker 的 CORE 超时是另一条历史观察，后续 FULL 完成不抹去超时，也未证实首次 getTypeInfo 较慢的原因。
 
-九项中止由过程、REF cursor、ROWID、多结果 SQL 资产缺失/阻塞引起，属于平台准备范围限制，不是驱动失败或通过。两项 XA 准备失败时 max_prepared_transactions=0，按环境前提不足解释，原始 CONTRACT_VIOLATION 标签不改写。LOB 边界/局部写入、DataSource logWriter 观察保留供驱动/契约复核；REF 元数据、按列下标批量键、未实现 holdability 须结合可选 API 契约，不能笼统认定驱动缺陷。正式状态不认证这些未执行的准备路径，也不推广至其他版本、模式或驱动。
+历史 FULL 的九项中止由过程、REF cursor、ROWID、多结果 SQL 资产缺失/阻塞引起，属于平台准备范围限制，不是驱动失败或通过。两项 XA 准备失败时 max_prepared_transactions=0，按环境前提不足解释，原始 CONTRACT_VIOLATION 标签不改写。LOB 边界/局部写入、DataSource logWriter 观察保留供驱动/契约复核；REF 元数据、按列下标批量键、未实现 holdability 须结合可选 API 契约，不能笼统认定驱动缺陷。历史 FULL 不认证当时未执行的准备路径，也不推广至其他版本、模式或驱动。后续针对性九项均调用契约，8 项符合、1 项更新计数断言失败；4 项直接准备缺失、5 项连带阻塞均已解决，断言单独保留 OPEN。本轮归属对象及唯一 schema 清理完成，不改历史结果及两项 XA 环境限制。详见[准备后续验证](development.zh-CN.md#准备后续针对性验证9-项)。
 
 [脱敏组合证据](../adapters/kingbase/evidence/platform-v009r002c016-oracle-v008r006b0001.json)保留实际统计、全部 18 项非通过结果、归因评审及任务源摘录。原 ignored 报告目前不可用，摘录哈希不是原始 Worker 报告哈希。后续四库验收未全部完成：MySQL、PG、Kingbase 已执行 FULL，Oracle 仅驱动/连接探测。夹具截图和单元测试不作为额外实库证据。接入及最小诊断见[开发指南](development.zh-CN.md#kingbasees-接入)。
 

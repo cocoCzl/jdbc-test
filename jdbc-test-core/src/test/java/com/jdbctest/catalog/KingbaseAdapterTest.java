@@ -17,7 +17,7 @@ class KingbaseAdapterTest {
         assertEquals(DbType.KINGBASE, adapter.dbType().orElseThrow());
         assertEquals("OFFICIAL", adapter.metadata().status());
         assertEquals(SqlDialect.POSTGRESQL, adapter.dialect());
-        assertEquals("postgresql", adapter.assets().directory());
+        assertEquals("kingbase", adapter.assets().directory());
         var combinations = (List<?>) adapter.declaration().get("validated_combinations");
         assertEquals(1, combinations.size());
         var combination = (Map<?, ?>) combinations.getFirst();

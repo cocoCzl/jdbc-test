@@ -1,0 +1,5 @@
+CREATE PROCEDURE {{cursor_output}}(p_cursor OUT REFCURSOR) AS
+BEGIN
+  OPEN p_cursor FOR SELECT 11 AS n UNION ALL SELECT 22 AS n ORDER BY n;
+END;
+/

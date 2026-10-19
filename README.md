@@ -56,6 +56,8 @@ To run the website without source development, choose [Deployment](docs/deployme
 
 Adapter status describes platform integration maturity, not an all-JDBC-tests-pass requirement. JDBC results describe the tested database/driver combination. KingbaseES validation is limited to server V009R002C016, oracle mode, JDBC database version 12.1 and driver V008R006B0001; failures, missing preparation and environment limits remain in the [validation record](adapters/kingbase/evidence/platform-v009r002c016-oracle-v008r006b0001.json). The FULL task has 270 terminal result records: 261 contracts invoked and 9 not invoked due to missing or blocked preparation (4 direct, 5 blocked). Other builds/modes/drivers are unvalidated. Other products can use local declarative adapters.
 
+The Kingbase targeted follow-up now validates four isolated preparation resources: all nine contracts ran independently and together, with eight conforming and one result-sequence update-count assertion failure; preparation blockers were removed and cleanup succeeded. This does not rewrite the historical FULL results.
+
 ## Development requirements
 
 Source Web development requires JDK 21, Maven Wrapper 3.9.15, Node >=22.12.0/npm and a dedicated platform PG; follow [local source startup](docs/development.md#local-source-startup) for config/Key/Worker preparation. Python >=3.9 and an authorized target database/driver are additionally needed for CLI target tests, not for opening the development website.

@@ -568,21 +568,76 @@ The subsequent four-database acceptance was incomplete: MySQL, PostgreSQL and Ki
 FULL tasks and later page flows; Oracle completed driver/connection probes, without its writable
 FULL run. Unit and mocked browser checks remain fixture evidence, not additional target validation.
 
-### Preparation follow-ups (9 pending cases)
+### Targeted preparation follow-up (9 cases)
 
-These stable scenario IDs did not invoke their contracts. Supply the named SQL assets, then minimally validate their dependent cases in an authorized scope; no additional target tests run in this change and none of these items is resolved. Blocked means failed shared preparation, not a case-to-case dependency graph.
+The historical FULL left four direct preparation gaps and five shared-fixture blockers. Four resources
+now live under isolated `ddl/kingbase/`; the existing 35 DDL/DML/pool baseline assets are byte-identical
+copies, and shared PostgreSQL SQL is untouched. Resources provide IN/INOUT/OUT arithmetic,
+REF_CURSOR output, table-local ROWID and native implicit results with an update. No standard
+assertion, capability gate or global parameter was changed.
 
-| Stable scenario ID | Recorded preparation issue | Shared SQL asset to supply and validate |
-| --- | --- | --- |
-| `callable_statement.procedure_parameter_metadata` | Direct missing prerequisite (`PREREQUISITE_UNMET`) | `procedure_behavior_ddl.sql` |
-| `callable_statement.ref_cursor_output` | Direct missing prerequisite (`PREREQUISITE_UNMET`) | `ref_cursor_ddl.sql` |
-| `result_set.batch_row_id_binding` | Direct missing prerequisite (`PREREQUISITE_UNMET`) | `rowid_behavior_ddl.sql` |
-| `statement.result_sequence` | Direct missing prerequisite (`PREREQUISITE_UNMET`) | `multiple_results_ddl.sql` |
-| `callable_statement.in_out_and_in_out` | Blocked by shared preparation (`BLOCKED_PREREQUISITE`) | `procedure_behavior_ddl.sql` |
-| `callable_statement.null_output` | Blocked by shared preparation (`BLOCKED_PREREQUISITE`) | `procedure_behavior_ddl.sql` |
-| `callable_statement.repeated_binding` | Blocked by shared preparation (`BLOCKED_PREREQUISITE`) | `procedure_behavior_ddl.sql` |
-| `result_set.row_id_round_trip` | Blocked by shared preparation (`BLOCKED_PREREQUISITE`) | `rowid_behavior_ddl.sql` |
-| `result_set.update_and_delete_by_row_id` | Blocked by shared preparation (`BLOCKED_PREREQUISITE`) | `rowid_behavior_ddl.sql` |
+The owner explicitly authorized a new unique Kingbase test schema. Its fresh schema OID,
+actual current user/database/schema and probe-table owner were checked in the database before
+scenario tasks. The observed combination remains V009R002C016 / oracle mode / V008R006B0001.
+Nine independent tasks and combined task `30d16db6-4faa-4800-b6b1-0c9d50e8d5bf` used the normal
+Server/Worker/report path. All selected contracts were invoked, without skips, preparation failures,
+blockers, NOT_RUN or INCOMPLETE. Combined results are eight PASSED/CONFORMS and one
+FAILED/CONTRACT_VIOLATION. Do not add repeated independent and combined executions as unique
+coverage or rewrite the historical 270-record FULL result.
+
+| Stable scenario ID | Historical preparation issue | Kingbase SQL resource | Supplemental result |
+| --- | --- | --- | --- |
+| `callable_statement.procedure_parameter_metadata` | Direct missing resource | `procedure_behavior_ddl.sql` | PASSED / CONFORMS |
+| `callable_statement.ref_cursor_output` | Direct missing resource | `ref_cursor_ddl.sql` | PASSED / CONFORMS |
+| `result_set.batch_row_id_binding` | Direct missing resource | `rowid_behavior_ddl.sql` | PASSED / CONFORMS |
+| `statement.result_sequence` | Direct missing resource | `multiple_results_ddl.sql` | FAILED: update count not exposed |
+| `callable_statement.in_out_and_in_out` | Blocked shared resource | `procedure_behavior_ddl.sql` | PASSED / CONFORMS |
+| `callable_statement.null_output` | Blocked shared resource | `procedure_behavior_ddl.sql` | PASSED / CONFORMS |
+| `callable_statement.repeated_binding` | Blocked shared resource | `procedure_behavior_ddl.sql` | PASSED / CONFORMS |
+| `result_set.row_id_round_trip` | Blocked shared resource | `rowid_behavior_ddl.sql` | PASSED / CONFORMS |
+| `result_set.update_and_delete_by_row_id` | Blocked shared resource | `rowid_behavior_ddl.sql` | PASSED / CONFORMS |
+
+`statement.result_sequence` successfully prepared both owned objects and invoked its contract.
+Its failure occurs after the result-value and result-set closure checks: the sequence did not expose
+the expected one-row update count. The native implicit-result mechanism is relevant to further
+contract/driver review; this observation alone is not an established driver defect. Keep the original
+assertion and failure. All five old shared-resource blockers are removed. The four missing resources
+are no longer a preparation gap for this verified combination; the remaining assertion is separate.
+
+Every task reported owned cleanup SUCCESS; the combined task created and dropped five roots,
+showing shared preparation rather than conflicting duplicate CREATE. After all reports were saved,
+the unique schema's original OID/owner and empty relation/routine/type inventory were verified,
+then it was dropped without CASCADE. No existing schema was reused or cleared. The two historical
+XA max_prepared_transactions failures were outside this subset and remain documented unchanged.
+Raw sanitized reports, exact per-case task IDs, frozen selections, code/binary fingerprints and hashes
+are saved in the private archive outside the checkout at
+`~/Documents/jdbc-test-evidence/2026-10-19-oracle-kingbase-closeout/original-229/`;
+no Kingbase FULL was repeated. All four direct preparation gaps and five shared-resource blockers
+are **RESOLVED**. The remaining assertion is a separate OPEN item, not an unresolved preparation gap.
+
+### Kingbase result-sequence update-count follow-up
+
+OPEN: `statement.result_sequence` (`MultipleResultsTest.testResultSequence`). Test SQL is
+[`ddl/kingbase/multiple_results_ddl.sql`](../ddl/kingbase/multiple_results_ddl.sql), called through
+`{call {{multiple_results}}()}`. Its owned table starts at `(id=1, value=0)`; the procedure publishes
+`SELECT 11`, executes `UPDATE {{multiple_results_data}} SET value = value + 1 WHERE id = 1`,
+then publishes `SELECT 22` via native `dbms_sql.return_result`.
+
+The unchanged contract expects ordered result values `[11, 22]`, at least one update count `1`,
+and traversal ending with update count `-1`. Actual failure is
+`Procedure must report its one-row update ==> expected: <true> but was: <false>`.
+Reaching this assertion establishes that `[11, 22]` and earlier result-set closure checks passed;
+no update count `1` was observed. Loop completion implies terminal `-1`, but the later explicit
+terminal-count assertion and data-value check were not reached. These are source/control-flow
+inferences from the report, not a captured per-call JDBC trace. No complete interleaved return
+sequence or other intermediate count values were retained; do not invent them.
+
+Independent task `9bf09a2e-779f-48cb-a0ed-bc6ea54a6af5` and combined task
+`30d16db6-4faa-4800-b6b1-0c9d50e8d5bf` retain the failure. Evidence paths relative to the private
+archive are `original-229/evidence/{task-id}/worker-report-report.json.sanitized.json`;
+`closeout/kingbase-result-sequence-followup.json` records SQL, expected/observed values and limits.
+Review the implicit-result/JDBC contract before assigning a cause. This is not an established driver
+defect; assertions and historical results remain unchanged. No new live testing is part of closeout.
 
 ### Artifact and version sources
 

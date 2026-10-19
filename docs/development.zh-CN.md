@@ -452,21 +452,63 @@ Server 在加载目录和每次执行前检查协议版本。版本不匹配时�
 
 后续“四库验收”未全部完成：MySQL、PostgreSQL、Kingbase 已执行实际 FULL 及后续页面流程，Oracle 仅驱动/连接验证，未执行其完整写入任务。单元、模拟浏览器证据与实库证据分开。详见[执行安全](execution-safety.zh-CN.md#kingbasees-平台验证)。具体版本来源及单项超时诊断命令见[英文说明](development.md#kingbasees-setup)，无需重跑全部测试。
 
-### 准备后续待办（9 项，均待完成）
+### 准备后续针对性验证（9 项）
 
-以下稳定用例 ID 尚未实际调用契约。先补齐对应 SQL 资产，再在授权范围内最小验证依赖用例；本轮不补跑实库，不视为已解决。连带阻塞仅表示共享准备资源失败，不表示存在用例调用依赖图。
+历史 FULL 的 4 项直接准备缺失、5 项共享资源阻塞由四份 `ddl/kingbase/` 资源补齐：
+IN/INOUT/OUT 算术过程、REF_CURSOR 输出过程、表级 ROWID、多结果及数据准备。
+独立 DDL/DML/pool 目录中的 35 份原基线资源与 PostgreSQL 逐字节相同，共享 SQL 未改。
+未改变标准断言、能力开关、全局参数或历史结果。
 
-| 稳定用例 ID | 记录的准备问题 | 需补齐并验证的共享 SQL 资产 |
-| --- | --- | --- |
-| `callable_statement.procedure_parameter_metadata` | 直接缺失 (`PREREQUISITE_UNMET`) | `procedure_behavior_ddl.sql` |
-| `callable_statement.ref_cursor_output` | 直接缺失 (`PREREQUISITE_UNMET`) | `ref_cursor_ddl.sql` |
-| `result_set.batch_row_id_binding` | 直接缺失 (`PREREQUISITE_UNMET`) | `rowid_behavior_ddl.sql` |
-| `statement.result_sequence` | 直接缺失 (`PREREQUISITE_UNMET`) | `multiple_results_ddl.sql` |
-| `callable_statement.in_out_and_in_out` | 连带阻塞 (`BLOCKED_PREREQUISITE`) | `procedure_behavior_ddl.sql` |
-| `callable_statement.null_output` | 连带阻塞 (`BLOCKED_PREREQUISITE`) | `procedure_behavior_ddl.sql` |
-| `callable_statement.repeated_binding` | 连带阻塞 (`BLOCKED_PREREQUISITE`) | `procedure_behavior_ddl.sql` |
-| `result_set.row_id_round_trip` | 连带阻塞 (`BLOCKED_PREREQUISITE`) | `rowid_behavior_ddl.sql` |
-| `result_set.update_and_delete_by_row_id` | 连带阻塞 (`BLOCKED_PREREQUISITE`) | `rowid_behavior_ddl.sql` |
+按用户明确授权创建随机唯一 schema；通过实际数据库查询确认新 schema OID/owner、连接用户/current_schema 及探针表归属。
+目标仍限 V009R002C016、oracle 模式、驱动 V008R006B0001。九项分别独立运行，并通过正常
+Server/Worker/报告链路执行精确九项组合任务 `30d16db6-4faa-4800-b6b1-0c9d50e8d5bf`。
+两轮结果一致：9 项均实际调用契约，8 PASSED/CONFORMS、1 FAILED/CONTRACT_VIOLATION；
+没有准备不足、阻塞、跳过、NOT_RUN、INCOMPLETE 或超时。独立和组合是重复执行，不能相加为
+18 项独立覆盖，亦不能改写旧 FULL 的 270 项记录。
+
+| 稳定用例 ID | 历史准备问题 | Kingbase SQL 资源 | 补充实测结果 |
+| --- | --- | --- | --- |
+| `callable_statement.procedure_parameter_metadata` | 直接缺失 | `procedure_behavior_ddl.sql` | PASSED / CONFORMS |
+| `callable_statement.ref_cursor_output` | 直接缺失 | `ref_cursor_ddl.sql` | PASSED / CONFORMS |
+| `result_set.batch_row_id_binding` | 直接缺失 | `rowid_behavior_ddl.sql` | PASSED / CONFORMS |
+| `statement.result_sequence` | 直接缺失 | `multiple_results_ddl.sql` | FAILED：未暴露预期更新计数 |
+| `callable_statement.in_out_and_in_out` | 共享准备阻塞 | `procedure_behavior_ddl.sql` | PASSED / CONFORMS |
+| `callable_statement.null_output` | 共享准备阻塞 | `procedure_behavior_ddl.sql` | PASSED / CONFORMS |
+| `callable_statement.repeated_binding` | 共享准备阻塞 | `procedure_behavior_ddl.sql` | PASSED / CONFORMS |
+| `result_set.row_id_round_trip` | 共享准备阻塞 | `rowid_behavior_ddl.sql` | PASSED / CONFORMS |
+| `result_set.update_and_delete_by_row_id` | 共享准备阻塞 | `rowid_behavior_ddl.sql` | PASSED / CONFORMS |
+
+多结果用例准备成功、实际调用契约，失败发生在结果值和结果集关闭检查之后，序列没有暴露预期的
+一行更新计数。服务端原生隐式结果机制与后续契约/驱动归因有关，仅凭这一观察不能认定驱动缺陷。
+保留原断言及失败。四项缺失不再是这个已验证组合的准备缺口，五项连带阻塞均已解除；断言失败另列。
+
+十个任务均为所有权清理 SUCCESS；组合任务共创建并删除 5 个根对象，验证共享准备没有重复冲突。
+保存所有实际报告后，实查本轮 schema OID/owner 未变且关系、例程、类型均为空，再以不带 CASCADE 的
+DROP 删除 schema。没有复用或清空已有 schema，没有重跑 Kingbase FULL；两项历史 XA 全局配置限制
+属于范围之外，继续保留。逐项任务 ID、完整脱敏 Worker 报告、冻结选择、源码/二进制指纹及哈希位于
+工作区外私密归档
+`~/Documents/jdbc-test-evidence/2026-10-19-oracle-kingbase-closeout/original-229/`。
+4 项直接准备缺失与 5 项连带阻塞均标记为**已解决**；剩余断言另列 OPEN，不再记作准备缺失。
+
+### Kingbase 多结果更新计数待办
+
+OPEN：`statement.result_sequence`（`MultipleResultsTest.testResultSequence`）。完整测试 SQL 见
+[`ddl/kingbase/multiple_results_ddl.sql`](../ddl/kingbase/multiple_results_ddl.sql)，JDBC 调用为
+`{call {{multiple_results}}()}`。任务自建表初值 `(id=1, value=0)`；过程通过原生
+`dbms_sql.return_result` 返回 `SELECT 11`，执行
+`UPDATE {{multiple_results_data}} SET value = value + 1 WHERE id = 1`，再返回 `SELECT 22`。
+
+未改动契约预期结果值顺序 `[11, 22]`，至少一个更新计数 `1`，最终遍历终止计数 `-1`。
+实际失败为 `Procedure must report its one-row update ==> expected: <true> but was: <false>`。
+到达此断言说明此前 `[11, 22]` 及结果集关闭检查已通过，没有观察到计数 `1`。循环结束可推知
+终止计数 `-1`，但后面的显式终止计数断言及数据值检查尚未执行。这些是报告结合源码控制流的推知，
+不是逐次 JDBC 返回日志；没有保留完整交错序列及其他中间计数，不能补写不存在的记录。
+
+独立任务 `9bf09a2e-779f-48cb-a0ed-bc6ea54a6af5` 和组合任务
+`30d16db6-4faa-4800-b6b1-0c9d50e8d5bf` 均保留该失败。相对私密归档的证据路径为
+`original-229/evidence/{任务ID}/worker-report-report.json.sanitized.json`，
+`closeout/kingbase-result-sequence-followup.json` 保存 SQL、预期/观察值及边界。
+后续先复核隐式结果与 JDBC 契约，尚不认定驱动缺陷；不改断言或历史结果，本轮收尾不追加实库测试。
 
 ## 测试
 

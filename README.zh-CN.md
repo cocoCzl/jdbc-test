@@ -56,6 +56,8 @@ if (-not (Test-Path '.env')) { Copy-Item .env.example .env }
 
 适配器状态表示平台接入成熟度，不要求 JDBC 用例全部通过；JDBC 结果表示被测组合的实际行为。KingbaseES 验证仅限服务端 V009R002C016、oracle 模式、JDBC 数据库版本 12.1、驱动 V008R006B0001，失败、准备不足及环境限制保留在[验证记录](adapters/kingbase/evidence/platform-v009r002c016-oracle-v008r006b0001.json)。FULL 任务有 270 项终态结果记录：261 项实际调用契约，9 项因准备直接缺失（4 项）或连带阻塞（5 项）未调用。其他版本、模式及驱动尚未验证。其他产品可以通过本地声明式适配器接入。
 
+Kingbase 已完成四份隔离准备资源的针对性实库验证：9 项独立及组合运行均实际调用契约，8 项符合、1 项多结果更新计数断言失败；原准备阻塞解除，清理成功，不改写历史 FULL 结果。
+
 ## 开发环境
 
 源码 Web 开发需 JDK 21、Maven Wrapper 3.9.15、Node >=22.12.0/npm 和专用平台 PG；配置、Key 与 Worker 准备见[本地源码启动](docs/development.zh-CN.md#local-source-startup)。Python >=3.9、已授权目标库和驱动是 CLI 目标测试的额外要求，不是打开开发网站的前提。

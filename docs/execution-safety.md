@@ -74,13 +74,18 @@ follow-up table/routine counts were zero, the disposable schema was removed, and
 transaction remained. The initial standalone CORE timeout is a separate historical observation;
 it does not negate the later completed FULL run, nor establish the cause of the slow first getTypeInfo.
 
-Nine aborted cases identify unavailable/blocked procedure, REF cursor, ROWID and multiple-result
+Nine historical FULL aborted cases identify unavailable/blocked procedure, REF cursor, ROWID and multiple-result
 SQL fixtures: platform preparation limits, not driver failures or passes. Two XA prepare failures
 occurred with max_prepared_transactions=0 and must be interpreted as an environment prerequisite.
 The raw historical CONTRACT_VIOLATION labels remain unchanged. LOB bounds/partial-write and
 DataSource logWriter observations remain for driver/contract review; REF metadata, indexed batch
 keys and unimplemented holdability do not establish a blanket defect claim for optional JDBC APIs.
-Official support does not certify those unexecuted fixture paths or other builds/modes/drivers.
+The historical FULL does not certify its unexecuted fixture paths or other builds/modes/drivers.
+The targeted follow-up has nine invoked contracts, eight conforming and one update-count assertion
+failure; four direct preparation gaps and five shared blockers are RESOLVED. The assertion remains
+a separate OPEN follow-up. Owned objects and the unique schema were cleaned; historical results
+and the two XA environment limits remain unchanged. See
+[preparation follow-up](development.md#targeted-preparation-follow-up-9-cases).
 
 The [sanitized combination record](../adapters/kingbase/evidence/platform-v009r002c016-oracle-v008r006b0001.json)
 contains the actual counts, all 18 non-passing cases, reviewed attribution and preserved source
