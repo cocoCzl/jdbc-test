@@ -117,7 +117,7 @@ describe("Locale selection and formatting", () => {
     expect(errorMessage(new Error("secret"))).not.toContain("secret");
     expect(moduleName("connection")).toBe("连接（Connection）");
     expect(moduleName("vendor-module", "Vendor custom label")).toBe("Vendor custom label");
-    expect(runPresentation.SUCCEEDED.label).toBe("运行成功");
+    expect(runPresentation.SUCCEEDED.label).toBe("已完成");
     expect(runPresentation.FAILED.label).toBe("运行失败");
     expect(resultPresentation.FAILED.label).toBe("失败");
   });
@@ -129,7 +129,7 @@ describe("Switching language preserves the workspace", () => {
     const fetch = mockApi(url => url.pathname === "/api/runs" ? json(page([finishedRun], {totalPages: 3, totalElements: 45, page: Number(url.searchParams.get("page") ?? 0)})) : undefined);
     const view = renderPage("/runs");
     await screen.findByRole("heading", {name: "Run history"});
-    await chooseOption(user, screen.getByLabelText("Filter run status"), "SUCCEEDED");
+    await chooseOption(user, screen.getByLabelText("Filter run status"), "COMPLETED");
     await chooseOption(user, screen.getByLabelText("Sort runs"), "finishedAt,desc");
     await user.click(await screen.findByRole("button", {name: "Next page"}));
     await waitFor(() => expect(screen.getByText(/Page 2 of 3/)).toBeVisible());
@@ -139,7 +139,7 @@ describe("Switching language preserves the workspace", () => {
     await user.keyboard("{Home}{Enter}");
     await screen.findByRole("heading", {name: "运行历史"});
     expect(screen.getByRole("columnheader", {name: "连接"})).toBeVisible();
-    expect(screen.getByLabelText("筛选运行状态")).toHaveAttribute("data-value", "SUCCEEDED");
+    expect(screen.getByLabelText("筛选运行状态")).toHaveAttribute("data-value", "COMPLETED");
     expect(screen.getByLabelText("运行排序")).toHaveAttribute("data-value", "finishedAt,desc");
     expect(screen.getByText(/第 2 页，共 3 页/)).toBeVisible();
     expect(view.router.state.location.pathname).toBe("/runs");
@@ -186,19 +186,19 @@ describe("Switching language preserves the workspace", () => {
   it("keeps cached raw business data and a single SSE subscription while live status updates translate", async () => {
     const fetch = mockApi(url => url.pathname === "/api/runs/run-1" ? json(run) : undefined);
     const view = renderPage("/runs/run-1");
-    await screen.findAllByText("Running");
+    await screen.findAllByText("In progress");
     await waitFor(() => expect(TestEventSource.instances).toHaveLength(1));
     const before = structuredClone(view.client.getQueryData(runsKeys.detail(run.id)));
     const source = TestEventSource.instances[0];
     const requests = fetch.mock.calls.length;
     await change("zh-CN");
-    expect(screen.getAllByText("运行中")[0]).toBeVisible();
+    expect(screen.getAllByText("进行中")[0]).toBeVisible();
     expect(TestEventSource.instances).toHaveLength(1);
     expect(source.closed).toBe(false);
     expect(fetch.mock.calls).toHaveLength(requests);
     expect(view.client.getQueryData(runsKeys.detail(run.id))).toEqual(before);
     act(() => source.emit("run.status", {runId: run.id, status: "GENERATING_REPORT"}));
-    expect(await screen.findByText("正在生成报告")).toBeVisible();
+    expect(await screen.findByText("生成报告")).toBeVisible();
     expect(view.client.getQueryData(runsKeys.detail(run.id))).toHaveProperty("status", "GENERATING_REPORT");
   });
   it("retains opened skipped details, Results filters and original report JSON", async () => {

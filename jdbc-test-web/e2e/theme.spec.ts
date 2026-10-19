@@ -158,13 +158,13 @@ test("state survives theme changes: password, driver form, wizard, filters, pagi
   await expect(page.getByRole("heading",{name:"Choose a validated driver"})).toBeVisible();
   expect(requests.length).toBe(before);
   await page.goto("/runs");
-  await chooseOption(page,page.getByRole("combobox",{name:"Filter run status"}),"FAILED");
+  await chooseOption(page,page.getByRole("combobox",{name:"Filter run status"}),"ABNORMAL");
   await chooseOption(page,page.getByRole("combobox",{name:"Sort runs"}),"finishedAt,desc");
   await page.getByRole("button",{name:"Next page"}).click();
   await expect(page.getByText("21 records · Page 2 of 2")).toBeVisible();
   await page.waitForLoadState("networkidle"); before=requests.length;
   await cycle(page);
-  await expect(page.getByRole("combobox",{name:"Filter run status"})).toHaveAttribute("data-value","FAILED");
+  await expect(page.getByRole("combobox",{name:"Filter run status"})).toHaveAttribute("data-value","ABNORMAL");
   await expect(page.getByRole("combobox",{name:"Sort runs"})).toHaveAttribute("data-value","finishedAt,desc");
   await expect(page.getByText("21 records · Page 2 of 2")).toBeVisible();
   expect(requests.length).toBe(before);

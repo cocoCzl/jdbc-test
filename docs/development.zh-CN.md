@@ -368,7 +368,7 @@ CLI 可通过 `db.driver` 指定其他固定版本（`kind: "maven"`、`coordina
 | 方法 | 接口 | 用途 |
 |---|---|---|
 | GET | `/api/test-catalog` | 测试配置、模块与场景数量 |
-| POST / GET | `/api/runs` | 创建 / 列出任务（可按 `status` 筛选） |
+| POST / GET | `/api/runs` | 创建 / 列出任务（可按 `status` 或 `statusGroup` 筛选） |
 | GET | `/api/runs/{id}` | 快照与进度 |
 | POST | `/api/runs/{id}/cancel` | 取消 |
 | GET | `/api/runs/{id}/events` | SSE，首先发送 `run.snapshot` |
@@ -378,7 +378,9 @@ CLI 可通过 `db.driver` 指定其他固定版本（`kind: "maven"`、`coordina
 
 模块与配置的场景数量以当前目录为准；CUSTOM 自选模块/场景。这些目录数量不是已验证通过的数量。新任务要求明确授权范围和 `destructiveConsent: true`。入队时冻结场景选择和非敏感执行输入，不自动重新验证驱动或探测连接。
 
-正常状态：`QUEUED → PREPARING → RUNNING → GENERATING_REPORT → SUCCEEDED`。失败、取消和恢复分别进入 `FAILED`、`CANCELLED`、`INTERRUPTED`。本地 FIFO 调度器限制并发 Worker，工作目录为 `<data-dir>/runs/<run-id>`。任务行锁防止迟到结果与取消竞态覆盖终态。超时为 `FAILED / RUN_TIMEOUT`，进程清理完成前仍占用调度名额。
+历史列表支持 `statusGroup=WAITING`（QUEUED）、`IN_PROGRESS`（PREPARING、历史 PROBING、RUNNING、GENERATING_REPORT）、`COMPLETED`（SUCCEEDED）、`ABNORMAL`（FAILED、INTERRUPTED）、`CANCELLED`（CANCELLED）。两者都不传则查询全部；旧 `status` 精确查询继续有效。两者同时使用返回 HTTP 400 / `CONFLICTING_STATUS_FILTERS`；分组非法或为空返回 HTTP 400 / `INVALID_STATUS_GROUP`。分组条件在数据库分页及计数之前生效。响应保留内部状态，无需迁移历史数据。当前执行转换没有进入 PROBING 的路径，仍保留其历史显示与筛选兼容。
+
+正常状态：`QUEUED → PREPARING → RUNNING → GENERATING_REPORT → SUCCEEDED`。失败、取消和恢复分别进入 `FAILED`、`CANCELLED`、`INTERRUPTED`。本地 FIFO 调度器限制并发 Worker，工作目录为 `<data-dir>/runs/<run-id>`。任务行锁防止迟到结果与取消竞态覆盖终态。超时为 `FAILED / RUN_TIMEOUT`，进程清理完成前仍占用调度名额。用户主标签使用生命周期分组，活动阶段及已记录的异常原因另行显示。SUCCEEDED 显示“已完成”，不表示所有用例通过：现有完成检查仍拒绝失败断言和非允许型中止，契约明确允许的不支持则可正常完成。结果统计和证据保留原意，异常结束也可包含部分有效结果。展示分组不参与状态转换、终态判断、取消、轮询或 SSE 控制。
 
 Server 在成功前核对事件、报告条目和数量。报告无效或不一致时返回 `REPORT_INCONSISTENT`；除明确允许的不支持外，即使退出码为 0，FAILED/ABORTED 结果仍导致 `WORKER_EXECUTION_FAILED`。报告 DTO 为 `{summary, failures}`。协议 v2 可从持久证据重建原始 JSON，通过 `source` 和 `workerReportValidated` 标明边界。统计规则见[执行安全](execution-safety.zh-CN.md)。
 

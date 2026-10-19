@@ -12,7 +12,7 @@ import {
 } from "@/test/fixtures";
 import { json, mockApi, problem, renderPage } from "@/test/harness";
 import { TestEventSource } from "@/test/test-event-source";
-import { runPresentation } from "@/lib/status";
+import { getRunPresentation, isTerminal, runPresentation } from "@/lib/status";
 import type { RunStatus } from "@/types/api";
 
 async function chooseConnectionAndDriver(
@@ -152,11 +152,11 @@ describe("Run detail / results / report", () => {
     renderPage("/runs");
     await chooseOption(user,
       await screen.findByLabelText("Filter run status"),
-      "FAILED",
+      "ABNORMAL",
     );
     await waitFor(() =>
       expect(
-        api.mock.calls.some(([url]) => String(url).includes("status=FAILED")),
+        api.mock.calls.some(([url]) => String(url).includes("statusGroup=ABNORMAL")),
       ).toBe(true),
     );
   });
@@ -164,7 +164,7 @@ describe("Run detail / results / report", () => {
     const user = userEvent.setup();
     const api = mockApi((url) => {
       if (url.pathname !== "/api/runs") return undefined;
-      const filtered = url.searchParams.get("status") === "FAILED";
+      const filtered = url.searchParams.get("statusGroup") === "ABNORMAL";
       return json(
         page(filtered ? [{ ...finishedRun, status: "FAILED" }] : [finishedRun], {
           page: Number(url.searchParams.get("page")),
@@ -181,12 +181,12 @@ describe("Run detail / results / report", () => {
     await waitFor(() =>
       expect(api.mock.calls.some(([url]) => String(url).includes("page=1"))).toBe(true),
     );
-    await chooseOption(user, screen.getByLabelText("Filter run status"), "FAILED");
+    await chooseOption(user, screen.getByLabelText("Filter run status"), "ABNORMAL");
     await waitFor(() =>
       expect(
         api.mock.calls.some(([input]) => {
           const url = new URL(String(input), "http://localhost");
-          return url.searchParams.get("status") === "FAILED" && url.searchParams.get("page") === "0";
+          return url.searchParams.get("statusGroup") === "ABNORMAL" && url.searchParams.get("page") === "0";
         }),
       ).toBe(true),
     );
@@ -235,12 +235,13 @@ describe("Run detail / results / report", () => {
       expect(await screen.findByText("Environment & driver")).toBeVisible();
       expect(
         screen
-          .getAllByText(runPresentation[status].label, { exact: true })
+          .getAllByText(getRunPresentation(status).label, { exact: true })
           .some((element) => element.tagName === "SPAN"),
       ).toBe(true);
       expect(document.body.textContent).not.toMatch(
         /workspacePath|encryptedPassword/,
       );
+      expect(screen.queryByRole("button", { name: "Cancel run" }) !== null).toBe(!isTerminal(status));
     },
   );
   it("updates progress from SSE and closes after completion", async () => {
@@ -307,7 +308,7 @@ describe("Run detail / results / report", () => {
     renderPage("/runs/run-1");
     await user.click(await screen.findByRole("button", { name: "Cancel run" }));
     await user.click(screen.getByRole("button", { name: "Cancel run" }));
-    expect(await screen.findByText("Run succeeded", { exact: true })).toBeVisible();
+    expect(await screen.findByText("Completed", { exact: true, selector: ".status-badge" })).toBeVisible();
   });
   it("requests server pagination/filtering and displays failure text safely", async () => {
     const user = userEvent.setup();

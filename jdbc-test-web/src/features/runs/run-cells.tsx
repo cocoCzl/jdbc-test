@@ -4,7 +4,7 @@ import type { Run } from "@/types/api";
 import { StatusBadge } from "@/components/common";
 import { abortedCount } from "@/lib/outcomes";
 import { moduleShortName, profileName, runSelectionName } from "@/lib/presentation";
-import { isTerminal, runPresentation } from "@/lib/status";
+import { getRunPresentation, isTerminal, runStageLabel } from "@/lib/status";
 import { formatNumber, shortId } from "@/lib/format";
 
 export function RunIdentityCell({ run }: { run: Run }) {
@@ -15,13 +15,16 @@ export function RunIdentityCell({ run }: { run: Run }) {
   const detail = run.profile === "CUSTOM"
     ? [profileName(run.profile), run.selectedModules.length > 1 ? modules : ""].filter(Boolean).join(" · ")
     : "";
+  const stage = runStageLabel(run.status);
+  const statusDetail = stage ?? (["FAILED", "INTERRUPTED"].includes(run.status) ? run.failureReason : null);
   return <div className="run-identity">
     <div className="run-identity-top">
       <Link to={`/runs/${run.id}`} className="run-identity-link rounded-sm" title={t("common.openRun", { id: run.id })}>
         {selection}
       </Link>
-      <StatusBadge {...runPresentation[run.status]} />
+      <StatusBadge {...getRunPresentation(run.status)} />
     </div>
+    {statusDetail ? <p className="run-cell-secondary mt-1">{stage ?? t(`errors.${statusDetail}`, { defaultValue: statusDetail })}</p> : null}
     <div className="run-cell-secondary run-identity-meta">
       <span title={run.id}>{t("ui.run")} {shortId(run.id)}</span>
       {detail ? <span className="run-identity-detail" title={detail}> · {detail}</span> : null}

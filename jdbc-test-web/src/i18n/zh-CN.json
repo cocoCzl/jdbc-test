@@ -400,7 +400,7 @@
   "run.complete": "已完成 {{percent, number}}%",
   "run.completedNote": "包含明确跳过；完成进度不等于兼容性通过率。",
   "run.failed": "运行失败",
-  "run.succeeded": "运行成功",
+  "run.succeeded": "已完成",
   "dashboard.allHistory": "全部历史 · 服务端统计",
   "dashboard.catalog": "当前测试目录",
   "dashboard.groups": "可用 JDBC 测试模块",
@@ -603,5 +603,17 @@
   "selection.NOT_EVALUATED": "尚未判定契约",
   "selection.EXECUTED": "已调用契约",
   "selection.jdbcVersion": "JDBC {{version}}",
-  "selection.modulePurpose": "验证 {{module}} 的标准 JDBC 接口契约。"
+  "selection.modulePurpose": "验证 {{module}} 的标准 JDBC 接口契约。",
+  "run.group.waiting": "等待中",
+  "run.group.inProgress": "进行中",
+  "run.group.abnormal": "异常结束",
+  "run.stage.preparing": "准备测试环境",
+  "run.stage.probing": "探测连接",
+  "run.stage.running": "正在执行",
+  "run.stage.report": "生成报告",
+  "run.noMatchingRuns": "没有符合条件的运行",
+  "run.clearFilter": "清除状态筛选",
+  "run.lifecycleNote": "运行状态描述任务生命周期，测试结论请查看用例结果。",
+  "errors.INVALID_STATUS_GROUP": "未知的运行状态分组，请选择列表中的筛选项。",
+  "errors.CONFLICTING_STATUS_FILTERS": "运行状态与状态分组不能同时筛选，请只选择一种。"
 }

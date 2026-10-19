@@ -410,7 +410,7 @@
   "run.complete": "{{percent, number}}% complete",
   "run.completedNote": "Includes explicit skips; completion is not a compatibility pass rate.",
   "run.failed": "Run failed",
-  "run.succeeded": "Run succeeded",
+  "run.succeeded": "Completed",
   "dashboard.allHistory": "All history · reported by the server",
   "dashboard.catalog": "Current test catalog",
   "dashboard.groups": "Available JDBC test groups",
@@ -608,5 +608,17 @@
   "selection.NOT_EVALUATED": "Contract not evaluated",
   "selection.EXECUTED": "Contracts invoked",
   "selection.jdbcVersion": "JDBC {{version}}",
-  "selection.modulePurpose": "Verify the standard JDBC contracts for {{module}}."
+  "selection.modulePurpose": "Verify the standard JDBC contracts for {{module}}.",
+  "run.group.waiting": "Waiting",
+  "run.group.inProgress": "In progress",
+  "run.group.abnormal": "Ended abnormally",
+  "run.stage.preparing": "Preparing test environment",
+  "run.stage.probing": "Probing connection",
+  "run.stage.running": "Executing",
+  "run.stage.report": "Generating report",
+  "run.noMatchingRuns": "No matching runs",
+  "run.clearFilter": "Clear status filter",
+  "run.lifecycleNote": "Run status describes the task lifecycle. See case results for test outcomes.",
+  "errors.INVALID_STATUS_GROUP": "Unknown run status group. Choose a listed filter.",
+  "errors.CONFLICTING_STATUS_FILTERS": "Use either a status or a status group filter, not both."
 }

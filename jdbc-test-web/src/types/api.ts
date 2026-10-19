@@ -17,6 +17,7 @@ export type RunStatus =
   | "CANCELLED"
   | "INTERRUPTED";
 export type ResultStatus = "PASSED" | "FAILED" | "SKIPPED" | "ABORTED";
+export type RunStatusGroup = "WAITING" | "IN_PROGRESS" | "COMPLETED" | "ABNORMAL" | "CANCELLED";
 export type ConnectionTestStatus = "SUCCEEDED" | "FAILED";
 export interface Artifact {
   id: string;
@@ -248,6 +249,7 @@ export interface ConnectionParams extends PageParams {
 }
 export interface RunParams extends PageParams {
   status?: RunStatus;
+  statusGroup?: RunStatusGroup;
 }
 export interface ResultParams extends PageParams {
   status?: ResultStatus;

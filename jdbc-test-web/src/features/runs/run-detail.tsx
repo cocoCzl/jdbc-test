@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { ApiError, errorMessage } from "@/api/client";
 import { runsApi, runsKeys } from "@/api/runs";
 import { useRunEvents } from "@/hooks/use-run-events";
-import { isTerminal, runPresentation } from "@/lib/status";
+import { getRunPresentation, isTerminal, runStageLabel } from "@/lib/status";
 import { formatDateTime, formatDuration, formatNumber, shortId } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/alert-dialog";
@@ -74,7 +74,7 @@ export default function RunDetail() {
         description=""
         action={
           <div className="flex items-center gap-3">
-            <StatusBadge {...runPresentation[run.status]} />
+            <StatusBadge {...getRunPresentation(run.status)} />
             {!isTerminal(run.status) ? (
               <Button variant="destructive" onClick={() => setCancelling(true)}>
                 {t("ui.cancelRun")}</Button>
@@ -83,6 +83,7 @@ export default function RunDetail() {
         }
       />
       <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        {runStageLabel(run.status) ? <span>{runStageLabel(run.status)}</span> : null}
         <code title={run.id}>{shortId(run.id)}</code>
         <CopyButton value={run.id} label={t("ui.runID")} />
         <span className="ml-auto" role="status">
@@ -107,7 +108,7 @@ export default function RunDetail() {
           <span className="font-mono text-sm">{formatNumber(run.completedCases)} / {formatNumber(run.totalCases)}</span>
         </div>
         <progress aria-label={t("ui.executionProgress")}
-          className={`run-progress h-2 w-full overflow-hidden rounded-full tone-${run.status === "SUCCEEDED" && run.passed > 0 ? "success" : runPresentation[run.status].tone}`}
+          className={`run-progress h-2 w-full overflow-hidden rounded-full tone-${getRunPresentation(run.status).tone}`}
           max={run.totalCases || 1} value={run.completedCases ?? undefined} />
         <p className="mt-2 text-xs text-muted-foreground">
           {progress == null ? t("ui.progressUnavailable") : t("run.complete", {percent: Math.round(progress)})}  {t("ui.durationInline")} {formatDuration(run.durationMs)}

@@ -70,7 +70,7 @@ test("TEST FIXTURE ONLY: bilingual Dashboard, menu, semantic Run Detail, skipped
   await page.screenshot({path: "test-results/fixture-language-menu.png", fullPage: true});
   await page.keyboard.press("Escape");
   await page.goto("/runs/run-1");
-  await expect(page.getByText("运行失败", {exact: true})).toBeVisible();
+  await expect(page.getByText("异常结束", {exact: true})).toBeVisible();
   await expect(page.locator('[data-stat="未执行"]')).toContainText("4");
   await expect(page.locator('[data-stat="已开始但未完成"]')).toContainText("2");
   await expect(page.getByRole("progressbar")).toHaveAttribute("value", "6");
@@ -78,7 +78,7 @@ test("TEST FIXTURE ONLY: bilingual Dashboard, menu, semantic Run Detail, skipped
   await expect(page.getByText(/包含明确跳过/)).toBeVisible();
   await page.screenshot({path: "test-results/fixture-run-detail-zh-CN.png", fullPage: true});
   await switchTo(page, "en");
-  await expect(page.getByText("Run failed", {exact: true})).toBeVisible();
+  await expect(page.getByText("Ended abnormally", {exact: true})).toBeVisible();
   await expect(page.getByRole("progressbar")).toHaveAttribute("value", "6");
   await page.screenshot({path: "test-results/fixture-run-detail-en.png", fullPage: true});
   await page.getByRole("tab", {name: "Test cases"}).click();
@@ -87,7 +87,7 @@ test("TEST FIXTURE ONLY: bilingual Dashboard, menu, semantic Run Detail, skipped
   await switchTo(page, "zh-CN");
   await page.getByRole("button", {name: "跳过原因"}).click();
   await expect(page.getByRole("dialog")).toContainText("capability arrays=false; skipSource=adapter");
-  await expect(page.getByRole("dialog")).toContainText("能力禁用属于配置");
+  await expect(page.getByRole("dialog")).toContainText("前提不足或历史能力门控均不能证明驱动是否支持");
   await page.keyboard.press("Escape");
   await page.getByRole("tab", {name: "报告", exact: true}).click();
   await page.getByRole("button", {name: "查看报告 JSON"}).click();

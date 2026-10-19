@@ -7,8 +7,8 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { runsApi, runsKeys } from "@/api/runs";
-import type { RunStatus } from "@/types/api";
-import { runPresentation } from "@/lib/status";
+import type { RunStatusGroup } from "@/types/api";
+import { runStatusGroupOrder, runStatusGroups } from "@/lib/status";
 import { plural } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { DataTable, Pagination } from "@/components/data-table";
@@ -21,9 +21,9 @@ import { getRunColumns } from "./run-columns";
 export default function Runs() {
   useTranslation();
   const [page, setPage] = useState(0);
-  const [status, setStatus] = useState<RunStatus | "">("");
+  const [statusGroup, setStatusGroup] = useState<RunStatusGroup | "">("");
   const [sort, setSort] = useState("createdAt,desc");
-  const params = { page, size: 20, sort, status: status || undefined };
+  const params = { page, size: 20, sort, statusGroup: statusGroup || undefined };
   const query = useQuery({
     queryKey: runsKeys.list(params),
     queryFn: ({ signal }) => runsApi.list(params, signal),
@@ -41,16 +41,16 @@ export default function Runs() {
         <label>
           {t("ui.status")}<Select
             aria-label={t("ui.filterRunStatus")}
-            value={status}
+            value={statusGroup}
             onValueChange={(value) => {
-              setStatus(value as RunStatus | "");
+              setStatusGroup(value as RunStatusGroup | "");
               setPage(0);
             }}
           >
             <option value="">{t("ui.allStatuses")}</option>
-            {Object.entries(runPresentation).map(([value, presentation]) => (
+            {runStatusGroupOrder.map((value) => (
               <option key={value} value={value}>
-                {presentation.label}
+                {runStatusGroups[value].label}
               </option>
             ))}
           </Select>
@@ -83,14 +83,17 @@ export default function Runs() {
             className="run-table run-table--history"
             empty={
               <EmptyState
-                title={t("ui.noTestRunsYet")}
+                title={statusGroup ? t("run.noMatchingRuns") : t("ui.noTestRunsYet")}
                 description={
-                  status
+                  statusGroup
                     ? t("ui.noRunsMatchThisStatus")
                     : t("ui.startYourFirstCompatibilityRunAndBuild")
                 }
                 action={
-                  <Button asChild variant="outline">
+                  statusGroup ? <Button variant="outline" onClick={() => {
+                    setStatusGroup("");
+                    setPage(0);
+                  }}>{t("run.clearFilter")}</Button> : <Button asChild variant="outline">
                     <Link to="/runs/new">{t("ui.createATestRun")}</Link>
                   </Button>
                 }

@@ -194,10 +194,19 @@ final class TestRunService {
     }
 
     PageResponse<TestRunResponse> list(int page, int size, String sort, TestRunStatus status) {
+        return list(page, size, sort, status, null);
+    }
+
+    PageResponse<TestRunResponse> list(int page, int size, String sort, TestRunStatus status,
+        TestRunStatusGroup statusGroup) {
+        if (status != null && statusGroup != null) {
+            throw problem(HttpStatus.BAD_REQUEST, "CONFLICTING_STATUS_FILTERS",
+                "Use either status or statusGroup, not both");
+        }
         var pageable = page(page, size, sort, RUN_SORTS, "createdAt,desc");
         return transactions.execute(tx -> {
-            var value =
-                status == null ? runs.findAll(pageable) : runs.findByStatus(status, pageable);
+            var value = statusGroup != null ? runs.findByStatusIn(statusGroup.statuses(), pageable)
+                : status == null ? runs.findAll(pageable) : runs.findByStatus(status, pageable);
             return new PageResponse<>(
                 value.getContent().stream().map(item -> response(item, moduleIds(item.getId())))
                     .toList(),

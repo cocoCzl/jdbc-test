@@ -151,7 +151,7 @@ test("REAL PostgreSQL browser flow: external Driver → Statement/Connection →
     await expect(page).toHaveURL(/\/runs\/[a-f0-9-]+$/);
     const id = page.url().split("/").at(-1)!;
     createdRunIds.push(id);
-    await expect(page.getByText("Run succeeded", { exact: true })).toBeVisible({
+    await expect(page.locator(".status-badge").filter({ hasText: /^Completed$/ })).toBeVisible({
       timeout: 60_000,
     });
     await expect(
@@ -198,7 +198,7 @@ test("REAL PostgreSQL browser flow: external Driver → Statement/Connection →
     )).toBe(true);
     await page.getByRole("tab", { name: "Test cases" }).click();
     await page.reload();
-    await expect(page.getByText("Run succeeded", { exact: true })).toBeVisible();
+    await expect(page.locator(".status-badge").filter({ hasText: /^Completed$/ })).toBeVisible();
     await page.getByRole("tab", { name: "Test cases" }).click();
     const resultsResponse = await request.get(
       `/api/runs/${id}/results?size=100`,
@@ -246,9 +246,9 @@ test("REAL PostgreSQL browser flow: external Driver → Statement/Connection →
       const filteredRuns = page.waitForResponse(
         (response) =>
           response.url().includes("/api/runs") &&
-          response.url().includes("status=SUCCEEDED"),
+          response.url().includes("statusGroup=COMPLETED"),
       );
-      await chooseOption(page, page.getByLabel("Filter run status"), "SUCCEEDED");
+      await chooseOption(page, page.getByLabel("Filter run status"), "COMPLETED");
       const filteredResponse = await filteredRuns;
       expect(filteredResponse.status()).toBe(200);
       const filteredPage = await filteredResponse.json() as {

@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -36,8 +37,14 @@ final class TestRunController {
     PageResponse<TestRunResponse> list(@RequestParam(value = "page", defaultValue = "0") int page,
         @RequestParam(value = "size", defaultValue = "20") int size,
         @RequestParam(value = "sort", defaultValue = "createdAt,desc") String sort,
-        @RequestParam(value = "status", required = false) TestRunStatus status) {
-        return service.list(page, size, sort, status);
+        @RequestParam(value = "status", required = false) TestRunStatus status,
+        @RequestParam(value = "statusGroup", required = false) String statusGroup,
+        @RequestParam Map<String, String> parameters) {
+        if (parameters.containsKey("status") && parameters.containsKey("statusGroup")) {
+            throw new RunException(org.springframework.http.HttpStatus.BAD_REQUEST,
+                "CONFLICTING_STATUS_FILTERS", "Use either status or statusGroup, not both");
+        }
+        return service.list(page, size, sort, status, TestRunStatusGroup.parse(statusGroup));
     }
 
     @GetMapping("/{id}")

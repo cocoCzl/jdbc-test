@@ -9,11 +9,11 @@ import { useQuery } from "@tanstack/react-query";
 import { runsApi, runsKeys } from "@/api/runs";
 import type { CaseResult, Run } from "@/types/api";
 import { abortedCount } from "@/lib/outcomes";
-import { isTerminal, resultPresentation } from "@/lib/status";
+import { getRunPresentation, isTerminal, resultPresentation } from "@/lib/status";
 import { formatDateTime, formatDuration, formatNumber } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { EmptyState, ErrorState, Loading } from "@/components/common";
+import { EmptyState, ErrorState, Loading, StatusBadge } from "@/components/common";
 import { FailureDetail } from "./results";
 const OutcomeChart = lazy(() => import("@/components/outcome-chart"));
 export default function Report({ run }: { run: Run }) {
@@ -50,6 +50,10 @@ export default function Report({ run }: { run: Run }) {
   return (
     <>
       {query.isError ? <ErrorState error={query.error} retry={() => void query.refetch()} /> : null}
+      <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+        <span>{t("ui.runStatus")}</span><StatusBadge {...getRunPresentation(summary.status)} />
+        <p className="text-xs text-muted-foreground">{t("run.lifecycleNote")}</p>
+      </div>
       {summary.accounting ? <p className="mb-4 text-sm">
         {t("report.accounting", {notRun: summary.accounting.notRun, incomplete: summary.accounting.incomplete})}{summary.accounting.started === 0 ? t("ui.noScenarioExecutionWasVerifiedSkippedCases") : ""}
       </p> : null}

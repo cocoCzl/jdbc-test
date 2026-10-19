@@ -29,8 +29,8 @@ describe("Resource loading and preserved history",()=>{
   next=undefined;await act(()=>client.invalidateQueries({queryKey:['runs']}));
  });
  it("does not display the previous filter's rows as the new filter result",async()=>{
-  const pending=deferred<Response>();mockApi(url=>url.pathname==='/api/runs'&&url.searchParams.get('status')==='FAILED'?pending.promise:undefined);renderPage('/runs');
-  await screen.findByRole('table');const user=userEvent.setup();await user.click(screen.getByRole('combobox',{name:'Filter run status'}));await user.click(screen.getByRole('option',{name:'Run failed'}));
+  const pending=deferred<Response>();mockApi(url=>url.pathname==='/api/runs'&&url.searchParams.get('statusGroup')==='ABNORMAL'?pending.promise:undefined);renderPage('/runs');
+  await screen.findByRole('table');const user=userEvent.setup();await user.click(screen.getByRole('combobox',{name:'Filter run status'}));await user.click(screen.getByRole('option',{name:'Ended abnormally'}));
   expect(screen.queryByRole('table')).not.toBeInTheDocument();expect(screen.getByLabelText('Loading data…')).toBeVisible();
   pending.resolve(json(page([])));expect(await screen.findByText('No runs match this status.')).toBeVisible();
  });

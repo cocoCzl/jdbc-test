@@ -4,8 +4,35 @@ import type {
   DriverStatus,
   ResultStatus,
   RunStatus,
+  RunStatusGroup,
 } from "@/types/api";
 export type Tone = "active" | "success" | "danger" | "neutral" | "warning";
+// History/presentation groups only. Execution controls continue to use RunStatus.
+export const runStatusGroups: Record<RunStatusGroup, { statuses: readonly RunStatus[]; label: string; tone: Tone }> = {
+  WAITING: { statuses: ["QUEUED"], get label() { return i18n.t("run.group.waiting"); }, tone: "neutral" },
+  IN_PROGRESS: { statuses: ["PREPARING", "PROBING", "RUNNING", "GENERATING_REPORT"], get label() { return i18n.t("run.group.inProgress"); }, tone: "active" },
+  COMPLETED: { statuses: ["SUCCEEDED"], get label() { return i18n.t("run.succeeded"); }, tone: "success" },
+  ABNORMAL: { statuses: ["FAILED", "INTERRUPTED"], get label() { return i18n.t("run.group.abnormal"); }, tone: "danger" },
+  CANCELLED: { statuses: ["CANCELLED"], get label() { return i18n.t("ui.cancelled"); }, tone: "neutral" },
+};
+export const runStatusGroupOrder: readonly RunStatusGroup[] = ["WAITING", "IN_PROGRESS", "COMPLETED", "ABNORMAL", "CANCELLED"];
+
+export function getRunPresentation(status: RunStatus) {
+  return Object.values(runStatusGroups).find(group => group.statuses.includes(status))
+    ?? { label: status, tone: "neutral" as const };
+}
+
+export function runStageLabel(status: RunStatus) {
+  switch (status) {
+    case "PREPARING": return i18n.t("run.stage.preparing");
+    case "PROBING": return i18n.t("run.stage.probing");
+    case "RUNNING": return i18n.t("run.stage.running");
+    case "GENERATING_REPORT": return i18n.t("run.stage.report");
+    default: return undefined;
+  }
+}
+
+// Internal status labels/recognition retained for protocol compatibility.
 export const runPresentation: Record<RunStatus, { label: string; tone: Tone }> =
   {
     QUEUED: { get label() { return i18n.t("ui.queued"); }, tone: "neutral" },

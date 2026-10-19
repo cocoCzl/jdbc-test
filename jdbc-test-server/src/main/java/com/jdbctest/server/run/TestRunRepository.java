@@ -24,6 +24,8 @@ public interface TestRunRepository extends JpaRepository<TestRunEntity, UUID> {
 
     List<TestRunEntity> findByStatusIn(List<TestRunStatus> statuses);
 
+    Page<TestRunEntity> findByStatusIn(List<TestRunStatus> statuses, Pageable pageable);
+
     @org.springframework.data.jpa.repository.Query("select run.id from TestRunEntity run where run.status in :statuses")
     List<UUID> findIdsByStatusIn(
         @org.springframework.data.repository.query.Param("statuses") List<TestRunStatus> statuses);

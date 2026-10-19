@@ -427,7 +427,7 @@ Probes use Worker `Driver.connect`, read metadata best-effort, close and exit wi
 | Method | Endpoint | Purpose |
 |---|---|---|
 | GET | `/api/test-catalog` | Profiles, modules and scenario counts |
-| POST / GET | `/api/runs` | Create / list runs (optional `status` filter) |
+| POST / GET | `/api/runs` | Create / list runs (optional `status` or `statusGroup` filter) |
 | GET | `/api/runs/{id}` | Snapshot and progress |
 | POST | `/api/runs/{id}/cancel` | Cancel |
 | GET | `/api/runs/{id}/events` | SSE, starting with `run.snapshot` |
@@ -437,7 +437,9 @@ Probes use Worker `Driver.connect`, read metadata best-effort, close and exit wi
 
 Read module and profile counts from the current catalog; CUSTOM selects modules/scenarios. These counts are not proven compatibility results. New runs require explicit scope and `destructiveConsent: true`. Selection and nonsecret execution inputs are frozen at enqueue; a new validation/probe is not performed automatically.
 
-Normal states: `QUEUED → PREPARING → RUNNING → GENERATING_REPORT → SUCCEEDED`. Failure, cancellation and recovery end in `FAILED`, `CANCELLED`, `INTERRUPTED`. A local FIFO scheduler limits concurrent Workers; workspaces are `<data-dir>/runs/<run-id>`. Run row locks protect terminal states against late results/cancel races. Timeout gives `FAILED / RUN_TIMEOUT`; a slot stays occupied until process cleanup finishes.
+History filters use `statusGroup=WAITING` (QUEUED), `IN_PROGRESS` (PREPARING, legacy PROBING, RUNNING, GENERATING_REPORT), `COMPLETED` (SUCCEEDED), `ABNORMAL` (FAILED, INTERRUPTED), or `CANCELLED` (CANCELLED). Omit both filters for all runs. Exact `status` queries remain supported; combining the two returns HTTP 400 / `CONFLICTING_STATUS_FILTERS`, and an invalid or empty group returns HTTP 400 / `INVALID_STATUS_GROUP`. Group predicates apply in the database before pagination and counting. Responses retain the original internal status, and no history migration is required. PROBING has no current execution transition into it; it remains readable/filterable for historical compatibility.
+
+Normal states: `QUEUED → PREPARING → RUNNING → GENERATING_REPORT → SUCCEEDED`. Failure, cancellation and recovery end in `FAILED`, `CANCELLED`, `INTERRUPTED`. A local FIFO scheduler limits concurrent Workers; workspaces are `<data-dir>/runs/<run-id>`. Run row locks protect terminal states against late results/cancel races. Timeout gives `FAILED / RUN_TIMEOUT`; a slot stays occupied until process cleanup finishes. User-facing main labels describe lifecycle groups, with active phases and recorded abnormal reasons shown separately. SUCCEEDED is displayed as Completed, never as proof that every test passed: current completion checks still reject failed assertions and non-permitted aborts, while explicitly permitted unsupported outcomes may complete normally. Result counts/evidence, including partial results after abnormal termination, retain their original meaning. Display groups never control transitions, terminal detection, cancellation, polling or SSE.
 
 Server checks events, report entries and counts before success. Invalid/inconsistent reports fail with `REPORT_INCONSISTENT`; FAILED/ABORTED results other than explicitly permitted unsupported outcomes yield `WORKER_EXECUTION_FAILED` even with exit code 0. The report DTO is `{summary, failures}`. Protocol v2 raw JSON can be reconstructed from persisted evidence, with `source` and `workerReportValidated` identifying that boundary. See [Execution safety](execution-safety.md) for accounting rules.
 
