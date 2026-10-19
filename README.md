@@ -58,6 +58,8 @@ Adapter status describes platform integration maturity, not an all-JDBC-tests-pa
 
 The Kingbase targeted follow-up now validates four isolated preparation resources: all nine contracts ran independently and together, with eight conforming and one result-sequence update-count assertion failure; preparation blockers were removed and cleanup succeeded. This does not rewrite the historical FULL results.
 
+Oracle 19.3 / ojdbc11 21.13 FULL has 270 records but 261 invoked contracts; its preparation gaps and an unresolved two-entry LOB dictionary difference remain. Read-only investigation has not identified their historical table/column or a causal operation, and does not establish business-data loss or complete safety. See the [follow-up and limits](docs/development.md#oracle-full-follow-up-2026-10-19).
+
 ## Development requirements
 
 Source Web development requires JDK 21, Maven Wrapper 3.9.15, Node >=22.12.0/npm and a dedicated platform PG; follow [local source startup](docs/development.md#local-source-startup) for config/Key/Worker preparation. Python >=3.9 and an authorized target database/driver are additionally needed for CLI target tests, not for opening the development website.

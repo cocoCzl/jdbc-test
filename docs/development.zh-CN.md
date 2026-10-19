@@ -398,7 +398,7 @@ Server 在成功前核对事件、报告条目和数量。报告无效或不一�
 
 能力审计：A 类为除 Provider 三项以外的全部现有 capability 声明（保存点、可调用语句、数组/REF/STRUCT/ROWID/XML/RowSet、LOB、参数元数据、可滚动/可更新结果、生成键、多结果、取消、超时、ClientInfo、request/sharding、java_time 等），保留声明作为证据，false 不再通用禁用。B 类为 data_source、connection_pool、xa_data_source 的实际 Provider 配置，以及 SQL 资产/对象形状、权限、Oracle XML 配套 JAR；缺失呈现 PREREQUISITE_UNMET，包括所选驱动包找不到已配置的 Provider 类；不把构造器、属性设置及实际接口调用的所有错误都包装成前提不足。C 类目前没有显式前置用例依赖图；已失败的共享 SQL 准备会阻塞依赖该资源的后续用例，并保留原始异常、准备路径及阻塞用例 ID。D 类改由显式扩展适用范围表达，目前无实际扩展用例。
 
-`@UseSqlScripts` 延迟到选中方法的 beforeEach；同类共享成功准备，失败只影响依赖同一资产的用例。方法上的空注解取消类级准备；连接、元数据、内存 SQLXML API 等不需要表的方法不执行无关 DDL。数组夹具验证实际列形状，Oracle 以 JSON/VARCHAR 替代数组的旧 SQL 不会冒充数组 API 测试已运行。Kingbase 的 PostgreSQL SQL 保留明确的验证范围及准备不足限制，失败保留 SQLState/厂商码并标明准备阶段。获取注入连接的实际认证或连接失败记录为 PREPARATION 阶段的 CONNECTION_FAILURE，保留原始错误，不归为平台前提不足；即使 JUnit 已发布执行回调，也不计契约调用。测试体中的 SQL 仍按原契约判定，不把所有 SQL 错误归为环境问题。公共断言未放宽；holdability 用例实测并记录 supports 声明是否一致。
+`@UseSqlScripts` 延迟到选中方法的 beforeEach；同类共享成功准备，失败只影响依赖同一资产的用例。方法上的空注解取消类级准备；连接、元数据、内存 SQLXML API 等不需要表的方法不执行无关 DDL。数组夹具验证实际列形状，Oracle 以 JSON/VARCHAR 替代数组的旧 SQL 不会冒充数组 API 测试已运行。Kingbase 隔离目录保留原 PostgreSQL 基线资源及明确的验证范围；新增准备资源仍待针对性实库验证，失败保留 SQLState/厂商码并标明准备阶段。获取注入连接的实际认证或连接失败记录为 PREPARATION 阶段的 CONNECTION_FAILURE，保留原始错误，不归为平台前提不足；即使 JUnit 已发布执行回调，也不计契约调用。测试体中的 SQL 仍按原契约判定，不把所有 SQL 错误归为环境问题。公共断言未放宽；holdability 用例实测并记录 supports 声明是否一致。
 
 执行状态 PASSED/FAILED/SKIPPED/ABORTED 与新增结论分开。CONFORMS、CONTRACT_VIOLATION、UNSUPPORTED_ALLOWED、UNSUPPORTED_REQUIRED、PREREQUISITE_UNMET、BLOCKED_PREREQUISITE、TIMEOUT、CONNECTION_FAILURE、PLATFORM_ERROR、NOT_EVALUATED 保留类别、阶段、耗时、脱敏异常/SQLState/厂商码、声明及观察。只在特定 API 调用处通过 `JdbcContracts.optional` 接受 SQLFeatureNotSupportedException：Connection.createBlob/createClob/createSQLXML 和 CommonDataSource.getParentLogger；后续对象操作仍使用原断言。允许不支持记录 ABORTED + contractConforms=true，不计 PASSED，并明确展示功能不支持。`JdbcContracts.required` 当前明确约束 Connection.getAutoCommit，不支持该必需 API 记录为违反契约。未经具体调用确认的 SQLFeatureNotSupportedException 保留 NOT_EVALUATED、原始错误及未确定结论，不自动算符合契约；普通 SQLException、SQLState 或错误文本也不能证明允许不支持。无明确前提标记的准备阶段 SQL 错误同样保留 NOT_EVALUATED。逐用例 phaseDurationsMs 记录准备（包含注入连接获取）、方法主体和连接清理耗时；类级对象清理另见 cleanupEvidence。旧报告不补造这些结论。
 
@@ -450,7 +450,7 @@ Server 在加载目录和每次执行前检查协议版本。版本不匹配时�
 
 九项中止来自缺失或阻塞的 `procedure_behavior_ddl.sql`、`ref_cursor_ddl.sql`、`rowid_behavior_ddl.sql`、`multiple_results_ddl.sql`，属于平台准备范围限制，不是通过或数据库不支持。实库中八项数组及全部数据库元数据用例已通过，不能继续笼统称为未实测。两项 XA 准备失败时 `max_prepared_transactions=0`，属于环境限制，不能当作驱动缺陷或不支持 XA；保留原状态/结论，另在证据评审中说明。LOB 边界/局部写入、DataSource logWriter 观察保留；REF 元数据、按列下标批量键、未实现的 holdability 仍需结合原契约/可选 API 解释，不笼统归为驱动缺陷。
 
-后续“四库验收”未全部完成：MySQL、PostgreSQL、Kingbase 已执行实际 FULL 及后续页面流程，Oracle 仅驱动/连接验证，未执行其完整写入任务。单元、模拟浏览器证据与实库证据分开。详见[执行安全](execution-safety.zh-CN.md#kingbasees-平台验证)。具体版本来源及单项超时诊断命令见[英文说明](development.md#kingbasees-setup)，无需重跑全部测试。
+此前“四库验收”检查点中 MySQL、PostgreSQL、Kingbase 已执行实际 FULL 及后续页面流程，Oracle 当时仅驱动/连接验证。后续 Oracle FULL 尝试及其未完成条件见下文，仍不能宣称四库完整验收完成。单元、模拟浏览器证据与实库证据分开。详见[执行安全](execution-safety.zh-CN.md#kingbasees-平台验证)。具体版本来源及单项超时诊断命令见[英文说明](development.md#kingbasees-setup)，无需重跑全部测试。
 
 ### 准备后续针对性验证（9 项）
 
@@ -509,6 +509,69 @@ OPEN：`statement.result_sequence`（`MultipleResultsTest.testResultSequence`）
 `original-229/evidence/{任务ID}/worker-report-report.json.sanitized.json`，
 `closeout/kingbase-result-sequence-followup.json` 保存 SQL、预期/观察值及边界。
 后续先复核隐式结果与 JDBC 契约，尚不认定驱动缺陷；不改断言或历史结果，本轮收尾不追加实库测试。
+
+### Oracle FULL 后续验证（2026-10-19）
+
+真实页面创建任务 `200dfecd-7606-4e82-b499-25fe978133a1`，实测 Oracle 19.3.0.0.0、
+ojdbc11 21.13.0.0.0，主 JAR SHA-256 为
+`d5672fe8bb1403df85bfedd1d50a09dd10c9b0ae8527e67dd0e9a297ea98780d`。
+配套 orai18n、xdb、xmlparserv2 均为 21.13.0.0，明确配置 Oracle DataSource、连接池及 XA Provider。
+实际连接身份和 schema 已核对。页面请求、目录、冻结元数据、Worker 报告及分页结果
+270 个 ID 完全一致，无排除项；预算 1800 秒、默认方法超时 60 秒、任务耗时 94.296 秒。
+
+270 项终态记录为 251 PASSED、10 FAILED、9 ABORTED；实际调用契约 261 项，另 2 项准备不足、
+7 项共享准备阻塞未调用。另一维度的契约结论是 251 CONFORMS、9 CONTRACT_VIOLATION、
+1 PLATFORM_ERROR、2 PREREQUISITE_UNMET、7 BLOCKED_PREREQUISITE，不能将两套统计相加。
+允许不支持、NOT_RUN、INCOMPLETE、超时均为 0；任务为 FAILED/WORKER_EXECUTION_FAILED。
+这不是全部契约已执行或全部通过的验收。
+
+Oracle 旧数组准备含 VARCHAR2 替代列，初始化报 ORA-00933（42000/933），8 项数组契约未运行；
+`statement.result_sequence` 缺少 `multiple_results_ddl.sql`。实际失败涉及过程参数序号、锁等待/查询
+超时与取消、ROWID 类型元数据、批量返回键和 SQLXML 流文本。按列名批量键出现的
+NullPointerException 仍保留 PLATFORM_ERROR，缺少调用栈证据时不认定驱动缺陷。
+未改写原始结果或断言，也没有在发现清理清单差异后追加可写补充任务。
+
+原始 Worker 报告已在运行时目录清理前保存完整脱敏副本，另保留 API 下载内容
+（`source=PERSISTED_WORKER_EVENTS`、`workerReportValidated=true`）、冻结输入、选择核对、
+驱动指纹、执行源码快照、逐用例归因及 SHA-256 清单，位于工作区外私密归档
+`~/Documents/jdbc-test-evidence/2026-10-19-oracle-kingbase-closeout/original-229/preserved-prior-evidence/evidence/200dfecd-7606-4e82-b499-25fe978133a1/`。
+原始未脱敏字节哈希与脱敏副本哈希明确分开，不保存到 Git 的私密 JAR、凭据及业务数据。
+较早 Kingbase FULL 原始报告仍不可获取。
+
+Worker 归属记录报告 36 条任务根对象记录清理成功，只读检查无任务前缀残留。另有两条测试前已存在的
+LOB 字典记录在后清单中缺失，均不在归属记录中；历史父映射和致因操作仍未知。任务归属清理成功不能
+证明既有对象没有受到影响。Oracle 完整验收仍受此未解决差异、9 项未调用契约及终态页面/筛选/下载按钮
+复核未完成限制。
+
+### Oracle LOB 差异只读调查
+
+状态：**原因未确定，等待额外历史证据；未解决。** 两条测试前存在的 LOB 字典记录在后清单中
+缺失，既不能认定业务数据丢失，也不能宣称没有影响。真实内部对象名、连接身份、查询、清单和
+诊断输出仅保存在私密归档，不在这里公开。
+
+保留的前后 USER_OBJECTS 查询列、排序和筛选口径一致，实际连接 user/current_schema 检查一致。
+缺少的是 OBJECT_ID 条目，不是业务行数；历史父表/列映射未采集。此前原始私密采集流已删除，
+哈希无法重建原件，也不能证明历史 EOF、SCN、DBID/PDB/edition 一致。未保留采集错误不能排除采集缺口。
+
+后续只执行 SELECT。当前字典、回收站、SQL 缓存和已有审计未建立父映射或致因操作。缓存不是完整
+审计；根据未改动源码及归属记录重建的清理 SQL 与实际采集 SQL 明确区分。没有证明历史普通自有表
+操作或后台回收的审计覆盖。审计/缓存为空、任务前缀无残留都不证明安全。
+
+命名、显式占位符展开、连接范围及归属清理检查未确认公共缺陷。使用合成标识的
+`OracleOwnershipIsolationTest` 仅验证父对象 DROP、依赖元数据只作证据、未知/失败 CREATE 保留；
+它没有复现、解释或修复记录消失的根因。未修改生产清理逻辑，未在历史 Oracle 范围写入复现、恢复、
+重新建表或清理。
+
+进一步归因需要 DBA 提供**已有**事前 LOB—表/列映射或字典/DDL 备份、审计/redo/归档/后台诊断历史，
+以及其他位置如仍保留的原始采集流、SCN 和数据库身份。没有新增证据时不重复调查，不为调查启用设置。
+历史账号/schema 继续停止写入测试；后续实库写入验收改用独立专用测试账号/schema。
+
+数组准备、多结果资源、批量键 NPE、页面复核各自保持 OPEN。旧临时管理库已删除，脱敏 JSON 仍在，
+旧任务页面不可访问，不为截图重跑 FULL，不把离线复查写成页面点击。
+完整私密证据位于工作区之外的
+`~/Documents/jdbc-test-evidence/2026-10-19-oracle-kingbase-closeout/`：
+`original-229/` 原样保存 229 个文件及原 SHA256 清单，`closeout/` 保存后续待办和本地提交来源记录。
+这是已校验的本机归档，不宣称已异地备份。Git 仅保存正式脱敏说明和合成测试。
 
 ## 测试
 

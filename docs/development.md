@@ -457,7 +457,7 @@ New runs reuse executionInput and selected scenario rows. They freeze the catalo
 
 Gate audit: A comprises all current capability declarations except the three Provider flags (savepoints, callable statements, advanced types, LOB/XML/RowSet, metadata, result sets, keys, cancellation/timeouts, client info, request/sharding, java_time and related operations). Declarations remain evidence; false does not disable standard verification. B comprises configured data_source/connection_pool/xa_data_source Providers, SQL assets/object shapes, privileges and Oracle XML companion JARs. Missing prerequisites are explicit, including an absent configured Provider class in the selected driver package. Provider constructor/setter and actual interface failures are not blanket-converted into missing prerequisites. C has no explicit predecessor-test graph today; a failed shared fixture blocks only cases using it, preserving its cause, resource and originating scenario ID. D uses explicit adapter applicability; no production vendor scenarios exist yet.
 
-UseSqlScripts is prepared lazily before a selected method and shared within its class. An empty method annotation overrides class scripts. Connection, metadata and in-memory XML methods that need no table avoid unrelated DDL. Array fixture shape is checked; Oracle's legacy JSON/VARCHAR substitutes cannot masquerade as executed array tests. Kingbase's PostgreSQL assets retain the documented validation scope and preparation gaps. Preparation failures retain SQLState/vendor codes. Failure to obtain the injected scenario connection is CONNECTION_FAILURE in PREPARATION, preserving authentication/connection errors even after a JUnit execution callback; it is not a missing prerequisite or contract invocation. Calls made by the test body retain their own contract context. SQL inside a test body retains its contract interpretation. Public assertions are not relaxed. Holdability is exercised even if supportsResultSetHoldability returns false, and that declaration is recorded and compared with actual behavior.
+UseSqlScripts is prepared lazily before a selected method and shared within its class. An empty method annotation overrides class scripts. Connection, metadata and in-memory XML methods that need no table avoid unrelated DDL. Array fixture shape is checked; Oracle's legacy JSON/VARCHAR substitutes cannot masquerade as executed array tests. Kingbase's isolated assets preserve the existing PostgreSQL baseline and the documented validation scope; new preparation resources require targeted real validation. Preparation failures retain SQLState/vendor codes. Failure to obtain the injected scenario connection is CONNECTION_FAILURE in PREPARATION, preserving authentication/connection errors even after a JUnit execution callback; it is not a missing prerequisite or contract invocation. Calls made by the test body retain their own contract context. SQL inside a test body retains its contract interpretation. Public assertions are not relaxed. Holdability is exercised even if supportsResultSetHoldability returns false, and that declaration is recorded and compared with actual behavior.
 
 PASSED/FAILED/SKIPPED/ABORTED remain execution statuses. New conclusions distinguish CONFORMS, CONTRACT_VIOLATION, UNSUPPORTED_ALLOWED, UNSUPPORTED_REQUIRED, PREREQUISITE_UNMET, BLOCKED_PREREQUISITE, TIMEOUT, CONNECTION_FAILURE, PLATFORM_ERROR and NOT_EVALUATED, with phase, category, duration, sanitized exception/SQLState/vendor code, declarations and observations. JdbcContracts.optional accepts SQLFeatureNotSupportedException only around specific permitted factory/logger calls: Connection.createBlob/createClob/createSQLXML and CommonDataSource.getParentLogger. Subsequent object operations retain their assertions. Allowed unsupported is ABORTED plus contractConforms=true, never PASSED, and remains visibly unsupported. JdbcContracts.required currently scopes Connection.getAutoCommit: its explicit unsupported response violates that required API contract. Unscoped SQLFeatureNotSupportedException remains NOT_EVALUATED with its original error and no inferred compliance. Ordinary SQLException, SQLState and error text never establish unsupported permission. Preparation SQL without a known prerequisite marker also remains NOT_EVALUATED. Per-case phaseDurationsMs measures preparation including injected connection acquisition, the method body and connection cleanup; class-level owned-object cleanup is separate cleanupEvidence. Historical reports receive no invented conclusions.
 
@@ -564,9 +564,10 @@ remain visible; REF metadata, indexed batch keys and unimplemented holdability r
 contract/unsupported interpretation, not a blanket driver-defect conclusion. FULL selection is not
 proof every contract ran. See [Execution safety](execution-safety.md#kingbasees-platform-validation).
 
-The subsequent four-database acceptance was incomplete: MySQL, PostgreSQL and Kingbase ran actual
-FULL tasks and later page flows; Oracle completed driver/connection probes, without its writable
-FULL run. Unit and mocked browser checks remain fixture evidence, not additional target validation.
+At the earlier four-database acceptance checkpoint, MySQL, PostgreSQL and Kingbase had actual
+FULL tasks and later page flows; Oracle had only driver/connection probes. A later Oracle FULL
+attempt is recorded below; its preparation and cleanup qualifications prevent an all-four-complete
+claim. Unit and mocked browser checks remain fixture evidence, not additional target validation.
 
 ### Targeted preparation follow-up (9 cases)
 
@@ -638,6 +639,87 @@ archive are `original-229/evidence/{task-id}/worker-report-report.json.sanitized
 `closeout/kingbase-result-sequence-followup.json` records SQL, expected/observed values and limits.
 Review the implicit-result/JDBC contract before assigning a cause. This is not an established driver
 defect; assertions and historical results remain unchanged. No new live testing is part of closeout.
+
+### Oracle FULL follow-up (2026-10-19)
+
+Task `200dfecd-7606-4e82-b499-25fe978133a1` was created from the real New Run page against
+Oracle 19.3.0.0.0, ojdbc11 21.13.0.0.0 (JAR SHA-256
+`d5672fe8bb1403df85bfedd1d50a09dd10c9b0ae8527e67dd0e9a297ea98780d`). Companion orai18n,
+xdb and xmlparserv2 21.13.0.0 and the Oracle DataSource/pool/XA Providers were configured.
+Actual session identity and schema were checked. Catalog, page request, frozen metadata,
+Worker report and persisted results contain the same 270 IDs, with no exclusions. Budget was
+1800 seconds, default method timeout 60 seconds; task duration was 94.296 seconds.
+
+There are 270 terminal records: 251 PASSED, 10 FAILED, 9 ABORTED. Exactly 261 contracts were
+invoked; 2 preparation failures and 7 shared-fixture blockers were not invoked. Contract conclusions
+are a separate dimension: 251 CONFORMS, 9 CONTRACT_VIOLATION, 1 PLATFORM_ERROR,
+2 PREREQUISITE_UNMET and 7 BLOCKED_PREREQUISITE. No permitted-unsupported, NOT_RUN,
+INCOMPLETE or timeout outcomes were recorded. The task ended FAILED/WORKER_EXECUTION_FAILED;
+this is not an all-pass or all-contracts-executed acceptance.
+
+The legacy Oracle array resource failed initialization with ORA-00933 (SQLState 42000, code 933)
+and still contains VARCHAR2 substitutes rather than JDBC array columns; eight array contracts did
+not run. `statement.result_sequence` lacks `multiple_results_ddl.sql`. Recorded execution failures
+cover parameter ordinals, lock/query timeout and cancellation behavior, ROWID type metadata,
+batch generated keys and SQLXML stream text. The batch-key-by-name NullPointerException remains
+an unresolved-origin PLATFORM_ERROR, not an established driver defect. The raw per-case exceptions,
+phases and SQL codes are retained; no assertion or recorded result was changed. No supplemental
+writable Oracle task was started after the cleanup discrepancy described below.
+
+The actual original Worker report was copied and sanitized before runtime cleanup, together with
+API download evidence (`source=PERSISTED_WORKER_EVENTS`), frozen inputs, selection audit,
+artifact fingerprints, source snapshot and SHA-256 manifests, in the external private archive
+`~/Documents/jdbc-test-evidence/2026-10-19-oracle-kingbase-closeout/original-229/preserved-prior-evidence/evidence/200dfecd-7606-4e82-b499-25fe978133a1/`.
+Unredacted source hashes and sanitized-copy hashes are explicitly separate; no private JAR or
+credentials belong in Git. The older Kingbase FULL original remains unavailable.
+
+Worker ownership evidence reports successful cleanup of the 36 task-owned root records and
+read-only checks found no task-prefix residue. Separately, two pre-existing LOB dictionary entries
+are missing afterward and neither is in the ownership ledger. Their historical parent mapping and
+causal operation remain unknown. Task-owned cleanup success does not establish no impact on
+existing objects. Broader Oracle acceptance remains incomplete due to this unresolved difference,
+the nine uninvoked contracts and terminal-page/filter/download-button review not completed.
+
+### Read-only Oracle LOB difference investigation
+
+Status: **Cause undetermined; awaiting additional historical evidence. Unresolved.** Two
+pre-existing LOB dictionary entries are absent from the retained post-run inventory. Neither
+business-data loss nor absence of impact is established. Internal object names, connection identity,
+queries, inventories and diagnostic output are restricted archive material and are not published here.
+
+The retained pre/post USER_OBJECTS queries have the same columns, ordering and filters; the
+retained session user/current-schema checks agree. The two missing records are OBJECT_ID entries,
+not row counts. Their historical parent table/column mapping was not captured. Original private
+capture streams were deleted during earlier cleanup; hashes cannot reconstruct them or certify
+historical EOF, SCN, DBID/PDB or edition consistency. No retained capture error establishes or
+excludes incomplete collection.
+
+Only SELECT was used in the follow-up. Current dictionaries, recycle-bin views, SQL cache and
+existing audits did not establish a parent mapping or causal operation. SQL cache is incomplete;
+cleanup statements reconstructed from unchanged source/ownership records are explicitly distinct
+from captured SQL. Audit coverage for historical ordinary own-table/background operations was
+not established. Empty audit/cache and absence of task-prefix residue do not establish safety.
+
+Naming, explicit placeholder expansion, connection-scope checks and ownership cleanup review found
+no confirmed shared defect. The synthetic `OracleOwnershipIsolationTest` checks parent-only DROP,
+metadata dependencies as evidence, and preservation of unknown/failed CREATEs. It does not reproduce,
+explain or fix the disappearance. No production cleanup logic was changed and no write reproduction,
+restoration, DDL or cleanup was performed in the historical Oracle scope.
+
+Further attribution requires DBA-provided **existing** pre-run LOB-to-table/column mapping or
+DDL/dictionary backups, audit/redo/archive/background diagnostic history, and original capture
+streams/SCNs/database identity if retained elsewhere. Do not enable settings or repeat investigation
+without new evidence. Keep the historical account/schema closed to write tests; future writable
+validation must use an independent dedicated test account/schema.
+
+Oracle array preparation, multiple-result resource, batch-key NPE and page review remain separate
+OPEN follow-ups. The former temporary management database is gone; archived JSON survives but
+its live page does not. Do not rerun FULL for screenshots or describe offline JSON review as clicks.
+The complete private evidence archive is outside the checkout under
+`~/Documents/jdbc-test-evidence/2026-10-19-oracle-kingbase-closeout/`:
+`original-229/` preserves the 229 files plus their original SHA-256 manifest, and `closeout/`
+records unresolved items and local commit provenance. This is a verified local archive, not a claim
+of off-device backup. Only formal sanitized summaries and synthetic tests belong in Git.
 
 ### Artifact and version sources
 

@@ -58,6 +58,8 @@ if (-not (Test-Path '.env')) { Copy-Item .env.example .env }
 
 Kingbase 已完成四份隔离准备资源的针对性实库验证：9 项独立及组合运行均实际调用契约，8 项符合、1 项多结果更新计数断言失败；原准备阻塞解除，清理成功，不改写历史 FULL 结果。
 
+Oracle 19.3 / ojdbc11 21.13 FULL 有 270 项结果记录、261 项契约调用，仍有准备缺口及两个 LOB 字典条目的未归因差异。只读调查尚不能确定历史表/列或致因操作，也不能据此认定业务数据丢失或完全安全。详见[后续验证及限制](docs/development.zh-CN.md#oracle-full-后续验证2026-10-19)。
+
 ## 开发环境
 
 源码 Web 开发需 JDK 21、Maven Wrapper 3.9.15、Node >=22.12.0/npm 和专用平台 PG；配置、Key 与 Worker 准备见[本地源码启动](docs/development.zh-CN.md#local-source-startup)。Python >=3.9、已授权目标库和驱动是 CLI 目标测试的额外要求，不是打开开发网站的前提。

@@ -90,15 +90,23 @@ and the two XA environment limits remain unchanged. See
 The [sanitized combination record](../adapters/kingbase/evidence/platform-v009r002c016-oracle-v008r006b0001.json)
 contains the actual counts, all 18 non-passing cases, reviewed attribution and preserved source
 excerpts. Original ignored reports are no longer available; its excerpt hash is not an original
-Worker report hash. Subsequent four-database acceptance was incomplete: MySQL/PG/Kingbase FULL
-ran, while Oracle only had driver/connection probes. Fixture screenshots and unit tests are not
-additional real-target evidence. Setup and narrow diagnostics: [Development](development.md#kingbasees-setup).
+Worker report hash. At that earlier acceptance checkpoint Oracle only had probes.
+
+The later Oracle FULL task `200dfecd-7606-4e82-b499-25fe978133a1` has 270 records but only 261
+invoked contracts; preparation gaps and a two-entry pre-existing LOB inventory discrepancy remain.
+It does not establish complete four-database acceptance. Read-only investigation found no confirmed
+shared cleanup defect, but historical parent mapping and a causal operation remain unknown.
+Status: **cause undetermined, awaiting additional historical evidence; unresolved**. There is no
+absence-of-impact claim. Do not repeat without new evidence; future writes require an independent
+dedicated test account/schema. See the [Oracle follow-up](development.md#oracle-full-follow-up-2026-10-19).
+Fixture screenshots and unit tests are not additional real-target evidence.
+Setup and narrow diagnostics: [Development](development.md#kingbasees-setup).
 
 ## Credentials, adapter preflight and cleanup evidence
 
 Embedded credentials are rejected before driver use, including historical URLs at saved-probe/run/Worker entry points. Public projections redact Oracle credential segments, query/semicolon secrets (including SQL Server brace escapes), and explicit sensitive JSON keys recursively. Driver stdout/stderr is discarded from public channels; known execution passwords are also removed from diagnostic/metadata fields. Text recognition cannot identify every arbitrary secret. Original valid input goes to the driver; redacted values never become execution URLs. Existing records are not scanned or rewritten automatically: owners should inspect old records and rotate credentials if appropriate; this is not a claim that a leak occurred.
 
-`adapterExecution` freezes manifest identity, version bounds, asset ID, dialect and quoting. Web and CLI use the same Java preflight before auto-namespace creation or fixture DDL/DML. Invalid regexes, unparseable constrained versions and mismatches reject preflight (`PREFLIGHT_FAILURE`) without invented failed cases. Reports retain declarations, observed product/driver versions and MATCHED/REJECTED. Optional absent endpoints stay unbounded. Older queued inputs without this field use the installed manifest; historical reports are not retroactively revalidated. Manifest acceptance is not proof of support for untested targets; no new GaussDB/SQL Server/MySQL/Oracle real-target claims are made here.
+`adapterExecution` freezes manifest identity, version bounds, asset ID, dialect and quoting. Web and CLI use the same Java preflight before auto-namespace creation or fixture DDL/DML. Invalid regexes, unparseable constrained versions and mismatches reject preflight (`PREFLIGHT_FAILURE`) without invented failed cases. Reports retain declarations, observed product/driver versions and MATCHED/REJECTED. Optional absent endpoints stay unbounded. Older queued inputs without this field use the installed manifest; historical reports are not retroactively revalidated. Manifest acceptance is not proof of support for untested targets; the Oracle follow-up above records the actual tested scope and remaining acceptance limits.
 
 `cleanupEvidence` is additive in protocol 2 / report schema 2.0.0: SUCCESS, FAILED, UNKNOWN or NOT_EXECUTED, phase, attempt/deletion counts, retained objects, namespace disposition and safe SQLState/vendorCode. Cleanup failure changes the run conclusion (`CLEANUP_FAILURE`), never the actual case counts. Test/container/preflight failures retain their primary reason and attached cleanup evidence; timeout/cancel/crash retain their existing primary terminal reason. Cleanup stays inside the Worker deadline on the execution thread; an interrupted live JDBC call is never raced by a second cleanup thread. Confirmed drops are not repeated. Intentionally retained namespaces are not failed object cleanup.
 

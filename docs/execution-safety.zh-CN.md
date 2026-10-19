@@ -66,13 +66,15 @@ KingbaseES 已提升为正式平台适配，仅限服务端 V009R002C016、oracl
 
 历史 FULL 的九项中止由过程、REF cursor、ROWID、多结果 SQL 资产缺失/阻塞引起，属于平台准备范围限制，不是驱动失败或通过。两项 XA 准备失败时 max_prepared_transactions=0，按环境前提不足解释，原始 CONTRACT_VIOLATION 标签不改写。LOB 边界/局部写入、DataSource logWriter 观察保留供驱动/契约复核；REF 元数据、按列下标批量键、未实现 holdability 须结合可选 API 契约，不能笼统认定驱动缺陷。历史 FULL 不认证当时未执行的准备路径，也不推广至其他版本、模式或驱动。后续针对性九项均调用契约，8 项符合、1 项更新计数断言失败；4 项直接准备缺失、5 项连带阻塞均已解决，断言单独保留 OPEN。本轮归属对象及唯一 schema 清理完成，不改历史结果及两项 XA 环境限制。详见[准备后续验证](development.zh-CN.md#准备后续针对性验证9-项)。
 
-[脱敏组合证据](../adapters/kingbase/evidence/platform-v009r002c016-oracle-v008r006b0001.json)保留实际统计、全部 18 项非通过结果、归因评审及任务源摘录。原 ignored 报告目前不可用，摘录哈希不是原始 Worker 报告哈希。后续四库验收未全部完成：MySQL、PG、Kingbase 已执行 FULL，Oracle 仅驱动/连接探测。夹具截图和单元测试不作为额外实库证据。接入及最小诊断见[开发指南](development.zh-CN.md#kingbasees-接入)。
+[脱敏组合证据](../adapters/kingbase/evidence/platform-v009r002c016-oracle-v008r006b0001.json)保留实际统计、全部 18 项非通过结果、归因评审及任务源摘录。原 ignored 报告目前不可用，摘录哈希不是原始 Worker 报告哈希。在该历史检查点 Oracle 仅驱动/连接探测。
+
+后续 Oracle FULL 任务 `200dfecd-7606-4e82-b499-25fe978133a1` 有 270 项记录、261 项契约调用，但仍有准备缺失和两个既有 LOB 清单条目差异，不能宣称四库完整验收完成。只读调查未确认公共清理缺陷，但历史父映射和致因操作未知。LOB 差异状态为**原因未确定，等待额外历史证据；未解决**，不得宣称无影响。无新证据不重复调查，后续写入使用独立专用测试账号/schema。详见[Oracle 后续验证及限制](development.zh-CN.md#oracle-full-后续验证2026-10-19)。夹具截图和单元测试不作为额外实库证据。接入及最小诊断见[开发指南](development.zh-CN.md#kingbasees-接入)。
 
 ## 凭据、适配预检与清理证据
 
 内嵌凭据在驱动使用前拒绝，包括历史 URL 的已保存探测、运行及 Worker 入口。公开投影递归遮盖 Oracle 凭据片段、查询/分号秘密属性（包括 SQL Server 大括号转义）及明确敏感 JSON 键。驱动 stdout/stderr 不进入公开通道；已知执行密码也从诊断/元数据字段移除。文本识别不能保证发现任意秘密。合法原始输入交给驱动，脱敏 URL 不用于执行。不自动扫描或改写历史记录：所有者应人工检查旧记录，必要时轮换凭据；这不表示已经发生泄漏。
 
-`adapterExecution` 冻结 manifest 身份、版本范围、assetId、dialect 与引号规则。Web/CLI 共用 Java 预检，先检查再创建自动命名空间或执行 fixture DDL/DML。非法正则、受约束但不可解析的版本与不匹配均拒绝预检（`PREFLIGHT_FAILURE`），不编造用例失败。报告保留声明、产品/驱动观察版本及 MATCHED/REJECTED；可选端点缺省表示无该端限制。旧队列输入没有此字段时使用安装版本的 manifest，不重新判定历史报告。声明通过不证明未测目标受支持，本轮不新增 GaussDB/SQL Server/MySQL/Oracle 的真实目标验证声明。
+`adapterExecution` 冻结 manifest 身份、版本范围、assetId、dialect 与引号规则。Web/CLI 共用 Java 预检，先检查再创建自动命名空间或执行 fixture DDL/DML。非法正则、受约束但不可解析的版本与不匹配均拒绝预检（`PREFLIGHT_FAILURE`），不编造用例失败。报告保留声明、产品/驱动观察版本及 MATCHED/REJECTED；可选端点缺省表示无该端限制。旧队列输入没有此字段时使用安装版本的 manifest，不重新判定历史报告。声明通过不证明未测目标受支持，Oracle 后续记录说明实际测试范围和剩余验收限制。
 
 `cleanupEvidence` 是 protocol 2 / report schema 2.0.0 的增量字段：SUCCESS、FAILED、UNKNOWN、NOT_EXECUTED，以及阶段、尝试/确认删除数量、保留对象、命名空间处置与安全 SQLState/vendorCode。清理失败影响运行结论（`CLEANUP_FAILURE`），不改真实用例统计。用例/容器/预检失败保留主要原因并附加清理证据；超时、取消和崩溃保留既有主终态。清理在原执行线程及 Worker deadline 内进行，绝不对仍存活的中断 JDBC 调用另开线程并发清理；确认删除的对象不重复 DROP。声明保留的命名空间不算失败残留。
 
