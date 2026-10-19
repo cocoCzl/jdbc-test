@@ -112,10 +112,13 @@ class ConnectionFilteringTest {
             .andExpect(jsonPath("$[3].validatedCombinations[0].databaseVersion").value("15.2"))
             .andExpect(jsonPath("$[3].declaration").doesNotExist())
             .andExpect(jsonPath("$[5].id").value("kingbase"))
-            .andExpect(jsonPath("$[5].status").value("CANDIDATE"))
+            .andExpect(jsonPath("$[5].status").value("OFFICIAL"))
             .andExpect(jsonPath("$[5].driverClass").value("com.kingbase8.Driver"))
             .andExpect(jsonPath("$[5].recommendedMavenCoordinate").isEmpty())
-            .andExpect(jsonPath("$[5].validatedCombinations").isEmpty())
+            .andExpect(jsonPath("$[5].validatedCombinations.length()").value(1))
+            .andExpect(jsonPath("$[5].validatedCombinations[0].databaseVersion").value("12.1"))
+            .andExpect(jsonPath("$[5].validatedCombinations[0].driverVersion")
+                .value("V008R006B0001"))
             .andExpect(jsonPath("$[5].qualificationNoteKey").value("adapter.kingbaseQualification"));
         verifyNoInteractions(worker);
     }
