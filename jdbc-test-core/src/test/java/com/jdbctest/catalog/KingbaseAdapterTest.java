@@ -12,13 +12,19 @@ import org.junit.jupiter.api.Test;
 class KingbaseAdapterTest {
 
     @Test
-    void candidateKeepsProductDriverAndInfrastructureIndependent() {
+    void officialKeepsProductDriverAndInfrastructureIndependent() {
         var adapter = AdapterRegistry.bundled().required("kingbase");
         assertEquals(DbType.KINGBASE, adapter.dbType().orElseThrow());
-        assertEquals("CANDIDATE", adapter.metadata().status());
+        assertEquals("OFFICIAL", adapter.metadata().status());
         assertEquals(SqlDialect.POSTGRESQL, adapter.dialect());
         assertEquals("postgresql", adapter.assets().directory());
-        assertEquals(List.of(), adapter.declaration().get("validated_combinations"));
+        var combinations = (List<?>) adapter.declaration().get("validated_combinations");
+        assertEquals(1, combinations.size());
+        var combination = (Map<?, ?>) combinations.getFirst();
+        assertEquals("12.1", combination.get("database_version"));
+        assertEquals("V008R006B0001", combination.get("driver_version"));
+        assertEquals("V009R002C016", combination.get("server_version"));
+        assertEquals("oracle", combination.get("database_mode"));
         var driver = (Map<?, ?>) adapter.declaration().get("driver");
         assertEquals("com.kingbase8.Driver", driver.get("class"));
         assertEquals(Map.of("kind", "local", "path", "local-drivers/kingbase"),

@@ -52,9 +52,9 @@ if (-not (Test-Path '.env')) { Copy-Item .env.example .env }
 | Oracle | `oracle` | 正式 |
 | GaussDB | `gaussdb` | 候选 |
 | SQL Server | `sqlserver` | 候选 |
-| KingbaseES（金仓） | `kingbase` | 候选 |
+| KingbaseES（金仓） | `kingbase` | 正式 |
 
-适配器状态表示平台接入成熟度，JDBC 结果表示被测数据库与驱动组合的实际行为。其他产品可以通过本地声明式适配器接入。
+适配器状态表示平台接入成熟度，不要求 JDBC 用例全部通过；JDBC 结果表示被测组合的实际行为。KingbaseES 验证仅限服务端 V009R002C016、oracle 模式、JDBC 数据库版本 12.1、驱动 V008R006B0001，失败、准备不足及环境限制保留在[验证记录](adapters/kingbase/evidence/platform-v009r002c016-oracle-v008r006b0001.json)。FULL 任务有 270 项终态结果记录：261 项实际调用契约，9 项因准备直接缺失（4 项）或连带阻塞（5 项）未调用。其他版本、模式及驱动尚未验证。其他产品可以通过本地声明式适配器接入。
 
 ## 开发环境
 

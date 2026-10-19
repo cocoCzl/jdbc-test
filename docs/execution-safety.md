@@ -58,15 +58,36 @@ The 2026-10-07 checkpoint used production Web → REST → external-driver Worke
 
 These historical selections overlap and used the previous static-gate semantics. Historical skips are not evidence of absent database support; inspect their original reasons in Results/raw JSON. These results cover local production JAR deployment, not Docker image acceptance, other driver versions or release authorization. Disposable-container regressions do not replace acceptance on actual target combinations. No real targets participate in default Maven/CI tests.
 
-## KingbaseES candidate observations
+## KingbaseES platform validation
 
-The adapter remains candidate with `validated_combinations=[]`; full CORE has not completed validation and previously reached the task budget. Limited observations apply only to server V009R002C016, oracle mode, JDBC database version 12.1 and driver declaration V008R006B0001, without qualification of other builds, modes or drivers.
+KingbaseES is official for the observed server V009R002C016, oracle mode, JDBC database version
+12.1 and driver V008R006B0001 only. Official denotes platform adaptation and interpretable results;
+PostgreSQL, MySQL, Oracle and Kingbase use the same standard, without requiring all JDBC cases
+PASSED. No assertion, capability, terminal rule or historical result changes with this promotion.
 
-The trial used a standalone harness invoking the isolated Worker, bypassing Server scheduling and persistence. Its results were not automatically stored in platform PostgreSQL. Per-case reports, phase timings and diagnostics stay local and are not committed adapter resources. Normal platform tasks persist case results and run state through Server; original reports and ownership ledgers also use the local runtime directory.
+The 2026-10-19 real FULL task has 270 terminal result records: 261 contracts invoked and
+9 not invoked due to missing or blocked preparation (4 direct, 5 blocked). Recorded statuses are
+252 PASSED, 9 FAILED and 9 ABORTED. Historical NOT_RUN/INCOMPLETE counts are zero; those
+accounting fields do not establish that every contract ran. The Server/isolated Worker/platform
+PostgreSQL report path and subsequent browser flows were exercised. Cleanup was SUCCESS,
+follow-up table/routine counts were zero, the disposable schema was removed, and no prepared
+transaction remained. The initial standalone CORE timeout is a separate historical observation;
+it does not negate the later completed FULL run, nor establish the cause of the slow first getTypeInfo.
 
-The CORE exploration exhausted the shared Worker execution and cleanup budget, not an individual JDBC call deadline. Narrow reproduction observed a costly first `getTypeInfo()` call, and the original scenario completed in isolation. No platform, driver or database defect has been established; server work, network latency and driver query costs have not been separated. No global timeout increase, scenario skipping or capability disabling was used to change that outcome.
+Nine aborted cases identify unavailable/blocked procedure, REF cursor, ROWID and multiple-result
+SQL fixtures: platform preparation limits, not driver failures or passes. Two XA prepare failures
+occurred with max_prepared_transactions=0 and must be interpreted as an environment prerequisite.
+The raw historical CONTRACT_VIOLATION labels remain unchanged. LOB bounds/partial-write and
+DataSource logWriter observations remain for driver/contract review; REF metadata, indexed batch
+keys and unimplemented holdability do not establish a blanket defect claim for optional JDBC APIs.
+Official support does not certify those unexecuted fixture paths or other builds/modes/drivers.
 
-PostgreSQL execution infrastructure and SQL assets remain limited candidate inputs. Full CORE, other SQL, LOB/XML/CallableStatement, other metadata, DataSource/pool/XA and other modes remain unqualified. Setup and narrow reproduction: [Development](development.md#kingbasees-candidate-setup).
+The [sanitized combination record](../adapters/kingbase/evidence/platform-v009r002c016-oracle-v008r006b0001.json)
+contains the actual counts, all 18 non-passing cases, reviewed attribution and preserved source
+excerpts. Original ignored reports are no longer available; its excerpt hash is not an original
+Worker report hash. Subsequent four-database acceptance was incomplete: MySQL/PG/Kingbase FULL
+ran, while Oracle only had driver/connection probes. Fixture screenshots and unit tests are not
+additional real-target evidence. Setup and narrow diagnostics: [Development](development.md#kingbasees-setup).
 
 ## Credentials, adapter preflight and cleanup evidence
 

@@ -1,4 +1,5 @@
 import json
+import hashlib
 import os
 import copy
 import tempfile
@@ -59,13 +60,46 @@ class AdapterRuntimeTest(unittest.TestCase):
         self.assertEqual("postgresql-local", package.adapter_id)
         self.assertEqual("local", package.manifest["trust"])
 
-    def test_kingbase_candidate_does_not_publish_partial_reports(self):
+    def test_kingbase_official_records_real_scope_without_claiming_all_tests_passed(self):
         package = load_adapter(PROJECT_ROOT, "kingbase")
-        self.assertEqual("candidate", package.manifest["trust"])
-        self.assertEqual([], package.manifest["validated_combinations"])
-        qualification = package.manifest["qualification"]
-        self.assertNotIn("partial_validation_record", qualification)
-        self.assertNotIn("timeout_diagnostic_record", qualification)
+        self.assertEqual("official", package.manifest["trust"])
+        combinations = package.manifest["validated_combinations"]
+        self.assertEqual(1, len(combinations))
+        combination = combinations[0]
+        evidence = json.loads((package.root / combination["evidence"]).read_text())
+        for field in ("database_version", "driver_version", "server_version", "database_mode"):
+            self.assertEqual(evidence[field], combination[field])
+        self.assertEqual("FAILED", evidence["run_status"])
+        self.assertNotIn("target_outcome", evidence)
+        self.assertEqual(270, evidence["selected"])
+        self.assertEqual(evidence["selected"], evidence["completed"])
+        cases = evidence["non_passing_cases"]
+        self.assertEqual(evidence["failed"], sum(c["status"] == "FAILED" for c in cases))
+        self.assertEqual(evidence["aborted"], sum(c["status"] == "ABORTED" for c in cases))
+        self.assertEqual(270, evidence["passed"] + len(cases))
+        self.assertEqual(261, evidence["contracts_invoked"])
+        followups = evidence["preparation_followups"]
+        pending = {item["scenario_id"]: item for item in followups}
+        preparation = {c["scenario_id"]: c for c in cases if c["phase"] == "PREPARATION"}
+        self.assertEqual(9, len(followups))
+        self.assertEqual(set(preparation), set(pending))
+        self.assertEqual(4, sum(f["dependency_kind"] == "direct_missing" for f in followups))
+        self.assertEqual(5, sum(f["dependency_kind"] == "blocked_shared_fixture" for f in followups))
+        for scenario_id, followup in pending.items():
+            self.assertEqual("pending", followup["state"])
+            self.assertEqual(preparation[scenario_id]["recorded_conclusion"],
+                             followup["recorded_conclusion"])
+            self.assertTrue(preparation[scenario_id]["message"].endswith(followup["resource"]))
+            for guide in ("development.md", "development.zh-CN.md"):
+                self.assertIn(scenario_id, (PROJECT_ROOT / "docs" / guide).read_text())
+        self.assertEqual("SUCCESS", evidence["cleanup_status"])
+        self.assertEqual(0, evidence["cleanup_failures"])
+        self.assertTrue(all(c["review"] for c in cases))
+        self.assertFalse(evidence["provenance"]["original_worker_report_available"])
+        canonical = json.dumps(evidence["provenance"]["source_records"],
+                               ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        self.assertEqual(hashlib.sha256(canonical.encode()).hexdigest(),
+                         evidence["provenance"]["source_records_sha256"])
 
     def test_custom_adapter_reuses_selected_dialect_assets(self):
         for dialect in ("oracle", "mysql", "postgresql"):

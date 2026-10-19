@@ -31,7 +31,8 @@ venv/
 htmlcov/
 
 # Reports
-/adapters/kingbase/evidence/
+/adapters/kingbase/evidence/*
+!/adapters/kingbase/evidence/platform-v009r002c016-oracle-v008r006b0001.json
 report/
 baseline/
 compatibility-matrix.json

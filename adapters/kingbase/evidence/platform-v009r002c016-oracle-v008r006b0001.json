@@ -1,0 +1,458 @@
+{
+  "database_product": "KingbaseES",
+  "database_version": "12.1",
+  "server_version": "V009R002C016",
+  "database_mode": "oracle",
+  "driver_name": "Kingbase8 JDBC Driver",
+  "driver_version": "V008R006B0001",
+  "driver_artifact_sha256": "662ad6f0646cc3fb9b552c9fff93e09bf9eb12e4a9f33f0dec18a624cb48104c",
+  "test_suite_version": "1.2.1-SNAPSHOT",
+  "validation_date": "2026-10-19",
+  "validation_scope": "Platform adapter integration for this observed combination; not JDBC certification or an all-tests-pass claim.",
+  "run_id": "f48e3615-e4b7-4f63-8cc1-a81495728ce3",
+  "run_status": "FAILED",
+  "profile": "FULL",
+  "selected": 270,
+  "completed": 270,
+  "contracts_invoked": 261,
+  "passed": 252,
+  "failed": 9,
+  "aborted": 9,
+  "skipped": 0,
+  "not_run": 0,
+  "incomplete": 0,
+  "duration_ms": 423417,
+  "recorded_contract_summary": {
+    "CONFORMS": 252,
+    "CONTRACT_VIOLATION": 8,
+    "NOT_EVALUATED": 1,
+    "PREREQUISITE_UNMET": 4,
+    "BLOCKED_PREREQUISITE": 5
+  },
+  "cleanup_failures": 0,
+  "cleanup_status": "SUCCESS",
+  "scope_cleanup": {
+    "tables_and_routines_before_schema_drop": [
+      0,
+      0
+    ],
+    "session_schema_removed": true,
+    "prepared_transactions_after_run": 0
+  },
+  "scope_limits": [
+    "No claim for other server builds, compatibility modes or driver artifacts.",
+    "Nine cases did not invoke their contracts because procedure_behavior_ddl.sql, ref_cursor_ddl.sql, rowid_behavior_ddl.sql or multiple_results_ddl.sql was unavailable or blocked.",
+    "Two XA failures occurred with max_prepared_transactions=0. Historical CONTRACT_VIOLATION labels are preserved; the review attributes the missing environment prerequisite separately.",
+    "Unsupported/metadata outcomes and JDBC assertion failures remain visible; no target_compatible conclusion is asserted.",
+    "Full four-database acceptance was not completed: Oracle driver/connection probes passed, but its FULL writable run was not executed."
+  ],
+  "non_passing_cases": [
+    {
+      "scenario_id": "blob_clob.blob_invalid_bounds",
+      "status": "FAILED",
+      "recorded_conclusion": "CONTRACT_VIOLATION",
+      "phase": "EXECUTION",
+      "message": "Unexpected exception type thrown, expected: <java.sql.SQLException> but was: <java.lang.NegativeArraySizeException>",
+      "review": "Observed JDBC behavior/assertion failure in the test body; retained for driver/contract review, not an adapter setup failure."
+    },
+    {
+      "scenario_id": "blob_clob.clob_invalid_bounds",
+      "status": "FAILED",
+      "recorded_conclusion": "CONTRACT_VIOLATION",
+      "phase": "EXECUTION",
+      "message": "Invalid position and substring length",
+      "review": "Observed JDBC behavior/assertion failure in the test body; retained for driver/contract review, not an adapter setup failure."
+    },
+    {
+      "scenario_id": "blob_clob.clob_partial_write",
+      "status": "FAILED",
+      "recorded_conclusion": "CONTRACT_VIOLATION",
+      "phase": "EXECUTION",
+      "message": "expected: <a12de> but was: <a23de>",
+      "review": "Observed JDBC behavior/assertion failure in the test body; retained for driver/contract review, not an adapter setup failure."
+    },
+    {
+      "scenario_id": "callable_statement.in_out_and_in_out",
+      "status": "ABORTED",
+      "recorded_conclusion": "BLOCKED_PREREQUISITE",
+      "phase": "PREPARATION",
+      "message": "FIXTURE_BLOCKED: procedure_behavior_ddl.sql",
+      "review": "Platform SQL fixture unavailable or blocked; contract not invoked. Not a driver failure or a pass."
+    },
+    {
+      "scenario_id": "callable_statement.null_output",
+      "status": "ABORTED",
+      "recorded_conclusion": "BLOCKED_PREREQUISITE",
+      "phase": "PREPARATION",
+      "message": "FIXTURE_BLOCKED: procedure_behavior_ddl.sql",
+      "review": "Platform SQL fixture unavailable or blocked; contract not invoked. Not a driver failure or a pass."
+    },
+    {
+      "scenario_id": "callable_statement.procedure_parameter_metadata",
+      "status": "ABORTED",
+      "recorded_conclusion": "PREREQUISITE_UNMET",
+      "phase": "PREPARATION",
+      "message": "FIXTURE_UNAVAILABLE: procedure_behavior_ddl.sql",
+      "review": "Platform SQL fixture unavailable or blocked; contract not invoked. Not a driver failure or a pass."
+    },
+    {
+      "scenario_id": "callable_statement.ref_cursor_output",
+      "status": "ABORTED",
+      "recorded_conclusion": "PREREQUISITE_UNMET",
+      "phase": "PREPARATION",
+      "message": "FIXTURE_UNAVAILABLE: ref_cursor_ddl.sql",
+      "review": "Platform SQL fixture unavailable or blocked; contract not invoked. Not a driver failure or a pass."
+    },
+    {
+      "scenario_id": "callable_statement.repeated_binding",
+      "status": "ABORTED",
+      "recorded_conclusion": "BLOCKED_PREREQUISITE",
+      "phase": "PREPARATION",
+      "message": "FIXTURE_BLOCKED: procedure_behavior_ddl.sql",
+      "review": "Platform SQL fixture unavailable or blocked; contract not invoked. Not a driver failure or a pass."
+    },
+    {
+      "scenario_id": "datasource.log_writer",
+      "status": "FAILED",
+      "recorded_conclusion": "CONTRACT_VIOLATION",
+      "phase": "EXECUTION",
+      "message": "expected: <java.io.PrintWriter@7fe9f729> but was: <null>",
+      "review": "Observed JDBC behavior/assertion failure in the test body; retained for driver/contract review, not an adapter setup failure."
+    },
+    {
+      "scenario_id": "datasource.xa_prepared_recovery_rollback",
+      "status": "FAILED",
+      "recorded_conclusion": "CONTRACT_VIOLATION",
+      "phase": "EXECUTION",
+      "message": "Error preparing transaction. prepare _xid=com.jdbctest.datasource.XaBehaviorTest$1@4bdf7d78",
+      "review": "Environment prerequisite: max_prepared_transactions=0; not evidence of missing XA support or a driver defect. Recorded status/conclusion unchanged."
+    },
+    {
+      "scenario_id": "datasource.xa_two_phase_commit",
+      "status": "FAILED",
+      "recorded_conclusion": "CONTRACT_VIOLATION",
+      "phase": "EXECUTION",
+      "message": "Error preparing transaction. prepare _xid=com.jdbctest.datasource.XaBehaviorTest$1@33408f36",
+      "review": "Environment prerequisite: max_prepared_transactions=0; not evidence of missing XA support or a driver defect. Recorded status/conclusion unchanged."
+    },
+    {
+      "scenario_id": "jdbc_type.ref_type_metadata",
+      "status": "FAILED",
+      "recorded_conclusion": "CONTRACT_VIOLATION",
+      "phase": "EXECUTION",
+      "message": "expected: <true> but was: <false>",
+      "review": "Observed metadata/unsupported API result; optional-contract interpretation remains limited. Not certified as a driver defect."
+    },
+    {
+      "scenario_id": "prepared_statement.batch_keys_by_column_index",
+      "status": "FAILED",
+      "recorded_conclusion": "CONTRACT_VIOLATION",
+      "phase": "EXECUTION",
+      "message": "Returning autogenerated keys is not supported.",
+      "review": "Observed metadata/unsupported API result; optional-contract interpretation remains limited. Not certified as a driver defect."
+    },
+    {
+      "scenario_id": "result_set.batch_row_id_binding",
+      "status": "ABORTED",
+      "recorded_conclusion": "PREREQUISITE_UNMET",
+      "phase": "PREPARATION",
+      "message": "FIXTURE_UNAVAILABLE: rowid_behavior_ddl.sql",
+      "review": "Platform SQL fixture unavailable or blocked; contract not invoked. Not a driver failure or a pass."
+    },
+    {
+      "scenario_id": "result_set.default_holdability_across_commit",
+      "status": "FAILED",
+      "recorded_conclusion": "NOT_EVALUATED",
+      "phase": "EXECUTION",
+      "message": "Method com.kingbase8.jdbc.KbResultSet.getHoldability() is not yet implemented.",
+      "review": "Observed metadata/unsupported API result; optional-contract interpretation remains limited. Not certified as a driver defect."
+    },
+    {
+      "scenario_id": "result_set.row_id_round_trip",
+      "status": "ABORTED",
+      "recorded_conclusion": "BLOCKED_PREREQUISITE",
+      "phase": "PREPARATION",
+      "message": "FIXTURE_BLOCKED: rowid_behavior_ddl.sql",
+      "review": "Platform SQL fixture unavailable or blocked; contract not invoked. Not a driver failure or a pass."
+    },
+    {
+      "scenario_id": "result_set.update_and_delete_by_row_id",
+      "status": "ABORTED",
+      "recorded_conclusion": "BLOCKED_PREREQUISITE",
+      "phase": "PREPARATION",
+      "message": "FIXTURE_BLOCKED: rowid_behavior_ddl.sql",
+      "review": "Platform SQL fixture unavailable or blocked; contract not invoked. Not a driver failure or a pass."
+    },
+    {
+      "scenario_id": "statement.result_sequence",
+      "status": "ABORTED",
+      "recorded_conclusion": "PREREQUISITE_UNMET",
+      "phase": "PREPARATION",
+      "message": "FIXTURE_UNAVAILABLE: multiple_results_ddl.sql",
+      "review": "Platform SQL fixture unavailable or blocked; contract not invoked. Not a driver failure or a pass."
+    }
+  ],
+  "provenance": {
+    "task_id": "01a151d3-fdf9-76c2-8d7c-a940389cb1fc",
+    "source": "Preserved task tool outputs from actual target execution and subsequent report review. Original ignored report directories are no longer present.",
+    "original_worker_report_available": false,
+    "hash_boundary": "source_records_sha256 hashes the canonical UTF-8 JSON of source_records (sorted keys, compact separators), not the missing original Worker report.",
+    "source_records_sha256": "0cb82f5f52d032f403d3fbc0de2357bb7bb1927efae9387e75bf48fbbab5312d",
+    "source_records": [
+      {
+        "recorded_at": "2026-10-19T02:02:41.374Z",
+        "kind": "server_result_summary",
+        "text": "kingbase f48e3615-e4b7-4f63-8cc1-a81495728ce3 FAILED 270 None {'PASSED': 252, 'FAILED': 9, 'ABORTED': 9} SUCCESS {'CONFORMS': 252, 'EXECUTED': 261, 'CONTRACT_VIOLATION': 8, 'PREREQUISITE_UNMET': 4, 'BLOCKED_PREREQUISITE': 5, 'NOT_EVALUATED': 1}"
+      },
+      {
+        "recorded_at": "2026-10-19T02:05:45.824Z",
+        "kind": "accounting_and_case_results",
+        "accounting": {
+          "selected": 270,
+          "started": 270,
+          "completed": 270,
+          "notRun": 0,
+          "incomplete": 0
+        },
+        "non_passing_cases": [
+          {
+            "scenario_id": "blob_clob.blob_invalid_bounds",
+            "status": "FAILED",
+            "recorded_conclusion": "CONTRACT_VIOLATION",
+            "phase": "EXECUTION",
+            "message": "Unexpected exception type thrown, expected: <java.sql.SQLException> but was: <java.lang.NegativeArraySizeException>"
+          },
+          {
+            "scenario_id": "blob_clob.clob_invalid_bounds",
+            "status": "FAILED",
+            "recorded_conclusion": "CONTRACT_VIOLATION",
+            "phase": "EXECUTION",
+            "message": "Invalid position and substring length"
+          },
+          {
+            "scenario_id": "blob_clob.clob_partial_write",
+            "status": "FAILED",
+            "recorded_conclusion": "CONTRACT_VIOLATION",
+            "phase": "EXECUTION",
+            "message": "expected: <a12de> but was: <a23de>"
+          },
+          {
+            "scenario_id": "callable_statement.in_out_and_in_out",
+            "status": "ABORTED",
+            "recorded_conclusion": "BLOCKED_PREREQUISITE",
+            "phase": "PREPARATION",
+            "message": "FIXTURE_BLOCKED: procedure_behavior_ddl.sql"
+          },
+          {
+            "scenario_id": "callable_statement.null_output",
+            "status": "ABORTED",
+            "recorded_conclusion": "BLOCKED_PREREQUISITE",
+            "phase": "PREPARATION",
+            "message": "FIXTURE_BLOCKED: procedure_behavior_ddl.sql"
+          },
+          {
+            "scenario_id": "callable_statement.procedure_parameter_metadata",
+            "status": "ABORTED",
+            "recorded_conclusion": "PREREQUISITE_UNMET",
+            "phase": "PREPARATION",
+            "message": "FIXTURE_UNAVAILABLE: procedure_behavior_ddl.sql"
+          },
+          {
+            "scenario_id": "callable_statement.ref_cursor_output",
+            "status": "ABORTED",
+            "recorded_conclusion": "PREREQUISITE_UNMET",
+            "phase": "PREPARATION",
+            "message": "FIXTURE_UNAVAILABLE: ref_cursor_ddl.sql"
+          },
+          {
+            "scenario_id": "callable_statement.repeated_binding",
+            "status": "ABORTED",
+            "recorded_conclusion": "BLOCKED_PREREQUISITE",
+            "phase": "PREPARATION",
+            "message": "FIXTURE_BLOCKED: procedure_behavior_ddl.sql"
+          },
+          {
+            "scenario_id": "datasource.log_writer",
+            "status": "FAILED",
+            "recorded_conclusion": "CONTRACT_VIOLATION",
+            "phase": "EXECUTION",
+            "message": "expected: <java.io.PrintWriter@7fe9f729> but was: <null>"
+          },
+          {
+            "scenario_id": "datasource.xa_prepared_recovery_rollback",
+            "status": "FAILED",
+            "recorded_conclusion": "CONTRACT_VIOLATION",
+            "phase": "EXECUTION",
+            "message": "Error preparing transaction. prepare _xid=com.jdbctest.datasource.XaBehaviorTest$1@4bdf7d78"
+          },
+          {
+            "scenario_id": "datasource.xa_two_phase_commit",
+            "status": "FAILED",
+            "recorded_conclusion": "CONTRACT_VIOLATION",
+            "phase": "EXECUTION",
+            "message": "Error preparing transaction. prepare _xid=com.jdbctest.datasource.XaBehaviorTest$1@33408f36"
+          },
+          {
+            "scenario_id": "jdbc_type.ref_type_metadata",
+            "status": "FAILED",
+            "recorded_conclusion": "CONTRACT_VIOLATION",
+            "phase": "EXECUTION",
+            "message": "expected: <true> but was: <false>"
+          },
+          {
+            "scenario_id": "prepared_statement.batch_keys_by_column_index",
+            "status": "FAILED",
+            "recorded_conclusion": "CONTRACT_VIOLATION",
+            "phase": "EXECUTION",
+            "message": "Returning autogenerated keys is not supported."
+          },
+          {
+            "scenario_id": "result_set.batch_row_id_binding",
+            "status": "ABORTED",
+            "recorded_conclusion": "PREREQUISITE_UNMET",
+            "phase": "PREPARATION",
+            "message": "FIXTURE_UNAVAILABLE: rowid_behavior_ddl.sql"
+          },
+          {
+            "scenario_id": "result_set.default_holdability_across_commit",
+            "status": "FAILED",
+            "recorded_conclusion": "NOT_EVALUATED",
+            "phase": "EXECUTION",
+            "message": "Method com.kingbase8.jdbc.KbResultSet.getHoldability() is not yet implemented."
+          },
+          {
+            "scenario_id": "result_set.row_id_round_trip",
+            "status": "ABORTED",
+            "recorded_conclusion": "BLOCKED_PREREQUISITE",
+            "phase": "PREPARATION",
+            "message": "FIXTURE_BLOCKED: rowid_behavior_ddl.sql"
+          },
+          {
+            "scenario_id": "result_set.update_and_delete_by_row_id",
+            "status": "ABORTED",
+            "recorded_conclusion": "BLOCKED_PREREQUISITE",
+            "phase": "PREPARATION",
+            "message": "FIXTURE_BLOCKED: rowid_behavior_ddl.sql"
+          },
+          {
+            "scenario_id": "statement.result_sequence",
+            "status": "ABORTED",
+            "recorded_conclusion": "PREREQUISITE_UNMET",
+            "phase": "PREPARATION",
+            "message": "FIXTURE_UNAVAILABLE: multiple_results_ddl.sql"
+          }
+        ]
+      },
+      {
+        "recorded_at": "2026-10-19T02:05:45.824Z",
+        "kind": "target_scope_cleanup",
+        "observed": "Session Kingbase schema removed after table/routine counts [0, 0]."
+      },
+      {
+        "recorded_at": "2026-10-19T03:17:02.743Z",
+        "kind": "acceptance_cleanup_record",
+        "observed": "Kingbase prepared transactions=0; session schema absent after cleanup. Temporary platform PostgreSQL and runtime removed."
+      }
+    ]
+  },
+  "historical_checks": {
+    "source_commit": "69aaa5954789813a6767cb1c9906644f28a37fc5",
+    "source_files": [
+      {
+        "path": "adapters/kingbase/evidence/v9-oracle-partial-20261016.json",
+        "sha256": "631046f93a31985f1c893ff284426a810d1bdf0b17595b3948923fdd729cf169"
+      },
+      {
+        "path": "adapters/kingbase/evidence/v9-oracle-type-info-20261016.json",
+        "sha256": "c497d70ab9443a31b6e1055053f65a6e4a7433389914dd17049bd7c4f75492e5"
+      }
+    ],
+    "route": "Standalone isolated Worker/diagnostic, not Server persistence or browser acceptance. Historical records retained as originally written in Git history, not relabelled official.",
+    "selected_subset": {
+      "selected": 20,
+      "passed": 20
+    },
+    "initial_core": {
+      "selected": 153,
+      "started": 43,
+      "completed": 42,
+      "passed": 42,
+      "worker_timeout_ms": 90000,
+      "overall_status": "TIMEOUT",
+      "worker_cleanup_at_timeout": "UNKNOWN_PENDING_PROCESS_EXIT"
+    },
+    "subset_core_overlap": 7,
+    "counting_note": "Do not add the overlapping subset/CORE counts or combine them with the later FULL task.",
+    "type_info_original_scenario": {
+      "run_id": "kingbase-type-info-isolated",
+      "process_exit_code": 0,
+      "process_elapsed_nanos": 37785468708
+    }
+  },
+  "record_count_semantics": "completed=270 counts terminal result records, not contract invocations or passes. contracts_invoked=261; nine PREPARATION aborts did not invoke contracts (four PREREQUISITE_UNMET, five BLOCKED_PREREQUISITE). Historical not_run=0/incomplete=0 does not imply all contracts ran.",
+  "preparation_followups": [
+    {
+      "scenario_id": "callable_statement.in_out_and_in_out",
+      "recorded_conclusion": "BLOCKED_PREREQUISITE",
+      "dependency_kind": "blocked_shared_fixture",
+      "resource": "procedure_behavior_ddl.sql",
+      "state": "pending"
+    },
+    {
+      "scenario_id": "callable_statement.null_output",
+      "recorded_conclusion": "BLOCKED_PREREQUISITE",
+      "dependency_kind": "blocked_shared_fixture",
+      "resource": "procedure_behavior_ddl.sql",
+      "state": "pending"
+    },
+    {
+      "scenario_id": "callable_statement.procedure_parameter_metadata",
+      "recorded_conclusion": "PREREQUISITE_UNMET",
+      "dependency_kind": "direct_missing",
+      "resource": "procedure_behavior_ddl.sql",
+      "state": "pending"
+    },
+    {
+      "scenario_id": "callable_statement.ref_cursor_output",
+      "recorded_conclusion": "PREREQUISITE_UNMET",
+      "dependency_kind": "direct_missing",
+      "resource": "ref_cursor_ddl.sql",
+      "state": "pending"
+    },
+    {
+      "scenario_id": "callable_statement.repeated_binding",
+      "recorded_conclusion": "BLOCKED_PREREQUISITE",
+      "dependency_kind": "blocked_shared_fixture",
+      "resource": "procedure_behavior_ddl.sql",
+      "state": "pending"
+    },
+    {
+      "scenario_id": "result_set.batch_row_id_binding",
+      "recorded_conclusion": "PREREQUISITE_UNMET",
+      "dependency_kind": "direct_missing",
+      "resource": "rowid_behavior_ddl.sql",
+      "state": "pending"
+    },
+    {
+      "scenario_id": "result_set.row_id_round_trip",
+      "recorded_conclusion": "BLOCKED_PREREQUISITE",
+      "dependency_kind": "blocked_shared_fixture",
+      "resource": "rowid_behavior_ddl.sql",
+      "state": "pending"
+    },
+    {
+      "scenario_id": "result_set.update_and_delete_by_row_id",
+      "recorded_conclusion": "BLOCKED_PREREQUISITE",
+      "dependency_kind": "blocked_shared_fixture",
+      "resource": "rowid_behavior_ddl.sql",
+      "state": "pending"
+    },
+    {
+      "scenario_id": "statement.result_sequence",
+      "recorded_conclusion": "PREREQUISITE_UNMET",
+      "dependency_kind": "direct_missing",
+      "resource": "multiple_results_ddl.sql",
+      "state": "pending"
+    }
+  ]
+}

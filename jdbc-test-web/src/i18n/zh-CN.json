@@ -570,7 +570,7 @@
   "driverPreset.sqlserver": "SQL Server",
   "driverPreset.custom": "自定义",
   "driverPreset.kingbase": "KingbaseES（金仓数据库）",
-  "adapter.kingbaseQualification": "仅用于 KingbaseES V9 有限测试的候选适配：服务端 V009R002C016、oracle 模式、JDBC 数据库版本 12.1、驱动 V008R006B0001。PostgreSQL 基础设施与 SQL 资产作为试运行输入。首次 CORE 达到共享的 90 秒任务期限，完整 CORE 尚未通过。其他组合及未启用场景仍待验证，能力开关关闭不代表数据库不支持。",
+  "adapter.kingbaseQualification": "正式平台适配仅限已验证组合：KingbaseES V009R002C016、oracle 模式、JDBC 数据库版本 12.1、驱动 V008R006B0001。真实 FULL 任务有 270 项终态结果记录，261 项实际调用契约，9 项因准备直接缺失（4 项）或连带阻塞（5 项）未调用；原状态为 252 通过、9 失败、9 中止，清理成功。正式不代表 JDBC 全部通过；缺失 SQL 准备资产、XA 配置限制和实际 JDBC 失败均保留，其他版本、模式及驱动尚未验证。",
   "selection.scopeHint": "默认包含已实现的全部标准 JDBC 测试及适用的厂商扩展。已选用例仍可能报告执行前提不足。",
   "selection.STANDARD_JDBC": "标准 JDBC 测试",
   "selection.VENDOR_EXTENSION": "厂商扩展测试",

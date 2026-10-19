@@ -457,7 +457,7 @@ New runs reuse executionInput and selected scenario rows. They freeze the catalo
 
 Gate audit: A comprises all current capability declarations except the three Provider flags (savepoints, callable statements, advanced types, LOB/XML/RowSet, metadata, result sets, keys, cancellation/timeouts, client info, request/sharding, java_time and related operations). Declarations remain evidence; false does not disable standard verification. B comprises configured data_source/connection_pool/xa_data_source Providers, SQL assets/object shapes, privileges and Oracle XML companion JARs. Missing prerequisites are explicit, including an absent configured Provider class in the selected driver package. Provider constructor/setter and actual interface failures are not blanket-converted into missing prerequisites. C has no explicit predecessor-test graph today; a failed shared fixture blocks only cases using it, preserving its cause, resource and originating scenario ID. D uses explicit adapter applicability; no production vendor scenarios exist yet.
 
-UseSqlScripts is prepared lazily before a selected method and shared within its class. An empty method annotation overrides class scripts. Connection, metadata and in-memory XML methods that need no table avoid unrelated DDL. Array fixture shape is checked; Oracle's legacy JSON/VARCHAR substitutes cannot masquerade as executed array tests. Kingbase's PostgreSQL assets remain candidate inputs. Preparation failures retain SQLState/vendor codes. Failure to obtain the injected scenario connection is CONNECTION_FAILURE in PREPARATION, preserving authentication/connection errors even after a JUnit execution callback; it is not a missing prerequisite or contract invocation. Calls made by the test body retain their own contract context. SQL inside a test body retains its contract interpretation. Public assertions are not relaxed. Holdability is exercised even if supportsResultSetHoldability returns false, and that declaration is recorded and compared with actual behavior.
+UseSqlScripts is prepared lazily before a selected method and shared within its class. An empty method annotation overrides class scripts. Connection, metadata and in-memory XML methods that need no table avoid unrelated DDL. Array fixture shape is checked; Oracle's legacy JSON/VARCHAR substitutes cannot masquerade as executed array tests. Kingbase's PostgreSQL assets retain the documented validation scope and preparation gaps. Preparation failures retain SQLState/vendor codes. Failure to obtain the injected scenario connection is CONNECTION_FAILURE in PREPARATION, preserving authentication/connection errors even after a JUnit execution callback; it is not a missing prerequisite or contract invocation. Calls made by the test body retain their own contract context. SQL inside a test body retains its contract interpretation. Public assertions are not relaxed. Holdability is exercised even if supportsResultSetHoldability returns false, and that declaration is recorded and compared with actual behavior.
 
 PASSED/FAILED/SKIPPED/ABORTED remain execution statuses. New conclusions distinguish CONFORMS, CONTRACT_VIOLATION, UNSUPPORTED_ALLOWED, UNSUPPORTED_REQUIRED, PREREQUISITE_UNMET, BLOCKED_PREREQUISITE, TIMEOUT, CONNECTION_FAILURE, PLATFORM_ERROR and NOT_EVALUATED, with phase, category, duration, sanitized exception/SQLState/vendor code, declarations and observations. JdbcContracts.optional accepts SQLFeatureNotSupportedException only around specific permitted factory/logger calls: Connection.createBlob/createClob/createSQLXML and CommonDataSource.getParentLogger. Subsequent object operations retain their assertions. Allowed unsupported is ABORTED plus contractConforms=true, never PASSED, and remains visibly unsupported. JdbcContracts.required currently scopes Connection.getAutoCommit: its explicit unsupported response violates that required API contract. Unscoped SQLFeatureNotSupportedException remains NOT_EVALUATED with its original error and no inferred compliance. Ordinary SQLException, SQLState and error text never establish unsupported permission. Preparation SQL without a known prerequisite marker also remains NOT_EVALUATED. Per-case phaseDurationsMs measures preparation including injected connection acquisition, the method body and connection cleanup; class-level owned-object cleanup is separate cleanupEvidence. Historical reports receive no invented conclusions.
 
@@ -493,67 +493,96 @@ Events include `RUN_STARTED`, `MODULE_STARTED`, `CASE_STARTED`, `CASE_FINISHED`,
 | 4 | Execution or timeout failure |
 | 5 | Catalog, workspace, report or internal failure |
 
-## KingbaseES candidate setup
+## KingbaseES setup
 
-1. In **Drivers → Add a driver**, select **KingbaseES**. This suggests vendor `Kingbase`, class
-   `com.kingbase8.Driver` and protocol prefix `jdbc:kingbase8:`. All three remain editable. Presets
-   protect manual edits and intentional clearing; **Restore current preset defaults** explicitly
-   reapplies only those three values. No version, name, file or DataSource class is inferred.
-2. Upload the locally supplied JAR. Clearing the class allows the existing SPI discovery flow;
-   multiple classes still require an explicit selection. Run the existing driver validation action.
-   Use a version label grounded in the actual artifact, such as `V008R006B0001` for the inspected
-   file, rather than treating its filename as authoritative.
-3. In **Connections → Add a connection**, select **KingbaseES · Candidate** and independently select
-   the validated Kingbase driver package. The product display label can be `KingbaseES`. Use the
-   actual URL, for example `jdbc:kingbase8://host:4321/test`; enter credentials in their own fields.
-   Neither the preset nor adapter selection rewrites the driver class or protocol.
-4. Have the database owner provision a **dedicated test schema**, with CONNECT to the database and
-   USAGE/CREATE in that schema. Enter that schema in **Authorized test schema**; `test` is the
-   database in the example. Do not select a schema containing business data. The adapter uses an
-   existing authorized schema and does not create/drop the schema automatically. Runs use the
-   existing consent, unique object prefixes, ownership ledger and cleanup mechanisms.
-5. Probe the connection before running tests. The current page's **Custom** selection operates at
-   module level. Exact scenario selection is
-   available through the existing run API (`profile: "CUSTOM"`, `modules: []`, `includeScenarios`
-   containing the intended catalog IDs) or Worker selection (`profile: "FULL"`, `includeScenarios`). Module
-   selections and the new default full selection include additional, unqualified cases; the initial
-   broader trial timed out. Inspect metadata and cleanup evidence, not just validation status or
-   `acceptsURL`.
+### Official adapter decision and scope
 
-The adapter's `driver.source` is the existing relative local source `local-drivers/kingbase`, used by
-the CLI's local-driver resolver. CLI users place their own authorized JAR there. It is not a Maven
-coordinate, an upload destination or a server classpath dependency. Server runs load the selected
-uploaded package through the isolated Worker. Ordinary builds/tests require no proprietary JAR.
-The JAR is ignored, unmodified and not distributed by this repository.
+Official means verified platform integration and interpretable evidence for an observed combination;
+it does not require every tested JDBC contract to pass. Apply the same standard to PostgreSQL,
+MySQL, Oracle and Kingbase: verify product/driver identity, authorized fixture preparation and
+execution, truthful case/prerequisite attribution, report/count consistency and ownership cleanup.
+Record real versions and evidence; disclose unexecuted fixture paths and environment prerequisites.
+Manifest parsing alone is not validation, and an adapter's status is not a v1 `target_compatible`
+conclusion. Existing PostgreSQL/MySQL/Oracle evidence predates the current 270-case selection.
 
-### Product and dialect responsibilities
+Kingbase was promoted after reviewing the 2026-10-19 actual FULL run
+`f48e3615-e4b7-4f63-8cc1-a81495728ce3`: 270 terminal result records, 261 contracts invoked,
+and 9 contracts not invoked due to missing or blocked preparation (4 direct, 5 blocked). Recorded
+statuses: 252 PASSED, 9 FAILED, 9 ABORTED; cleanup SUCCESS. Historical NOT_RUN/INCOMPLETE counts
+are zero; these accounting fields do not mean every contract was invoked.
+Only server V009R002C016, `database_mode=oracle`, JDBC database version 12.1 and driver
+V008R006B0001 (the recorded artifact SHA-256 below) are validated. Other builds, modes and drivers
+are unvalidated. The initial standalone 20-case subset passed; the 153-selected CORE run completed 42 passes
+before the 90-second timeout (7 overlap with the subset, so counts must not be added). The later
+FULL task completed in 423.4 seconds. This is not a claim of universal PostgreSQL SQL compatibility.
 
-`DbType.KINGBASE` identifies a database product. `DriverPreset` only suggests form values.
-`SqlDialect.POSTGRESQL` selects existing execution infrastructure: schema scope, double-quote
-identifiers, lower-case identifier handling and index cleanup syntax. These responsibilities are
-independent. No Kingbase dialect, GENERIC fallback or substitution of the PostgreSQL driver is added.
+`validated_combinations` uses the observed JDBC metadata version 12.1, with explicit server build,
+mode and driver fields, and links the [sanitized evidence](../adapters/kingbase/evidence/platform-v009r002c016-oracle-v008r006b0001.json).
+The original ignored report directories are no longer present. The record preserves actual task
+tool-output summaries, all 18 non-passing cases and cleanup observations, with a hash of those
+source excerpts. It is explicitly not a hash or reconstruction of the missing original Worker report.
+No v1 target outcome was invented, and no historical case status was rewritten.
 
-The official V9 JDBC documentation describes the Kingbase driver/protocol and partially implemented
-JDBC functionality; the schema documentation describes `search_path` and qualified objects. These
-documents do **not** establish compatibility with every PostgreSQL test script. On the supplied
-instance, metadata reports `"` quoting and lower-case identifier storage; `setSchema/getSchema`,
-catalog selection, dedicated schema creation/deletion and the selected JDBC/SQL trial passed.
-Although `SHOW database_mode` returns `oracle`, the project's Oracle dialect forces uppercase
-identifiers and is not selected merely from the mode's name.
+### Driver and authorized namespace
 
-`assets.directory=postgresql` reuses the existing SQL bundle as **candidate trial inputs**, without
-copying the bundle or declaring every statement compatible. Only the selected scenario paths and
-their setup/cleanup have passed. Other modes, builds, privileges and scripts need separate testing.
-The generic API/UI still permits selecting broader scenarios; the candidate warning is not a
-runtime version/mode gate.
+1. In **Drivers → Add a driver**, select KingbaseES. The editable suggestions are vendor
+   `Kingbase`, class `com.kingbase8.Driver` and prefix `jdbc:kingbase8:`. Upload your authorized JAR;
+   SPI discovery and isolated validation remain available. No private JAR is distributed.
+2. In **Connections → Add a connection**, select **KingbaseES · Official** and the actual validated
+   driver package. Use your actual `jdbc:kingbase8://host:4321/test` URL and separate credential fields.
+3. Have the owner create a dedicated schema and grant CONNECT plus schema USAGE/CREATE. Enter
+   its database/schema and destructive consent. The adapter uses an existing authorized schema;
+   owned objects use unique prefixes and cleanup, while the schema itself is retained by the run.
+4. Probe before running. The page supports exact scenario selection, module selection and search;
+   default full selection includes the documented preparation gaps. API `CUSTOM`/`includeScenarios`
+   also supports narrow reproduction. Review case results and cleanup evidence, not just run status.
 
-The manifest's capability booleans remain historical declarations; false no longer disables standard tests. Unqualified SQL/API groups are exercised or explicitly report missing preparation, without certifying database capability. CallableStatement, arrays, LOB, XML, rowsets, DataSource, pooling and XA remain unqualified on this candidate. No DataSource implementation is guessed.
+The CLI's relative `driver.source=local-drivers/kingbase` resolves local private artifacts;
+Web/Server runs use the selected uploaded package in the isolated Worker. Product identity,
+PostgreSQL dialect infrastructure and SQL assets remain separate responsibilities. Identity is
+anchored to `^KingbaseES$` / `^Kingbase8 JDBC Driver$`, so ordinary PostgreSQL is not admitted.
+Observed double-quote/lower-case identifier handling and schema selection use the PostgreSQL
+infrastructure even in oracle mode; the project's Oracle dialect is not substituted.
 
-Identity preflight requires the observed, anchored names `^KingbaseES$` and
-`^Kingbase8 JDBC Driver$`. Ordinary PostgreSQL or unrelated drivers cannot pass those checks. No
-supported version interval is asserted (`supported_versions` has empty database/driver objects),
-so version checks impose no bounds. This records a lack of version qualification, not support for
-every version. Operators must confirm mode/build before reusing the candidate.
+The numeric `supported_versions` objects remain empty because the existing range format cannot
+express the Kingbase build/driver declaration. This is not all-version support. Build/mode are a
+documented validation boundary, not an automatic runtime gate; operators must confirm them.
+Historical capability booleans do not disable standard tests. No capability was changed to hide
+failures, and promotion adds no known-difference suppression or changed public assertion.
+
+### Results and limits
+
+Nine ABORTED cases identify missing/blocked `procedure_behavior_ddl.sql`, `ref_cursor_ddl.sql`,
+`rowid_behavior_ddl.sql` or `multiple_results_ddl.sql`. They are platform preparation limits, not
+passes or absent driver capability. Eight array cases and all database-metadata cases did pass
+in this actual run, superseding the initial narrow-trial uncertainty without certifying every script.
+
+Two XA prepare failures occurred with `max_prepared_transactions=0`; do not infer unsupported XA
+or a driver defect. Historical statuses/conclusions remain unchanged; the evidence review records
+this environment limitation separately. LOB bounds/partial writes and DataSource logWriter failures
+remain visible; REF metadata, indexed batch keys and unimplemented holdability require the recorded
+contract/unsupported interpretation, not a blanket driver-defect conclusion. FULL selection is not
+proof every contract ran. See [Execution safety](execution-safety.md#kingbasees-platform-validation).
+
+The subsequent four-database acceptance was incomplete: MySQL, PostgreSQL and Kingbase ran actual
+FULL tasks and later page flows; Oracle completed driver/connection probes, without its writable
+FULL run. Unit and mocked browser checks remain fixture evidence, not additional target validation.
+
+### Preparation follow-ups (9 pending cases)
+
+These stable scenario IDs did not invoke their contracts. Supply the named SQL assets, then minimally validate their dependent cases in an authorized scope; no additional target tests run in this change and none of these items is resolved. Blocked means failed shared preparation, not a case-to-case dependency graph.
+
+| Stable scenario ID | Recorded preparation issue | Shared SQL asset to supply and validate |
+| --- | --- | --- |
+| `callable_statement.procedure_parameter_metadata` | Direct missing prerequisite (`PREREQUISITE_UNMET`) | `procedure_behavior_ddl.sql` |
+| `callable_statement.ref_cursor_output` | Direct missing prerequisite (`PREREQUISITE_UNMET`) | `ref_cursor_ddl.sql` |
+| `result_set.batch_row_id_binding` | Direct missing prerequisite (`PREREQUISITE_UNMET`) | `rowid_behavior_ddl.sql` |
+| `statement.result_sequence` | Direct missing prerequisite (`PREREQUISITE_UNMET`) | `multiple_results_ddl.sql` |
+| `callable_statement.in_out_and_in_out` | Blocked by shared preparation (`BLOCKED_PREREQUISITE`) | `procedure_behavior_ddl.sql` |
+| `callable_statement.null_output` | Blocked by shared preparation (`BLOCKED_PREREQUISITE`) | `procedure_behavior_ddl.sql` |
+| `callable_statement.repeated_binding` | Blocked by shared preparation (`BLOCKED_PREREQUISITE`) | `procedure_behavior_ddl.sql` |
+| `result_set.row_id_round_trip` | Blocked by shared preparation (`BLOCKED_PREREQUISITE`) | `rowid_behavior_ddl.sql` |
+| `result_set.update_and_delete_by_row_id` | Blocked by shared preparation (`BLOCKED_PREREQUISITE`) | `rowid_behavior_ddl.sql` |
 
 ### Artifact and version sources
 
@@ -598,31 +627,6 @@ The original-scenario reproduction additionally needs a dedicated schema, explic
 unique object prefix and the existing Worker request with `includeScenarios` containing only
 `database_metadata.get_type_info`; retain ownership cleanup even on timeout. This does not require
 running all CORE scenarios again.
-
-### Partial evidence registration
-
-The Java/Python manifest validators require database version, driver version and a relative
-`evidence` path for each `validated_combinations` entry; `official` requires a nonempty list, and
-the Python package validator checks official evidence files exist. They do **not** enforce a
-certification scope or define a typed partial-validation entry. Existing bundled evidence records
-assert `target_outcome: target_compatible` with broad suite results. In the existing v1 assessment
-logic, subset-filtered/non-full runs are `diagnostic_run` and yield `evaluation_inconclusive`.
-Worker protocol-2 PASSED for selected cases is not itself that full compatibility conclusion.
-
-Therefore `validated_combinations` stays empty, `trust` stays candidate, and no supported version
-range is added. Detailed trial reports and diagnostics belong in ignored local storage, not
-adapter manifests or committed resources. For normal platform tasks, Server persists case results
-and execution evidence in platform PostgreSQL; original Worker reports and ownership ledgers also
-use the local run workspace. Direct Worker diagnostics bypass that persistence and must not be
-represented as historical platform tasks by manually inserting incomplete results.
-
-- [V9 JDBC overview and version discovery](https://help.kingbase.com.cn/v9/development/client-interfaces/jdbc/jdbc-1.html)
-- [V9 JDBC loading and connection URLs](https://help.kingbase.com.cn/v9/development/client-interfaces/jdbc/jdbc-2.html)
-- [V9 schema/search path parameters](https://help.kingbase.com.cn/v9/admin/reference/ref-database-parameter/initialization-parameters/runtime-config-client.html)
-
-These are documentation references for the scoped decision, not test evidence for unexecuted SQL.
-
-Qualification boundaries are in [Execution safety](execution-safety.md#kingbasees-candidate-observations). Detailed trial reports remain local.
 
 ## Testing
 

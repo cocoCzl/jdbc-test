@@ -1,9 +1,9 @@
 {
   "id": "kingbase",
   "name": "KingbaseES",
-  "version": "0.1.0",
-  "revision": "candidate-1",
-  "trust": "candidate",
+  "version": "1.0.0",
+  "revision": "official-1",
+  "trust": "official",
   "dialect": "postgresql",
   "identifier_quote": "\"",
   "driver": {
@@ -21,7 +21,15 @@
     "database": {},
     "driver": {}
   },
-  "validated_combinations": [],
+  "validated_combinations": [
+    {
+      "database_version": "12.1",
+      "driver_version": "V008R006B0001",
+      "server_version": "V009R002C016",
+      "database_mode": "oracle",
+      "evidence": "evidence/platform-v009r002c016-oracle-v008r006b0001.json"
+    }
+  ],
   "capabilities": {
     "savepoint": true,
     "callable_statement": false,
@@ -102,15 +110,16 @@
   "db_type": "kingbase",
   "qualification_note_key": "adapter.kingbaseQualification",
   "qualification": {
-    "scope": "Only the observed combination: server V009R002C016, database_mode=oracle, JDBC database version 12.1, driver declaration V008R006B0001. Limited trials, not full CORE qualification; other builds and modes unqualified. See docs/execution-safety.md#kingbasees-candidate-observations.",
-    "timeout_note": "The initial CORE run exhausted its shared Worker execution and cleanup budget. Narrow reproduction observed a costly initial getTypeInfo call and the original scenario completed in isolation. No full CORE pass or platform, driver or database defect established. Detailed reports remain local; no global timeout, scenario skipping policy or capability gate changed to hide the result.",
-    "capability_policy": "Booleans are scenario execution gates. True enables candidate assessment, not a compatibility guarantee. False disables unqualified scenarios, not a finding of missing database support.",
-    "asset_policy": "PostgreSQL assets are trial inputs for the scoped JDBC scenarios, not a claim that all PostgreSQL SQL is compatible. Callable, array, LOB, XML and rowset groups remain disabled.",
-    "version_policy": "No supported version interval asserted. JDBC database version 12.1, server build V009R002C016, Manifest/metadata driver version V008R006B0001 and Driver major/minor 0.0 are distinct observations.",
+    "scope": "Official platform integration only for observed server V009R002C016, database_mode=oracle, JDBC database version 12.1, driver V008R006B0001 and the recorded artifact SHA-256. The 2026-10-19 FULL task has 270 terminal result records: 261 contracts invoked and nine not invoked due to missing or blocked preparation (four direct, five blocked); 252 passed, nine failed, nine aborted, with successful cleanup. Other combinations are unvalidated. See docs/execution-safety.md#kingbasees-platform-validation.",
+    "timeout_note": "The initial 90-second CORE exploration timed out. Subsequent FULL execution completed in 423.4 seconds; this does not erase the historical timeout or claim that all JDBC tests passed.",
+    "capability_policy": "Historical declarations only; false does not disable standard JDBC tests. Actual contract outcomes and missing prerequisites remain separate from adapter maturity.",
+    "asset_policy": "PostgreSQL assets are reused for the validated integration. Missing procedure_behavior, ref_cursor, rowid_behavior and multiple_results fixtures leave nine cases unexecuted; this is platform preparation scope, not missing database support.",
+    "version_policy": "Only the recorded build/mode/artifact is validated. Existing numeric version ranges remain unset because they cannot express the Kingbase build and driver declaration; no all-version support is implied and build/mode are not runtime-enforced.",
     "references": [
       "https://help.kingbase.com.cn/v9/development/client-interfaces/jdbc/jdbc-1.html",
       "https://help.kingbase.com.cn/v9/development/client-interfaces/jdbc/jdbc-2.html",
       "https://help.kingbase.com.cn/v9/admin/reference/ref-database-parameter/initialization-parameters/runtime-config-client.html"
-    ]
+    ],
+    "result_review": "Retain the nine original failures and nine aborts. XA prepare failures with max_prepared_transactions=0 are environment limitations. LOB, DataSource logWriter, REF metadata, indexed batch keys and holdability observations remain visible with the review boundaries in the evidence record."
   }
 }

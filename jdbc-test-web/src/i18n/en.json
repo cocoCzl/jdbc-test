@@ -575,7 +575,7 @@
   "driverPreset.sqlserver": "SQL Server",
   "driverPreset.custom": "Custom",
   "driverPreset.kingbase": "KingbaseES",
-  "adapter.kingbaseQualification": "Candidate for limited KingbaseES V9 testing: server V009R002C016, oracle mode, JDBC database version 12.1, driver V008R006B0001 only. PostgreSQL infrastructure and SQL fixtures are trial inputs. The initial CORE run reached its shared 90-second deadline; full CORE has not passed. Other combinations and disabled scenarios remain unqualified. Disabled features do not mean the database lacks support.",
+  "adapter.kingbaseQualification": "Official platform integration for the validated combination only: KingbaseES V009R002C016, oracle mode, JDBC database version 12.1, driver V008R006B0001. A real FULL task has 270 terminal result records: 261 contracts invoked and 9 not invoked due to missing or blocked preparation (4 direct, 5 blocked); 252 passed, 9 failed and 9 aborted, with successful cleanup. Official does not mean all JDBC tests passed. Missing SQL fixtures, XA configuration limits and observed JDBC failures remain documented; other builds, modes and drivers are unvalidated.",
   "selection.scopeHint": "Defaults include every implemented standard JDBC test and applicable vendor extension. A selected test may report an unmet execution prerequisite.",
   "selection.STANDARD_JDBC": "Standard JDBC tests",
   "selection.VENDOR_EXTENSION": "Vendor extension tests",

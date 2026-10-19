@@ -20,14 +20,15 @@ async function fillDraft(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText("Username"), "tester");
 }
 describe("Connection UI", () => {
-  it("sends the Kingbase product, candidate adapter and actual driver/URL independently", async () => {
+  it("sends the Kingbase product, official adapter and actual driver/URL independently", async () => {
     const kingbaseDriver = { ...driver, id: "kingbase-driver", name: "Kingbase JDBC", vendor: "Kingbase",
       version: "V008R006B0001", driverClass: "com.kingbase8.Driver", urlPrefix: "jdbc:kingbase8:" };
     const user = userEvent.setup();
     const api = mockApi((url, options) => {
       if (url.pathname === "/api/adapters") return json([{
-        id: "kingbase", name: "KingbaseES", status: "CANDIDATE", dialect: "postgresql",
-        namespaceSelection: "schema", driverClass: "com.kingbase8.Driver", validatedCombinations: [],
+        id: "kingbase", name: "KingbaseES", status: "OFFICIAL", dialect: "postgresql",
+        namespaceSelection: "schema", driverClass: "com.kingbase8.Driver",
+        validatedCombinations: [{ databaseVersion: "12.1", driverVersion: "V008R006B0001" }],
         qualificationNoteKey: "adapter.kingbaseQualification",
       }]);
       if (url.pathname === "/api/drivers") return json(page([kingbaseDriver]));
@@ -37,8 +38,9 @@ describe("Connection UI", () => {
     await user.type(await screen.findByLabelText("Name"), "Kingbase trial");
     await chooseOption(user, screen.getByLabelText("Adapter"), "kingbase");
     expect(screen.getByLabelText("Database type")).toHaveValue("KingbaseES");
-    expect(screen.getByText(/Candidate for limited KingbaseES V9 testing/)).toBeVisible();
-    expect(screen.getByText("No validated version combinations declared.")).toBeVisible();
+    expect(screen.getByText(/Official platform integration for the validated combination only/)).toBeVisible();
+    expect(screen.getByLabelText("Adapter")).toHaveTextContent("KingbaseES · Official");
+    expect(screen.getByText("Database 12.1 · Driver V008R006B0001")).toBeVisible();
     await chooseOption(user, await screen.findByLabelText("Driver package"), kingbaseDriver.id);
     await user.type(screen.getByLabelText("JDBC URL"), "jdbc:kingbase8://example.invalid:4321/test");
     await user.type(screen.getByLabelText("Username"), "tester");

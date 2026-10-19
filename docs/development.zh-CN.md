@@ -398,7 +398,7 @@ Server 在成功前核对事件、报告条目和数量。报告无效或不一�
 
 能力审计：A 类为除 Provider 三项以外的全部现有 capability 声明（保存点、可调用语句、数组/REF/STRUCT/ROWID/XML/RowSet、LOB、参数元数据、可滚动/可更新结果、生成键、多结果、取消、超时、ClientInfo、request/sharding、java_time 等），保留声明作为证据，false 不再通用禁用。B 类为 data_source、connection_pool、xa_data_source 的实际 Provider 配置，以及 SQL 资产/对象形状、权限、Oracle XML 配套 JAR；缺失呈现 PREREQUISITE_UNMET，包括所选驱动包找不到已配置的 Provider 类；不把构造器、属性设置及实际接口调用的所有错误都包装成前提不足。C 类目前没有显式前置用例依赖图；已失败的共享 SQL 准备会阻塞依赖该资源的后续用例，并保留原始异常、准备路径及阻塞用例 ID。D 类改由显式扩展适用范围表达，目前无实际扩展用例。
 
-`@UseSqlScripts` 延迟到选中方法的 beforeEach；同类共享成功准备，失败只影响依赖同一资产的用例。方法上的空注解取消类级准备；连接、元数据、内存 SQLXML API 等不需要表的方法不执行无关 DDL。数组夹具验证实际列形状，Oracle 以 JSON/VARCHAR 替代数组的旧 SQL 不会冒充数组 API 测试已运行。Kingbase 的 PostgreSQL SQL 仍仅为候选输入，失败保留 SQLState/厂商码并标明准备阶段。获取注入连接的实际认证或连接失败记录为 PREPARATION 阶段的 CONNECTION_FAILURE，保留原始错误，不归为平台前提不足；即使 JUnit 已发布执行回调，也不计契约调用。测试体中的 SQL 仍按原契约判定，不把所有 SQL 错误归为环境问题。公共断言未放宽；holdability 用例实测并记录 supports 声明是否一致。
+`@UseSqlScripts` 延迟到选中方法的 beforeEach；同类共享成功准备，失败只影响依赖同一资产的用例。方法上的空注解取消类级准备；连接、元数据、内存 SQLXML API 等不需要表的方法不执行无关 DDL。数组夹具验证实际列形状，Oracle 以 JSON/VARCHAR 替代数组的旧 SQL 不会冒充数组 API 测试已运行。Kingbase 的 PostgreSQL SQL 保留明确的验证范围及准备不足限制，失败保留 SQLState/厂商码并标明准备阶段。获取注入连接的实际认证或连接失败记录为 PREPARATION 阶段的 CONNECTION_FAILURE，保留原始错误，不归为平台前提不足；即使 JUnit 已发布执行回调，也不计契约调用。测试体中的 SQL 仍按原契约判定，不把所有 SQL 错误归为环境问题。公共断言未放宽；holdability 用例实测并记录 supports 声明是否一致。
 
 执行状态 PASSED/FAILED/SKIPPED/ABORTED 与新增结论分开。CONFORMS、CONTRACT_VIOLATION、UNSUPPORTED_ALLOWED、UNSUPPORTED_REQUIRED、PREREQUISITE_UNMET、BLOCKED_PREREQUISITE、TIMEOUT、CONNECTION_FAILURE、PLATFORM_ERROR、NOT_EVALUATED 保留类别、阶段、耗时、脱敏异常/SQLState/厂商码、声明及观察。只在特定 API 调用处通过 `JdbcContracts.optional` 接受 SQLFeatureNotSupportedException：Connection.createBlob/createClob/createSQLXML 和 CommonDataSource.getParentLogger；后续对象操作仍使用原断言。允许不支持记录 ABORTED + contractConforms=true，不计 PASSED，并明确展示功能不支持。`JdbcContracts.required` 当前明确约束 Connection.getAutoCommit，不支持该必需 API 记录为违反契约。未经具体调用确认的 SQLFeatureNotSupportedException 保留 NOT_EVALUATED、原始错误及未确定结论，不自动算符合契约；普通 SQLException、SQLState 或错误文本也不能证明允许不支持。无明确前提标记的准备阶段 SQL 错误同样保留 NOT_EVALUATED。逐用例 phaseDurationsMs 记录准备（包含注入连接获取）、方法主体和连接清理耗时；类级对象清理另见 cleanupEvidence。旧报告不补造这些结论。
 
@@ -434,19 +434,39 @@ Server 在加载目录和每次执行前检查协议版本。版本不匹配时�
 | 4 | 执行或超时失败 |
 | 5 | 目录、工作目录、报告或内部失败 |
 
-## KingbaseES 候选接入
+## KingbaseES 接入
 
-新增驱动时选择 KingbaseES，预设建议厂商 `Kingbase`、驱动类 `com.kingbase8.Driver`、URL 协议前缀 `jdbc:kingbase8:`。字段仍可编辑，主动清空或手动修改不会被切换预设覆盖；恢复默认值只影响这三个字段，不推断驱动版本。上传自己的 JAR，清空驱动类可使用原有 SPI 发现和多候选选择，再执行驱动校验。
+正式适配表示已验证的平台接入和可解释的结果，不要求被测驱动所有 JDBC 用例通过。PostgreSQL、MySQL、Oracle、Kingbase 使用一致标准：真实身份校验、授权范围内准备及执行、区分实际契约行为与平台前提不足、报告/统计一致、所有权清理及真实版本证据。声明解析成功不是实库验收，official 也不等于 v1 的 `target_compatible`。原三库的组合证据早于当前 270 项选择。
 
-新增连接选择 `KingbaseES · 候选` 适配器及已校验的 Kingbase 驱动包，填写实际 `jdbc:kingbase8://host:4321/test` 地址，凭据单独填写。预先创建并授权专用测试 schema，填写执行数据库/schema、明确破坏性测试授权后运行；不使用业务 schema。适配器使用已有 schema，不自动创建或删除它。页面现在可按稳定 ID 搜索并精确勾选 20 项历史子集；API 可使用 `CUSTOM` / `includeScenarios`。默认全选会包含尚未验证的场景。
+复核 2026-10-19 的真实 FULL 任务 `f48e3615-e4b7-4f63-8cc1-a81495728ce3` 后提升为 official：270 项有终态结果记录，261 项实际调用契约，另 9 项因准备直接缺失（4 项）或连带阻塞（5 项）未调用契约；原状态为 252 通过、9 失败、9 中止，清理 SUCCESS。历史未运行/未完成计数字段均为 0，不表示全部契约均已调用。验证仅限服务端 V009R002C016、oracle 模式、JDBC 数据库版本 12.1、驱动 V008R006B0001 及已记录 SHA256 的 JAR。其他版本、模式和驱动尚未验证。首次独立 Worker 子集 20 项通过；当时 CORE 选中 153 项，90 秒期限前完成 42 项通过，与子集重叠 7 项，不能相加。后续 FULL 在 423.4 秒完成，不改写旧记录。
 
-`DbType.KINGBASE` 是独立产品，`DriverPreset` 是表单建议。`SqlDialect.POSTGRESQL` 复用 schema 选择与验证、双引号、非 Oracle 的小写标识符处理及索引清理语法；没有替换 Kingbase 驱动或协议。观察到的 oracle 模式不等于本项目 Oracle 方言的强制大写语义。`assets.directory=postgresql` 仅提供候选测试输入，未确认整套 PostgreSQL SQL 都兼容。能力布尔值保留为历史声明，不再禁用标准测试；尚未验证的 SQL/API 会实测或明确报告准备不足，均非数据库能力认证。
+`validated_combinations` 以 JDBC 元数据版本 12.1 登记，另记录服务端构建及模式，链接[脱敏证据](../adapters/kingbase/evidence/platform-v009r002c016-oracle-v008r006b0001.json)。原 ignored 报告目录目前已不存在；证据明确来自保留的任务工具输出，包含统计、全部 18 项非通过结果及清理观察，哈希只覆盖这些源摘录，不冒充原始 Worker 报告哈希或完整报告。未编造 v1 目标兼容结论。
 
-适配器的 `driver.source=local-drivers/kingbase` 用于 CLI 本地解析；Web/Server 使用选中的上传包，通过隔离 Worker 加载。普通构建不需要私有 JAR，不加入全局 classpath、不推断 Maven 坐标。身份要求 `^KingbaseES$` / `^Kingbase8 JDBC Driver$`，版本范围为空表示没有已确认边界，不能视为支持所有版本。
+新增驱动选择 KingbaseES，使用可编辑的 `Kingbase`、`com.kingbase8.Driver`、`jdbc:kingbase8:` 预设，上传自己的授权 JAR；保持 SPI 发现及隔离验证。新增连接选择 `KingbaseES · 官方`（正式状态）和实际驱动，填写自己的 URL、独立凭据及已授权的专用测试数据库/schema，明确破坏性测试授权。适配器使用已有 schema，只清理唯一前缀的自有对象，不自动删除 schema。先探测连接，再通过页面精确选择、模块选择或 API `CUSTOM` / `includeScenarios` 运行。
 
-有限验证不能填入 `validated_combinations`：现有校验器只检查版本与 evidence 路径结构，未定义部分认证范围；v1 对子集运行判为 `diagnostic_run` / `evaluation_inconclusive`。因此仍为 candidate、组合列表为空。逐项验证报告与诊断记录仅留在 Git 忽略的本地目录，不作为适配器资源提交。平台正常任务由 Server 将结果与执行证据保存到平台 PostgreSQL，原始报告和所有权日志也涉及本地运行目录。独立 Worker 诊断绕过 Server 持久化，不手工补写为历史平台任务。
+产品、驱动及方言职责保持独立：身份要求 `^KingbaseES$` / `^Kingbase8 JDBC Driver$`，使用观察到的双引号、小写标识符及 schema 处理，所以复用 PostgreSQL 基础设施，不因 oracle 模式替换为本项目 Oracle 方言。`driver.source=local-drivers/kingbase` 用于 CLI 私有 JAR 解析，Web/Server 使用上传包和隔离 Worker；不分发私有驱动。
 
-版本来源、官方参考及可复现的单项诊断命令见[英文开发说明](development.md#kingbasees-candidate-setup)；适配范围与超时结论见[执行安全](execution-safety.zh-CN.md#kingbasees-候选验证)。诊断使用测试源码中的隔离加载工具，从私有连接请求 stdin 读取，须限制外层进程期限，运行后删除临时凭据文件并清理自建测试资源。
+数字版本区间无法表达该 Kingbase 构建/驱动声明，因此 `supported_versions` 仍为空；这不表示支持全部版本。构建/模式属于明确文档边界，当前不是自动运行门控，使用者须确认。能力布尔值不再禁用标准用例，本次不改变能力开关、公共断言或差异豁免。
+
+九项中止来自缺失或阻塞的 `procedure_behavior_ddl.sql`、`ref_cursor_ddl.sql`、`rowid_behavior_ddl.sql`、`multiple_results_ddl.sql`，属于平台准备范围限制，不是通过或数据库不支持。实库中八项数组及全部数据库元数据用例已通过，不能继续笼统称为未实测。两项 XA 准备失败时 `max_prepared_transactions=0`，属于环境限制，不能当作驱动缺陷或不支持 XA；保留原状态/结论，另在证据评审中说明。LOB 边界/局部写入、DataSource logWriter 观察保留；REF 元数据、按列下标批量键、未实现的 holdability 仍需结合原契约/可选 API 解释，不笼统归为驱动缺陷。
+
+后续“四库验收”未全部完成：MySQL、PostgreSQL、Kingbase 已执行实际 FULL 及后续页面流程，Oracle 仅驱动/连接验证，未执行其完整写入任务。单元、模拟浏览器证据与实库证据分开。详见[执行安全](execution-safety.zh-CN.md#kingbasees-平台验证)。具体版本来源及单项超时诊断命令见[英文说明](development.md#kingbasees-setup)，无需重跑全部测试。
+
+### 准备后续待办（9 项，均待完成）
+
+以下稳定用例 ID 尚未实际调用契约。先补齐对应 SQL 资产，再在授权范围内最小验证依赖用例；本轮不补跑实库，不视为已解决。连带阻塞仅表示共享准备资源失败，不表示存在用例调用依赖图。
+
+| 稳定用例 ID | 记录的准备问题 | 需补齐并验证的共享 SQL 资产 |
+| --- | --- | --- |
+| `callable_statement.procedure_parameter_metadata` | 直接缺失 (`PREREQUISITE_UNMET`) | `procedure_behavior_ddl.sql` |
+| `callable_statement.ref_cursor_output` | 直接缺失 (`PREREQUISITE_UNMET`) | `ref_cursor_ddl.sql` |
+| `result_set.batch_row_id_binding` | 直接缺失 (`PREREQUISITE_UNMET`) | `rowid_behavior_ddl.sql` |
+| `statement.result_sequence` | 直接缺失 (`PREREQUISITE_UNMET`) | `multiple_results_ddl.sql` |
+| `callable_statement.in_out_and_in_out` | 连带阻塞 (`BLOCKED_PREREQUISITE`) | `procedure_behavior_ddl.sql` |
+| `callable_statement.null_output` | 连带阻塞 (`BLOCKED_PREREQUISITE`) | `procedure_behavior_ddl.sql` |
+| `callable_statement.repeated_binding` | 连带阻塞 (`BLOCKED_PREREQUISITE`) | `procedure_behavior_ddl.sql` |
+| `result_set.row_id_round_trip` | 连带阻塞 (`BLOCKED_PREREQUISITE`) | `rowid_behavior_ddl.sql` |
+| `result_set.update_and_delete_by_row_id` | 连带阻塞 (`BLOCKED_PREREQUISITE`) | `rowid_behavior_ddl.sql` |
 
 ## 测试
 

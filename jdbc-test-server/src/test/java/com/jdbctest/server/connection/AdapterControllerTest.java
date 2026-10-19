@@ -20,6 +20,17 @@ import tools.jackson.databind.ObjectMapper;
 class AdapterControllerTest {
 
     @Test
+    void kingbasePublishesOfficialStatusAndOnlyItsObservedCombination() {
+        var response = new AdapterController().list().stream()
+            .filter(adapter -> "kingbase".equals(adapter.id())).findFirst().orElseThrow();
+        assertEquals("OFFICIAL", response.status());
+        assertEquals("com.kingbase8.Driver", response.driverClass());
+        assertEquals("adapter.kingbaseQualification", response.qualificationNoteKey());
+        assertEquals(List.of(new AdapterResponse.ValidatedCombination("12.1", "V008R006B0001")),
+            response.validatedCombinations());
+    }
+
+    @Test
     void publicHintsExcludePrivateSourcePathsExtensionsAndEvidenceContents() throws Exception {
         String manifest;
         try (InputStream input = getClass().getResourceAsStream(

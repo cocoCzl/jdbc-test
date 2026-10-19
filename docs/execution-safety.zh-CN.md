@@ -58,15 +58,15 @@ REST、SSE、持久证据和原始 JSON 使用同一套规则。崩溃后重建�
 
 这些历史选择存在重叠。当时因能力配置跳过的记录只表示旧门控生效，不证明数据库不支持；新任务不再以这些布尔值禁用标准能力验证。具体原因见结果页或原始 JSON。这些结果覆盖本地生产 JAR 部署，不代表 Docker 镜像验收、其他驱动版本或发布授权。可丢弃容器的回归不能替代真实目标组合验收。默认 Maven/CI 测试不连接真实目标。
 
-## KingbaseES 候选验证
+## KingbaseES 平台验证
 
-当前接入保持 candidate，`validated_combinations=[]`，完整 CORE 尚未完成验证，曾达到任务总时间预算。有限观察仅对应服务端 V009R002C016、oracle 模式、JDBC 数据库版本 12.1、驱动声明 V008R006B0001，不推广至其他版本、模式或驱动。
+KingbaseES 已提升为正式平台适配，仅限服务端 V009R002C016、oracle 模式、JDBC 数据库版本 12.1、驱动 V008R006B0001。与 PostgreSQL、MySQL、Oracle 一致，正式表示平台适配及结果可解释，不要求所有 JDBC 用例通过；本次不改变断言、能力开关、终态规则或历史结果。
 
-本次使用独立程序调用隔离 Worker，未经过 Server 任务调度与持久化，因此没有自动进入平台 PostgreSQL。逐项测试报告、阶段耗时及诊断记录仅保留本地，不作为适配器资源提交。平台正常任务的用例结果与运行状态由 Server 保存至平台数据库，原始报告和所有权日志还涉及本地运行目录；两者不能混为同一存储。
+2026-10-19 真实 FULL 任务有 270 项终态结果记录：261 项实际调用契约，另 9 项因准备直接缺失（4 项）或连带阻塞（5 项）未调用契约；原状态为 252 PASSED、9 FAILED、9 ABORTED。历史未运行/未完成计数字段均为 0，不表示全部契约均已调用。Server、隔离 Worker、平台 PostgreSQL 报告链路及后续浏览器流程已有实际验证。清理 SUCCESS，后查表/例程均为 0，专用 schema 已删除，未决 prepared transaction 为 0。最初独立 Worker 的 CORE 超时是另一条历史观察，后续 FULL 完成不抹去超时，也未证实首次 getTypeInfo 较慢的原因。
 
-CORE 探索耗尽的是整个 Worker 执行与清理的共享预算，不是单个 JDBC 调用的独立期限。最小复现观察到首次 `getTypeInfo()` 调用耗时较长，单项运行可以完成；尚未确认平台、驱动或数据库缺陷，未区分服务端、网络与驱动内部查询耗时。未提高全局超时、跳过用例或为此关闭能力。
+九项中止由过程、REF cursor、ROWID、多结果 SQL 资产缺失/阻塞引起，属于平台准备范围限制，不是驱动失败或通过。两项 XA 准备失败时 max_prepared_transactions=0，按环境前提不足解释，原始 CONTRACT_VIOLATION 标签不改写。LOB 边界/局部写入、DataSource logWriter 观察保留供驱动/契约复核；REF 元数据、按列下标批量键、未实现 holdability 须结合可选 API 契约，不能笼统认定驱动缺陷。正式状态不认证这些未执行的准备路径，也不推广至其他版本、模式或驱动。
 
-PostgreSQL 执行设施及 SQL 资产仅作为有限候选输入。完整 CORE、其他 SQL、LOB/XML/CallableStatement、其他元数据、DataSource/连接池/XA 及其他模式仍待验证。接入及最小诊断操作见[开发指南](development.zh-CN.md#kingbasees-候选接入)。
+[脱敏组合证据](../adapters/kingbase/evidence/platform-v009r002c016-oracle-v008r006b0001.json)保留实际统计、全部 18 项非通过结果、归因评审及任务源摘录。原 ignored 报告目前不可用，摘录哈希不是原始 Worker 报告哈希。后续四库验收未全部完成：MySQL、PG、Kingbase 已执行 FULL，Oracle 仅驱动/连接探测。夹具截图和单元测试不作为额外实库证据。接入及最小诊断见[开发指南](development.zh-CN.md#kingbasees-接入)。
 
 ## 凭据、适配预检与清理证据
 

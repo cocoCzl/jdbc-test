@@ -52,9 +52,9 @@ To run the website without source development, choose [Deployment](docs/deployme
 | Oracle | `oracle` | Official |
 | GaussDB | `gaussdb` | Candidate |
 | SQL Server | `sqlserver` | Candidate |
-| KingbaseES | `kingbase` | Candidate |
+| KingbaseES | `kingbase` | Official |
 
-Adapter status describes platform integration maturity. JDBC results describe the tested database/driver combination. Other products can use local declarative adapters.
+Adapter status describes platform integration maturity, not an all-JDBC-tests-pass requirement. JDBC results describe the tested database/driver combination. KingbaseES validation is limited to server V009R002C016, oracle mode, JDBC database version 12.1 and driver V008R006B0001; failures, missing preparation and environment limits remain in the [validation record](adapters/kingbase/evidence/platform-v009r002c016-oracle-v008r006b0001.json). The FULL task has 270 terminal result records: 261 contracts invoked and 9 not invoked due to missing or blocked preparation (4 direct, 5 blocked). Other builds/modes/drivers are unvalidated. Other products can use local declarative adapters.
 
 ## Development requirements
 
