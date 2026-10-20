@@ -1,4 +1,4 @@
-import { queryString, request } from "./client";
+import { ApiError, queryString, request } from "./client";
 import type {
   Driver,
   DriverInput,
@@ -28,8 +28,24 @@ export const driversApi = {
       method: "PATCH",
       body: JSON.stringify(input),
     }),
-  validate: (id: string) =>
-    request<DriverValidation>(`/drivers/${id}/validate`, { method: "POST" }),
+  validate: async (id: string) => {
+    const value = await request<DriverValidation>(`/drivers/${id}/validate`, { method: "POST" });
+    const version = (part: unknown) => typeof part === "number" && Number.isInteger(part)
+      && part >= 0 && part <= 2_147_483_647;
+    const text = (part: unknown) => part == null || (typeof part === "string" && part.trim() !== "");
+    const artifact = value?.loadedArtifact;
+    if (!value || value.status !== "VALIDATED" || typeof value.driverClass !== "string"
+      || !value.driverClass.trim() || !version(value.majorVersion) || !version(value.minorVersion)
+      || typeof value.jdbcCompliant !== "boolean"
+      || (value.warnings !== undefined && (!Array.isArray(value.warnings)
+        || value.warnings.some(item => typeof item !== "string")))
+      || (artifact != null && (typeof artifact.fileName !== "string" || !artifact.fileName.trim()
+        || typeof artifact.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(artifact.sha256)
+        || !text(artifact.implementationVersion) || !text(artifact.bundleVersion)))) {
+      throw new ApiError(200, "INVALID_RESPONSE", "Invalid driver metadata response");
+    }
+    return value;
+  },
   delete: (id: string) => request<void>(`/drivers/${id}`, { method: "DELETE" }),
 };
 export const driversKeys = {

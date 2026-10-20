@@ -877,3 +877,29 @@ standard JDBC selection is unchanged. `PostgresPackageMigrationTest` and `Postgr
 require explicit loopback `JDBC_TEST_DISPOSABLE_PG_URL` pointing only to a session-owned disposable
 PostgreSQL. They remove their schemas/roles; the session owner must remove the temporary container
 and volume. Never point these tests at an existing platform or target database.
+
+### Driver validation metadata and version sources
+
+Driver validation loads the selected class in the isolated Worker and calls only
+`java.sql.Driver.getMajorVersion()`, `getMinorVersion()` and `jdbcCompliant()`; it does not connect.
+The registered version is an editable operator label, not the probe result. The two API integers
+need not equal a full release string. A genuine `0.0` is retained with a review hint.
+`jdbcCompliant()` is the driver's declaration, not a platform test or certification conclusion.
+See the official [Driver API](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/Driver.html).
+
+`DRIVER_VALIDATED` includes `loadedArtifact`: the actual defining JAR's filename and SHA-256,
+plus its manifest `Implementation-Version` (package section, then main attributes) and
+`Bundle-Version` (main attributes). These independent declarations are not inferred from filenames,
+registered labels, dependencies, or vendor-specific methods. Missing manifest fields display as
+not provided. Worker verifies the defining JAR belongs to the selected artifact list. Server never
+loads driver classes. Older valid events without artifact evidence remain explicitly unknown.
+
+Server rejects missing, wrong-type, negative or out-of-int-range API versions, nonboolean compliance,
+class mismatches, duplicate success events and malformed artifact evidence with
+`DRIVER_VALIDATION_PROTOCOL_ERROR`; it does not coerce absent data to 0/false. Frontend also rejects
+invalid responses. Successful validation means loading and metadata reads completed, not that a
+connection or full compatibility test succeeded. Responses remain transient, not persisted probes.
+Deploy/restart matching Server and Worker builds after updating; restarting is required for already
+running backend code. `DriverValidationProtocolTest` invokes real Worker serialization and Server
+parsing with synthetic drivers (connection calls deliberately throw), including classpath order and
+mutated missing/type-invalid serialized events. No real database is needed for these checks.

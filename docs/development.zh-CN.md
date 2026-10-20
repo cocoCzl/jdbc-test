@@ -685,3 +685,23 @@ PostgresPackageMigrationTest 与 PostgresSqlFlowTest 只接受显式回环 JDBC_
 SQL 任务完整执行且报告已校验、失败均为 SQL 断言时，Server 原因记录 `SQL_ASSERTION_FAILED`，
 沿用 FAILED 状态；Worker 协议执行失败码为 4，SQL CLI 将已完成失败映射为 1。其他执行/平台问题仍独立保留，
 不能把 CLI 与 Worker 退出码混用。参见[SQL 测试包](sql-packages.zh-CN.md)。
+
+### 驱动验证元数据与版本来源
+
+驱动验证仅在隔离 Worker 中加载所选类，读取 `java.sql.Driver.getMajorVersion()`、
+`getMinorVersion()` 和 `jdbcCompliant()`，不连接数据库。登记版本是可编辑的人工标签，不是探测值。
+自报主/次版本两个整数不要求与完整发行字符串一致；真实 `0.0` 保留并提示核对。
+`jdbcCompliant()` 是驱动声明，不是平台测试或认证结论。
+规范来源：[官方 Driver API](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/Driver.html)。
+
+`DRIVER_VALIDATED.loadedArtifact` 记录实际驱动类所在 JAR 的文件名和 SHA-256，及该制品清单中的
+`Implementation-Version`（包级节优先，其次主属性）、`Bundle-Version`（主属性）。这些是独立声明，
+不从文件名、登记标签、依赖包或厂商私有方法推测；缺少字段显示“未提供”。Worker 确认该 JAR 属于
+所选制品列表；Server 不加载驱动类。旧 Worker 合法事件缺少制品证据时保持明确未知。
+
+Server 对缺失、类型错误、负数、超出 int 范围的版本、非布尔合规性、驱动类不符、重复成功事件和
+无效制品证据返回 `DRIVER_VALIDATION_PROTOCOL_ERROR`，不再默认成 0/false；前端也拒绝无效响应。
+验证成功仅代表加载及元数据读取成功，不代表连接成功或完整兼容性通过。本次响应仍不持久保存。
+更新后需部署/重启匹配的 Server/Worker；已经运行的后端代码需要重启才生效。
+`DriverValidationProtocolTest` 以合成驱动调用真实 Worker 序列化和 Server 解析，驱动连接方法故意抛错，
+覆盖类加载顺序及序列化后缺失/类型错误的事件，不需要真实数据库。

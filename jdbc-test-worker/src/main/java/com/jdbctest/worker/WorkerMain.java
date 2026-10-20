@@ -216,6 +216,7 @@ public final class WorkerMain {
                     "driverClass", request.driverClass(), "majorVersion", driver.getMajorVersion(),
                     "minorVersion", driver.getMinorVersion(), "jdbcCompliant",
                     driver.jdbcCompliant(),
+                    "loadedArtifact", DriverArtifactEvidence.read(driver, request.artifacts()),
                     "warnings", OracleDriverDependencies.warnings(request.driverClass(),
                         loaded.classLoader())));
                 return SUCCESS;

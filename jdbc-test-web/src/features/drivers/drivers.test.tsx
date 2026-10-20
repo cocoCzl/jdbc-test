@@ -20,7 +20,7 @@ describe("Driver UI", () => {
     renderPage("/drivers/new");
     await user.type(await screen.findByLabelText("Name"), "Package");
     await user.type(screen.getByLabelText("Vendor"), "Vendor");
-    await user.type(screen.getByLabelText("Version"), "1");
+    await user.type(screen.getByLabelText("Registered version"), "1");
     await user.upload(
       screen.getByLabelText("JAR files"),
       new File(["jar"], "driver.jar"),
@@ -134,7 +134,7 @@ describe("Driver UI", () => {
     await user.type(screen.getByLabelText("xaDataSource — Implementation class"), "custom.jdbc.XA");
     await user.type(await screen.findByLabelText("Name"), "PostgreSQL JDBC");
     await user.type(screen.getByLabelText("Vendor"), "PostgreSQL");
-    await user.type(screen.getByLabelText("Version"), "42.7.10");
+    await user.type(screen.getByLabelText("Registered version"), "42.7.10");
     await user.upload(screen.getByLabelText("JAR files"), [
       new File(["jar"], "one.jar"),
       new File(["jar"], "two.jar"),
@@ -179,12 +179,55 @@ describe("Driver UI", () => {
       await screen.findByRole("button", { name: "Validate driver" }),
     );
     expect(
-      await screen.findByText("Validated in an isolated Worker"),
+      await screen.findByText("Driver loaded and metadata read in an isolated Worker"),
     ).toBeVisible();
-    expect(screen.getByText(/Version 42.7/)).toHaveTextContent(
-      "JDBC compliant: No",
-    );
+    expect(screen.getByText("Driver-reported major/minor version: 42.7")).toBeVisible();
+    expect(screen.getByText("Driver-reported JDBC compliance: No")).toBeVisible();
     expect(document.body.textContent).not.toMatch(/storageKey|workspacePath/);
+  });
+  it.each(["en", "zh-CN"])("separates registered, API and defining-JAR versions in %s", async language => {
+    await i18n.changeLanguage(language);
+    const user = userEvent.setup();
+    mockApi(url => {
+      if (url.pathname === "/api/drivers/driver-1") return json({ ...driver, version: "9.0.0" });
+      if (url.pathname.endsWith("/validate")) return json({
+        status: "VALIDATED", driverClass: driver.driverClass,
+        majorVersion: 0, minorVersion: 0, jdbcCompliant: false,
+        loadedArtifact: {
+          fileName: "actual-driver.jar", sha256: "a".repeat(64),
+          implementationVersion: null, bundleVersion: "0.0.0.V009R002C016",
+        },
+      });
+      return undefined;
+    });
+    renderPage("/drivers/driver-1");
+    await user.click(await screen.findByRole("button", { name: i18n.t("ui.validateDriver") }));
+    expect(await screen.findByText(`${i18n.t("ui.driverReportedVersion")}: 0.0`)).toBeVisible();
+    expect(screen.getByText(i18n.t("ui.registeredDriverVersion"), { selector: "dt" }).nextElementSibling).toHaveTextContent("9.0.0");
+    expect(screen.getByText(i18n.t("ui.driverZeroVersionHint"))).toBeVisible();
+    expect(screen.getByText("JAR manifest · Implementation-Version").nextElementSibling).toHaveTextContent(i18n.t("ui.driverMetadataNotProvided"));
+    expect(screen.getByText("JAR manifest · Bundle-Version").nextElementSibling).toHaveTextContent("0.0.0.V009R002C016");
+    expect(screen.getByText("actual-driver.jar")).toBeVisible();
+    expect(screen.getByText(i18n.t("ui.driverComplianceSource"))).toBeVisible();
+    expect(screen.getByText(i18n.t("ui.metadataFromThisValidationResponseNotA"))).toBeVisible();
+    await i18n.changeLanguage("en");
+  });
+  it.each([
+    {},
+    { majorVersion: 1, minorVersion: 0 },
+    { majorVersion: "0", minorVersion: 0, jdbcCompliant: false },
+    { majorVersion: 0, minorVersion: null, jdbcCompliant: false },
+    { majorVersion: 0, minorVersion: 0, jdbcCompliant: "false" },
+  ])("rejects invalid metadata rather than displaying invented zeros or No: %j", async fields => {
+    const user = userEvent.setup();
+    mockApi(url => url.pathname.endsWith("/validate") ? json({
+      status: "VALIDATED", driverClass: driver.driverClass, ...fields,
+    }) : undefined);
+    renderPage("/drivers/driver-1");
+    await user.click(await screen.findByRole("button", { name: "Validate driver" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("INVALID_RESPONSE");
+    expect(screen.queryByText(/Driver-reported major\/minor version:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Driver-reported JDBC compliance:/)).not.toBeInTheDocument();
   });
   it.each([
     ["/drivers", "Validate"],

@@ -154,7 +154,7 @@ export default function DriverForm() {
                 placeholder="PostgreSQL"
               />
               <Field
-                label={t("ui.version")}
+                label={t("ui.registeredDriverVersion")}
                 id="driver-version"
                 required
                 maxLength={80}

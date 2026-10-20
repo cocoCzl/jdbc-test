@@ -75,6 +75,12 @@ export interface DriverValidation {
   minorVersion: number;
   jdbcCompliant: boolean;
   warnings?: string[];
+  loadedArtifact?: {
+    fileName: string;
+    sha256: string;
+    implementationVersion: string | null;
+    bundleVersion: string | null;
+  } | null;
 }
 export interface Connection {
   executionDatabase?: string | null;

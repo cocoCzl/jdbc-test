@@ -133,7 +133,7 @@ test("API-mocked browser flow: upload → connection → Custom Statement → re
   await page.goto("/drivers/new");
   await page.getByLabel("Name", { exact: true }).fill("PostgreSQL JDBC");
   await page.getByLabel("Vendor", { exact: true }).fill("PostgreSQL");
-  await page.getByLabel("Version", { exact: true }).fill("42.7.10");
+  await page.getByLabel("Registered version", { exact: true }).fill("42.7.10");
   await page
     .getByLabel("JAR files")
     .setInputFiles({
@@ -143,7 +143,7 @@ test("API-mocked browser flow: upload → connection → Custom Statement → re
     });
   await page.getByRole("button", { name: "Upload driver package" }).click();
   await page.getByRole("button", { name: "Validate driver" }).click();
-  await expect(page.getByText("Validated in an isolated Worker")).toBeVisible();
+  await expect(page.getByText("Driver loaded and metadata read in an isolated Worker")).toBeVisible();
   await page.goto("/connections/new");
   await page.getByLabel("Name", { exact: true }).fill("Test database");
   await page.getByLabel("Database type", { exact: true }).fill("VendorDB");

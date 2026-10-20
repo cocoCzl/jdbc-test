@@ -16,7 +16,7 @@ async function select(user: User, code: string) {
 }
 async function upload(user: User) {
   await user.type(field("Name"), "Private package");
-  await user.type(field("Version"), "private-version");
+  await user.type(field("Registered version"), "private-version");
   await user.upload(field("JAR files"), new File(["jar"], "driver.jar"));
   await user.click(screen.getByRole("button", { name: "Upload driver package" }));
 }
@@ -41,7 +41,7 @@ describe("New driver presets", () => {
     expect(vendor()).toHaveValue("Kingbase");
     expect(driverClass()).toHaveValue("com.kingbase8.Driver");
     expect(prefix()).toHaveValue("jdbc:kingbase8:");
-    expect(field("Version")).toHaveValue("");
+    expect(field("Registered version")).toHaveValue("");
     await user.clear(driverClass());
     await user.clear(prefix());
     await user.type(prefix(), "jdbc:customkingbase:");
@@ -52,7 +52,7 @@ describe("New driver presets", () => {
     await user.click(screen.getByRole("button", { name: "Restore current preset defaults" }));
     expect(driverClass()).toHaveValue("com.kingbase8.Driver");
     expect(prefix()).toHaveValue("jdbc:kingbase8:");
-    expect(field("Version")).toHaveValue("");
+    expect(field("Registered version")).toHaveValue("");
   });
   it("starts empty and switches only untouched suggestions without changing unrelated fields", async () => {
     mockApi();
@@ -79,7 +79,7 @@ describe("New driver presets", () => {
     expect(driverClass()).toHaveValue("");
     expect(prefix()).toHaveValue("");
     expect(field("Name")).toHaveValue("My package");
-    expect(field("Version")).toHaveValue("");
+    expect(field("Registered version")).toHaveValue("");
     expect(screen.getByText("kept.jar")).toBeVisible();
     expect(field("dataSource — Implementation class")).toHaveValue("private.Source");
   });

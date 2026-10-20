@@ -70,7 +70,7 @@ function MetadataForm({
               {
                 name: t("ui.name"),
                 vendor: t("ui.vendor"),
-                version: t("ui.version"),
+                version: t("ui.registeredDriverVersion"),
                 driverClass: t("ui.driverClass"),
                 urlPrefix: t("ui.urlPrefix"),
               }[key]
@@ -139,7 +139,7 @@ export default function DriverDetail() {
       {query.isError ? <ErrorState error={query.error} retry={() => void query.refetch()} /> : null}
       <PageHeader
         title={driver.name}
-        description={`${driver.vendor} · ${driver.version}`}
+        description={`${driver.vendor} · ${t("ui.registeredDriverVersion")}: ${driver.version}`}
         action={
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setEditing(!editing)}>
@@ -172,7 +172,7 @@ export default function DriverDetail() {
               [t("ui.source")]: t(`driverSource.${driver.sourceType}`),
               [t("ui.created")]: formatDateTime(driver.createdAt),
               [t("ui.updated")]: formatDateTime(driver.updatedAt),
-              [t("ui.version")]: driver.version,
+              [t("ui.registeredDriverVersion")]: driver.version,
             }).map(([label, value]) => (
               <div key={label}>
                 <dt className="mb-2 text-muted-foreground">{label}</dt>
@@ -195,15 +195,35 @@ export default function DriverDetail() {
             </div>
           </div>
         </Card>
-        {validate.data ? (
+        <FormError message={validate.error} />
+        {validate.isSuccess && validate.data ? (
           <Card as="section" role="status" className="panel border-success/20">
             <h2 className="font-semibold text-success">
               {t("ui.validatedInAnIsolatedWorker")}</h2>
+            <p className="mt-2 text-sm">{validate.data.driverClass}</p>
             <p className="mt-2 text-sm">
-              {validate.data.driverClass}  {t("ui.versionInline")} {validate.data.majorVersion}
-              .{validate.data.minorVersion}  {t("ui.jdbcCompliant")}{" "}
-              {validate.data.jdbcCompliant ? t("ui.yes") : t("ui.no")}
+              {t("ui.driverReportedVersion")}: {validate.data.majorVersion}.{validate.data.minorVersion}
             </p>
+            <p className="mt-2 text-xs text-muted-foreground">{t("ui.driverApiVersionSource")}</p>
+            {validate.data.majorVersion === 0 && validate.data.minorVersion === 0 ? (
+              <p className="mt-2 text-sm text-warning">{t("ui.driverZeroVersionHint")}</p>
+            ) : null}
+            <p className="mt-2 text-sm">{t("ui.driverReportedCompliance")}: {validate.data.jdbcCompliant ? t("ui.yes") : t("ui.no")}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{t("ui.driverComplianceSource")}</p>
+            <dl className="mt-4 grid gap-4 text-sm md:grid-cols-2">
+              {Object.entries({
+                [t("ui.driverDefiningArtifact")]: driver.artifacts.find(item => item.sha256 === validate.data?.loadedArtifact?.sha256)?.fileName
+                  ?? validate.data.loadedArtifact?.fileName ?? t("ui.driverMetadataNotProvided"),
+                "SHA-256": validate.data.loadedArtifact?.sha256 ?? t("ui.driverMetadataNotProvided"),
+                "JAR manifest · Implementation-Version": validate.data.loadedArtifact?.implementationVersion ?? t("ui.driverMetadataNotProvided"),
+                "JAR manifest · Bundle-Version": validate.data.loadedArtifact?.bundleVersion ?? t("ui.driverMetadataNotProvided"),
+              }).map(([label, value]) => (
+                <div key={label}>
+                  <dt className="text-muted-foreground">{label}</dt>
+                  <dd className="mt-1 break-all">{value}</dd>
+                </div>
+              ))}
+            </dl>
             <p className="mt-2 text-xs text-muted-foreground">
               {t("ui.metadataFromThisValidationResponseNotA")}</p>
             {validate.data.warnings?.length ? (

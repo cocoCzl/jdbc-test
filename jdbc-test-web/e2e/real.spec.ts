@@ -70,7 +70,7 @@ test("REAL PostgreSQL browser flow: external Driver → Statement/Connection →
   await page.getByLabel("Name", { exact: true }).fill(name);
   await page.getByLabel("Vendor", { exact: true }).fill("PostgreSQL");
   await page
-    .getByLabel("Version", { exact: true })
+    .getByLabel("Registered version", { exact: true })
     .fill(process.env.JDBC_TEST_E2E_DRIVER_VERSION ?? "42.7.5");
   await page.getByLabel("JAR files").setInputFiles(jar);
   const uploadResponse = page.waitForResponse(
@@ -85,7 +85,7 @@ test("REAL PostgreSQL browser flow: external Driver → Statement/Connection →
   expect(driver.packageFingerprint).toMatch(/^[a-f0-9]{64}$/);
   expect(driver.artifacts).toHaveLength(1);
   await page.getByRole("button", { name: "Validate driver" }).click();
-  await expect(page.getByText("Validated in an isolated Worker")).toBeVisible();
+  await expect(page.getByText("Driver loaded and metadata read in an isolated Worker")).toBeVisible();
   await page.reload();
   await expect(page.getByRole("button", { name: "Validate driver" })).toBeVisible();
   await page.getByRole("link", { name: "Connections", exact: true }).click();
