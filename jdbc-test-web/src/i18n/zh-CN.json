@@ -664,5 +664,12 @@
   "errors.BUILTIN_ADAPTER_REQUIRED": "选择受支持的内置数据库类型或显式兼容方言；上传适配包已撤回。",
   "errors.SQL_PACKAGES_RETIRED": "SQL 测试包已撤回，请选择内置标准 JDBC 测试。",
   "errors.RETIRED_PACKAGE_EXECUTION": "此历史任务依赖已撤回的包执行入口，未执行；请使用内置标准 JDBC 测试创建新任务。",
-  "run.reason.RETIRED_PACKAGE_EXECUTION": "此历史任务依赖已撤回的包执行入口，未执行；请使用内置标准 JDBC 测试创建新任务。"
+  "run.reason.RETIRED_PACKAGE_EXECUTION": "此历史任务依赖已撤回的包执行入口，未执行；请使用内置标准 JDBC 测试创建新任务。",
+  "driverUpload.description": "选择驱动文件，填写基本信息后上传",
+  "driverUpload.fileHint": "选择 JDBC 驱动及所需依赖 JAR",
+  "driverUpload.dropHint": "也可将多个 JAR 文件拖入此处",
+  "driverUpload.chooseFiles": "选择 JAR 文件",
+  "driverUpload.dependencyHelp": "需要哪些依赖 JAR？",
+  "driverUpload.confirm": "确认上传",
+  "driverUpload.selectFirst": "请先选择 JAR 文件"
 }

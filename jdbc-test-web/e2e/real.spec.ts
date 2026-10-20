@@ -78,7 +78,7 @@ test("REAL PostgreSQL browser flow: external Driver → Statement/Connection →
       response.url().endsWith("/api/drivers") &&
       response.request().method() === "POST",
   );
-  await page.getByRole("button", { name: "Upload driver package" }).click();
+  await page.getByRole("button", { name: "Confirm upload" }).click();
   const uploaded = await uploadResponse;
   expect(uploaded.status()).toBe(201);
   const driver = (await uploaded.json()) as Driver;

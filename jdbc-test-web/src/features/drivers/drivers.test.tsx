@@ -26,7 +26,7 @@ describe("Driver UI", () => {
       new File(["jar"], "driver.jar"),
     );
     await user.click(
-      screen.getByRole("button", { name: "Upload driver package" }),
+      screen.getByRole("button", { name: "Confirm upload" }),
     );
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "DRIVER_CLASS_AMBIGUOUS",
@@ -143,7 +143,7 @@ describe("Driver UI", () => {
     await user.click(screen.getByRole("button", { name: "Remove remove.jar" }));
     expect(screen.getByText("2 artifacts")).toBeVisible();
     await user.click(
-      screen.getByRole("button", { name: "Upload driver package" }),
+      screen.getByRole("button", { name: "Confirm upload" }),
     );
     await waitFor(() =>
       expect(router.state.location.pathname).toBe("/drivers/driver-1"),

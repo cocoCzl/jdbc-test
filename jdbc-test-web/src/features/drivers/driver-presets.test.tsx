@@ -18,7 +18,7 @@ async function upload(user: User) {
   await user.type(field("Name"), "Private package");
   await user.type(field("Registered version"), "private-version");
   await user.upload(field("JAR files"), new File(["jar"], "driver.jar"));
-  await user.click(screen.getByRole("button", { name: "Upload driver package" }));
+  await user.click(screen.getByRole("button", { name: "Confirm upload" }));
 }
 async function metadata(api: ReturnType<typeof mockApi>) {
   const request = api.mock.calls.find(([, options]) => options?.method === "POST")!;

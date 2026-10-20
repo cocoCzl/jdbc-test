@@ -89,13 +89,13 @@ export default function DriverForm() {
     });
   };
   return (
-    <>
+    <div className="mx-auto w-full max-w-7xl">
       <PageHeader
         title={t("ui.addADriver")}
-        description={t("ui.aVersionedImmutablePackageOfJDBCArtifacts")}
+        description={t("driverUpload.description")}
       />
       <form
-        className="grid grid-cols-1 max-w-5xl gap-6 xl:grid-cols-[minmax(0,1fr)_320px]"
+        className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]"
         onSubmit={(event) => {
           event.preventDefault();
           const failure = validateFiles(files);
@@ -103,7 +103,82 @@ export default function DriverForm() {
           if (!failure) upload.mutate();
         }}
       >
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
+          <Card as="section" className="panel min-w-0" aria-labelledby="driver-files-heading">
+            <h2 id="driver-files-heading" className="mb-3 text-lg font-semibold">{t("ui.driverArtifacts")}</h2>
+            <input
+              ref={uploadInput}
+              type="file"
+              multiple
+              accept=".jar"
+              aria-label={t("ui.jarFiles")}
+              className="sr-only"
+              onChange={(event) => {
+                const selectedFiles = Array.from(event.target.files ?? []);
+                setFiles((previous) => [...previous, ...selectedFiles]);
+                event.target.value = "";
+              }}
+            />
+            <div
+              role="group"
+              aria-label={t("ui.driverArtifacts")}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                if (!upload.isPending)
+                  setFiles((previous) => [
+                    ...previous,
+                    ...Array.from(event.dataTransfer.files),
+                  ]);
+              }}
+              className="flex flex-col items-start gap-3 rounded-xl border-2 border-dashed border-input bg-background p-4 sm:flex-row sm:items-center"
+            >
+              <UploadCloud className="size-6 shrink-0 text-primary" aria-hidden="true" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">{t("driverUpload.fileHint")}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{t("driverUpload.dropHint")}</p>
+              </div>
+              <Button type="button" variant="outline" disabled={upload.isPending}
+                className="shrink-0" onClick={() => uploadInput.current?.click()}>
+                {t("driverUpload.chooseFiles")}
+              </Button>
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">{t("ui.upTo20Files100MBPer")}</p>
+            <details className="mt-3 text-sm text-muted-foreground">
+              <summary className="cursor-pointer">{t("driverUpload.dependencyHelp")}</summary>
+              <p className="mt-2 leading-relaxed">{t("ui.driverCompanionHint")}</p>
+            </details>
+            <ul className="mt-4 divide-y divide-border">
+              {files.map((file, index) => (
+                <li
+                  key={`${file.name}-${index}`}
+                  className="flex items-center gap-3 py-3"
+                >
+                  <FileArchive className="size-5 text-muted-foreground" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm">{file.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatBytes(file.size)}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    disabled={upload.isPending}
+                    aria-label={t("common.removeName", {name: file.name})}
+                    onClick={() =>
+                      setFiles((previous) =>
+                        previous.filter((_, position) => position !== index),
+                      )
+                    }
+                  >
+                    <X />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </Card>
           <Card as="section" className="panel">
             <h2 className="mb-5 text-lg font-semibold">{t("ui.packageIdentity")}</h2>
             <div className="mb-5 space-y-3">
@@ -204,76 +279,8 @@ export default function DriverForm() {
             ) : null}
           </Card>
           <DataSourceFields value={dataSources} onChange={setDataSources} />
-          <Card as="section" className="panel">
-            <h2 className="mb-5 text-lg font-semibold">{t("ui.driverArtifacts")}</h2>
-            <p className="mb-4 text-sm text-muted-foreground">{t("ui.driverCompanionHint")}</p>
-            <input
-              ref={uploadInput}
-              type="file"
-              multiple
-              accept=".jar"
-              aria-label={t("ui.jarFiles")}
-              className="sr-only"
-              onChange={(event) => {
-                const selectedFiles = Array.from(event.target.files ?? []);
-                setFiles((previous) => [...previous, ...selectedFiles]);
-                event.target.value = "";
-              }}
-            />
-            <button
-              type="button"
-              disabled={upload.isPending}
-              onClick={() => uploadInput.current?.click()}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => {
-                event.preventDefault();
-                if (!upload.isPending)
-                  setFiles((previous) => [
-                    ...previous,
-                    ...Array.from(event.dataTransfer.files),
-                  ]);
-              }}
-              className="flex w-full flex-col items-center rounded-2xl border-2 border-dashed border-input bg-background px-5 py-9 text-center hover:border-primary"
-            >
-              <UploadCloud className="mb-3 size-7 text-primary" />
-              <span className="text-sm font-medium">
-                {t("ui.clickToUploadOrDropJARFiles")}</span>
-              <span className="mt-2 text-xs text-muted-foreground">
-                {t("ui.upTo20Files100MBPer")}</span>
-            </button>
-            <ul className="mt-4 divide-y divide-border">
-              {files.map((file, index) => (
-                <li
-                  key={`${file.name}-${index}`}
-                  className="flex items-center gap-3 py-3"
-                >
-                  <FileArchive className="size-5 text-muted-foreground" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm">{file.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatBytes(file.size)}
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    disabled={upload.isPending}
-                    aria-label={t("common.removeName", {name: file.name})}
-                    onClick={() =>
-                      setFiles((previous) =>
-                        previous.filter((_, position) => position !== index),
-                      )
-                    }
-                  >
-                    <X />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          </Card>
         </div>
-        <Card as="aside" className="panel h-fit">
+        <Card as="aside" className="panel min-w-0 h-fit lg:sticky lg:top-24">
           <p className="eyebrow">{t("ui.readyToPackage")}</p>
           <p className="mt-5 text-2xl font-semibold">
             {files.length} {t("ui.artifactsInline")}</p>
@@ -282,12 +289,15 @@ export default function DriverForm() {
             {t("ui.totalInline")}</p>
           <p className="my-6 text-sm leading-relaxed text-muted-foreground">
             {t("ui.artifactsCannotBeReplacedAfterUploadTo")}</p>
+          {!files.length ? (
+            <p className="mb-3 text-sm font-medium" role="status">{t("driverUpload.selectFirst")}</p>
+          ) : null}
           <FormError message={error} />
           <Button className="mt-4 w-full" disabled={upload.isPending}>
-            {upload.isPending ? t("ui.uploadingPackage") : t("ui.uploadDriverPackage")}
+            {upload.isPending ? t("ui.uploadingPackage") : t("driverUpload.confirm")}
           </Button>
         </Card>
       </form>
-    </>
+    </div>
   );
 }

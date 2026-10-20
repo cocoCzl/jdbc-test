@@ -141,7 +141,7 @@ test("API-mocked browser flow: upload → connection → Custom Statement → re
       mimeType: "application/java-archive",
       buffer: Buffer.from("mocked artifact"),
     });
-  await page.getByRole("button", { name: "Upload driver package" }).click();
+  await page.getByRole("button", { name: "Confirm upload" }).click();
   await page.getByRole("button", { name: "Validate driver" }).click();
   await expect(page.getByText("Driver loaded and metadata read in an isolated Worker")).toBeVisible();
   await page.goto("/connections/new");

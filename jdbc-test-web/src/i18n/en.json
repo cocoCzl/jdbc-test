@@ -669,5 +669,12 @@
   "errors.BUILTIN_ADAPTER_REQUIRED": "Select a built-in database type or explicit compatible dialect; uploaded adapters are retired.",
   "errors.SQL_PACKAGES_RETIRED": "SQL packages are retired; select built-in standard JDBC tests.",
   "errors.RETIRED_PACKAGE_EXECUTION": "This historical task requires a retired package executor and was not run. Create a standard JDBC run instead.",
-  "run.reason.RETIRED_PACKAGE_EXECUTION": "This historical task requires a retired package executor and was not run. Create a standard JDBC run instead."
+  "run.reason.RETIRED_PACKAGE_EXECUTION": "This historical task requires a retired package executor and was not run. Create a standard JDBC run instead.",
+  "driverUpload.description": "Choose driver files, fill in the basic information, then upload.",
+  "driverUpload.fileHint": "Choose the JDBC driver and any required dependency JARs",
+  "driverUpload.dropHint": "You can also drop multiple JAR files here.",
+  "driverUpload.chooseFiles": "Choose JAR files",
+  "driverUpload.dependencyHelp": "Which dependency JARs do I need?",
+  "driverUpload.confirm": "Confirm upload",
+  "driverUpload.selectFirst": "Please choose JAR files first"
 }
