@@ -8,7 +8,6 @@ import com.jdbctest.server.JdbcTestServerApplication;
 import com.jdbctest.server.connection.AdapterService;
 import com.jdbctest.server.connection.DatabaseConnectionProfileRepository;
 import com.jdbctest.server.driver.JdbcDriverPackageRepository;
-import com.jdbctest.server.sql.SqlPackageService;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
@@ -21,7 +20,6 @@ import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
-import org.springframework.mock.web.MockMultipartFile;
 import tools.jackson.databind.ObjectMapper;
 
 /** Explicit external URL must identify this session's disposable PostgreSQL, never a platform DB. */
@@ -74,13 +72,13 @@ class PostgresPackageMigrationTest {
             try (var context = new SpringApplicationBuilder(JdbcTestServerApplication.class)
                 .web(WebApplicationType.NONE).run(args)) {
                 assertEquals(10, sql.queryForObject("select max(version::integer) from flyway_schema_history where success", Integer.class));
-                fingerprint = context.getBean(AdapterService.class).importPackage(
-                    ImportedAdapterFlowTest.bundle("migration-fixture", "1", false), null).fingerprint();
-                sqlFingerprint = context.getBean(SqlPackageService.class).importPackage(new MockMultipartFile(
-                    "file", "sql-package.json", "application/json", Files.readAllBytes(Path.of("../examples/sql/postgresql-basics.json")))).fingerprint();
+                fingerprint = "c".repeat(64);
+                sqlFingerprint = "d".repeat(64);
                 frozen = new ObjectMapper().writeValueAsString(Map.of("adapterPackage",
-                    context.getBean(AdapterService.class).packageSnapshot("migration-fixture"),
-                    "sqlPackage", context.getBean(SqlPackageService.class).required(sqlFingerprint)));
+                    Map.of("fingerprint", fingerprint), "sqlPackage",
+                    Map.of("fingerprint", sqlFingerprint, "manifest", "{\"id\":\"legacy\"}")));
+                sql.update("insert into imported_adapter(id,fingerprint,snapshot_json) values ('migration-fixture',?,?)", fingerprint, frozen);
+                sql.update("insert into sql_test_package(fingerprint,snapshot_json) values (?,?)", sqlFingerprint, frozen);
                 if (upgrade) {
                     assertNotNull(context.getBean(JdbcDriverPackageRepository.class).findById(driver).orElseThrow());
                     assertEquals("synthetic connection", context.getBean(DatabaseConnectionProfileRepository.class).findById(connection).orElseThrow().getName());
@@ -92,10 +90,10 @@ class PostgresPackageMigrationTest {
             }
             try (var reopened = new SpringApplicationBuilder(JdbcTestServerApplication.class)
                 .web(WebApplicationType.NONE).run(args)) {
-                var snapshot = reopened.getBean(AdapterService.class).packageSnapshot("migration-fixture");
-                assertEquals(fingerprint, snapshot.fingerprint());
-                assertTrue(!snapshot.resources().isEmpty());
-                assertEquals(sqlFingerprint, reopened.getBean(SqlPackageService.class).required(sqlFingerprint).fingerprint());
+                assertEquals(fingerprint, sql.queryForObject("select fingerprint from imported_adapter where id='migration-fixture'", String.class));
+                assertEquals(frozen, sql.queryForObject("select snapshot_json from sql_test_package where fingerprint=?", String.class, sqlFingerprint));
+                assertTrue(reopened.getBean(AdapterService.class).list().stream()
+                    .noneMatch(item -> "migration-fixture".equals(item.id())));
                 if (upgrade) {
                     assertEquals(frozen, reopened.getBean(TestRunRepository.class).findById(run).orElseThrow().getExecutionInput());
                 }

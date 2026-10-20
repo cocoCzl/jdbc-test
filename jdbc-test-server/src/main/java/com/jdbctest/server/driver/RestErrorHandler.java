@@ -55,6 +55,19 @@ final class RestErrorHandler {
         LOG.debug("Async response disconnected; no response body can be written");
     }
 
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    ResponseEntity<ErrorResponse> unsupportedMethod(Exception exception) {
+        return problem(HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED",
+            "This endpoint does not support this operation", java.util.Map.of());
+    }
+
+    @ExceptionHandler({org.springframework.web.servlet.resource.NoResourceFoundException.class,
+        org.springframework.web.servlet.NoHandlerFoundException.class})
+    ResponseEntity<ErrorResponse> missingEndpoint(Exception exception) {
+        return problem(HttpStatus.NOT_FOUND, "NOT_FOUND", "Endpoint was not found",
+            java.util.Map.of());
+    }
+
     @ExceptionHandler(Exception.class)
     ResponseEntity<ErrorResponse> internal(Exception exception) {
         if (org.springframework.web.util.DisconnectedClientHelper

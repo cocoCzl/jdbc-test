@@ -95,8 +95,7 @@ test("REAL PostgreSQL browser flow: external Driver → Statement/Connection →
     .click();
   const connectionName = `PostgreSQL UI target ${Date.now()}`;
   await page.getByLabel("Name", { exact: true }).fill(connectionName);
-  await page.getByLabel("Database type", { exact: true }).fill("PostgreSQL");
-  await chooseOption(page, page.getByLabel("Adapter", { exact: true }), "postgresql");
+  await chooseOption(page, page.getByLabel("Database type", { exact: true }), "postgresql");
   await chooseOption(page, page.getByLabel("Driver package", { exact: true }), driver.id);
   await page
     .getByLabel("JDBC URL", { exact: true })

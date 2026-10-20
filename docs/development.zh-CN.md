@@ -267,7 +267,7 @@ Oracle 执行预检在命名空间/夹具创建前，只读查询 `NLS_DATABASE_
 缺资源、重复 ID、目录/声明 ID 不一致或声明损坏均明确失败，`contains` 也不会绕过校验。
 Core 只校验元数据，不加载 Suite、SQL 或被测驱动；Suite 打包测试检查声明的 SQL 区域与连接池配置。
 索引包使用现有 classpath 根 `ddl`、`dml`、`pool`，由 `assets.directory` 独立选择资产包。
-CLI 使用同一个索引和严格元数据契约；明确指定的本地 manifest 不需要注册，并保留本地资产路径语义。
+CLI 使用同一个索引和严格元数据契约；运行时不再接受外部适配清单或上传包。
 
 `DbType` 只表达已知产品的稳定 code，不是注册白名单。自定义适配可用可选 `db_type` 分类；
 省略时，已知旧 ID 保留产品分类，未知 ID/分类保留原声明但没有已知分类。`adapterId` 和自由标签
@@ -321,17 +321,7 @@ npm test
 npm run build
 ```
 
-未注册的私有 CLI 包仍可通过显式 manifest 路径使用。现有生成器可在不修改内置目录的情况下准备本地包
-（请在本地替换占位值）：
-
-```bash
-python3 -B scripts/runner.py init-custom --id private-db --dialect postgresql \
-  --driver-class com.example.Driver --driver-dir /absolute/path/to/driver-jars \
-  --url jdbc:postgresql://target.example/test_db --username test_user \
-  --namespace authorized_test_schema
-```
-
-执行前审查生成的身份、版本及能力声明；这条命令只是准备，不证明兼容。生成配置、私有 manifest 与 JAR 保持本地。
+私有驱动可在连接配置中显式选择已有兼容方言，见[当前示例](../examples/README.zh-CN.md)。修改适配逻辑必须更新源码、重新构建部署。
 
 manifest 中的 `org.postgresql:postgresql:42.7.2` 仅为声明示例，不是最新版本或安全推荐。
 CLI 可通过 `db.driver` 指定其他固定版本（`kind: "maven"`、`coordinate: "group:artifact:version"`），
@@ -342,7 +332,7 @@ CLI 可通过 `db.driver` 指定其他固定版本（`kind: "maven"`、`coordina
 被测驱动仍是隔离 Worker 加载的外部输入。没有新增在线 Web Maven 导入功能。
 
 连接编辑器分别展示适配声明提示、声明的版本组合、已安装驱动验证状态及目标探测结果；
-`databaseType` 保持为自定义显示标签。任务向导按适配筛选已保存连接，服务端先筛选再分页，
+数据库类型选择内置适配；显式 `databaseType=compatible` 时复用指定内置方言，冻结的执行配置不声称其他产品的元数据身份／版本范围，实际产品身份仍独立记录。旧标签保留读取。任务向导按适配筛选已保存连接，服务端先筛选再分页，
 不改写连接适配，也不根据 vendor 限制驱动。深链接所选连接与筛选冲突时会明确保留并提示，
 清除筛选或另选连接后才可继续。已保存连接探测区分未提供密码（回退已保存凭据）与显式 `""`；
 空格及其他密码字符均原样保留。
@@ -665,26 +655,18 @@ CLI 用户配置使用 `password_env`，生成私有的字面密码运行配置�
 允许的驱动制品变化及 CI 退出码。已审查的 JDBC 断言、独立声明/实测证据和限定的方案要求
 见[能力契约判定依据](jdbc-capability-contracts.md)。历史报告保持原样。
 
-### Web 导入与冻结资源
+### 源码维护与历史兼容
 
-[Web 适配包](web-adapters.zh-CN.md) 是在运行时接入包的入口，无需登记内置 ID。
-Core 复用清单校验并约束可迁移 ZIP；Server 通过 V9 持久化当前数据，在任务创建时冻结完整包。
-连接写入与归档引用检查串行化。仅 Worker 在自有目录写入冻结资源并执行原有 Suite 用例。
-公开 `adapterSnapshot` 保留有效本地来源，原清单 trust 不会授予正式身份。
-`adapterExecution` 字段保持不变；协议 2 增加可选包/来源快照，元数据握手声明
-`adapterPackageVersion=1`，部署时需使用匹配构建。缺少历史快照仍为未知。
-显式更新和保留边界见上述指南。
+新任务只执行内置标准 JDBC 目录。已移除用户适配包和 SQL 包的页面、导入／版本管理 API、CLI 命令和 Worker 执行器。
+`GET /api/adapters` 仅供连接选择内置类型。开发者维护 `adapters/catalog.json`、清单、方言资源与用例源码，修改后重新构建部署。
+Server 仍不加载上传驱动或执行目标 SQL。Worker 协议 2 以 `adapterSnapshotVersion=1` 声明内置快照支持，两端须使用匹配构建。
+未知 `sqlPackage`／`adapterPackage` Worker 字段被严格拒绝，不会回退为标准 JDBC 执行。
 
-## SQL 功能测试包（格式 1）
-
-见[格式、执行和验证](sql-packages.zh-CN.md)。V10 新增不可变 SQL 包存储，标准 JDBC 选择不变。
-PostgresPackageMigrationTest 与 PostgresSqlFlowTest 只接受显式回环 JDBC_TEST_DISPOSABLE_PG_URL，
-必须指向本轮新建的可丢弃 PostgreSQL，禁止现有平台或目标数据库。测试删除自有 schema/角色，
-运行者须清理本轮 PostgreSQL 容器和卷。
-
-SQL 任务完整执行且报告已校验、失败均为 SQL 断言时，Server 原因记录 `SQL_ASSERTION_FAILED`，
-沿用 FAILED 状态；Worker 协议执行失败码为 4，SQL CLI 将已完成失败映射为 1。其他执行/平台问题仍独立保留，
-不能把 CLI 与 Worker 退出码混用。参见[SQL 测试包](sql-packages.zh-CN.md)。
+V9/V10 迁移原样保留，旧包表、驱动、连接、已执行任务和报告不删除、不重写。
+历史 SQL 定义作为普通 JSON 只读返回，无需加载已撤回校验器；报告继续标注 SQL_FEATURE，禁止 JDBC 基线比较。
+旧上传适配连接保持可读，新任务须先改选内置类型或显式兼容方言；执行器若收到旧排队包任务，以 `RETIRED_PACKAGE_EXECUTION` 失败，未执行和清理 UNKNOWN 保持可见；正常服务重启仍沿用 `SERVER_RESTART` 中断所有旧非终态任务。
+旧客户端提交 `sqlPackageFingerprint` 明确返回 `SQL_PACKAGES_RETIRED`，而非静默运行其他测试。
+`PostgresPackageMigrationTest` 仍保留空库／V8 升级及重启后的原始历史数据读取测试，仅可指向本轮所有的可丢弃 PG。
 
 ### 驱动验证元数据与版本来源
 

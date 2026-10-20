@@ -36,6 +36,16 @@ def fail(report, name="b"):
 
 
 class RegressionTest(unittest.TestCase):
+    def test_historical_sql_reports_remain_excluded_after_package_retirement(self):
+        report = synthetic_report()
+        report["testDomain"] = "SQL_FEATURE"
+        with self.assertRaisesRegex(ValueError, "SQL_FEATURE"):
+            regression.select_baseline(report)
+        result = runner.compare_reports(report, report, "internal")
+        self.assertEqual(2, result["exit_code"])
+        self.assertFalse(result["comparable"])
+        self.assertTrue(any("SQL_FEATURE" in reason for reason in result["errors"]))
+
     def test_local_baseline_keeps_provenance_and_allows_driver_and_dependency_jar_upgrade(self):
         base = synthetic_report()
         snapshot = regression.select_baseline(base)
@@ -223,9 +233,9 @@ class RegressionTest(unittest.TestCase):
             with patch.dict(os.environ, {"FIXTURE_DB_PASSWORD": "fixture-password",
                                          "JDBC_TEST_REGRESSION_KEY": "k" * 32}):
                 config = build_runtime_config(runner.PROJECT_ROOT, user,
-                                              load_adapter(runner.PROJECT_ROOT, "examples/adapters/postgresql-local"), artifact)
+                                              load_adapter(runner.PROJECT_ROOT, "postgresql"), artifact)
                 again = build_runtime_config(runner.PROJECT_ROOT, user,
-                                             load_adapter(runner.PROJECT_ROOT, "examples/adapters/postgresql-local"), artifact)
+                                             load_adapter(runner.PROJECT_ROOT, "postgresql"), artifact)
                 self.assertEqual(config["regression_inputs"], again["regression_inputs"])
                 env = {"surefire.test.class.path": os.pathsep.join(str(p) for p in jars)}
                 captured = regression.build_evidence(runner.PROJECT_ROOT, config, env, {"a"})
@@ -239,7 +249,7 @@ class RegressionTest(unittest.TestCase):
                     self.assertNotIn(secret, encoded)
                 user["db"]["properties"]["secret"] = "different-value"
                 changed = build_runtime_config(runner.PROJECT_ROOT, user,
-                                               load_adapter(runner.PROJECT_ROOT, "examples/adapters/postgresql-local"), artifact)
+                                               load_adapter(runner.PROJECT_ROOT, "postgresql"), artifact)
                 self.assertNotEqual(config["regression_inputs"]["config_hmac"], changed["regression_inputs"]["config_hmac"])
 
     def test_unexplained_maven_errors_and_unknown_statuses_do_not_compare_as_passes(self):

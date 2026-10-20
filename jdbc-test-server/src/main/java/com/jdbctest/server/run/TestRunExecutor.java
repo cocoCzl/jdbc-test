@@ -146,20 +146,7 @@ final class TestRunExecutor {
                 return;
             }
             if (process.exitValue() != 0 || "FAILED".equals(text(terminalEvent.get(), "status"))) {
-                boolean sqlAssertions = input.frozen().has("sqlPackage")
-                    // Worker protocol uses 4 for execution failure; CLI maps that to exit 1.
-                    && process.exitValue() == 4
-                    && "TEST_FAILURE".equals(text(terminalEvent.get(), "terminationReason"))
-                    && Boolean.TRUE.equals(transactions.execute(tx -> {
-                        var failedCases = results.findByRun_Id(runId).stream()
-                            .filter(item -> item.getStatus() == TestCaseResultStatus.FAILED)
-                            .toList();
-                        return !failedCases.isEmpty() && failedCases.stream().allMatch(
-                            item -> item.getExecutionEvidence() != null
-                                && "SQL_ASSERTION_FAILED".equals(mapper.readTree(
-                                    item.getExecutionEvidence()).path("conclusion").asString()));
-                    }));
-                fail(runId, sqlAssertions ? "SQL_ASSERTION_FAILED" : "WORKER_EXECUTION_FAILED");
+                fail(runId, "WORKER_EXECUTION_FAILED");
                 return;
             }
             transition(runId, TestRunStatus.SUCCEEDED, null);
@@ -194,22 +181,6 @@ final class TestRunExecutor {
         if (process == null) {
             return false;
         }
-        boolean sqlRun = Boolean.TRUE.equals(transactions.execute(tx -> runs.findById(runId)
-            .map(run -> run.getExecutionInput() != null
-                && mapper.readTree(run.getExecutionInput()).has("sqlPackage")).orElse(false)));
-        if (sqlRun) {
-            try {
-                Files.writeString(workspace(runId).resolve("cancel.request"), "cancel");
-                if (process.waitFor(execution.getTerminationGracePeriod().toMillis(), TimeUnit.MILLISECONDS)) {
-                    return true;
-                }
-            } catch (IOException error) {
-                org.slf4j.LoggerFactory.getLogger(TestRunExecutor.class)
-                    .warn("SQL cancellation signal unavailable; terminating Worker");
-            } catch (InterruptedException interrupted) {
-                Thread.currentThread().interrupt();
-            }
-        }
         terminateQuietly(process);
         return true;
     }
@@ -236,6 +207,10 @@ final class TestRunExecutor {
                 throw new IllegalArgumentException("EXECUTION_SCOPE_REQUIRED");
             }
             JsonNode frozen = mapper.readTree(run.getExecutionInput());
+            if (frozen.has("sqlPackage") || frozen.has("adapterPackage")) {
+                transition(run, TestRunStatus.FAILED, "RETIRED_PACKAGE_EXECUTION");
+                return null;
+            }
             if (JdbcUrlSanitizer.containsCredentials(frozen.path("jdbcUrl").asString())) {
                 throw new IllegalArgumentException("CONNECTION_URL_CONTAINS_CREDENTIALS");
             }
@@ -247,7 +222,7 @@ final class TestRunExecutor {
             return new RunInput(runId, run.getDriverClassSnapshot(), paths,
                 frozen.path("jdbcUrl").asString(), frozen.path("username").asString(),
                 run.getAdapterIdSnapshot(), password,
-                frozen.has("sqlPackage") ? "CUSTOM" : "FULL",
+                "FULL",
                 scenarios.stream().map(TestRunSelectedScenarioEntity::getModuleId)
                     .collect(java.util.stream.Collectors.toSet()).stream().toList(),
                 scenarios.stream().map(TestRunSelectedScenarioEntity::getScenarioId).toList(),
@@ -261,7 +236,7 @@ final class TestRunExecutor {
 
     private Process start(RunInput input, Path workspace) throws IOException, InterruptedException {
         new com.jdbctest.server.driver.WorkerProcessRunner(workerProperties,
-            mapper).requireRunProtocol(input.frozen().has("adapterSnapshot"), input.frozen().has("sqlPackage"));
+            mapper).requireRunProtocol(input.frozen().has("adapterSnapshot"));
         Path executable = workerProperties.getExecutable();
         if (executable == null || !Files.isRegularFile(executable)) {
             throw new IOException("Worker executable unavailable");
@@ -281,9 +256,6 @@ final class TestRunExecutor {
                     input.scenarios(), "excludeScenarios", List.of()), "workspace",
                 workspace.toString(), "timeoutMs", budgetMillis(input)));
         request.put("protocolVersion", 2);
-        if (input.frozen().has("sqlPackage")) {
-            request.put("sqlPackage", input.frozen().path("sqlPackage"));
-        }
         if (input.frozen().has("selection") && !"legacy".equals(
             input.frozen().path("selection").path("catalogVersion").asString())) {
             request.put("catalogVersion", input.frozen().path("selection").path("catalogVersion"));
@@ -292,9 +264,6 @@ final class TestRunExecutor {
         request.put("caseTimeoutMs", input.frozen().path("caseTimeoutMs").asLong(60_000L));
         if (input.frozen().has("adapterExecution")) {
             request.put("adapterExecution", input.frozen().path("adapterExecution"));
-        }
-        if (input.frozen().has("adapterPackage")) {
-            request.put("adapterPackage", input.frozen().path("adapterPackage"));
         }
         if (input.frozen().has("adapterSnapshot")) {
             request.put("adapterSnapshot", input.frozen().path("adapterSnapshot"));
@@ -321,12 +290,7 @@ final class TestRunExecutor {
         }
         String type = required(event, "type");
         if (TestRunStateTransitions.terminal(status(runId))) {
-            boolean closingSql = Boolean.TRUE.equals(transactions.execute(tx -> runs.findById(runId)
-                .map(this::sqlCancellation).orElse(false)));
-            if (!closingSql || !java.util.Set.of("RUN_STARTED", "CASE_STARTED", "CASE_FINISHED",
-                "CLEANUP_FINISHED", "RUN_FINISHED").contains(type)) {
-                return false;
-            }
+            return false;
         }
         if ("RUN_STARTED".equals(type)) {
             if (event.path("protocolVersion").asInt(0) != 2 || !protocolStarted.add(runId)) {
@@ -343,7 +307,7 @@ final class TestRunExecutor {
             case "CASE_STARTED" -> {
                 transactions.executeWithoutResult(tx -> {
                     TestRunEntity run = runs.findForUpdate(runId).orElseThrow();
-                    if (TestRunStateTransitions.terminal(run.getStatus()) && !sqlCancellation(run)) {
+                    if (TestRunStateTransitions.terminal(run.getStatus())) {
                         return;
                     }
                     TestRunSelectedScenarioEntity item = selectedScenario(runId, event);
@@ -389,7 +353,7 @@ final class TestRunExecutor {
             });
             case "CLEANUP_FINISHED" -> transactions.executeWithoutResult(tx -> {
                 TestRunEntity run = runs.findForUpdate(runId).orElseThrow();
-                if (TestRunStateTransitions.terminal(run.getStatus()) && !sqlCancellation(run)) {
+                if (TestRunStateTransitions.terminal(run.getStatus())) {
                     return;
                 }
                 JsonNode cleanup = event.path("cleanupEvidence");
@@ -428,15 +392,10 @@ final class TestRunExecutor {
         return false;
     }
 
-    private boolean sqlCancellation(TestRunEntity run) {
-        return run.getStatus() == TestRunStatus.CANCELLED && run.getExecutionInput() != null
-            && mapper.readTree(run.getExecutionInput()).has("sqlPackage");
-    }
-
     private void persistCase(UUID runId, JsonNode event) {
         transactions.executeWithoutResult(tx -> {
             TestRunEntity run = runs.findForUpdate(runId).orElseThrow();
-            if (TestRunStateTransitions.terminal(run.getStatus()) && !sqlCancellation(run)) {
+            if (TestRunStateTransitions.terminal(run.getStatus())) {
                 return;
             }
             String scenario = required(event, "scenarioId");
@@ -649,8 +608,6 @@ final class TestRunExecutor {
                 && (run.getCleanupEvidence() == null ? report.path("cleanupEvidence")
                 .isMissingNode()
                 : report.path("cleanupEvidence").equals(mapper.readTree(run.getCleanupEvidence())))
-                && (!frozen.has("sqlPackage") || "SQL_FEATURE".equals(text(report, "testDomain"))
-                && report.path("sqlPackage").equals(frozen.path("sqlPackage")))
                 && report.path("scope").equals(frozen.path("scope"))
                 && report.path("objectPrefix").equals(frozen.path("objectPrefix"))
                 && report.path("capabilities").equals(frozen.path("capabilities"))

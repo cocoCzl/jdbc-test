@@ -2,18 +2,17 @@
 
 [English](internal-regression.md) | 简体中文
 
-内部基线是用户明确选定的 CLI 报告快照，local/private、candidate 适配包均可使用。
+内部基线是用户明确选定的 CLI 报告快照。私有驱动可使用内置适配或显式兼容方言；历史 local/candidate 来源保留读取，不恢复上传包入口。
 它不改变 `adapter.trust`、`formal_eligible`、已知差异或原报告，不构成 JDBC 认证或项目维护者背书。
 默认 `compare --scope formal` 继续要求正式报告资格；两种范围现在都要求完整、版本化的比较证据。
 历史 JSON 保留原样，缺少证据时明确拒绝比较，需要用当前 CLI 重跑。
 
 ## 驱动 A → 选择基线 → 驱动 B → 比较
 
-使用 JDK 21、Maven Wrapper 和明确授权的独立测试数据库/schema。已有本地适配包使用
-`init --adapter /absolute/path/to/adapter`；需要创建时使用 `init-custom`，参见[示例](../examples/README.zh-CN.md)。
-驱动和含连接信息的配置留在本地，不提交 Git。
-
-在生成的配置中合并以下字段，保留已有连接、密码环境变量、适配包、命名空间授权和用例选择：
+使用 JDK 21、Maven Wrapper 与已授权的专用测试数据库／schema。用 `init --adapter postgresql`
+等内置 ID 生成连接配置；私有驱动使用 `--driver-dir`／`--driver-class`，复用方言时显式加 `--compatible-dialect`。
+不再制作或上传适配包，见[示例](../examples/README.zh-CN.md)。
+在配置中加入以下字段，替换示例身份、构建和模式：
 
 ```json
 {

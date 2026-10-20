@@ -2,6 +2,8 @@
 
 English | [简体中文](acceptance-2026-10-20.zh-CN.md)
 
+> Historical acceptance: SQL packages and uploaded adapters are now retired. Results below describe the earlier implementation, not current entrypoints. Original definitions remain in Git checkpoint `035ac76`; see README for current scope.
+
 This summary separates real system validation, fixture tests and unverified scope across the first
 three implementation phases. It is not JDBC certification or proof of product compatibility.
 The custom PostgreSQL adapter validates the self-service integration mechanism, not a proprietary
@@ -66,12 +68,12 @@ CLI and Web agreed on the same adapter's execution declarations/fingerprint and 
 fingerprint/templates. CLI_LOCAL/LOCAL and IMPORTED/LOCAL provenance remained distinct; no official
 status was granted.
 
-The four [MySQL example](../examples/sql/mysql-basics.json) cases passed using the real driver and
+The four MySQL example (historical checkpoint `035ac76`) cases passed using the real driver and
 Worker: table creation/seeding, typed binding, JOIN/aggregation, duplicate-preserving multisets,
 NULL, Decimal scale, update counts and expected errors. Both owned tables were dropped; final table
 count was zero. Explicit MySQL variants use SIGNED/CHAR, InnoDB and duplicate-primary-key error
 SQLState 23000/code 1062/SQLIntegrityConstraintViolationException. PostgreSQL division-by-zero
-semantics were not silently rewritten or weakened; see [SQL package references](sql-packages.md).
+semantics were not silently rewritten or weakened; see SQL package references (historical checkpoint `035ac76`).
 
 Real JDBC A/B selected exactly these six IDs, passing all six for each driver and excluding 264:
 
@@ -98,7 +100,7 @@ need their own persistent key and newly selected baseline.
 | --- | --- |
 | PostgreSQL migrations | Reused real `PostgresPackageMigrationTest`, 1 passed, not skipped: empty V1–V10, populated synthetic V8→V9→V10, old drivers/connections/tasks/results/reports readable, new package resources/task snapshots restored after reopening. This session's real Web platform also migrated an empty V1–V10 database; the full upgrade matrix was not repeated |
 | PostgreSQL SQL | Real `PostgresSqlFlowTest`, 1 passed, not skipped: examples, intentional failure, timeout, cooperative cancellation, subsequent execution and cleanup; CLI 0/1 real, invalid-input 2 offline |
-| Real browser | Two tests passed separately: custom workflow and restart/new revision. [Opt-in test](../jdbc-test-web/e2e/custom-integration.real.spec.ts) requires an explicitly owned environment |
+| Real browser | Two tests passed separately: custom workflow and restart/new revision. Opt-in test (`jdbc-test-web/e2e/custom-integration.real.spec.ts`, historical checkpoint `035ac76`) requires an explicitly owned environment |
 | Focused Java | Core SQL 5, credentials 8, SQL executor 7, WorkerMain 9, REST handler 1; related runs passed |
 | Scheduling/forced termination | 3 boundary tests plus 1 UNKNOWN evidence test passed; forced termination used a fixture Worker, retaining CANCELLED, unvalidated report and cleanup UNKNOWN |
 | Python | regression 17, SQL 4, adapter archive 3, distribution 12 passed |

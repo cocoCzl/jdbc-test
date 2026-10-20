@@ -15,22 +15,6 @@ final class AdapterController {
         this.service = service;
     }
 
-    @org.springframework.web.bind.annotation.PostMapping(consumes = "multipart/form-data")
-    AdapterResponse importPackage(
-        @org.springframework.web.bind.annotation.RequestPart("file")
-        org.springframework.web.multipart.MultipartFile file,
-        @org.springframework.web.bind.annotation.RequestParam(value = "expectedFingerprint",
-            required = false) String expectedFingerprint) {
-        return service.importPackage(file, expectedFingerprint);
-    }
-
-    @org.springframework.web.bind.annotation.DeleteMapping("/{id}")
-    org.springframework.http.ResponseEntity<Void> archive(
-        @org.springframework.web.bind.annotation.PathVariable("id") String id) {
-        service.archive(id);
-        return org.springframework.http.ResponseEntity.noContent().build();
-    }
-
     @GetMapping
     List<AdapterResponse> list() {
         return service.list();

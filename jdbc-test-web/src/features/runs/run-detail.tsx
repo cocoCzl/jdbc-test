@@ -1,4 +1,4 @@
-import { SqlPackageSnapshot } from "@/features/sql-packages/sql-package-snapshot";
+import { LegacySqlSnapshot } from "./legacy-sql-snapshot";
 import { AdapterDetails } from "@/features/connections/adapter-details";
 import { CleanupEvidence } from "./cleanup-evidence";
 import { Card } from "@/components/ui/card";
@@ -98,7 +98,7 @@ export default function RunDetail() {
                 : t("ui.runComplete")}
         </span>
       </div>
-      {run.sqlPackage ? <SqlPackageSnapshot snapshot={run.sqlPackage} /> : null}
+      {run.sqlPackage ? <LegacySqlSnapshot snapshot={run.sqlPackage} /> : null}
       <section aria-label={t("ui.runOutcomeSummary")} className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Metric label={t("ui.total")} value={run.totalCases ?? "—"} icon={<ListChecks className="size-4" />} />
         <Metric label={t("ui.passed")} tone="success" subdued={run.passed == null || run.passed === 0} value={run.passed ?? "—"} icon={<Check className="size-4" />} />

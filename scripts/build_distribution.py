@@ -64,15 +64,12 @@ def build(output: Path) -> tuple[Path, Path, Path]:
         shutil.copy2(PROJECT_ROOT / ".env.example", staging / ".env.example")
         shutil.copy2(PROJECT_ROOT / "LICENSE", staging / "LICENSE")
         (staging / "docs").mkdir()
-        for document in ("deployment.md", "deployment.zh-CN.md", "execution-safety.md", "execution-safety.zh-CN.md", "sql-packages.md", "sql-packages.zh-CN.md"):
+        for document in ("deployment.md", "deployment.zh-CN.md", "execution-safety.md", "execution-safety.zh-CN.md"):
             content = (PROJECT_ROOT / "docs" / document).read_text(encoding="utf-8")
             # Development sources are available online, outside the runtime bundle.
             for guide in ("development.md", "development.zh-CN.md"):
                 content = content.replace(f"({guide}#", f"(https://github.com/cocoCzl/jdbc-test/blob/master/docs/{guide}#")
             (staging / "docs" / document).write_text(content, encoding="utf-8")
-        (staging / "examples/sql").mkdir(parents=True)
-        for example in ("postgresql-basics.json", "mysql-basics.json"):
-            shutil.copy2(PROJECT_ROOT / "examples/sql" / example, staging / "examples/sql")
         (staging / "README.md").write_text(
             "# JDBC Test Server\n\n"
             "Runtime: Java 21 + shell/PowerShell + a prepared dedicated platform PostgreSQL. No Node/npm/Maven/Python.\n\n"

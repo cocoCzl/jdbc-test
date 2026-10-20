@@ -18,7 +18,7 @@ public record TestRunResponse(UUID id, TestRunStatus status, String profile,
     java.util.Map<String, Object> selectionSnapshot,
     java.util.Map<String, Long> contractSummary,
     com.jdbctest.server.connection.AdapterResponse adapterSnapshot,
-    com.jdbctest.catalog.SqlTestPackage sqlPackage) {
+    tools.jackson.databind.JsonNode sqlPackage) {
 
     public record ConnectionSnapshot(String name, String databaseType, String adapterId,
         String jdbcUrl) {

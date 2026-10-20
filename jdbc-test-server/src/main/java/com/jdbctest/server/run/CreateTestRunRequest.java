@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import java.util.UUID;
 
+/** sqlPackageFingerprint is retained only to reject clients of the retired SQL feature. */
 public record CreateTestRunRequest(@NotNull UUID connectionId, UUID driverId,
     @NotNull String profile,
     List<String> modules, List<String> includeScenarios,

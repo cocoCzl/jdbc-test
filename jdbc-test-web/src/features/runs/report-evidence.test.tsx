@@ -1,3 +1,4 @@
+import { finishedRun } from "@/test/fixtures";
 import { act, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
@@ -5,6 +6,17 @@ import i18n from "@/i18n";
 import { json, mockApi, problem, renderPage } from "@/test/harness";
 
 describe("Report JSON provenance", () => {
+  it("keeps historical SQL definitions readable without package management", async () => {
+    const snapshot = {manifest: JSON.stringify({id: "old-sql", version: "1", description: "retained evidence"}), fingerprint: "old-fingerprint"};
+    const historical = {...finishedRun, sqlPackage: snapshot, contractSummary: null};
+    mockApi(url => url.pathname === "/api/runs/run-1" ? json(historical)
+      : url.pathname.endsWith("/report") ? json({summary: historical, failures: []}) : undefined);
+    renderPage("/runs/run-1");
+    expect(await screen.findByText("old-sql · 1 · Local import")).toBeVisible();
+    expect(screen.getByText("Historical SQL definition (read only)")).toBeVisible();
+    expect(screen.queryByRole("link", {name: "SQL test packages"})).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", {name: "Database adapters"})).not.toBeInTheDocument();
+  });
   afterEach(() => document.querySelector('meta[name="jdbc-environment"]')?.remove());
   it("labels persisted events as database evidence and keeps the JSON when switching language", async () => {
     const evidence = { source: "PERSISTED_WORKER_EVENTS", runId: "run-1", summary: { passed: 23 } };

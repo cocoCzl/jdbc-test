@@ -3,18 +3,18 @@
 English | [简体中文](internal-regression.zh-CN.md)
 
 An internal baseline is an explicitly selected snapshot of a CLI report. It does not change
-`adapter.trust`, `formal_eligible`, known differences or the original report. Local/private and
-candidate adapters can use this workflow. Internal comparison is not JDBC certification or
+`adapter.trust`, `formal_eligible`, known differences or the original report. Private drivers using bundled adapters or explicit compatible dialect selection can use this workflow.
+Historical local/candidate provenance remains readable without enabling retired package imports. Internal comparison is not JDBC certification or
 maintainer endorsement. The default `compare --scope formal` still requires formal eligibility;
 both scopes now require the same versioned comparison evidence. Historical JSON is not upgraded.
 
 ## Run A, select, run B, compare
 
-Use JDK 21, the Maven wrapper and an authorized disposable database/schema. Prepare a local adapter
-with `init-custom` or use an existing package with `init --adapter /absolute/path/to/adapter`.
-Keep driver files and configurations outside Git. See [examples](../examples/README.md).
-
-Add these fields to the generated local configuration (replace the example identity/build/mode):
+Use JDK 21, the Maven wrapper and an authorized dedicated test database/schema. Generate connection
+configuration with `init --adapter postgresql` or another built-in ID. Private drivers use `--driver-dir`
+and `--driver-class`; explicitly add `--compatible-dialect` for dialect reuse. No adapter package is
+created or uploaded. See [examples](../examples/README.md).
+Add these fields to the configuration (replace the example identity/build/mode):
 
 ```json
 {

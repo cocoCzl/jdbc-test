@@ -136,7 +136,7 @@ test("state survives theme changes: password, driver form, wizard, filters, pagi
   await page.goto("/connections/new");
   await page.getByLabel("Name",{exact:true}).fill("Unsaved theme fixture");
   await page.getByLabel("Password",{exact:true}).fill("fixture-password-only");
-  await chooseOption(page,page.getByRole("combobox",{name:"Adapter",exact:true}),"postgresql");
+  await chooseOption(page,page.getByRole("combobox",{name:"Database type",exact:true}),"postgresql");
   await page.waitForLoadState("networkidle"); let before = requests.length;
   const input = await page.getByLabel("Password",{exact:true}).elementHandle();
   await cycle(page);

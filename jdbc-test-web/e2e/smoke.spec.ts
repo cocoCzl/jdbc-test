@@ -146,8 +146,7 @@ test("API-mocked browser flow: upload → connection → Custom Statement → re
   await expect(page.getByText("Driver loaded and metadata read in an isolated Worker")).toBeVisible();
   await page.goto("/connections/new");
   await page.getByLabel("Name", { exact: true }).fill("Test database");
-  await page.getByLabel("Database type", { exact: true }).fill("VendorDB");
-  await chooseOption(page, page.getByLabel("Adapter", { exact: true }), "postgresql");
+  await chooseOption(page, page.getByLabel("Database type", { exact: true }), "postgresql");
   await chooseOption(page, page.getByLabel("Driver package", { exact: true }), driver.id);
   await page.getByLabel("JDBC URL", { exact: true }).fill(connection.jdbcUrl);
   await page
@@ -238,10 +237,10 @@ test("TEST FIXTURE ONLY: adapter declarations, filtered deep link and empty save
     await route.fulfill({json: body});
   });
   await page.goto("/connections/new");
-  await page.getByLabel("Database type", {exact: true}).fill("Preserved custom label");
+
   for (const item of declarations) {
-    await chooseOption(page, page.getByLabel("Adapter", {exact: true}), item.id);
-    await expect(page.getByLabel("Database type", {exact: true})).toHaveValue("Preserved custom label");
+    await chooseOption(page, page.getByLabel("Database type", {exact: true}), item.id);
+    await expect(page.getByLabel("Database type", {exact: true})).toHaveAttribute("data-value", item.id);
     await expect(page.getByText("No validated version combinations declared.")).toBeVisible();
   }
   await expect(page.getByRole("link", {name: "Upload a driver package"})).toBeVisible();
@@ -334,10 +333,10 @@ test("TEST FIXTURE ONLY: Kingbase official explains qualification in both langua
     await page.addInitScript((language) => localStorage.setItem("jdbc-test.locale", language), locale);
     await page.goto("/connections/new");
     const chinese = locale === "zh-CN";
-    await chooseOption(page, page.locator("#adapter"), "kingbase");
-    await expect(page.locator("#database-type")).toHaveValue("KingbaseES");
+    await chooseOption(page, page.locator("#database-type"), "kingbase");
+    await expect(page.locator("#database-type")).toHaveAttribute("data-value", "kingbase");
     await expect(page.getByText(chinese ? /正式平台适配仅限已验证组合/ : /Official platform integration for the validated combination only/)).toBeVisible();
-    await expect(page.locator("#adapter")).toContainText(chinese ? "KingbaseES · 官方" : "KingbaseES · Official");
+    await expect(page.locator("#database-type")).toContainText(chinese ? "KingbaseES · 官方" : "KingbaseES · Official");
     await expect(page.getByText(chinese ? "数据库 12.1 · 驱动 V008R006B0001" : "Database 12.1 · Driver V008R006B0001")).toBeVisible();
     await chooseOption(page, page.locator("#default-driver"), kingbaseDriver.id);
     await page.locator("#connection-name").fill("TEST FIXTURE — Kingbase official");

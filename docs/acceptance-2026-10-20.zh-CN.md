@@ -2,6 +2,8 @@
 
 [English](acceptance-2026-10-20.md) | 简体中文
 
+> 历史验收记录：SQL 测试包和上传适配包功能现已撤回。以下结果仅描述当时实现，不代表当前入口。原定义可从 Git 检查点 `035ac76` 读取；当前产品流程见 README。
+
 本摘要整理前三阶段的集成验收结果，区别真实系统、夹具和未验证范围。
 它不是 JDBC 认证或产品兼容性证明。自定义 PostgreSQL 适配包仅验证自助接入机制，
 未使用真实第三方自研数据库或私有驱动。
@@ -60,11 +62,11 @@
 同一适配包经 CLI/Web 解释的核心执行声明及指纹相同，SQL 模板和包指纹相同；
 来源分别保留 CLI_LOCAL/LOCAL 与 IMPORTED/LOCAL，没有提升为 official。
 
-[MySQL 示例](../examples/sql/mysql-basics.json)四项经真实驱动和 Worker 全部通过，覆盖建表/准备、
+MySQL 示例 (historical checkpoint `035ac76`)四项经真实驱动和 Worker 全部通过，覆盖建表/准备、
 参数绑定、JOIN/聚合、保留重复行的多重集、NULL、Decimal scale、更新计数及预期错误。
 两张归属表确认删除，最终表数 0。MySQL 显式使用 SIGNED/CHAR、InnoDB 和重复主键错误
 （SQLState 23000、错误码 1062、SQLIntegrityConstraintViolationException）；
-没有将 PostgreSQL 除零错误静默改写或弱化为通用断言。依据见 [SQL 文档](sql-packages.zh-CN.md)。
+没有将 PostgreSQL 除零错误静默改写或弱化为通用断言。依据见 SQL 文档 (historical checkpoint `035ac76`)。
 
 真实 JDBC A/B 仅选择以下六项，两驱动各六项通过，其余 264 项排除：
 
@@ -88,7 +90,7 @@ SQL 报告建立 JDBC 基线实际被拒绝（退出 2，未产生基线）。�
 | --- | --- |
 | PostgreSQL 迁移 | 复用前三阶段真实 `PostgresPackageMigrationTest`：1 项通过、未跳过；空库 V1–V10、合成旧数据 V8→V9→V10，原驱动/连接/任务/结果/报告可读，新包资源及任务快照重开后恢复。本轮真实 Web 的空平台也执行 V1–V10；未重复完整升级矩阵 |
 | PostgreSQL SQL | 真实 `PostgresSqlFlowTest` 1 项通过、未跳过；示例、故意失败、超时、协作取消、后续执行和清理；CLI 实测 0/1，无效输入 2 离线验证 |
-| 真实浏览器 | 自定义全链路、重启与新版本两个测试分别通过；测试入口见 [custom-integration.real.spec.ts](../jdbc-test-web/e2e/custom-integration.real.spec.ts)，必须显式启用独立环境 |
+| 真实浏览器 | 自定义全链路、重启与新版本两个测试分别通过；测试入口见 custom-integration.real.spec.ts (`jdbc-test-web/e2e/custom-integration.real.spec.ts`, historical checkpoint `035ac76`)，必须显式启用独立环境 |
 | Java 定向测试 | Core SQL 5、凭据 8、SQL executor 7、WorkerMain 9、REST handler 1，相关运行通过 |
 | 调度/强制结束 | 3 项边界测试，另补 1 项 UNKNOWN 证据测试通过；强制结束使用夹具 Worker，保留 CANCELLED、报告未校验、清理 UNKNOWN |
 | Python | regression 17、SQL 4、adapter archive 3、distribution 12，全部通过 |

@@ -308,8 +308,8 @@ duplicate IDs, ID/path mismatches and malformed declarations fail explicitly, in
 Core validates metadata without loading Suite, SQL resources or target JDBC drivers. Suite packaging
 tests check the declared SQL areas and pool profiles. Indexed packages use the existing classpath
 roots `ddl`, `dml`, `pool`; `assets.directory` selects the asset bundle independently of adapter ID.
-The CLI uses the same index and strict metadata contract. An explicitly selected local manifest
-remains independent of registration and retains its separate local asset-path semantics.
+The CLI uses the same index and strict metadata contract. Runtime external manifests and uploaded
+packages are no longer accepted.
 
 `DbType` contains stable codes for known product classifications; it is not a registry whitelist.
 Optional `db_type` classifies a custom adapter. Without it, known legacy IDs retain their product
@@ -376,18 +376,8 @@ npm test
 npm run build
 ```
 
-Unregistered private CLI packages remain available by explicit manifest path. The existing generator
-can prepare a local package without changing the built-in registry (replace the placeholders locally):
-
-```bash
-python3 -B scripts/runner.py init-custom --id private-db --dialect postgresql \
-  --driver-class com.example.Driver --driver-dir /absolute/path/to/driver-jars \
-  --url jdbc:postgresql://target.example/test_db --username test_user \
-  --namespace authorized_test_schema
-```
-
-Review the generated identity/version/capability declarations before executing anything; this command
-is preparation, not evidence of compatibility. Keep generated configs, private manifests and JARs local.
+Private drivers can explicitly reuse a built-in compatibility dialect in connection settings; see
+[current examples](../examples/README.md). Adaptation changes require source updates and rebuild/deploy.
 
 The manifest coordinate `org.postgresql:postgresql:42.7.2` is a declaration example, not a latest-version
 or security recommendation. Select a different fixed version through CLI `db.driver` (`kind: "maven"`,
@@ -400,7 +390,9 @@ fingerprints or historical runs. The platform PostgreSQL dependency serves platf
 drivers remain separate inputs loaded by the isolated Worker. There is no online Web Maven importer.
 
 The connection editor shows declaration hints and declared version combinations independently of
-installed-driver validation and target probe results. `databaseType` remains a custom display label.
+installed-driver validation and target probe results. Database type selects a built-in adapter. Explicit `databaseType=compatible` reuses its dialect without
+asserting another product identity/version range in the frozen execution configuration; actual identity
+is still recorded independently. Old display labels remain readable.
 The run wizard's adapter filter queries saved connections before pagination; it does not change their
 adapter or filter drivers by vendor. An off-filter deep-linked selection remains visible and requires
 clearing the filter or choosing another connection before continuing. Saved probes distinguish omitted
@@ -859,24 +851,24 @@ evidence requirements, allowed driver artifact changes and CI exit codes.
 See [capability contract decisions](jdbc-capability-contracts.md) for the reviewed JDBC assertions,
 independent declarations/observations and narrow plan requirements. Historical reports remain unchanged.
 
-### Web imports and frozen resources
+### Source maintenance and historical compatibility
 
-[Web adapter packages](web-adapters.md) are the runtime alternative to registering a bundled ID.
-Core validates the same manifest and bounded portable ZIP resources; Server persists current data in
-V9 and freezes the full package at task creation. Connection writes serialize with package archive
-checks. Worker alone materializes frozen data under its owned workspace and executes existing Suite
-cases. Public `adapterSnapshot` includes effective local provenance; raw declared trust cannot grant
-official status. `adapterExecution` remains unchanged; protocol 2 adds optional package/public
-snapshots and advertises `adapterPackageVersion=1` in the metadata handshake. Deploy matching builds.
-Historical missing snapshots remain unknown. See the guide for explicit update/retention boundaries.
+New runs execute the built-in standard JDBC catalog only. Uploaded adapter and SQL package pages,
+import/version APIs, CLI commands and Worker executors are removed. `GET /api/adapters` supplies built-in
+connection choices only. Developers maintain `adapters/catalog.json`, manifests, dialect resources and
+case source, then rebuild/deploy. Server still never loads uploaded drivers or executes target SQL.
+Protocol 2 advertises `adapterSnapshotVersion=1` for built-in snapshots; deploy matching Server/Worker.
+Unknown Worker `sqlPackage`/`adapterPackage` fields fail strictly rather than falling back to JDBC.
 
-## SQL feature packages (format 1)
-
-See [format, execution and validation](sql-packages.md). V10 adds immutable SQL package storage;
-standard JDBC selection is unchanged. `PostgresPackageMigrationTest` and `PostgresSqlFlowTest`
-require explicit loopback `JDBC_TEST_DISPOSABLE_PG_URL` pointing only to a session-owned disposable
-PostgreSQL. They remove their schemas/roles; the session owner must remove the temporary container
-and volume. Never point these tests at an existing platform or target database.
+V9/V10 migrations remain unchanged. Old package tables, drivers, connections, executed runs and reports
+are neither deleted nor rewritten. Historical SQL definitions return as read-only JSON without active
+validators; reports retain SQL_FEATURE and cannot enter JDBC baselines. Old custom-adapter connections
+remain readable but need a built-in type or explicit compatible dialect before a new run. Queued retired
+package runs reaching the executor fail with `RETIRED_PACKAGE_EXECUTION`, retaining not-run and cleanup UNKNOWN evidence.
+Normal service restart still interrupts all earlier nonterminal runs with `SERVER_RESTART`.
+Old clients supplying `sqlPackageFingerprint` receive `SQL_PACKAGES_RETIRED`, never a substituted run.
+`PostgresPackageMigrationTest` retains empty/V8 upgrade and raw historical-data restart checks; it may
+only target the session's own disposable PostgreSQL.
 
 ### Driver validation metadata and version sources
 

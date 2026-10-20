@@ -72,11 +72,6 @@ public final class WorkerProcessRunner {
 
     public void requireRunProtocol(boolean requireAdapterSnapshots)
         throws IOException, InterruptedException {
-        requireRunProtocol(requireAdapterSnapshots, false);
-    }
-
-    public void requireRunProtocol(boolean requireAdapterSnapshots, boolean requireSqlPackages)
-        throws IOException, InterruptedException {
         Result result = run("--describe-catalog", java.util.Map.of(),
             java.time.Duration.ofSeconds(30));
         if (!result.timedOut() && result.exitCode() == 0) {
@@ -86,8 +81,7 @@ public final class WorkerProcessRunner {
                     if ("CATALOG_DESCRIBED".equals(event.path("type").asString())
                         && event.path("protocolVersion").asInt(0) == 2
                         && (!requireAdapterSnapshots
-                        || event.path("adapterPackageVersion").asInt(0) == 1)
-                        && (!requireSqlPackages || event.path("sqlPackageVersion").asInt(0) == 1)) {
+                        || event.path("adapterSnapshotVersion").asInt(0) == 1)) {
                         return;
                     }
                 } catch (RuntimeException ignored) {

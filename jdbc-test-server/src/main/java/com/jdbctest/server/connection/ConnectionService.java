@@ -69,7 +69,6 @@ final class ConnectionService {
             throw invalid("password is required when savePassword is true");
         }
         return transactions.execute(status -> {
-            adapters.lockForConnection(values.adapterId());
             JdbcDriverPackageEntity driver = requiredValidatedDriver(values.driverId());
             DatabaseConnectionProfileEntity entity = new DatabaseConnectionProfileEntity(
                 values.name(),
@@ -134,7 +133,6 @@ final class ConnectionService {
         }
         return transactions.execute(status -> {
             DatabaseConnectionProfileEntity entity = requiredConnection(id);
-            adapters.lockForConnection(values.adapterId());
             JdbcDriverPackageEntity driver = requiredValidatedDriver(values.driverId());
             entity.setExecutionScope(
                 request.executionDatabase() == null ? entity.getExecutionDatabase()

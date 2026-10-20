@@ -136,7 +136,7 @@ export default function NewRun() {
   const unmet = catalog.data?.scenarios.filter(item => selection.selected.has(item.id) && missingPrerequisites(item, driverDetail.data?.dataSources).length) ?? [];
   const continueAllowed =
     step === 0
-      ? !!chosen && !outsideFilter
+      ? !!chosen && !!chosenAdapter && !outsideFilter
       : step === 1
         ? chosenDriver?.status === "VALIDATED" && (!needsPassword || !!password || emptyPassword)
         : step === 2
@@ -255,7 +255,10 @@ export default function NewRun() {
             !connections.data.items.some((item) => item.id === chosen.id) ? (
               <p className="mt-4 text-sm">{t("ui.selectedConnection")} {chosen.name}</p>
             ) : null}
-            {chosen ? <div className="mt-4"><AdapterDetails adapter={chosenAdapter} /></div> : null}
+            {chosen ? <div className="mt-4"><AdapterDetails adapter={chosenAdapter} />
+              {chosen.databaseType === "compatible" ? <p className="mt-2 text-sm">{t("adapter.compatibleHint")}</p> : null}
+              {adapters.data && !chosenAdapter ? <p role="alert">{t("adapter.legacyConnection")}</p> : null}
+            </div> : null}
           </>
         ) : null}
         {step === 1 ? (
@@ -410,6 +413,7 @@ export default function NewRun() {
           <Button
             disabled={
               create.isPending ||
+              !chosenAdapter ||
               !consent ||
               selectionCount === 0 ||
               !catalog.data ||

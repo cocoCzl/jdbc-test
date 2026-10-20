@@ -10,7 +10,7 @@ from unittest.mock import patch
 from adapter_runtime import AdapterPackage, build_runtime_config, discover_adapters, load_adapter, resolve_driver, validate_adapter
 from build_release import project_version, release_files
 from compatibility_v1 import RunKind, aggregate_target_outcome, build_v1_report, collect_preflight_issues
-from runner import _assessment_exit_code, _custom_adapter_manifest, _parse_connection_properties, _profile_test_patterns, compare_reports
+from runner import _assessment_exit_code, _parse_connection_properties, _profile_test_patterns, compare_reports
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -55,10 +55,6 @@ class AdapterRuntimeTest(unittest.TestCase):
         for adapter_id in adapters:
             self.assertEqual(adapter_id, load_adapter(PROJECT_ROOT, adapter_id).adapter_id)
 
-    def test_local_adapter_path_is_valid_without_java_core_change(self):
-        package = load_adapter(PROJECT_ROOT, "examples/adapters/postgresql-local")
-        self.assertEqual("postgresql-local", package.adapter_id)
-        self.assertEqual("local", package.manifest["trust"])
 
     def test_kingbase_official_records_real_scope_without_claiming_all_tests_passed(self):
         package = load_adapter(PROJECT_ROOT, "kingbase")
@@ -101,14 +97,32 @@ class AdapterRuntimeTest(unittest.TestCase):
         self.assertEqual(hashlib.sha256(canonical.encode()).hexdigest(),
                          evidence["provenance"]["source_records_sha256"])
 
-    def test_custom_adapter_reuses_selected_dialect_assets(self):
-        for dialect in ("oracle", "mysql", "postgresql"):
-            manifest = _custom_adapter_manifest("database-a", dialect, "example.jdbc.Driver", "local-drivers/database-a")
-            package = AdapterPackage(PROJECT_ROOT / "configs" / "custom-adapters" / "database-a", manifest)
-            validate_adapter(package, PROJECT_ROOT)
-            self.assertEqual("local", manifest["trust"])
-            self.assertEqual(dialect, manifest["assets"]["directory"])
-            self.assertEqual("example.jdbc.Driver", manifest["driver"]["class"])
+
+    def test_retired_commands_and_external_adapters_are_rejected(self):
+        import runner
+        import contextlib
+        import io
+        for command in ("init-custom", "pack-adapter", "sql-validate", "sql-run"):
+            with self.subTest(command=command), contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as error:
+                    runner.main([command, "--package", "ignored.json"])
+                self.assertEqual(2, error.exception.code)
+        for reference in ("/private/adapter", "examples/adapters/postgresql-local", "../adapter"):
+            with self.subTest(reference=reference), self.assertRaisesRegex(ValueError, "BUILTIN_ADAPTER_REQUIRED"):
+                load_adapter(PROJECT_ROOT, reference)
+
+    def test_compatible_dialect_keeps_observed_identity_independent_and_local_provenance(self):
+        user = {"db": {"url": "jdbc:fixture:never-contacted", "username": "tester",
+                       "password_env": "FIXTURE_PASSWORD", "driver_class": "fixture.Driver",
+                       "compatible_dialect": True},
+                "namespace": {"name": "owned_schema", "destructive_consent": True}}
+        with patch.dict(os.environ, {"FIXTURE_PASSWORD": "synthetic"}):
+            runtime = build_runtime_config(PROJECT_ROOT, user, load_adapter(PROJECT_ROOT, "postgresql"),
+                                           {}, regression_evidence=False)
+        self.assertEqual("fixture.Driver", runtime["db"]["driver_class"])
+        self.assertEqual("", runtime["db"]["expected_database_product_regex"])
+        self.assertEqual("local", runtime["adapter"]["trust"])
+        self.assertEqual("postgresql", runtime["db"]["adapter_id"])
 
     def test_local_driver_directory_resolves_all_jars(self):
         adapter = load_adapter(PROJECT_ROOT, "postgresql")

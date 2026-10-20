@@ -42,7 +42,6 @@ final class TestRunService {
     private final TestRunScheduler scheduler;
     private final ExecutionProperties executionProperties;
     private final AdapterService adapters;
-    private final com.jdbctest.server.sql.SqlPackageService sqlPackages;
 
     TestRunService(TestRunRepository runs, TestRunSelectedScenarioRepository selected,
         TestRunModuleRepository modules, TestRunCredentialRepository credentials,
@@ -50,9 +49,7 @@ final class TestRunService {
         JdbcDriverPackageRepository drivers,
         CredentialEncryptionService encryption, RunCatalogService catalog,
         TransactionTemplate transactions, TestRunScheduler scheduler,
-        ExecutionProperties executionProperties, AdapterService adapters,
-        com.jdbctest.server.sql.SqlPackageService sqlPackages) {
-        this.sqlPackages = sqlPackages;
+        ExecutionProperties executionProperties, AdapterService adapters) {
         this.adapters = adapters;
         this.runs = runs;
         this.selected = selected;
@@ -69,6 +66,10 @@ final class TestRunService {
     }
 
     TestRunResponse create(CreateTestRunRequest request) {
+        if (request.sqlPackageFingerprint() != null) {
+            throw problem(HttpStatus.UNPROCESSABLE_CONTENT, "SQL_PACKAGES_RETIRED",
+                "SQL package execution has been retired; select standard JDBC cases");
+        }
         if (!request.destructiveConsent()) {
             throw problem(HttpStatus.UNPROCESSABLE_CONTENT, "DESTRUCTIVE_CONSENT_REQUIRED",
                 "Destructive test consent is required");
@@ -98,26 +99,28 @@ final class TestRunService {
             }
             com.jdbctest.catalog.ExecutionScope scope = new com.jdbctest.catalog.ExecutionScope(
                 connection.getExecutionDatabase(), connection.getExecutionSchema());
-            var adapterPackage = adapters.packageSnapshot(connection.getAdapterId());
-            var definition = adapterPackage == null ? adapters.required(connection.getAdapterId())
-                : adapterPackage.definition();
-            var adapterSnapshot = adapterPackage == null ? AdapterResponse.from(definition)
-                : AdapterResponse.imported(adapterPackage);
+            var definition = adapters.required(connection.getAdapterId());
+            var adapterSnapshot = AdapterResponse.from(definition);
             if (request.expectedAdapterFingerprint() != null
                 && !request.expectedAdapterFingerprint().equals(adapterSnapshot.fingerprint())) {
                 throw problem(HttpStatus.CONFLICT, "ADAPTER_CHANGED",
                     "Adapter changed; refresh and review its current version");
             }
             var adapterExecution = definition.execution();
+            if ("compatible".equals(connection.getDatabaseType())) {
+                // Explicit dialect reuse does not assert another product's metadata identity.
+                adapterExecution = new com.jdbctest.catalog.AdapterExecutionConfig(
+                    adapterExecution.id(), adapterExecution.assetId(), adapterExecution.dialect(),
+                    adapterExecution.identifierQuote(), adapterExecution.capabilities(),
+                    java.util.Map.of());
+            }
             try {
                 scope.validate(adapterExecution.sqlDialect());
             } catch (IllegalArgumentException exception) {
                 throw problem(HttpStatus.UNPROCESSABLE_CONTENT, "EXECUTION_SCOPE_REQUIRED",
                     exception.getMessage());
             }
-            var sqlPackage = request.sqlPackageFingerprint() == null ? null
-                : sqlPackages.required(request.sqlPackageFingerprint());
-            var source = sqlPackage == null ? catalog.catalog() : sqlCatalog(sqlPackage, request);
+            var source = catalog.catalog();
             ResolvedSelection selection = resolve(request, source, connection.getAdapterId());
             String password =
                 request.password() == null ? encryption.decrypt(connection.getEncryptedPassword())
@@ -133,11 +136,9 @@ final class TestRunService {
                 driver.getVersion(), driver.getDriverClass(), driver.getPackageFingerprint());
             run.setTotalCases(selection.scenarios().size());
             var execution = new java.util.LinkedHashMap<String, Object>();
-            execution.put("testDomain", sqlPackage == null ? "JDBC_CONTRACT" : "SQL_FEATURE");
-            if (sqlPackage != null) {
-                execution.put("sqlPackage", sqlPackage);
-                execution.put("sqlPackageOrigin", "LOCAL");
-            }
+            execution.put("testDomain", "JDBC_CONTRACT");
+            execution.put("adaptationMode", "compatible".equals(connection.getDatabaseType())
+                ? "COMPATIBLE_DIALECT" : "BUILTIN_PRODUCT");
             execution.put("jdbcUrl", connection.getJdbcUrl());
             execution.put("username", connection.getUsername());
             execution.put("scope", scope);
@@ -146,9 +147,6 @@ final class TestRunService {
                 "j" + UUID.randomUUID().toString().replace("-", "").substring(0, 20));
             execution.put("adapterExecution", adapterExecution);
             execution.put("adapterSnapshot", adapterSnapshot);
-            if (adapterPackage != null) {
-                execution.put("adapterPackage", adapterPackage);
-            }
             execution.put("dataSources", driver.getDataSources().toMap());
             execution.put("selection", java.util.Map.of(
                 "catalogVersion", source.catalogVersion(), "semanticsVersion", 2,
@@ -306,29 +304,13 @@ final class TestRunService {
         return password;
     }
 
-    private com.jdbctest.catalog.SqlTestPackage frozenSqlPackage(TestRunEntity run) {
+    /** Historical data is read as evidence, never revalidated or executed as a current package. */
+    private tools.jackson.databind.JsonNode frozenSqlPackage(TestRunEntity run) {
         if (run.getExecutionInput() == null) {
             return null;
         }
-        var node = new tools.jackson.databind.ObjectMapper().readTree(run.getExecutionInput()).get("sqlPackage");
-        return node == null ? null : new tools.jackson.databind.ObjectMapper().treeToValue(node,
-            com.jdbctest.catalog.SqlTestPackage.class);
-    }
-
-    private RunCatalogService.Catalog sqlCatalog(com.jdbctest.catalog.SqlTestPackage snapshot,
-        CreateTestRunRequest request) {
-        if (!"CUSTOM".equals(request.profile()) || request.includeScenarios() == null
-            || request.includeScenarios().isEmpty() || request.excludeScenarios() != null
-            && !request.excludeScenarios().isEmpty()) {
-            throw problem(HttpStatus.UNPROCESSABLE_CONTENT, "INVALID_SELECTION",
-                "SQL packages require explicit CUSTOM case IDs and no exclusions");
-        }
-        var cases = snapshot.definition().cases().stream().map(item -> new RunCatalogService.Scenario(
-            item.id(), "sql_feature", item.name(), "CUSTOM", "SQL_FEATURE", List.of(),
-            "NOT_APPLICABLE", List.of(), List.of(), "declarative.SQL", item.id(), "REQUIRED")).toList();
-        return new RunCatalogService.Catalog(List.of(), List.of(new RunCatalogService.Module(
-            "sql_feature", "SQL features", "Declarative SQL assertions", cases.size(), 0)),
-            cases, cases.size(), "sql-v1:" + snapshot.fingerprint());
+        return new tools.jackson.databind.ObjectMapper().readTree(
+            JdbcUrlSanitizer.sanitizeJson(run.getExecutionInput())).get("sqlPackage");
     }
 
     private ResolvedSelection resolve(CreateTestRunRequest request,

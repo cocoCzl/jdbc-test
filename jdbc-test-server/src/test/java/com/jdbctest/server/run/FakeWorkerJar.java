@@ -53,7 +53,7 @@ final class FakeWorkerJar {
                         test -> test.module().id().equals(item.id()) && test.profile().name()
                             .equals("CORE")).count())).toList();
             var payload = java.util.Map.of("type", "CATALOG_DESCRIBED", "protocolVersion",
-                protocolVersion, "adapterPackageVersion", 1, "runId", "catalog", "profiles", java.util.List.of(
+                protocolVersion, "adapterSnapshotVersion", 1, "runId", "catalog", "profiles", java.util.List.of(
                     java.util.Map.of("id", "CORE", "name", "Core", "scenarioCount",
                         catalog.select(com.jdbctest.catalog.TestSelection.core()).size()),
                     java.util.Map.of("id", "FULL", "name", "Full", "scenarioCount",

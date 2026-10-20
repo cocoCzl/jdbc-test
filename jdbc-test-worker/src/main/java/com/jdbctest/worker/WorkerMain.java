@@ -59,23 +59,14 @@ public final class WorkerMain {
         if (args.length == 1 && "--describe-catalog".equals(args[0])) {
             return describeCatalog();
         }
-        if (args.length == 1 && "--validate-sql-package".equals(args[0])) {
-            try {
-                var snapshot = com.jdbctest.catalog.SqlTestPackage.readPackage(System.in);
-                events.write("SQL_PACKAGE_VALIDATED", "", Map.of("sqlPackage", snapshot,
-                    "definition", snapshot.definition(), "testDomain", "SQL_FEATURE"));
-                return SUCCESS;
-            } catch (Exception exception) {
-                events.write("SQL_PACKAGE_INVALID", "", Map.of("message",
-                    java.util.Objects.toString(exception.getMessage(), "Invalid SQL package")));
-                return INVALID_REQUEST;
-            }
-        }
         if (args.length == 1 && "--validate-driver".equals(args[0])) {
             return validateDriver();
         }
         if (args.length == 1 && "--probe-connection".equals(args[0])) {
             return probeConnection();
+        }
+        if (args.length != 0) {
+            return INVALID_REQUEST;
         }
         WorkerRunRequest request;
         try {
@@ -108,8 +99,7 @@ public final class WorkerMain {
         }
         List<TestCaseDescriptor> selected;
         try {
-            selected = request.sqlPackage() == null ? resolveScenarios(request, catalog, selection)
-                : SqlFeatureExecutor.selected(request);
+            selected = resolveScenarios(request, catalog, selection);
             if (selected.isEmpty()) {
                 throw new IllegalArgumentException("Selection resolved to no scenarios");
             }
@@ -394,7 +384,7 @@ public final class WorkerMain {
             }).toList();
             events.write("CATALOG_DESCRIBED", "catalog",
                 Map.of("catalogVersion", catalog.version(), "profiles", profiles, "modules", modules,
-                    "protocolVersion", 2, "adapterPackageVersion", 1, "sqlPackageVersion", 1, "scenarios", scenarios, "totalScenarioCount",
+                    "protocolVersion", 2, "adapterSnapshotVersion", 1, "scenarios", scenarios, "totalScenarioCount",
                     catalog.testCases().size()));
             return SUCCESS;
         } catch (Exception exception) {
@@ -406,9 +396,6 @@ public final class WorkerMain {
 
     private WorkerExecutionEvidence execute(WorkerRunRequest request,
         List<TestCaseDescriptor> selected) throws Exception {
-        if (request.sqlPackage() != null) {
-            return executeSql(request, selected);
-        }
         Map<String, TestCaseDescriptor> descriptors = new HashMap<>();
         for (TestCaseDescriptor descriptor : selected) {
             descriptors.put(key(descriptor.sourceClass(), descriptor.sourceMethod()), descriptor);
@@ -494,32 +481,6 @@ public final class WorkerMain {
         return fields;
     }
 
-    private WorkerExecutionEvidence executeSql(WorkerRunRequest request,
-        List<TestCaseDescriptor> selected) throws Exception {
-        var evidence = new WorkerExecutionEvidence(request.runId(), selected, events);
-        var executor = java.util.concurrent.Executors.newSingleThreadExecutor(
-            Thread.ofPlatform().daemon(true).name("jdbc-test-sql").factory());
-        try {
-            var future = executor.submit(() -> {
-                try {
-                    JdbcContext.init(com.jdbctest.config.ConfigLoader.load());
-                    new SqlFeatureExecutor(request, evidence).execute();
-                } finally {
-                    JdbcContext.shutdown();
-                }
-            });
-            try {
-                future.get(timeoutMillis(request), TimeUnit.MILLISECONDS);
-            } catch (TimeoutException exception) {
-                future.cancel(true);
-                throw exception;
-            }
-        } finally {
-            executor.shutdownNow();
-        }
-        return evidence;
-    }
-
     private static String key(String className, String methodName) {
         return className + "#" + methodName;
     }
@@ -554,18 +515,6 @@ public final class WorkerMain {
         config.put("ddl", Map.of("base_path", "classpath:ddl"));
         config.put("dml", Map.of("base_path", "classpath:dml"));
         config.put("pool", Map.of("profile_dir", "classpath:pool"));
-        if (request.adapterPackage() != null) {
-            var frozen = request.adapterPackage();
-            if (!frozen.definition().execution().equals(adapter)) {
-                throw new IllegalArgumentException("ADAPTER_PACKAGE_EXECUTION_MISMATCH");
-            }
-            Path resources = Path.of(request.workspace()).resolve("adapter-resources");
-            frozen.materialize(resources);
-            var assets = frozen.definition().assets();
-            config.put("ddl", Map.of("base_path", resources.resolve(assets.ddl()).toString()));
-            config.put("dml", Map.of("base_path", resources.resolve(assets.dml()).toString()));
-            config.put("pool", Map.of("profile_dir", resources.resolve(assets.pool()).toString()));
-        }
         db.put("identifier_quote", adapter.identifierQuote());
         Map<String, Object> namespace = new LinkedHashMap<>();
         namespace.put("mode", "existing");
@@ -582,7 +531,7 @@ public final class WorkerMain {
         config.put("adapter", Map.of("id", adapterId, "capabilities",
             com.jdbctest.catalog.AdapterExecutionConfig.validateCapabilities(
                 request.capabilities())));
-        config.put("preflight", Map.of("require_sqlxml", request.sqlPackage() == null && resolveScenarios(request,
+        config.put("preflight", Map.of("require_sqlxml", resolveScenarios(request,
             TestCatalog.loadDefault(), toSelection(request.selection())).stream()
             .anyMatch(test -> test.requiredCapabilities().contains("sqlxml"))));
         config.put("test_filter", Map.of("timeout_ms", timeoutMillis(request)));
@@ -642,6 +591,16 @@ public final class WorkerMain {
             ? com.jdbctest.catalog.AdapterExecutionConfig.load(request.connection().adapterId())
             : request.adapterExecution();
         if (!java.util.Objects.equals(request.connection().adapterId(), adapter.id())) {
+            throw new IllegalArgumentException("ADAPTER_SNAPSHOT_MISMATCH");
+        }
+        if (!com.jdbctest.catalog.AdapterRegistry.bundled().contains(adapter.id())) {
+            throw new IllegalArgumentException("BUILTIN_ADAPTER_REQUIRED");
+        }
+        var bundled = com.jdbctest.catalog.AdapterExecutionConfig.load(adapter.id());
+        var compatible = new com.jdbctest.catalog.AdapterExecutionConfig(bundled.id(),
+            bundled.assetId(), bundled.dialect(), bundled.identifierQuote(),
+            bundled.capabilities(), Map.of());
+        if (!adapter.equals(bundled) && !adapter.equals(compatible)) {
             throw new IllegalArgumentException("ADAPTER_SNAPSHOT_MISMATCH");
         }
         request.scope().validate(adapter.sqlDialect());

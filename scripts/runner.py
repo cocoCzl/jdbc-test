@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import copy
 import html
 import json
 import os
@@ -41,26 +40,14 @@ REPORT_SCHEMA_VERSION = "1.0.0"
 
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
-    if argv and argv[0] not in {"init", "init-custom", "pack-adapter", "sql-validate", "sql-run", "run", "compare", "baseline", "adapters", "coverage", "--help", "-h"}:
+    if argv and argv[0] in {"init-custom", "pack-adapter", "sql-validate", "sql-run"}:
+        _parser().error("Package commands are retired; use init with a built-in adapter and run standard JDBC tests")
+    if argv and argv[0] not in {"init", "run", "compare", "baseline", "adapters", "coverage", "--help", "-h"}:
         argv.insert(0, "run")
     parser = _parser()
     args = parser.parse_args(argv)
     if args.command == "init":
         return command_init(args)
-    if args.command == "init-custom":
-        return command_init_custom(args)
-    if args.command == "pack-adapter":
-        from adapter_archive import pack_adapter
-        try:
-            pack_adapter(PROJECT_ROOT, args.adapter, Path(args.output))
-            print(f"Adapter archive: {args.output}")
-            return 0
-        except (ValueError, OSError) as error:
-            print(f"Adapter archive failed: {error}", file=sys.stderr)
-            return 2
-    if args.command in {"sql-validate", "sql-run"}:
-        from sql_runner import command_sql
-        return command_sql(args, PROJECT_ROOT)
     if args.command == "run":
         return command_run(args)
     if args.command == "compare":
@@ -78,17 +65,11 @@ def main(argv: list[str] | None = None) -> int:
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="JDBC 4.3 driver compatibility assessment")
     sub = parser.add_subparsers(dest="command")
-    for sql_command in ("sql-validate", "sql-run"):
-        sql = sub.add_parser(sql_command, help="Validate/run declarative SQL feature package v1")
-        sql.add_argument("--package", required=True)
-        sql.add_argument("--worker", default=str(PROJECT_ROOT / "jdbc-test-worker/target/jdbc-test-worker-1.2.1-SNAPSHOT-all.jar"))
-        if sql_command == "sql-run":
-            sql.add_argument("--config", required=True)
-            sql.add_argument("--case", action="append", required=True, dest="cases")
-            sql.add_argument("--output", required=True)
-            sql.add_argument("--budget-seconds", type=int, default=300)
     init = sub.add_parser("init", help="Generate secure local configuration")
-    init.add_argument("--adapter")
+    init.add_argument("--adapter", choices=tuple(discover_adapters(PROJECT_ROOT)))
+    init.add_argument("--compatible-dialect", action="store_true", help="Explicitly reuse built-in preparation without claiming product identity")
+    init.add_argument("--driver-class", help="Driver class for an explicitly selected compatible dialect")
+    init.add_argument("--driver-dir", help="Local JDBC driver/dependency JAR file or directory")
     init.add_argument("--url")
     init.add_argument("--username")
     init.add_argument("--password-env", default="DB_PASSWORD")
@@ -96,24 +77,6 @@ def _parser() -> argparse.ArgumentParser:
     init.add_argument("--consent", action="store_true")
     init.add_argument("--output", default="configs/config.local.json")
     _add_connection_arguments(init, "hikari")
-
-    custom = sub.add_parser("init-custom", help="Generate a private adapter from a bundled SQL dialect")
-    custom.add_argument("--id", required=True, help="Local adapter id, for example database-a")
-    custom.add_argument("--dialect", required=True, choices=("oracle", "mysql", "postgresql"))
-    custom.add_argument("--driver-class", required=True)
-    custom.add_argument("--driver-dir", required=True, help="Local JAR file or directory (may be populated later)")
-    custom.add_argument("--url", required=True)
-    custom.add_argument("--username", required=True)
-    custom.add_argument("--password-env", default="DB_PASSWORD")
-    custom.add_argument("--namespace")
-    custom.add_argument("--consent", action="store_true")
-    custom.add_argument("--adapter-output")
-    custom.add_argument("--output")
-    _add_connection_arguments(custom, "driver_manager")
-
-    archive = sub.add_parser("pack-adapter", help="Export a local adapter for Web import (no driver JARs)")
-    archive.add_argument("--adapter", required=True)
-    archive.add_argument("--output", required=True)
 
     run = sub.add_parser("run", help="Run compatibility assessment")
     run.add_argument("config")
@@ -217,7 +180,9 @@ def command_init(args: argparse.Namespace) -> int:
             "url": url,
             "username": username,
             "password_env": args.password_env,
-            "driver": adapter.manifest["driver"]["source"],
+            "driver": {"kind": "local", "path": args.driver_dir} if args.driver_dir else adapter.manifest["driver"]["source"],
+            "driver_class": args.driver_class or adapter.manifest["driver"]["class"],
+            "compatible_dialect": args.compatible_dialect,
             "connection_mode": args.connection_mode,
             "properties": properties,
             "property_env": property_env,
@@ -247,96 +212,6 @@ def command_init(args: argparse.Namespace) -> int:
         print("[安全] destructive_consent=false；run 将拒绝执行数据库变更")
     return 0
 
-
-def _custom_adapter_manifest(adapter_id: str, dialect: str, driver_class: str, driver_dir: str) -> dict[str, Any]:
-    """Create a local adapter that reuses a bundled dialect's SQL assets."""
-    base = load_adapter(PROJECT_ROOT, dialect).manifest
-    assets = copy.deepcopy(base["assets"])
-    # The adapter id is private, but its SQL assets deliberately come from the selected dialect.
-    assets["directory"] = str(assets.get("directory") or dialect)
-    return {
-        "id": adapter_id,
-        "name": f"Local {dialect} compatible JDBC adapter",
-        "version": "0.1.0",
-        "revision": "local",
-        "trust": "local",
-        "dialect": base["dialect"],
-        "identifier_quote": base.get("identifier_quote", '\"'),
-        "driver": {
-            "class": driver_class,
-            "source": {"kind": "local", "path": driver_dir},
-        },
-        # Keep the template usable before a first successful metadata probe.
-        "identity": {"database_product_regex": ".*", "driver_name_regex": ".*"},
-        "supported_versions": {
-            "database": {"min": "0", "max": "999"},
-            "driver": {"min": "0", "max": "999"},
-        },
-        "validated_combinations": [],
-        "capabilities": copy.deepcopy(base["capabilities"]),
-        "assets": assets,
-        "namespace": copy.deepcopy(base["namespace"]),
-        "minimum_privileges": copy.deepcopy(base["minimum_privileges"]),
-        "privilege_checks": copy.deepcopy(base["privilege_checks"]),
-        "known_differences": [],
-    }
-
-
-def command_init_custom(args: argparse.Namespace) -> int:
-    try:
-        manifest = _custom_adapter_manifest(args.id, args.dialect, args.driver_class, args.driver_dir)
-        properties, property_env = _parse_connection_properties(args.property, args.property_env)
-        # Validate the generated manifest before writing it, including the inherited SQL assets.
-        from adapter_runtime import AdapterPackage, validate_adapter
-        validate_adapter(AdapterPackage(PROJECT_ROOT / "configs" / "custom-adapters" / args.id, manifest), PROJECT_ROOT)
-    except ValueError as exc:
-        print(f"[错误] {exc}", file=sys.stderr)
-        return 2
-
-    adapter_output = Path(args.adapter_output or f"configs/custom-adapters/{args.id}")
-    if not adapter_output.is_absolute():
-        adapter_output = PROJECT_ROOT / adapter_output
-    adapter_output.mkdir(parents=True, exist_ok=True)
-    (adapter_output / "adapter.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-
-    output = Path(args.output or f"configs/{args.id}.local.json")
-    if not output.is_absolute():
-        output = PROJECT_ROOT / output
-    output.parent.mkdir(parents=True, exist_ok=True)
-    config = {
-        "schema_version": "1.0.0",
-        "adapter": str(adapter_output),
-        "db": {
-            "url": args.url,
-            "username": args.username,
-            "password_env": args.password_env,
-            "driver": manifest["driver"]["source"],
-            "connection_mode": args.connection_mode,
-            "properties": properties,
-            "property_env": property_env,
-        },
-        "namespace": {
-            "mode": manifest["namespace"]["mode"],
-            "name": args.namespace,
-            "destructive_consent": bool(args.consent),
-        },
-        "execution": {"mode": "local"},
-        "test_profile": "full",
-        "report": {"output_dir": "report", "format": ["json", "html", "markdown"]},
-        "test_filter": {"include_tests": [], "exclude_tests": [], "timeout_ms": 60000},
-    }
-    output.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    for path in (adapter_output / "adapter.json", output):
-        try:
-            path.chmod(0o600)
-        except OSError:
-            pass
-    print(f"[生成] 本地适配包 {adapter_output}")
-    print(f"[生成] 本地配置 {output}")
-    print(f"[提示] 将 JDBC 驱动及依赖 JAR 放入 {args.driver_dir}，然后设置环境变量 {args.password_env}")
-    if not args.consent:
-        print("[安全] destructive_consent=false；run 将拒绝执行数据库变更")
-    return 0
 
 
 def command_run(args: argparse.Namespace) -> int:

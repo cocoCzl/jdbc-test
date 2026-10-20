@@ -9,8 +9,6 @@ import { Button } from "@/components/ui/button";
 const links = [
   { to: "/", key: "ui.dashboard", icon: LayoutDashboard },
   { to: "/drivers", key: "ui.drivers", icon: Database },
-  { to: "/sql-packages", key: "sql.manage", icon: Terminal },
-  { to: "/adapters", key: "adapter.manage", icon: Database },
   { to: "/connections", key: "ui.connections", icon: Cable },
   { to: "/runs", key: "ui.runHistory", icon: Terminal },
   { to: "/runs/new", key: "ui.newRun", icon: Play },

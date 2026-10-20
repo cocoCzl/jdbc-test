@@ -21,22 +21,8 @@ public record WorkerRunRequest(
     String catalogVersion,
     Long caseTimeoutMs,
     List<com.jdbctest.catalog.TestCaseDescriptor> frozenScenarios,
-    com.jdbctest.catalog.AdapterPackageSnapshot adapterPackage,
-    Map<String, Object> adapterSnapshot,
-    com.jdbctest.catalog.SqlTestPackage sqlPackage
+    Map<String, Object> adapterSnapshot
 ) {
-
-    public WorkerRunRequest(Integer protocolVersion, String runId, DriverRequest driver,
-        ConnectionRequest connection, SelectionRequest selection, String workspace, Long timeoutMs,
-        com.jdbctest.catalog.ExecutionScope scope, String objectPrefix,
-        Map<String, Boolean> capabilities, Boolean destructiveConsent,
-        com.jdbctest.catalog.AdapterExecutionConfig adapterExecution, String catalogVersion,
-        Long caseTimeoutMs, List<com.jdbctest.catalog.TestCaseDescriptor> frozenScenarios,
-        com.jdbctest.catalog.AdapterPackageSnapshot adapterPackage, Map<String, Object> adapterSnapshot) {
-        this(protocolVersion, runId, driver, connection, selection, workspace, timeoutMs, scope,
-            objectPrefix, capabilities, destructiveConsent, adapterExecution, catalogVersion,
-            caseTimeoutMs, frozenScenarios, adapterPackage, adapterSnapshot, null);
-    }
 
     public WorkerRunRequest(Integer protocolVersion, String runId, DriverRequest driver,
         ConnectionRequest connection, SelectionRequest selection, String workspace, Long timeoutMs,
@@ -46,7 +32,7 @@ public record WorkerRunRequest(
         Long caseTimeoutMs, List<com.jdbctest.catalog.TestCaseDescriptor> frozenScenarios) {
         this(protocolVersion, runId, driver, connection, selection, workspace, timeoutMs, scope,
             objectPrefix, capabilities, destructiveConsent, adapterExecution, catalogVersion,
-            caseTimeoutMs, frozenScenarios, null, null);
+            caseTimeoutMs, frozenScenarios, null);
     }
 
     public WorkerRunRequest(Integer protocolVersion, String runId, DriverRequest driver,

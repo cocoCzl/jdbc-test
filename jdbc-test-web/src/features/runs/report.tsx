@@ -1,4 +1,4 @@
-import { SqlPackageSnapshot } from "@/features/sql-packages/sql-package-snapshot";
+import { LegacySqlSnapshot } from "./legacy-sql-snapshot";
 import { AdapterDetails } from "@/features/connections/adapter-details";
 import { CleanupEvidence } from "./cleanup-evidence";
 import { JdbcUrl } from "@/components/jdbc-url";
@@ -66,7 +66,7 @@ export default function Report({ run }: { run: Run }) {
       {summary.contractSummary ? <Card className="panel mb-4"><h2 className="mb-3 font-semibold">{t("selection.evidence")}</h2>
         <dl className="grid gap-3 sm:grid-cols-2">{Object.entries(summary.contractSummary).filter(([key]) => key !== "EXECUTED").map(([key, count]) => <div key={key}><dt className="text-sm text-muted-foreground">{t(`selection.${key}`, { defaultValue: key })}</dt><dd>{count}</dd></div>)}</dl>
       </Card> : null}
-      {summary.sqlPackage ? <SqlPackageSnapshot snapshot={summary.sqlPackage} /> : null}
+      {summary.sqlPackage ? <LegacySqlSnapshot snapshot={summary.sqlPackage} /> : null}
       <CleanupEvidence evidence={summary.cleanupEvidence} />
       {summary.executionIssues?.length ? <Card className="panel mb-4"><h2>{t("ui.executionIssues")}</h2>
         {summary.executionIssues.map((issue, index) => <p key={index} className="break-words">{String(issue.level)}: {String(issue.message ?? issue.status)}</p>)}

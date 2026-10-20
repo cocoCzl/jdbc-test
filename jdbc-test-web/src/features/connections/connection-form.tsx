@@ -166,40 +166,25 @@ function Editor({ connection }: { connection?: Connection }) {
                 onChange={(event) => change("name", event.target.value)}
                 placeholder={t("ui.postgresqlTestWorkspace")}
               />
-              <Field
-                id="database-type"
-                label={t("ui.databaseType")}
-                required
-                maxLength={80}
-                value={form.databaseType}
-                onChange={(event) => change("databaseType", event.target.value)}
-                hint={t("adapter.displayLabelHint")}
-              />
-              <Field id="adapter" label={t("ui.adapter")} hint={t("adapter.selectionHint")}>
-                <Select
-                  id="adapter"
-                  required
-                  className=""
-                  value={form.adapterId}
-                  onValueChange={(value) => {
-                    change("adapterId", value);
-                    if (!form.databaseType)
-                      change(
-                        "databaseType",
-                        adapters.data.find(
-                          (item) => item.id === value,
-                        )?.name ?? "",
-                      );
-                  }}
-                >
+              <Field id="database-type" label={t("ui.databaseType")} hint={t("adapter.typeHint")}>
+                <Select id="database-type" required
+                  value={form.databaseType === "compatible" ? "compatible" : selectedAdapter?.id ?? ""}
+                  onValueChange={(value) => setForm(previous => ({ ...previous,
+                    databaseType: value === "compatible" ? value : adapters.data.find(item => item.id === value)?.name ?? value,
+                    adapterId: value === "compatible" ? "" : value,
+                  }))}>
                   <option value="">{t("ui.selectAnAdapter")}</option>
-                  {adapters.data.map((adapter) => (
-                    <option key={adapter.id} value={adapter.id}>
-                      {adapter.name} · {adapterStatus(adapter.status)}
-                    </option>
-                  ))}
+                  {adapters.data.map(adapter => <option key={adapter.id} value={adapter.id}>{adapter.name} · {adapterStatus(adapter.status)}</option>)}
+                  <option value="compatible">{t("adapter.compatibleType")}</option>
                 </Select>
               </Field>
+              {form.databaseType === "compatible" ? <Field id="adapter" label={t("adapter.compatibleDialect")} hint={t("adapter.compatibleHint")}>
+                <Select id="adapter" required value={form.adapterId} onValueChange={value => change("adapterId", value)}>
+                  <option value="">{t("ui.selectAnAdapter")}</option>
+                  {adapters.data.map(adapter => <option key={adapter.id} value={adapter.id}>{adapter.name} · {adapter.dialect}</option>)}
+                </Select>
+              </Field> : null}
+              {connection && !selectedAdapter ? <p role="alert">{t("adapter.legacyConnection")}</p> : null}
               <div className="sm:col-span-2">
                 <AdapterDetails adapter={selectedAdapter} />
               </div>
@@ -330,7 +315,7 @@ function Editor({ connection }: { connection?: Connection }) {
           <p className="text-sm leading-relaxed text-muted-foreground">
             {t("ui.savingAndTestingAreIndependentYouCan")}</p>
           <FormError message={error} />
-          <Button className="w-full" disabled={busy}>
+          <Button className="w-full" disabled={busy || !selectedAdapter}>
             {save.isPending ? t("ui.saving") : t("ui.saveConnection")}
           </Button>
           <Button

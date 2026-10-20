@@ -7,8 +7,8 @@ import { json, mockApi, problem, renderPage } from "@/test/harness";
 
 async function fillDraft(user: ReturnType<typeof userEvent.setup>) {
   await user.type(await screen.findByLabelText("Name"), "Vendor workspace");
-  await user.type(screen.getByLabelText("Database type"), "GaussDB-compatible");
-  await chooseOption(user, screen.getByLabelText("Adapter"), "postgresql");
+  await chooseOption(user, screen.getByLabelText("Database type"), "compatible");
+  await chooseOption(user, screen.getByLabelText("Built-in compatibility dialect"), "postgresql");
   await chooseOption(user,
     await screen.findByLabelText("Driver package"),
     driver.id,
@@ -36,10 +36,10 @@ describe("Connection UI", () => {
     });
     const { router } = renderPage("/connections/new");
     await user.type(await screen.findByLabelText("Name"), "Kingbase trial");
-    await chooseOption(user, screen.getByLabelText("Adapter"), "kingbase");
-    expect(screen.getByLabelText("Database type")).toHaveValue("KingbaseES");
+    await chooseOption(user, screen.getByLabelText("Database type"), "kingbase");
+    expect(screen.getByLabelText("Database type")).toHaveAttribute("data-value", "kingbase");
     expect(screen.getByText(/Official platform integration for the validated combination only/)).toBeVisible();
-    expect(screen.getByLabelText("Adapter")).toHaveTextContent("KingbaseES · Official");
+    expect(screen.getByLabelText("Database type")).toHaveTextContent("KingbaseES · Official");
     expect(screen.getByText("Database 12.1 · Driver V008R006B0001")).toBeVisible();
     await chooseOption(user, await screen.findByLabelText("Driver package"), kingbaseDriver.id);
     await user.type(screen.getByLabelText("JDBC URL"), "jdbc:kingbase8://example.invalid:4321/test");
@@ -67,20 +67,16 @@ describe("Connection UI", () => {
     },
   );
 
-  it("displays custom adapter declarations without replacing an existing label or probing", async () => {
+  it("requires an explicit built-in compatibility dialect without importing a package", async () => {
     const user = userEvent.setup();
-    const api = mockApi(url => url.pathname === "/api/adapters" ? json([
-      { id: "private-db", name: "Private DB", status: "CANDIDATE", dialect: "postgresql",
-        namespaceSelection: "schema", driverClass: "private.Driver", recommendedMavenCoordinate: null,
-        validatedCombinations: [] },
-    ]) : undefined);
+    const api = mockApi();
     renderPage("/connections/new");
-    await user.type(await screen.findByLabelText("Database type"), "Historical custom label");
-    await chooseOption(user, screen.getByLabelText("Adapter"), "private-db");
-    expect(screen.getByLabelText("Database type")).toHaveValue("Historical custom label");
-    expect(screen.getByText("Declared driver class: private.Driver")).toBeVisible();
-    expect(screen.getByText("No validated version combinations declared.")).toBeVisible();
+    await chooseOption(user, await screen.findByLabelText("Database type"), "compatible");
+    await chooseOption(user, screen.getByLabelText("Built-in compatibility dialect"), "postgresql");
+    expect(screen.getByText(/Product identity is observed independently/)).toBeVisible();
     expect(api.mock.calls.some(([, options]) => options?.method === "POST")).toBe(false);
+    expect(screen.queryByRole("link", {name: "Database adapters"})).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", {name: "SQL test packages"})).not.toBeInTheDocument();
   });
   it("saves an explicitly selected empty password", async () => {
     const user = userEvent.setup();
@@ -132,7 +128,7 @@ describe("Connection UI", () => {
         : undefined,
     );
     renderPage("/connections/new");
-    await user.click(await screen.findByLabelText("Adapter"));
+    await user.click(await screen.findByLabelText("Database type"));
     expect(
       await screen.findByRole("option", { name: /VendorDB/ }),
     ).toBeVisible();
@@ -171,7 +167,7 @@ describe("Connection UI", () => {
           .body as string,
       );
       expect(input).toMatchObject({
-        databaseType: "GaussDB-compatible",
+        databaseType: "compatible",
         adapterId: "postgresql",
         savePassword,
       });

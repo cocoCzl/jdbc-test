@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { catalog, connection, driver, finishedRun, page as paged } from "../src/test/fixtures";
+import { adapters, catalog, connection, driver, finishedRun, page as paged } from "../src/test/fixtures";
 const oracle = "jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=oracle-fixture.invalid)(PORT=1521))(CONNECT_DATA=(SERVICE_NAME=fixture_service)))?password=fixture-secret";
 test("TEST FIXTURE ONLY: CPA foundation representative pages and expanded menu", async ({page}) => {
   await page.route(url => url.pathname.startsWith("/api/"), async route => {
@@ -36,7 +36,7 @@ test("TEST FIXTURE ONLY: menus, long text, URL copy and bilingual form/wizard st
     const path = new URL(route.request().url()).pathname;
     requests.push({path,method:route.request().method()}); expect(route.request().method()).toBe("GET");
     const run = {...finishedRun, profile:"CUSTOM", selectedModules:["connection","statement"], connection:{...finishedRun.connection,name:longName,jdbcUrl:oracle}};
-    const body = path === "/api/test-catalog" ? catalog : path === "/api/drivers" ? paged([{...driver,name:"Long driver "+"LongName".repeat(30)}]) : path === "/api/drivers/driver-1" ? driver : path === "/api/adapters" ? Array.from({length:30},(_,i)=>({id:`adapter-${i}`,name:`Long adapter option ${i} — JDBC fixture`,status:"OFFICIAL"})) : path === "/api/connections" ? paged([{...connection,name:longName,jdbcUrl:oracle}]) : path === "/api/runs" ? paged([run]) : path === "/api/runs/run-1" ? run : undefined;
+    const body = path === "/api/test-catalog" ? catalog : path === "/api/drivers" ? paged([{...driver,name:"Long driver "+"LongName".repeat(30)}]) : path === "/api/drivers/driver-1" ? driver : path === "/api/adapters" ? [...adapters, ...Array.from({length:30},(_,i)=>({id:`adapter-${i}`,name:`Long adapter option ${i} — JDBC fixture`,status:"OFFICIAL"}))] : path === "/api/connections" ? paged([{...connection,name:longName,jdbcUrl:oracle}]) : path === "/api/runs" ? paged([run]) : path === "/api/runs/run-1" ? run : undefined;
     if(!body) throw new Error(`Unexpected fixture ${path}`); await route.fulfill({json:body});
   });
   const switchLanguage = async (locale:"en"|"zh-CN") => {
@@ -65,10 +65,10 @@ test("TEST FIXTURE ONLY: menus, long text, URL copy and bilingual form/wizard st
     await radio.check(); await next.click(); await switchLanguage("zh-CN"); await expect(page.getByRole("heading",{name:"选择已验证的驱动"})).toBeVisible();
     await switchLanguage("en"); await page.goto("/connections/new");
     await page.getByLabel("Name",{exact:true}).fill("Unsubmitted fixture input");
-    const adapter=page.getByRole("combobox",{name:"Adapter",exact:true}); await adapter.click();
-    await page.keyboard.press("End"); await expect(page.getByRole("option").last()).toBeFocused(); await page.keyboard.press("Enter"); await expect(adapter).toHaveAttribute("data-value","adapter-29");
+    const adapter=page.getByRole("combobox",{name:"Database type",exact:true}); await adapter.click();
+    await page.keyboard.press("End"); await expect(page.getByRole("option").last()).toBeFocused(); await page.keyboard.press("ArrowUp"); await expect(page.getByRole("option",{name:/Long adapter option 29/})).toBeFocused(); await page.keyboard.press("Enter"); await expect(adapter).toHaveAttribute("data-value","adapter-29");
     await noOverflow(); await adapter.click(); await expect(page.getByRole("listbox")).toBeVisible(); await page.screenshot({path:`test-results/fixture-form-menu-en-${width}.png`}); await page.keyboard.press("Escape"); await expect(adapter).toBeFocused();
-    await switchLanguage("zh-CN"); await expect(page.getByLabel("名称",{exact:true})).toHaveValue("Unsubmitted fixture input"); await expect(page.getByRole("combobox",{name:"适配包",exact:true})).toHaveAttribute("data-value","adapter-29"); await noOverflow();
+    await switchLanguage("zh-CN"); await expect(page.getByLabel("名称",{exact:true})).toHaveValue("Unsubmitted fixture input"); await expect(page.getByRole("combobox",{name:"数据库类型",exact:true})).toHaveAttribute("data-value","adapter-29"); await noOverflow();
     await switchLanguage("en");
   }
   expect(requests.every(request=>request.method === "GET")).toBe(true);

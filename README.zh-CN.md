@@ -1,14 +1,16 @@
-# JDBC 驱动兼容性测试框架
+# jdbc-test
 
 [English](README.md) | 简体中文
 
-面向数据库厂商和驱动维护者的 JDBC 4.3 兼容性与回归测试框架。在明确授权的测试命名空间中连接你的数据库、运行版本化测试集，并生成脱敏的 JSON、Markdown 和 HTML 报告。
+面向上传 JDBC 驱动的标准 JDBC 测试平台。平台管理数据库仍为 **PostgreSQL**，与被测数据库独立。
 
-平台管理数据仍保存在 **PostgreSQL**，与被测目标库分开。已支持 Web 自定义数据库适配包导入、CLI 内部 JDBC 驱动 A/B 回归，以及 Web/CLI 声明式 SQL 功能测试包。导入包保持 local 来源；导入或连接成功不代表兼容性通过。
+**上传驱动 → 配置连接 → 选择标准 JDBC 测试 → 执行 → 查看报告。**
+用例、断言、方言及准备资源统一在源码维护，修改后重新构建部署。普通用户无需编写 JSON、制作 ZIP 或管理适配包。
+保留私有驱动、依赖 JAR、驱动验证及内部驱动版本回归；已撤回 SQL 测试包和用户上传适配包。
 
-JDBC 报告判定已实现的 API 契约，分别保留能力声明、实测行为和方案要求。SQL 报告判定测试包定义的功能，逐步展示预期值与实际值，不混入 JDBC 兼容率或 JDBC 基线。
-
-测试会执行 DDL/DML。使用专用数据库/schema，运行前阅读[执行安全](docs/execution-safety.zh-CN.md)。本项目不是官方 JDBC 认证工具，也不用于性能压测、迁移、业务 SQL 或厂商专有 API 测试。
+结果区分 JDBC 契约、合法不支持、测试方案要求与执行准备／平台问题。历史 SQL 报告只读，不计入 JDBC 契约结论或基线。
+不宣称任意 JDBC 数据库均已兼容，不提供完整 JDBC 认证或完整产品兼容性结论。
+测试会执行 DDL/DML，仅使用专用目标库／schema；先阅读[执行安全](docs/execution-safety.zh-CN.md)。
 
 ## 快速开始：复制、编辑、启动
 
@@ -41,15 +43,12 @@ if (-not (Test-Path '.env')) { Copy-Item .env.example .env }
 
 ## 第一次 Web 测试
 
-启动后，准备专用目标数据库/schema 和可信 JDBC 驱动：
+1. 在“驱动”上传主驱动及必要依赖 JAR，点击验证。登记版本、Driver API 自报主／次版本和 JAR 声明分别显示；验证成功仅代表加载及元数据读取成功。
+2. 创建连接，选择数据库类型，自动使用内置适配。自研数据库选择“自研／兼容数据库”，再显式选择内置兼容方言；这不证明产品兼容。配置驱动及专用授权命名空间，测试连接。
+3. 在“新建测试”选择连接、驱动和内置标准 JDBC 用例，确认授权范围后执行。
+4. 查看进度、逐项结果、准备问题、清理证据、冻结的驱动／适配／选择快照和报告。
 
-1. 在**驱动管理**上传驱动及必要依赖 JAR，然后校验。
-2. 在**数据库适配器**导入 `pack-adapter` 导出的 ZIP，或使用内置适配器。见[模板与导出说明](docs/web-adapters.zh-CN.md)。
-3. 创建连接，选择驱动、适配包和明确授权的目标范围，再测试连接。
-4. 在 **SQL 测试包**导入 [postgresql-basics.json](examples/sql/postgresql-basics.json) 或 [mysql-basics.json](examples/sql/mysql-basics.json)，选择版本、连接及用例，创建任务。
-5. 查看任务进度和报告中的逐步预期/实际值、清理结果及冻结的驱动、适配包和 SQL 包指纹。JDBC 任务仍使用独立入口。
-
-示例必须匹配目标产品。上传校验、连接成功、测试通过是不同状态。详见[SQL 测试包流程与限制](docs/sql-packages.zh-CN.md)。
+驱动验证、连接成功与测试通过分别判定。无法适配的 SQL、权限或命名空间条件按准备问题显示，不能视为通过或自动归为驱动缺陷。
 
 ## 文档
 
@@ -58,8 +57,6 @@ if (-not (Test-Path '.env')) { Copy-Item .env.example .env }
 | 部署、配置与备份 | [Deployment](docs/deployment.md) | [部署指南](docs/deployment.zh-CN.md) |
 | 架构、本地开发、API 与 Worker 协议 | [Development](docs/development.md) | [开发指南](docs/development.zh-CN.md) |
 | 授权范围、清理与结果统计 | [Execution safety](docs/execution-safety.md) | [执行安全](docs/execution-safety.zh-CN.md) |
-| 自定义适配包模板、导入与快照 | [Web adapters](docs/web-adapters.md) | [Web 适配包](docs/web-adapters.zh-CN.md) |
-| SQL 测试包格式、示例及 CLI/Web 操作 | [SQL packages](docs/sql-packages.md) | [SQL 测试包](docs/sql-packages.zh-CN.md) |
 | 私有驱动 A/B 基线与 CI 退出码 | [Internal regression](docs/internal-regression.md) | [内部回归](docs/internal-regression.zh-CN.md) |
 | 实测范围、修复与缺口（2026-10-20） | [Acceptance summary](docs/acceptance-2026-10-20.md) | [验收摘要](docs/acceptance-2026-10-20.zh-CN.md) |
 
@@ -74,9 +71,9 @@ if (-not (Test-Path '.env')) { Copy-Item .env.example .env }
 | SQL Server | `sqlserver` | 候选 |
 | KingbaseES（金仓） | `kingbase` | 正式 |
 
-适配器状态表示接入成熟度，不代表认证或任意 JDBC 数据库均已兼容。本地包可复用已支持方言，无需重建平台；不支持的方言会被拒绝。
+适配器状态表示接入成熟度，不代表认证或任意 JDBC 数据库均已兼容。自研数据库可显式复用内置方言；需要修改适配逻辑时由开发者改源码、重新构建部署。
 
-[2026-10-20 验收摘要](docs/acceptance-2026-10-20.zh-CN.md)记录独立临时 PostgreSQL **16.15 / pgjdbc 42.7.11** 上的真实 Web/Server/Worker 全链路、MySQL **8.4.11 / Connector/J 8.3.0** 的四项 SQL 用例，以及 PostgreSQL 驱动 **42.7.2 → 42.7.11** 的恰好六项 JDBC 回归。自定义 PostgreSQL 包验证的是接入机制，不是真实自研数据库的兼容性。本轮未验证其他产品/版本/模式或完整 JDBC 矩阵。
+历史[2026-10-20 验收摘要](docs/acceptance-2026-10-20.zh-CN.md)记录独立临时 PostgreSQL **16.15 / pgjdbc 42.7.11** 上的真实 Web/Server/Worker 全链路、MySQL **8.4.11 / Connector/J 8.3.0** 的四项 SQL 用例，以及 PostgreSQL 驱动 **42.7.2 → 42.7.11** 的恰好六项 JDBC 回归。自定义 PostgreSQL 包验证的是接入机制，不是真实自研数据库的兼容性。本轮未验证其他产品/版本/模式或完整 JDBC 矩阵。
 
 此前 KingbaseES V009R002C016 oracle 模式 / 驱动 V008R006B0001 的证据保留在[验证记录](adapters/kingbase/evidence/platform-v009r002c016-oracle-v008r006b0001.json)。Oracle 19.3 / ojdbc11 21.13 仍有准备缺口及未归因的 LOB 字典差异，见[历史后续验证与限制](docs/development.zh-CN.md#oracle-full-后续验证2026-10-19)。两者均不能证明完整产品兼容性。
 
@@ -84,42 +81,27 @@ if (-not (Test-Path '.env')) { Copy-Item .env.example .env }
 
 源码 Web 开发需 JDK 21、Maven Wrapper 3.9.15、Node >=22.12.0/npm 和专用平台 PG；配置、Key 与 Worker 准备见[本地源码启动](docs/development.zh-CN.md#local-source-startup)。Python >=3.9、已授权目标库和驱动是 CLI 目标测试的额外要求，不是打开开发网站的前提。
 
-## CLI 快速开始
+## CLI 入门与内部驱动回归
 
-在源码根目录使用 JDK 21 构建一次 Worker，然后无需数据库即可校验测试包：
-
-```sh
-./mvnw -pl jdbc-test-worker -am package -DskipTests
-python3 -B scripts/runner.py sql-validate --package examples/sql/postgresql-basics.json
-```
-
-参照[完整 SQL 配置示例](docs/sql-packages.zh-CN.md)创建私有连接配置，通过秘密管理方式设置密码环境变量，指定已授权的已有命名空间及本地驱动，然后运行：
+在源码根目录运行，配置与驱动只保存在本地：
 
 ```sh
-python3 -B scripts/runner.py sql-run --config /private/sql-config.json \
-  --package examples/sql/postgresql-basics.json --case basic.query \
-  --output report/sql-first-run
+python3 -B scripts/runner.py adapters
+python3 -B scripts/runner.py init --adapter postgresql \
+  --url jdbc:postgresql://localhost:5432/test_db --username jdbc_tester \
+  --namespace authorized_test_schema --password-env DB_PASSWORD --consent
+# 使用现有秘密管理方式设置 DB_PASSWORD；可用 --driver-dir 指定驱动和依赖目录。
+python3 -B scripts/runner.py run configs/config.local.json
 ```
 
-每次使用新的输出目录。SQL 执行退出码 **0** 仅表示选中项全部通过且清理确认成功，**1** 为已完成但存在失败，**2** 为输入无效或执行证据不完整。`sql-validate` 的 0 仅表示定义有效。
+`run`：0 为本次评估通过，1 为测试／评估失败，2 为输入无效或评估启动前失败；已生成评估中的准备／执行问题仍使该次评估失败。
+内部 A/B 回归使用 `baseline create` 和 `compare --scope internal`，详见[内部回归](docs/internal-regression.zh-CN.md)。
+比较的 0 仅表示无新增回归，既有失败仍然显示；1 为新增回归，2 为不可比较／证据不足。两种命令的 0 含义不同。
+历史 SQL 报告不能用作 JDBC 基线。
 
-JDBC 驱动 A/B 使用[内部回归入门](docs/internal-regression.zh-CN.md)：准备连接配置、明确的数据库身份/构建/模式及持久保存的私有比较密钥，运行 A，用 `baseline create` 选报告为基线，仅更换驱动后运行 B，再执行 `compare --scope internal`。比较退出码 **0** 为无新增回归（旧失败仍可见），**1** 为新增回归，**2** 为不可比较或证据不完整；这里的 0 **不代表全部通过**。默认正式比较仍要求正式资格；旧报告缺证据需重跑。SQL 报告不能作为 JDBC 基线。
-
-执行 `python3 scripts/runner.py adapters` 查看适配包。配置、密钥和驱动 JAR 留在本地；`report.json` 是权威结果，分享诊断日志前需人工检查。见[契约判定依据](docs/jdbc-capability-contracts.md)。
-
-## 示例与自定义适配包
-
-[使用示例](examples/README.zh-CN.md)涵盖内置/私有数据库、Hikari/DriverManager、JDBC 属性、环境变量敏感值和多 JAR 驱动。`init-custom` 为本地适配包复用 Oracle/MySQL/PostgreSQL 方言资产。本地适配包包含 `adapter.json` 和 SQL 资产，通过 `runner.py init --adapter /path/to/adapter` 使用；其结果保留原来源，可明确选为内部驱动升级回归基线，不会自动获得正式资格。
-
-[Web 导入自定义适配包](docs/web-adapters.zh-CN.md)：用 `pack-adapter` 导出现有 CLI 包，在 Web 导入后创建连接。包保存在平台管理数据库，任务独立冻结资源与本地来源。
-
-适配包声明产品与驱动身份/版本范围、能力、资产、命名空间生命周期、最小权限、已验证组合和已知差异。使用本地驱动时，将生成配置的 `db.driver` 设置为：
-
-```json
-{"kind": "local", "path": "/absolute/path/to/driver.jar"}
-```
-
-不要提交私有或第三方 JDBC 二进制文件。
+兼容方言、本地驱动、多 JAR 和连接属性见[示例](examples/README.zh-CN.md)。
+`init-custom`、`pack-adapter`、`sql-validate`、`sql-run` 及外部适配包路径入口已撤回。
+不提交配置、密钥、凭据或私有驱动；`report.json` 为判定依据，对外分享前审查诊断信息。
 
 ## 测试范围与选择
 

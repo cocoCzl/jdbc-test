@@ -54,22 +54,12 @@ def discover_adapters(project_root: Path) -> dict[str, Path]:
 
 
 def load_adapter(project_root: Path, reference: str) -> AdapterPackage:
-    path = Path(reference)
-    bundled = False
-    if not path.is_absolute():
-        candidate = project_root / path
-        if candidate.exists():
-            path = candidate
-        else:
-            discovered = discover_adapters(project_root)
-            if reference not in discovered:
-                raise ValueError(f"未找到数据库适配包: {reference}")
-            path = discovered[reference]
-            bundled = True
-    manifest_path = path if path.name == "adapter.json" else path / "adapter.json"
-    raw = read_adapter_json(manifest_path)
-    package = AdapterPackage(manifest_path.parent.resolve(), raw)
-    validate_adapter(package, project_root, bundled=bundled)
+    discovered = discover_adapters(project_root)
+    if reference not in discovered:
+        raise ValueError(f"BUILTIN_ADAPTER_REQUIRED: {reference}")
+    path = discovered[reference]
+    package = AdapterPackage(path.resolve(), read_adapter_json(path / "adapter.json"))
+    validate_adapter(package, project_root, bundled=True)
     return package
 
 
@@ -136,8 +126,11 @@ def build_runtime_config(
                                ("connectionPoolDataSource", "connection_pool"),
                                ("xaDataSource", "xa_data_source")):
         capabilities[feature] = bool(providers.get(interface))
-    identity = manifest["identity"]
-    versions = manifest["supported_versions"]
+    compatible = db.get("compatible_dialect", False)
+    if not isinstance(compatible, bool):
+        raise ValueError("db.compatible_dialect must be a boolean")
+    identity = {} if compatible else manifest["identity"]
+    versions = {} if compatible else manifest["supported_versions"]
     namespace_spec = dict(manifest["namespace"])
     namespace_user = user_config.get("namespace") or {}
     namespace_mode = namespace_user.get("mode", namespace_spec.get("mode", "existing"))
@@ -171,13 +164,13 @@ def build_runtime_config(
             "url": db.get("url", ""),
             "username": db.get("username", ""),
             "password": password,
-            "driver_class": manifest["driver"]["class"],
+            "driver_class": db.get("driver_class") or manifest["driver"]["class"],
             "connection_mode": connection_mode,
             "properties": properties,
             "data_sources": providers,
             "identifier_quote": manifest.get("identifier_quote", '"'),
-            "expected_database_product_regex": identity["database_product_regex"],
-            "expected_driver_name_regex": identity["driver_name_regex"],
+            "expected_database_product_regex": identity.get("database_product_regex", ""),
+            "expected_driver_name_regex": identity.get("driver_name_regex", ""),
             "database_version_min": versions.get("database", {}).get("min", ""),
             "database_version_max": versions.get("database", {}).get("max", ""),
             "driver_version_min": versions.get("driver", {}).get("min", ""),
@@ -214,7 +207,7 @@ def build_runtime_config(
             "id": manifest["id"],
             "name": manifest["name"],
             "version": manifest["version"],
-            "trust": manifest["trust"],
+            "trust": "local" if compatible else manifest["trust"],
             "revision": manifest.get("revision", "release"),
             "capabilities": capabilities,
             "validated_combinations": manifest["validated_combinations"],

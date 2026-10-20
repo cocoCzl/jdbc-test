@@ -52,8 +52,23 @@ class ConnectionServiceTest {
         service = new ConnectionService(mock(DatabaseConnectionProfileRepository.class), drivers,
             artifacts, mock(TestRunRepository.class), mock(DriverStorage.class),
             mock(CredentialEncryptionService.class), worker, properties, new ObjectMapper(),
-            transactions, new AdapterService(mock(ImportedAdapterRepository.class),
-                mock(DatabaseConnectionProfileRepository.class), new ObjectMapper()));
+            transactions, new AdapterService());
+    }
+
+    @Test
+    void uploadedAdapterReferencesCannotCreateOrUpdateConnectionsOrProbeDrafts() {
+        var create = new CreateConnectionRequest("x", "Private", "retired-local",
+            "jdbc:fixture:never-contacted", "u", null, false, driverId, null, null, null);
+        var update = new UpdateConnectionRequest("x", "Private", "retired-local",
+            "jdbc:fixture:never-contacted", "u", null, false, false, driverId, null, null, null);
+        var draft = new DraftConnectionTestRequest("Private", "retired-local",
+            "jdbc:fixture:never-contacted", "u", "synthetic", driverId);
+        for (Runnable action : List.<Runnable>of(() -> service.create(create),
+            () -> service.update(UUID.randomUUID(), update), () -> service.testDraft(draft))) {
+            assertEquals("BUILTIN_ADAPTER_REQUIRED",
+                assertThrows(ConnectionException.class, action::run).code());
+        }
+        org.mockito.Mockito.verifyNoInteractions(worker);
     }
 
     @Test

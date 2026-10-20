@@ -853,41 +853,86 @@ class DeterministicOrchestrationTest {
     }
 
     @Test
-    void queuedImportedPackageReachesWorkerAndReportAfterLibraryUpdate() throws Exception {
-        var adapters = context.getBean(com.jdbctest.server.connection.AdapterService.class);
-        var original = adapters.importPackage(
-            ImportedAdapterFlowTest.bundle("queued-private", "1", false), null);
+    void retiredEntrypointsRejectWritesAndHistoricalEvidenceRemainsReadable() throws Exception {
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart(
+                "/api/adapters").file(new org.springframework.mock.web.MockMultipartFile(
+                    "file", "retired.zip", "application/zip", new byte[] {1})))
+            .andExpect(status().isMethodNotAllowed());
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete(
+                "/api/adapters/legacy")).andExpect(status().isNotFound());
+        mvc.perform(get("/api/sql-packages")).andExpect(status().isNotFound());
+        var error = org.junit.jupiter.api.Assertions.assertThrows(RunException.class,
+            () -> service.create(new CreateTestRunRequest(UUID.randomUUID(), null, "CUSTOM",
+                List.of(), List.of("legacy.sql"), List.of(), null, true, null, null, null,
+                "legacy-fingerprint")));
+        assertTrue(error.getMessage().contains("retired"));
+        UUID id = run("NORMAL", 1);
+        var mapper = new tools.jackson.databind.ObjectMapper();
+        String manifest = "{\"id\":\"legacy-sql\",\"version\":\"1\",\"description\":\"historical\"}";
+        transactions.executeWithoutResult(tx -> {
+            var row = runs.findById(id).orElseThrow();
+            var frozen = (tools.jackson.databind.node.ObjectNode) mapper.readTree(row.getExecutionInput());
+            frozen.putObject("sqlPackage").put("manifest", manifest).put("fingerprint", "legacy-sql-fingerprint");
+            var adapter = (tools.jackson.databind.node.ObjectNode) mapper.valueToTree(
+                com.jdbctest.server.connection.AdapterResponse.from(
+                    com.jdbctest.catalog.AdapterRegistry.bundled().required("postgresql")));
+            adapter.put("id", "legacy-adapter").put("origin", "IMPORTED").put("status", "LOCAL")
+                .put("version", "1").put("fingerprint", "legacy-adapter-fingerprint");
+            frozen.set("adapterSnapshot", adapter);
+            row.freezeExecutionInput(mapper.writeValueAsString(frozen));
+        });
+        service.cancel(id);
+        mvc.perform(get("/api/runs/{id}", id)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.sqlPackage.manifest").value(manifest))
+            .andExpect(jsonPath("$.adapterSnapshot.origin").value("IMPORTED"));
+        mvc.perform(get("/api/runs/{id}/report.json", id)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.testDomain").value("SQL_FEATURE"))
+            .andExpect(jsonPath("$.sqlComparisonSupported").value(false))
+            .andExpect(jsonPath("$.sqlPackage.fingerprint").value("legacy-sql-fingerprint"));
+    }
+
+    @Test
+    void compatibleConnectionFreezesBuiltinDialectWithoutClaimingItsProductIdentity() throws Exception {
         UUID blocker = run("BLOCK", 1);
         scheduler.enqueue(blocker);
         started(blocker);
         var connection = resource("NORMAL");
         transactions.executeWithoutResult(tx -> {
-            var persistent = connections.findById(connection.getId()).orElseThrow();
-            persistent.update("Private", "Private", "queued-private", persistent.getJdbcUrl(),
-                "NORMAL", null, persistent.getDefaultDriver());
+            var row = connections.findById(connection.getId()).orElseThrow();
+            row.update("Private", "compatible", "postgresql", row.getJdbcUrl(), "NORMAL", null,
+                row.getDefaultDriver());
         });
         var response = service.create(new CreateTestRunRequest(connection.getId(), null, "CUSTOM",
             List.of(), List.of("connection.is_valid"), List.of(), null, true));
         created.add(response.id());
-        assertEquals(TestRunStatus.QUEUED, state(response.id()));
-        adapters.importPackage(ImportedAdapterFlowTest.bundle("queued-private", "2", false),
-            original.fingerprint());
+        var frozen = new tools.jackson.databind.ObjectMapper().readTree(
+            runs.findById(response.id()).orElseThrow().getExecutionInput());
+        assertEquals("BUILTIN", frozen.at("/adapterSnapshot/origin").asString());
+        assertEquals("postgresql", frozen.at("/adapterExecution/id").asString());
+        assertEquals(0, frozen.at("/adapterExecution/metadataConstraints").size());
+        assertFalse(frozen.has("sqlPackage"));
+        assertFalse(frozen.has("adapterPackage"));
+        service.cancel(response.id());
         release(blocker);
         done(blocker, TestRunStatus.SUCCEEDED, null);
-        started(response.id());
-        done(response.id(), TestRunStatus.SUCCEEDED, null);
+    }
+
+    @Test
+    void retiredQueuedPackagesFailWithoutStartingWorker() throws Exception {
         var mapper = new tools.jackson.databind.ObjectMapper();
-        var input = mapper.readTree(Files.readString(
-            workspace(response.id()).resolve("input-evidence.json")));
-        assertEquals(original.fingerprint(), input.at("/adapterPackage/fingerprint").asString());
-        var frozen = mapper.treeToValue(input.path("adapterPackage"),
-            com.jdbctest.catalog.AdapterPackageSnapshot.class);
-        assertEquals("1", frozen.definition().version());
-        mvc.perform(get("/api/runs/{id}/report.json", response.id())).andExpect(status().isOk())
-            .andExpect(jsonPath("$.adapterSnapshot.version").value("1"))
-            .andExpect(jsonPath("$.adapterSnapshot.status").value("LOCAL"))
-            .andExpect(jsonPath("$.adapterSnapshot.fingerprint").value(original.fingerprint()));
-        assertEquals("2", adapters.required("queued-private").version());
+        for (String field : List.of("sqlPackage", "adapterPackage")) {
+            UUID id = run("NORMAL", 1);
+            transactions.executeWithoutResult(tx -> {
+                var row = runs.findById(id).orElseThrow();
+                var frozen = (tools.jackson.databind.node.ObjectNode) mapper.readTree(row.getExecutionInput());
+                frozen.putObject(field).put("fingerprint", "historical");
+                row.freezeExecutionInput(mapper.writeValueAsString(frozen));
+            });
+            scheduler.enqueue(id);
+            done(id, TestRunStatus.FAILED, "RETIRED_PACKAGE_EXECUTION");
+            assertFalse(Files.exists(workspace(id).resolve("input-evidence.json")));
+            assertTrue(service.get(id).accounting().notRun() > 0);
+        }
     }
 
     @Test

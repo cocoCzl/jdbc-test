@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 
-export function SqlPackageSnapshot({ snapshot }: { snapshot: { manifest: string; fingerprint: string } }) {
+export function LegacySqlSnapshot({ snapshot }: { snapshot: { manifest: string; fingerprint: string } }) {
   const { t } = useTranslation();
   let definition: { id: string; version: string; description: string } | null = null;
   try {

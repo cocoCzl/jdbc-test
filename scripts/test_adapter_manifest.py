@@ -66,17 +66,6 @@ class AdapterManifestTest(unittest.TestCase):
             (adapters / "custom-db/adapter.json").write_text(json.dumps(manifest), encoding="utf-8")
             self.assertEqual(["custom-db"], list(discover_adapters(project)))
 
-    def test_explicit_local_path_remains_independent_of_builtin_index(self):
-        with tempfile.TemporaryDirectory(prefix="jdbc-adapter-local-") as temporary:
-            project = Path(temporary)
-            package = load_adapter(ROOT, "examples/adapters/postgresql-local")
-            manifest = copy.deepcopy(package.manifest)
-            for area in ("ddl", "dml", "pool"):
-                manifest["assets"][area] = str(ROOT / area)
-            local = project / "private-adapter"
-            local.mkdir()
-            (local / "adapter.json").write_text(json.dumps(manifest), encoding="utf-8")
-            self.assertEqual("postgresql-local", load_adapter(project, str(local)).adapter_id)
 
     def test_invalid_encoding_and_resource_limits_fail_closed(self):
         for text in ('{"x":' + '9' * 129 + '}', '[' * 65 + '0' + ']' * 65,

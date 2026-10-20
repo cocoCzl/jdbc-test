@@ -21,8 +21,7 @@ class AdapterControllerTest {
 
     @Test
     void kingbasePublishesOfficialStatusAndOnlyItsObservedCombination() {
-        var response = new AdapterService(org.mockito.Mockito.mock(ImportedAdapterRepository.class),
-            org.mockito.Mockito.mock(DatabaseConnectionProfileRepository.class), new ObjectMapper()).list().stream()
+        var response = new AdapterService().list().stream()
             .filter(adapter -> "kingbase".equals(adapter.id())).findFirst().orElseThrow();
         assertEquals("OFFICIAL", response.status());
         assertEquals("com.kingbase8.Driver", response.driverClass());

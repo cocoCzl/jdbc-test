@@ -30,6 +30,13 @@ describe("App routing / Dashboard", () => {
       ),
     );
   });
+  it.each(["/adapters", "/sql-packages"])("removes retired package route %s and navigation", async path => {
+    mockApi();
+    renderPage(path);
+    expect(await screen.findByText("Page not found")).toBeVisible();
+    expect(screen.queryByRole("link", { name: "Database adapters" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "SQL test packages" })).not.toBeInTheDocument();
+  });
   it("handles unknown routes without a placeholder feature", async () => {
     mockApi();
     renderPage("/missing");

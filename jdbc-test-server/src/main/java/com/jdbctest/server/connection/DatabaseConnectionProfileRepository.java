@@ -8,8 +8,6 @@ import org.springframework.data.domain.Pageable;
 public interface DatabaseConnectionProfileRepository extends
     JpaRepository<DatabaseConnectionProfileEntity, UUID> {
 
-    long countByAdapterId(String adapterId);
-
     long countByDefaultDriver_Id(UUID driverId);
 
     Page<DatabaseConnectionProfileEntity> findByAdapterId(String adapterId, Pageable pageable);

@@ -148,8 +148,8 @@ describe("Switching language preserves the workspace", () => {
   it("retains unsaved connection input and translates an existing validation error without probe/save", async () => {
     const user = userEvent.setup(); const fetch = mockApi(); renderPage("/connections/new");
     await user.type(await screen.findByLabelText("Name"), "My untouched name");
-    await chooseOption(user, screen.getByLabelText("Adapter"), "postgresql");
-    await user.type(screen.getByLabelText("Database type"), "CustomDB");
+    await chooseOption(user, screen.getByLabelText("Database type"), "compatible");
+    await chooseOption(user, screen.getByLabelText("Built-in compatibility dialect"), "postgresql");
     await user.type(screen.getByLabelText("JDBC URL"), "jdbc:custom://fixture.invalid/mydb");
     await chooseOption(user, screen.getByLabelText("Driver package"), driver.id);
     await user.click(screen.getByRole("checkbox", {name: "Save password"}));
@@ -157,7 +157,7 @@ describe("Switching language preserves the workspace", () => {
     await chooseChinese(user);
     expect(screen.getByLabelText("名称")).toHaveValue("My untouched name");
     expect(screen.getByLabelText("JDBC URL")).toHaveValue("jdbc:custom://fixture.invalid/mydb");
-    expect(screen.getByLabelText("适配包")).toHaveAttribute("data-value", "postgresql");
+    expect(screen.getByLabelText("内置兼容方言")).toHaveAttribute("data-value", "postgresql");
     expect(screen.getByRole("alert")).toHaveTextContent("请输入需要保存的密码");
     expect(fetch.mock.calls.filter(([,options]) => options?.method === "POST")).toHaveLength(0);
   });

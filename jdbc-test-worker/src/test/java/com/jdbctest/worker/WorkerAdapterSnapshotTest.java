@@ -21,11 +21,11 @@ class WorkerAdapterSnapshotTest {
     Path directory;
 
     @Test
-    void customFrozenDialectDrivesScopeAndKeepsProtocolShape() throws Exception {
+    void builtinFrozenDialectDrivesScopeAndKeepsProtocolShape() throws Exception {
         ObjectMapper mapper = new ObjectMapper();
         for (String dialect : List.of("mysql", "oracle", "postgresql", "sqlserver")) {
             var original = AdapterExecutionConfig.load(dialect);
-            var snapshot = new AdapterExecutionConfig("private-db", original.assetId(),
+            var snapshot = new AdapterExecutionConfig(dialect, original.assetId(),
                 original.dialect(),
                 original.identifierQuote(), original.capabilities(),
                 original.metadataConstraints());
@@ -43,7 +43,7 @@ class WorkerAdapterSnapshotTest {
             Path config = directory.resolve(dialect + ".json");
             write.invoke(new WorkerMain(), config, request);
             var json = mapper.readTree(Files.readString(config));
-            assertEquals("private-db", json.at("/db/adapter_id").asText());
+            assertEquals(dialect, json.at("/db/adapter_id").asText());
             assertEquals(dialect, json.at("/db/dialect").asText());
             assertEquals(original.assetId(), json.at("/db/asset_id").asText());
             assertEquals(snapshot.sqlDialect().selection(),
@@ -68,9 +68,11 @@ class WorkerAdapterSnapshotTest {
         method.setAccessible(true);
         var snapshot = AdapterExecutionConfig.load("mysql");
         InvocationTargetException mismatch = assertThrows(InvocationTargetException.class,
-            () -> method.invoke(null, request(snapshot, new ExecutionScope("owned_db", null))));
-        assertEquals("ADAPTER_SNAPSHOT_MISMATCH", mismatch.getCause().getMessage());
-        var custom = new AdapterExecutionConfig("private-db", snapshot.assetId(),
+            () -> method.invoke(null, request(new AdapterExecutionConfig("private-db", snapshot.assetId(),
+                snapshot.dialect(), snapshot.identifierQuote(), snapshot.capabilities(), snapshot.metadataConstraints()),
+                new ExecutionScope("owned_db", null))));
+        assertEquals("BUILTIN_ADAPTER_REQUIRED", mismatch.getCause().getMessage());
+        var custom = new AdapterExecutionConfig("mysql", snapshot.assetId(),
             snapshot.dialect(),
             snapshot.identifierQuote(), snapshot.capabilities(), snapshot.metadataConstraints());
         InvocationTargetException missing = assertThrows(InvocationTargetException.class,
@@ -79,48 +81,41 @@ class WorkerAdapterSnapshotTest {
     }
 
     @Test
-    void importedPackageRoundTripsAndWorkerUsesItsFrozenFiles() throws Exception {
-        Path root = Path.of("..").toAbsolutePath().normalize();
-        Path zip = directory.resolve("custom.zip");
-        Process process = new ProcessBuilder("python3", "-B", "scripts/runner.py", "pack-adapter",
-            "--adapter", "examples/adapters/postgresql-local", "--output", zip.toString())
-            .directory(root.toFile()).redirectErrorStream(true).start();
-        String output = new String(process.getInputStream().readAllBytes(),
-            java.nio.charset.StandardCharsets.UTF_8);
-        assertEquals(0, process.waitFor(), output);
-        com.jdbctest.catalog.AdapterPackageSnapshot frozen;
-        try (var input = Files.newInputStream(zip)) {
-            frozen = com.jdbctest.catalog.AdapterPackageSnapshot.readZip(input);
+    void sourceResourceChangesCannotBeInjectedAsBuiltinSnapshots() throws Exception {
+        var original = AdapterExecutionConfig.load("postgresql");
+        var changed = new AdapterExecutionConfig(original.id(), "other-resources",
+            original.dialect(), original.identifierQuote(), original.capabilities(),
+            original.metadataConstraints());
+        var validate = WorkerMain.class.getDeclaredMethod("validate", WorkerRunRequest.class);
+        validate.setAccessible(true);
+        var error = assertThrows(InvocationTargetException.class, () -> validate.invoke(null,
+            request(changed, new ExecutionScope("owned_db", "owned_schema"))));
+        assertEquals("ADAPTER_SNAPSHOT_MISMATCH", error.getCause().getMessage());
+        var compatible = new AdapterExecutionConfig(original.id(), original.assetId(),
+            original.dialect(), original.identifierQuote(), original.capabilities(), Map.of());
+        validate.invoke(null, request(compatible, new ExecutionScope("owned_db", "owned_schema")));
+    }
+
+    @Test
+    void retiredPackageFieldsAndValidationCommandAreRejected() throws Exception {
+        var mapper = new ObjectMapper();
+        var wire = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.valueToTree(
+            request(AdapterExecutionConfig.load("postgresql"), new ExecutionScope("owned_db", "owned_schema")));
+        for (String field : List.of("sqlPackage", "adapterPackage")) {
+            var changed = wire.deepCopy();
+            changed.putObject(field).put("fingerprint", "legacy");
+            assertThrows(com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException.class,
+                () -> mapper.treeToValue(changed, WorkerRunRequest.class));
         }
-        var execution = frozen.definition().execution();
-        var original = request(execution, new ExecutionScope("owned_db", "owned_schema"));
-        var request = new WorkerRunRequest(2, "fixture", original.driver(),
-            new WorkerRunRequest.ConnectionRequest("jdbc:fixture:test", "fixture", "", Map.of(),
-                execution.id()), original.selection(), original.workspace(), original.timeoutMs(),
-            original.scope(), original.objectPrefix(), original.capabilities(), true, execution,
-            null, null, null, frozen, Map.of("origin", "IMPORTED", "fingerprint", frozen.fingerprint()));
-        ObjectMapper mapper = new ObjectMapper();
-        request = mapper.readValue(mapper.writeValueAsString(request), WorkerRunRequest.class);
-        assertEquals(frozen, request.adapterPackage());
-        var write = WorkerMain.class.getDeclaredMethod("writeConfig", Path.class,
-            WorkerRunRequest.class);
-        write.setAccessible(true);
-        Path config = directory.resolve("imported-config.json");
-        write.invoke(new WorkerMain(), config, request);
-        var json = mapper.readTree(Files.readString(config));
-        assertFalse(json.at("/ddl/base_path").asText().startsWith("classpath:"));
-        assertEquals(Files.readString(root.resolve("ddl/postgresql/connection_ddl.sql")),
-            Files.readString(Path.of(json.at("/ddl/base_path").asText())
-                .resolve("postgresql/connection_ddl.sql")));
-        assertEquals("owned_schema", json.at("/namespace/name").asText());
-        assertEquals("existing", json.at("/namespace/mode").asText());
+        assertEquals(WorkerMain.INVALID_REQUEST,
+            new WorkerMain().run(new String[] {"--validate-sql-package"}));
     }
 
     private WorkerRunRequest request(AdapterExecutionConfig snapshot, ExecutionScope scope) {
         return new WorkerRunRequest(2, "fixture",
             new WorkerRunRequest.DriverRequest("fixture.Driver", List.of()),
             new WorkerRunRequest.ConnectionRequest("jdbc:fixture:test", "fixture", "", Map.of(),
-                "private-db"),
+                snapshot.id()),
             new WorkerRunRequest.SelectionRequest("FULL", List.of("connection"), List.of(),
                 List.of()),
             directory.toString(), 1000L, scope, "j01234567890123456789",

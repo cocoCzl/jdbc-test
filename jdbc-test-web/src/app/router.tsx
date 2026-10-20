@@ -2,8 +2,6 @@ import { NotFound } from "@/components/not-found";
 import { createBrowserRouter, Outlet } from "react-router-dom";
 import { AppShell } from "@/components/layout/app-shell";
 import Dashboard from "@/features/dashboard/dashboard";
-import SqlPackages from "@/features/sql-packages/sql-packages";
-import Adapters from "@/features/adapters/adapters";
 import Drivers from "@/features/drivers/drivers";
 import DriverForm from "@/features/drivers/driver-form";
 import DriverDetail from "@/features/drivers/driver-detail";
@@ -22,8 +20,6 @@ export const routes = [
         ),
         children: [
           { index: true, element: <Dashboard /> },
-          { path: "sql-packages", element: <SqlPackages /> },
-          { path: "adapters", element: <Adapters /> },
           { path: "drivers", element: <Drivers /> },
           { path: "drivers/new", element: <DriverForm /> },
           { path: "drivers/:id", element: <DriverDetail /> },

@@ -225,7 +225,6 @@ export interface Run {
   failureReason: string | null;
 }
 export interface CreateRun {
-  sqlPackageFingerprint?: string;
   expectedAdapterFingerprint?: string;
   connectionId: string;
   driverId: string;
@@ -270,16 +269,4 @@ export interface RunParams extends PageParams {
 export interface ResultParams extends PageParams {
   status?: ResultStatus;
   moduleId?: string;
-}
-
-export interface SqlPackage {
-  fingerprint: string;
-  origin: "LOCAL";
-  definition: {
-    id: string; version: string; description: string;
-    cases: { id: string; name: string; tags: string[];
-      appliesTo: { products: string[]; dialects: string[]; minMajor: number; maxMajor: number; modeDescription: string };
-      timeoutSeconds: number; prerequisites: unknown[]; variants: Record<string, unknown>;
-    }[];
-  };
 }
