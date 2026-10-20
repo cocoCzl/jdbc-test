@@ -21,7 +21,8 @@ class AdapterControllerTest {
 
     @Test
     void kingbasePublishesOfficialStatusAndOnlyItsObservedCombination() {
-        var response = new AdapterController().list().stream()
+        var response = new AdapterService(org.mockito.Mockito.mock(ImportedAdapterRepository.class),
+            org.mockito.Mockito.mock(DatabaseConnectionProfileRepository.class), new ObjectMapper()).list().stream()
             .filter(adapter -> "kingbase".equals(adapter.id())).findFirst().orElseThrow();
         assertEquals("OFFICIAL", response.status());
         assertEquals("com.kingbase8.Driver", response.driverClass());
@@ -53,7 +54,7 @@ class AdapterControllerTest {
     }
 
     @Test
-    void indexedCustomAdapterReachesApiWithoutProductOrDriverClasspathChanges() throws Exception {
+    void indexedCustomAdapterLoadsWithoutProductOrDriverClasspathChanges() throws Exception {
         String manifest;
         try (InputStream input = getClass().getResourceAsStream(
             "/adapters/postgresql/adapter.json")) {
@@ -82,12 +83,9 @@ class AdapterControllerTest {
                 return super.getResourceAsStream(name);
             }
         }) {
-            Class<?> controller = isolated.loadClass(AdapterController.class.getName());
-            var constructor = controller.getDeclaredConstructor();
-            constructor.setAccessible(true);
-            var list = controller.getDeclaredMethod("list");
-            list.setAccessible(true);
-            List<?> adapters = (List<?>) list.invoke(constructor.newInstance());
+            Class<?> registryType = isolated.loadClass("com.jdbctest.catalog.AdapterRegistry");
+            Object registry = registryType.getMethod("bundled").invoke(null);
+            List<?> adapters = (List<?>) registryType.getMethod("list").invoke(registry);
             assertEquals(1, adapters.size());
             assertEquals("private-db",
                 adapters.getFirst().getClass().getMethod("id").invoke(adapters.getFirst()));

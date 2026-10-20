@@ -8,6 +8,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
 @RestControllerAdvice
 final class RestErrorHandler {
@@ -48,8 +49,20 @@ final class RestErrorHandler {
             java.util.Map.of());
     }
 
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    void disconnected(AsyncRequestNotUsableException exception) {
+        // The async response is already unusable. Writing JSON into an SSE stream fails again.
+        LOG.debug("Async response disconnected; no response body can be written");
+    }
+
     @ExceptionHandler(Exception.class)
     ResponseEntity<ErrorResponse> internal(Exception exception) {
+        if (org.springframework.web.util.DisconnectedClientHelper
+            .isClientDisconnectedException(exception)) {
+            // Servlet containers can wrap a broken pipe in a message-conversion exception.
+            LOG.debug("Client disconnected; no response body can be written");
+            return null;
+        }
         LOG.error("Unexpected REST error ({})", exception.getClass().getName());
         return problem(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR",
             "Unexpected server error",

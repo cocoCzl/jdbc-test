@@ -3,6 +3,7 @@ package com.jdbctest.statement;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.jdbctest.config.ConfigLoader;
+import com.jdbctest.extension.CapabilityEvidence;
 import com.jdbctest.extension.JdbcContext;
 import com.jdbctest.extension.JdbcTestExtension;
 import com.jdbctest.extension.UseSqlScripts;
@@ -100,7 +101,9 @@ class StatementTest {
     @Test
     @Order(7)
     @DisplayName("批处理 executeBatch")
-    void testExecuteBatch(Connection conn) throws SQLException {
+    void testExecuteBatch(Connection conn, TestReporter reporter) throws SQLException {
+        CapabilityEvidence.record(reporter, "metadata.batch_updates",
+            conn.getMetaData().supportsBatchUpdates());
         try (Statement stmt = conn.createStatement()) {
             String t = isOracle() ? "1" : "true";
             String f = isOracle() ? "0" : "false";
@@ -119,6 +122,7 @@ class StatementTest {
             for (int r : results) {
                 assertEquals(1, r, "每条 INSERT 应影响 1 行");
             }
+            CapabilityEvidence.record(reporter, "behavior.batch_updates", true);
         }
     }
 

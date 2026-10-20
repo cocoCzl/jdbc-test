@@ -16,7 +16,9 @@ public record TestRunResponse(UUID id, TestRunStatus status, String profile,
     java.util.List<java.util.Map<String, Object>> executionIssues,
     java.util.Map<String, Object> cleanupEvidence,
     java.util.Map<String, Object> selectionSnapshot,
-    java.util.Map<String, Long> contractSummary) {
+    java.util.Map<String, Long> contractSummary,
+    com.jdbctest.server.connection.AdapterResponse adapterSnapshot,
+    com.jdbctest.catalog.SqlTestPackage sqlPackage) {
 
     public record ConnectionSnapshot(String name, String databaseType, String adapterId,
         String jdbcUrl) {

@@ -658,3 +658,30 @@ CLI 用户配置使用 `password_env`，生成私有的字面密码运行配置�
 
 
 内嵌凭据、适配预检、清理证据及历史兼容见[执行安全](execution-safety.zh-CN.md)。本轮不改变三步源码启动、三态主题、Key 或目标认证配置。
+
+## CLI 内部驱动升级回归
+
+见[内部基线流程](internal-regression.zh-CN.md)：明确选择 local/private 基线、证据要求、
+允许的驱动制品变化及 CI 退出码。已审查的 JDBC 断言、独立声明/实测证据和限定的方案要求
+见[能力契约判定依据](jdbc-capability-contracts.md)。历史报告保持原样。
+
+### Web 导入与冻结资源
+
+[Web 适配包](web-adapters.zh-CN.md) 是在运行时接入包的入口，无需登记内置 ID。
+Core 复用清单校验并约束可迁移 ZIP；Server 通过 V9 持久化当前数据，在任务创建时冻结完整包。
+连接写入与归档引用检查串行化。仅 Worker 在自有目录写入冻结资源并执行原有 Suite 用例。
+公开 `adapterSnapshot` 保留有效本地来源，原清单 trust 不会授予正式身份。
+`adapterExecution` 字段保持不变；协议 2 增加可选包/来源快照，元数据握手声明
+`adapterPackageVersion=1`，部署时需使用匹配构建。缺少历史快照仍为未知。
+显式更新和保留边界见上述指南。
+
+## SQL 功能测试包（格式 1）
+
+见[格式、执行和验证](sql-packages.zh-CN.md)。V10 新增不可变 SQL 包存储，标准 JDBC 选择不变。
+PostgresPackageMigrationTest 与 PostgresSqlFlowTest 只接受显式回环 JDBC_TEST_DISPOSABLE_PG_URL，
+必须指向本轮新建的可丢弃 PostgreSQL，禁止现有平台或目标数据库。测试删除自有 schema/角色，
+运行者须清理本轮 PostgreSQL 容器和卷。
+
+SQL 任务完整执行且报告已校验、失败均为 SQL 断言时，Server 原因记录 `SQL_ASSERTION_FAILED`，
+沿用 FAILED 状态；Worker 协议执行失败码为 4，SQL CLI 将已完成失败映射为 1。其他执行/平台问题仍独立保留，
+不能把 CLI 与 Worker 退出码混用。参见[SQL 测试包](sql-packages.zh-CN.md)。

@@ -7,6 +7,10 @@
     <artifactId>jdbc-test-suite</artifactId>
     <name>jdbc-test-suite</name>
 
+    <properties>
+        <jdbc.test.integrationReportsDirectory>${project.build.directory}/surefire-reports</jdbc.test.integrationReportsDirectory>
+    </properties>
+
     <dependencies>
         <dependency><groupId>com.jdbctest</groupId><artifactId>jdbc-test-core</artifactId><version>${project.version}</version></dependency>
         <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter-api</artifactId><version>${junit.version}</version></dependency>
@@ -31,7 +35,7 @@
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId>
-                <configuration><includes><include>**/*Test.java</include></includes><additionalClasspathElements><additionalClasspathElement>${surefire.additionalClasspath}</additionalClasspathElement></additionalClasspathElements></configuration>
+                <configuration><includes><include>**/*Test.java</include></includes></configuration>
             </plugin>
         </plugins>
     </build>
@@ -49,11 +53,9 @@
                                 <phase>test</phase>
                                 <goals><goal>test</goal></goals>
                                 <configuration>
+                                    <reportsDirectory>${jdbc.test.integrationReportsDirectory}</reportsDirectory>
                                     <testClassesDirectory>${project.build.outputDirectory}</testClassesDirectory>
                                     <includes><include>**/*Test.class</include></includes>
-                                    <additionalClasspathElements>
-                                        <additionalClasspathElement>${surefire.additionalClasspath}</additionalClasspathElement>
-                                    </additionalClasspathElements>
                                     <excludedGroups>none</excludedGroups>
                                 </configuration>
                             </execution>

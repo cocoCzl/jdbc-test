@@ -16,7 +16,6 @@
     ["jdbc-test-server/src/main/java/com/jdbctest/server/driver/JdbcDriverArtifactEntity.java", "wildcard-import", "", "import jakarta.persistence.*;", 1],
     ["jdbc-test-server/src/main/java/com/jdbctest/server/driver/JdbcDriverPackageEntity.java", "wildcard-import", "", "import jakarta.persistence.*;", 1],
     ["jdbc-test-server/src/main/java/com/jdbctest/server/driver/WorkerProcessRunner.java", "empty-catch", "WorkerProcessRunner/drain(java.io.InputStream,ByteArrayOutputStream)", "IOException ignored", 1],
-    ["jdbc-test-server/src/main/java/com/jdbctest/server/driver/WorkerProcessRunner.java", "empty-catch", "WorkerProcessRunner/requireRunProtocol()", "RuntimeException ignored", 1],
     ["jdbc-test-server/src/main/java/com/jdbctest/server/run/TestCaseResultEntity.java", "wildcard-import", "", "import jakarta.persistence.*;", 1],
     ["jdbc-test-server/src/main/java/com/jdbctest/server/run/TestRunController.java", "wildcard-import", "", "import org.springframework.web.bind.annotation.*;", 1],
     ["jdbc-test-server/src/main/java/com/jdbctest/server/run/TestRunCredentialEntity.java", "wildcard-import", "", "import jakarta.persistence.*;", 1],

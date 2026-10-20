@@ -1,3 +1,5 @@
+import { SqlPackageSnapshot } from "@/features/sql-packages/sql-package-snapshot";
+import { AdapterDetails } from "@/features/connections/adapter-details";
 import { CleanupEvidence } from "./cleanup-evidence";
 import { Card } from "@/components/ui/card";
 import { JdbcUrl } from "@/components/jdbc-url";
@@ -96,6 +98,7 @@ export default function RunDetail() {
                 : t("ui.runComplete")}
         </span>
       </div>
+      {run.sqlPackage ? <SqlPackageSnapshot snapshot={run.sqlPackage} /> : null}
       <section aria-label={t("ui.runOutcomeSummary")} className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Metric label={t("ui.total")} value={run.totalCases ?? "—"} icon={<ListChecks className="size-4" />} />
         <Metric label={t("ui.passed")} tone="success" subdued={run.passed == null || run.passed === 0} value={run.passed ?? "—"} icon={<Check className="size-4" />} />
@@ -126,7 +129,7 @@ export default function RunDetail() {
           <p><span className="text-muted-foreground">{t("ui.currentModule")} </span>{run.currentModule ? moduleName(run.currentModule) : t("ui.waitingForWorker")}</p>
           <p className="break-all"><span className="text-muted-foreground">{t("ui.currentCase")} </span>{run.currentTestCase ?? "—"}</p>
         </div> : null}
-        {run.failureReason ? <p role="alert" className="mt-3 break-words rounded-lg bg-destructive/5 p-3 text-sm text-destructive">{run.failureReason}</p> : null}
+        {run.failureReason ? <p role="alert" className="mt-3 break-words rounded-lg bg-destructive/5 p-3 text-sm text-destructive">{t(`run.reason.${run.failureReason}`, { defaultValue: run.failureReason })}</p> : null}
       </Card>
       <Tabs defaultValue="overview">
         <TabsList>
@@ -157,6 +160,7 @@ export default function RunDetail() {
               <dl className="grid gap-5 text-sm sm:grid-cols-2">
                 {Object.entries({[t("ui.databaseType")]:run.connection.databaseType, [t("ui.adapter")]:run.connection.adapterId, [t("ui.driver")]:`${run.driver.name} · ${run.driver.version}`, [t("ui.vendor")]:run.driver.vendor, [t("ui.driverClass")]:run.driver.driverClass}).map(([label,value]) => <div key={label}><dt className="mb-2 text-muted-foreground">{label}</dt><dd className="break-words">{value}</dd></div>)}
               </dl>
+              <div className="mt-5"><h3 className="mb-2 font-medium">{t("adapter.frozen")}</h3>{run.adapterSnapshot ? <AdapterDetails adapter={run.adapterSnapshot} /> : <p>{t("adapter.snapshotMissing")}</p>}</div>
               <div className="mt-5 border-t pt-4 text-sm"><h3 className="mb-2 font-medium">{t("ui.testScopeSavedForThisRun")}</h3>
                 {run.executionScope ? <dl className="grid gap-3 sm:grid-cols-2">{[[t("scope.database"),run.executionScope.database],[t("scope.schema"),run.executionScope.schema]].map(([label,value]) => <div key={label}><dt className="text-muted-foreground">{label}</dt><dd className="mt-1 break-all">{value || t("scope.unspecified")}</dd></div>)}</dl> : <p className="text-muted-foreground">{t("scope.missing")}</p>}
               </div>

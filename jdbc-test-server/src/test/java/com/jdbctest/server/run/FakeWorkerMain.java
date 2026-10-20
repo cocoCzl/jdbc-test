@@ -37,6 +37,14 @@ public final class FakeWorkerMain {
             "driver", request.get("driver"),
             "scope", request.get("scope"), "jdbcUrl", connection.get("jdbcUrl"), "username",
             connection.get("username"), "capabilities", request.get("capabilities"))));
+        if (request.containsKey("adapterPackage")) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> inputEvidence = json.readValue(
+                Files.readString(workspace.resolve("input-evidence.json")), Map.class);
+            inputEvidence.put("adapterPackage", request.get("adapterPackage"));
+            Files.writeString(workspace.resolve("input-evidence.json"),
+                json.writeValueAsString(inputEvidence));
+        }
         slot = java.nio.channels.FileChannel.open(
             workspace.getParent().getParent().resolve("worker-slot"),
             java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE);
@@ -192,6 +200,9 @@ public final class FakeWorkerMain {
         report.put("cleanupEvidence", cleanup);
         report.put("terminationReason", reason);
         report.put("scope", request.get("scope"));
+        if (request.containsKey("adapterSnapshot")) {
+            report.put("adapterSnapshot", request.get("adapterSnapshot"));
+        }
         if (request.containsKey("adapterExecution")) {
             report.put("adapterExecution", request.get("adapterExecution"));
         }

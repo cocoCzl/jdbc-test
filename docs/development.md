@@ -441,7 +441,7 @@ History filters use `statusGroup=WAITING` (QUEUED), `IN_PROGRESS` (PREPARING, le
 
 Normal states: `QUEUED → PREPARING → RUNNING → GENERATING_REPORT → SUCCEEDED`. Failure, cancellation and recovery end in `FAILED`, `CANCELLED`, `INTERRUPTED`. A local FIFO scheduler limits concurrent Workers; workspaces are `<data-dir>/runs/<run-id>`. Run row locks protect terminal states against late results/cancel races. Timeout gives `FAILED / RUN_TIMEOUT`; a slot stays occupied until process cleanup finishes. User-facing main labels describe lifecycle groups, with active phases and recorded abnormal reasons shown separately. SUCCEEDED is displayed as Completed, never as proof that every test passed: current completion checks still reject failed assertions and non-permitted aborts, while explicitly permitted unsupported outcomes may complete normally. Result counts/evidence, including partial results after abnormal termination, retain their original meaning. Display groups never control transitions, terminal detection, cancellation, polling or SSE.
 
-Server checks events, report entries and counts before success. Invalid/inconsistent reports fail with `REPORT_INCONSISTENT`; FAILED/ABORTED results other than explicitly permitted unsupported outcomes yield `WORKER_EXECUTION_FAILED` even with exit code 0. The report DTO is `{summary, failures}`. Protocol v2 raw JSON can be reconstructed from persisted evidence, with `source` and `workerReportValidated` identifying that boundary. See [Execution safety](execution-safety.md) for accounting rules.
+Server checks events, report entries and counts before success. Invalid/inconsistent reports fail with `REPORT_INCONSISTENT`; FAILED/ABORTED results other than explicitly permitted unsupported outcomes yield `WORKER_EXECUTION_FAILED` even with exit code 0. A SQL-only assertion failure with a complete, validated report and Worker execution-failure exit 4 is identified separately as `SQL_ASSERTION_FAILED`; CLI maps completed failures to exit 1. The report DTO is `{summary, failures}`. Protocol v2 raw JSON can be reconstructed from persisted evidence, with `source` and `workerReportValidated` identifying that boundary. See [Execution safety](execution-safety.md) for accounting rules.
 
 ### Test scope and execution semantics (selection version 2)
 
@@ -851,3 +851,29 @@ expanding its value; missing variables and simultaneous `password`/`password_env
 CLI user configs use `password_env` and generate a private runtime literal. Never commit credentials.
 
 See [Execution safety](execution-safety.md) for embedded credentials, adapter preflight, cleanup evidence and historical compatibility. This work does not change the three-step source startup, theme modes, Key or target authentication configuration.
+
+## CLI internal driver upgrade regression
+
+See [internal baseline workflow](internal-regression.md) for explicit local/private baseline selection,
+evidence requirements, allowed driver artifact changes and CI exit codes.
+See [capability contract decisions](jdbc-capability-contracts.md) for the reviewed JDBC assertions,
+independent declarations/observations and narrow plan requirements. Historical reports remain unchanged.
+
+### Web imports and frozen resources
+
+[Web adapter packages](web-adapters.md) are the runtime alternative to registering a bundled ID.
+Core validates the same manifest and bounded portable ZIP resources; Server persists current data in
+V9 and freezes the full package at task creation. Connection writes serialize with package archive
+checks. Worker alone materializes frozen data under its owned workspace and executes existing Suite
+cases. Public `adapterSnapshot` includes effective local provenance; raw declared trust cannot grant
+official status. `adapterExecution` remains unchanged; protocol 2 adds optional package/public
+snapshots and advertises `adapterPackageVersion=1` in the metadata handshake. Deploy matching builds.
+Historical missing snapshots remain unknown. See the guide for explicit update/retention boundaries.
+
+## SQL feature packages (format 1)
+
+See [format, execution and validation](sql-packages.md). V10 adds immutable SQL package storage;
+standard JDBC selection is unchanged. `PostgresPackageMigrationTest` and `PostgresSqlFlowTest`
+require explicit loopback `JDBC_TEST_DISPOSABLE_PG_URL` pointing only to a session-owned disposable
+PostgreSQL. They remove their schemas/roles; the session owner must remove the temporary container
+and volume. Never point these tests at an existing platform or target database.

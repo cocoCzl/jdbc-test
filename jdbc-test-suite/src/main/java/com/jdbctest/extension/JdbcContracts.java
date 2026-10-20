@@ -16,7 +16,8 @@ public final class JdbcContracts {
 
     public static <T> T optional(String api, SqlCall<T> call) throws SQLException {
         if (!java.util.Set.of("Connection.createBlob", "Connection.createClob",
-            "Connection.createSQLXML", "CommonDataSource.getParentLogger").contains(api)) {
+            "Connection.createSQLXML", "CommonDataSource.getParentLogger",
+            "Connection.setSavepoint").contains(api)) {
             throw new IllegalArgumentException("No reviewed optional API contract: " + api);
         }
         try {

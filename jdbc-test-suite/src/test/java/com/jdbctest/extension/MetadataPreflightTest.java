@@ -18,6 +18,14 @@ class MetadataPreflightTest {
     Path directory;
 
     @Test
+    void multilineVendorMetadataRemainsSingleLineJsonEvidence() throws Exception {
+        var method = JdbcContext.class.getDeclaredMethod("json", String.class);
+        method.setAccessible(true);
+        assertEquals("Oracle 19c\\u000aVersion \\\"19.3\\\"\\u000d\\u0009",
+            method.invoke(null, "Oracle 19c\nVersion \"19.3\"\r\t"));
+    }
+
+    @Test
     void declarationsAreCheckedBeforeAutoNamespaceOrFixtureWrites() throws Exception {
         for (String failure : new String[] {"product", "driver", "databaseLow", "databaseHigh",
             "driverLow", "driverHigh", "regex", "unparseable", "invalidBound"}) {

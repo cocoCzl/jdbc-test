@@ -8,7 +8,7 @@ public final class ConnectionException extends RuntimeException {
     private final HttpStatus status;
     private final String code;
 
-    ConnectionException(HttpStatus status, String code, String message) {
+    public ConnectionException(HttpStatus status, String code, String message) {
         super(message);
         this.status = status;
         this.code = code;

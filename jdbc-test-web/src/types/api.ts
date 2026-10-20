@@ -125,6 +125,12 @@ export interface Probe {
   jdbcMinorVersion: number | null;
 }
 export interface Adapter {
+  version?: string;
+  revision?: string;
+  origin?: "BUILTIN" | "IMPORTED";
+  fingerprint?: string | null;
+  matchConditions?: Record<string, string>;
+  fingerprintScope?: "PACKAGE" | "MANIFEST";
   id: string;
   qualificationNoteKey?: string | null;
   name: string;
@@ -173,6 +179,8 @@ export interface CleanupEvidence {
   retainedObjects?: Record<string, unknown>[];
 }
 export interface Run {
+  sqlPackage?: { manifest: string; fingerprint: string } | null;
+  adapterSnapshot?: Adapter | null;
   selectionSnapshot?: { catalogVersion?: string; catalogCount?: number; userExcluded?: string[]; budgetMs?: number; caseTimeoutMs?: number };
   contractSummary?: Record<string, number> | null;
   cleanupEvidence?: CleanupEvidence;
@@ -211,6 +219,8 @@ export interface Run {
   failureReason: string | null;
 }
 export interface CreateRun {
+  sqlPackageFingerprint?: string;
+  expectedAdapterFingerprint?: string;
   connectionId: string;
   driverId: string;
   profile: "CORE" | "FULL" | "CUSTOM";
@@ -223,7 +233,7 @@ export interface CreateRun {
   password?: string;
 }
 export interface CaseResult {
-  executionEvidence?: { conclusion?: string; contractConforms?: boolean; phase?: string; contractInvoked?: boolean; declaredCapabilities?: Record<string, boolean>; observations?: Record<string, string>; sqlState?: string; vendorCode?: number };
+  executionEvidence?: { testDomain?: string; variant?: string; steps?: { id: string; phase: string; sql: string; expected: unknown; actual?: unknown; status: string; failure?: unknown }[]; cleanupSteps?: unknown[]; conclusion?: string; contractConforms?: boolean; phase?: string; contractInvoked?: boolean; declaredCapabilities?: Record<string, boolean>; observations?: Record<string, string>; sqlState?: string; vendorCode?: number };
   id: string;
   scenarioId: string;
   moduleId: string;
@@ -254,4 +264,16 @@ export interface RunParams extends PageParams {
 export interface ResultParams extends PageParams {
   status?: ResultStatus;
   moduleId?: string;
+}
+
+export interface SqlPackage {
+  fingerprint: string;
+  origin: "LOCAL";
+  definition: {
+    id: string; version: string; description: string;
+    cases: { id: string; name: string; tags: string[];
+      appliesTo: { products: string[]; dialects: string[]; minMajor: number; maxMajor: number; modeDescription: string };
+      timeoutSeconds: number; prerequisites: unknown[]; variants: Record<string, unknown>;
+    }[];
+  };
 }

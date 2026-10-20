@@ -218,23 +218,13 @@ class AdapterRuntimeTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "destructive_consent"):
                 build_runtime_config(PROJECT_ROOT, user, adapter, {"sha256": "abc", "path": "/tmp/driver.jar"})
 
-    def test_compare_blocks_new_failure_and_rejects_cross_suite_versions(self):
-        base = {
-            "formal_eligible": True,
-            "compatibility_baseline_version": "1.0.0",
-            "scenario_results": {"connection.open": {"compatibility_status": "passed"}},
-        }
-        current = {
-            "formal_eligible": True,
-            "compatibility_baseline_version": "1.0.0",
-            "scenario_results": {"connection.open": {"compatibility_status": "compatibility_failure"}},
-        }
-        compared = compare_reports(base, current)
-        self.assertTrue(compared["comparable"])
-        self.assertTrue(compared["blocking_changes"])
-
-        current["compatibility_baseline_version"] = "2.0.0"
-        self.assertFalse(compare_reports(base, current)["comparable"])
+    def test_legacy_formal_report_requires_new_evidence_without_silent_promotion(self):
+        base = {"formal_eligible": True, "compatibility_baseline_version": "1.0.0",
+                "scenario_results": {"connection.open": {"compatibility_status": "passed"}}}
+        compared = compare_reports(base, copy.deepcopy(base))
+        self.assertFalse(compared["comparable"])
+        self.assertEqual(2, compared["exit_code"])
+        self.assertTrue(any("evidence" in item for item in compared["errors"]))
 
     def test_known_difference_records_are_audited_and_official_records_classify_failures(self):
         package = load_adapter(PROJECT_ROOT, "postgresql")

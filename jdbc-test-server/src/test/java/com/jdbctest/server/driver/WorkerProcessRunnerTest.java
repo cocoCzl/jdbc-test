@@ -33,6 +33,15 @@ class WorkerProcessRunnerTest {
     }
 
     @Test
+    void legacyProtocolTwoCannotClaimImportedSnapshotSupport() throws Exception {
+        var runner = runner();
+        runner.requireRunProtocol();
+        org.junit.jupiter.api.Assertions.assertThrows(
+            WorkerProcessRunner.ProtocolMismatchException.class,
+            () -> runner.requireRunProtocol(true));
+    }
+
+    @Test
     void ordinaryWorkerOutputRetainsDiagnosticLimit() throws Exception {
         var result = runner().run("--validate-driver", java.util.Map.of(),
             Duration.ofSeconds(10));

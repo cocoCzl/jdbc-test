@@ -78,6 +78,44 @@ class WorkerAdapterSnapshotTest {
         assertEquals(IllegalArgumentException.class, missing.getCause().getClass());
     }
 
+    @Test
+    void importedPackageRoundTripsAndWorkerUsesItsFrozenFiles() throws Exception {
+        Path root = Path.of("..").toAbsolutePath().normalize();
+        Path zip = directory.resolve("custom.zip");
+        Process process = new ProcessBuilder("python3", "-B", "scripts/runner.py", "pack-adapter",
+            "--adapter", "examples/adapters/postgresql-local", "--output", zip.toString())
+            .directory(root.toFile()).redirectErrorStream(true).start();
+        String output = new String(process.getInputStream().readAllBytes(),
+            java.nio.charset.StandardCharsets.UTF_8);
+        assertEquals(0, process.waitFor(), output);
+        com.jdbctest.catalog.AdapterPackageSnapshot frozen;
+        try (var input = Files.newInputStream(zip)) {
+            frozen = com.jdbctest.catalog.AdapterPackageSnapshot.readZip(input);
+        }
+        var execution = frozen.definition().execution();
+        var original = request(execution, new ExecutionScope("owned_db", "owned_schema"));
+        var request = new WorkerRunRequest(2, "fixture", original.driver(),
+            new WorkerRunRequest.ConnectionRequest("jdbc:fixture:test", "fixture", "", Map.of(),
+                execution.id()), original.selection(), original.workspace(), original.timeoutMs(),
+            original.scope(), original.objectPrefix(), original.capabilities(), true, execution,
+            null, null, null, frozen, Map.of("origin", "IMPORTED", "fingerprint", frozen.fingerprint()));
+        ObjectMapper mapper = new ObjectMapper();
+        request = mapper.readValue(mapper.writeValueAsString(request), WorkerRunRequest.class);
+        assertEquals(frozen, request.adapterPackage());
+        var write = WorkerMain.class.getDeclaredMethod("writeConfig", Path.class,
+            WorkerRunRequest.class);
+        write.setAccessible(true);
+        Path config = directory.resolve("imported-config.json");
+        write.invoke(new WorkerMain(), config, request);
+        var json = mapper.readTree(Files.readString(config));
+        assertFalse(json.at("/ddl/base_path").asText().startsWith("classpath:"));
+        assertEquals(Files.readString(root.resolve("ddl/postgresql/connection_ddl.sql")),
+            Files.readString(Path.of(json.at("/ddl/base_path").asText())
+                .resolve("postgresql/connection_ddl.sql")));
+        assertEquals("owned_schema", json.at("/namespace/name").asText());
+        assertEquals("existing", json.at("/namespace/mode").asText());
+    }
+
     private WorkerRunRequest request(AdapterExecutionConfig snapshot, ExecutionScope scope) {
         return new WorkerRunRequest(2, "fixture",
             new WorkerRunRequest.DriverRequest("fixture.Driver", List.of()),

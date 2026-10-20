@@ -67,6 +67,16 @@ public final class WorkerProcessRunner {
      * Metadata-only handshake: no driver, credentials or target request is sent.
      */
     public void requireRunProtocol() throws IOException, InterruptedException {
+        requireRunProtocol(false);
+    }
+
+    public void requireRunProtocol(boolean requireAdapterSnapshots)
+        throws IOException, InterruptedException {
+        requireRunProtocol(requireAdapterSnapshots, false);
+    }
+
+    public void requireRunProtocol(boolean requireAdapterSnapshots, boolean requireSqlPackages)
+        throws IOException, InterruptedException {
         Result result = run("--describe-catalog", java.util.Map.of(),
             java.time.Duration.ofSeconds(30));
         if (!result.timedOut() && result.exitCode() == 0) {
@@ -74,10 +84,16 @@ public final class WorkerProcessRunner {
                 try {
                     var event = mapper.readTree(line);
                     if ("CATALOG_DESCRIBED".equals(event.path("type").asString())
-                        && event.path("protocolVersion").asInt(0) == 2) {
+                        && event.path("protocolVersion").asInt(0) == 2
+                        && (!requireAdapterSnapshots
+                        || event.path("adapterPackageVersion").asInt(0) == 1)
+                        && (!requireSqlPackages || event.path("sqlPackageVersion").asInt(0) == 1)) {
                         return;
                     }
-                } catch (RuntimeException ignored) { /* Not a valid handshake. */ }
+                } catch (RuntimeException ignored) {
+                    // A diagnostic line is not a handshake; inspect the next line.
+                    continue;
+                }
             }
         }
         throw new ProtocolMismatchException();

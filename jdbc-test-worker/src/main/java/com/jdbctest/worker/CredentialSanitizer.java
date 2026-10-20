@@ -30,7 +30,9 @@ final class CredentialSanitizer {
                 com.jdbctest.security.CredentialRedactor.sensitiveKey(String.valueOf(key))
                     && item != null
                     ? "[REDACTED]"
+                    : "rows".equals(String.valueOf(key)) ? sqlValues(item)
                     : item instanceof String text && java.util.Set.of("message", "stackTrace",
+                            "sql", "template", "value", "manifest",
                             "databaseProductName", "databaseProductVersion", "driverName",
                             "driverVersion")
                         .contains(String.valueOf(key)) ? sanitize(text) : project(item)));
@@ -40,5 +42,15 @@ final class CredentialSanitizer {
             return values.stream().map(CredentialSanitizer::project).toList();
         }
         return com.jdbctest.security.CredentialRedactor.sanitizeValue(value);
+    }
+
+    private static Object sqlValues(Object value) {
+        if (value instanceof String text) {
+            return sanitize(text);
+        }
+        if (value instanceof java.util.List<?> rows) {
+            return rows.stream().map(CredentialSanitizer::sqlValues).toList();
+        }
+        return project(value);
     }
 }

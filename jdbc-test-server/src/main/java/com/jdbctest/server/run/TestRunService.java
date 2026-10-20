@@ -1,6 +1,7 @@
 package com.jdbctest.server.run;
 
-import com.jdbctest.catalog.AdapterCatalog;
+import com.jdbctest.server.connection.AdapterService;
+import com.jdbctest.server.connection.AdapterResponse;
 import com.jdbctest.server.connection.DatabaseConnectionProfileEntity;
 import com.jdbctest.server.connection.DatabaseConnectionProfileRepository;
 import com.jdbctest.server.driver.DriverPackageStatus;
@@ -40,6 +41,8 @@ final class TestRunService {
     private final TransactionTemplate transactions;
     private final TestRunScheduler scheduler;
     private final ExecutionProperties executionProperties;
+    private final AdapterService adapters;
+    private final com.jdbctest.server.sql.SqlPackageService sqlPackages;
 
     TestRunService(TestRunRepository runs, TestRunSelectedScenarioRepository selected,
         TestRunModuleRepository modules, TestRunCredentialRepository credentials,
@@ -47,7 +50,10 @@ final class TestRunService {
         JdbcDriverPackageRepository drivers,
         CredentialEncryptionService encryption, RunCatalogService catalog,
         TransactionTemplate transactions, TestRunScheduler scheduler,
-        ExecutionProperties executionProperties) {
+        ExecutionProperties executionProperties, AdapterService adapters,
+        com.jdbctest.server.sql.SqlPackageService sqlPackages) {
+        this.sqlPackages = sqlPackages;
+        this.adapters = adapters;
         this.runs = runs;
         this.selected = selected;
         this.modules = modules;
@@ -77,10 +83,6 @@ final class TestRunService {
                     "CONNECTION_URL_CONTAINS_CREDENTIALS",
                     "JDBC URL must not contain credentials");
             }
-            if (!AdapterCatalog.contains(connection.getAdapterId())) {
-                throw problem(HttpStatus.UNPROCESSABLE_CONTENT, "ADAPTER_NOT_FOUND",
-                    "Connection adapter was not found");
-            }
             if (request.driverId() == null && connection.getDefaultDriver() == null) {
                 throw problem(HttpStatus.UNPROCESSABLE_CONTENT, "DRIVER_NOT_FOUND",
                     "Connection has no default driver");
@@ -96,15 +98,26 @@ final class TestRunService {
             }
             com.jdbctest.catalog.ExecutionScope scope = new com.jdbctest.catalog.ExecutionScope(
                 connection.getExecutionDatabase(), connection.getExecutionSchema());
-            var adapterExecution = com.jdbctest.catalog.AdapterExecutionConfig.load(
-                connection.getAdapterId());
+            var adapterPackage = adapters.packageSnapshot(connection.getAdapterId());
+            var definition = adapterPackage == null ? adapters.required(connection.getAdapterId())
+                : adapterPackage.definition();
+            var adapterSnapshot = adapterPackage == null ? AdapterResponse.from(definition)
+                : AdapterResponse.imported(adapterPackage);
+            if (request.expectedAdapterFingerprint() != null
+                && !request.expectedAdapterFingerprint().equals(adapterSnapshot.fingerprint())) {
+                throw problem(HttpStatus.CONFLICT, "ADAPTER_CHANGED",
+                    "Adapter changed; refresh and review its current version");
+            }
+            var adapterExecution = definition.execution();
             try {
                 scope.validate(adapterExecution.sqlDialect());
             } catch (IllegalArgumentException exception) {
                 throw problem(HttpStatus.UNPROCESSABLE_CONTENT, "EXECUTION_SCOPE_REQUIRED",
                     exception.getMessage());
             }
-            var source = catalog.catalog();
+            var sqlPackage = request.sqlPackageFingerprint() == null ? null
+                : sqlPackages.required(request.sqlPackageFingerprint());
+            var source = sqlPackage == null ? catalog.catalog() : sqlCatalog(sqlPackage, request);
             ResolvedSelection selection = resolve(request, source, connection.getAdapterId());
             String password =
                 request.password() == null ? encryption.decrypt(connection.getEncryptedPassword())
@@ -120,6 +133,11 @@ final class TestRunService {
                 driver.getVersion(), driver.getDriverClass(), driver.getPackageFingerprint());
             run.setTotalCases(selection.scenarios().size());
             var execution = new java.util.LinkedHashMap<String, Object>();
+            execution.put("testDomain", sqlPackage == null ? "JDBC_CONTRACT" : "SQL_FEATURE");
+            if (sqlPackage != null) {
+                execution.put("sqlPackage", sqlPackage);
+                execution.put("sqlPackageOrigin", "LOCAL");
+            }
             execution.put("jdbcUrl", connection.getJdbcUrl());
             execution.put("username", connection.getUsername());
             execution.put("scope", scope);
@@ -127,6 +145,10 @@ final class TestRunService {
             execution.put("objectPrefix",
                 "j" + UUID.randomUUID().toString().replace("-", "").substring(0, 20));
             execution.put("adapterExecution", adapterExecution);
+            execution.put("adapterSnapshot", adapterSnapshot);
+            if (adapterPackage != null) {
+                execution.put("adapterPackage", adapterPackage);
+            }
             execution.put("dataSources", driver.getDataSources().toMap());
             execution.put("selection", java.util.Map.of(
                 "catalogVersion", source.catalogVersion(), "semanticsVersion", 2,
@@ -284,6 +306,31 @@ final class TestRunService {
         return password;
     }
 
+    private com.jdbctest.catalog.SqlTestPackage frozenSqlPackage(TestRunEntity run) {
+        if (run.getExecutionInput() == null) {
+            return null;
+        }
+        var node = new tools.jackson.databind.ObjectMapper().readTree(run.getExecutionInput()).get("sqlPackage");
+        return node == null ? null : new tools.jackson.databind.ObjectMapper().treeToValue(node,
+            com.jdbctest.catalog.SqlTestPackage.class);
+    }
+
+    private RunCatalogService.Catalog sqlCatalog(com.jdbctest.catalog.SqlTestPackage snapshot,
+        CreateTestRunRequest request) {
+        if (!"CUSTOM".equals(request.profile()) || request.includeScenarios() == null
+            || request.includeScenarios().isEmpty() || request.excludeScenarios() != null
+            && !request.excludeScenarios().isEmpty()) {
+            throw problem(HttpStatus.UNPROCESSABLE_CONTENT, "INVALID_SELECTION",
+                "SQL packages require explicit CUSTOM case IDs and no exclusions");
+        }
+        var cases = snapshot.definition().cases().stream().map(item -> new RunCatalogService.Scenario(
+            item.id(), "sql_feature", item.name(), "CUSTOM", "SQL_FEATURE", List.of(),
+            "NOT_APPLICABLE", List.of(), List.of(), "declarative.SQL", item.id(), "REQUIRED")).toList();
+        return new RunCatalogService.Catalog(List.of(), List.of(new RunCatalogService.Module(
+            "sql_feature", "SQL features", "Declarative SQL assertions", cases.size(), 0)),
+            cases, cases.size(), "sql-v1:" + snapshot.fingerprint());
+    }
+
     private ResolvedSelection resolve(CreateTestRunRequest request,
         RunCatalogService.Catalog source, String adapterId) {
         if (request.catalogVersion() != null
@@ -367,7 +414,8 @@ final class TestRunService {
             JdbcUrlSanitizer.sanitize(run.getFailureReason()),
             ExecutionAccounting.of(run, selected.findByRun_IdOrderByScenarioId(run.getId())),
             scopeSnapshot(run), issueSnapshot(run), cleanupSnapshot(run), selectionSnapshot(run),
-            contractSummary(run));
+            contractSummary(run), adapterSnapshot(run),
+            frozenSqlPackage(run));
     }
 
     @SuppressWarnings("unchecked")
@@ -387,7 +435,19 @@ final class TestRunService {
         return value;
     }
 
+    private AdapterResponse adapterSnapshot(TestRunEntity run) {
+        if (run.getExecutionInput() == null) {
+            return null;
+        }
+        var mapper = new tools.jackson.databind.ObjectMapper();
+        var node = mapper.readTree(run.getExecutionInput()).path("adapterSnapshot");
+        return node.isMissingNode() ? null : mapper.treeToValue(node, AdapterResponse.class);
+    }
+
     private java.util.Map<String, Long> contractSummary(TestRunEntity run) {
+        if (frozenSqlPackage(run) != null) {
+            return null;
+        }
         java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
         var mapper = new tools.jackson.databind.ObjectMapper();
         for (var row : results.findByRun_Id(run.getId())) {
@@ -455,7 +515,8 @@ final class TestRunService {
                     || run.getStatus() == TestRunStatus.INTERRUPTED
                     || "RUN_TIMEOUT".equals(run.getFailureReason());
                 // Legacy v2 records predate the persisted Worker reason; cleanup remains independent.
-                reason = !validated || serverTermination ? run.getFailureReason()
+                reason = !validated || serverTermination ? run.getFailureReason() == null
+                    ? run.getStatus().name() : run.getFailureReason()
                     : !value.executionIssues().isEmpty() ? "CONTAINER_FAILURE"
                         : accounting.started() == 0 ? "NO_TESTS_EXECUTED"
                             : accounting.failed() + accounting.aborted() > 0 ? "TEST_FAILURE"
@@ -474,6 +535,13 @@ final class TestRunService {
             report.put("metadataEvidence", run.getMetadataEvidence() == null
                 ? java.util.Map.of("status", "UNKNOWN")
                 : new tools.jackson.databind.ObjectMapper().readTree(run.getMetadataEvidence()));
+            report.put("adapterSnapshot", value.adapterSnapshot());
+            report.put("testDomain", value.sqlPackage() == null ? "JDBC_CONTRACT" : "SQL_FEATURE");
+            if (value.sqlPackage() != null) {
+                report.put("sqlPackage", value.sqlPackage());
+                report.put("sqlPackageOrigin", "LOCAL");
+                report.put("sqlComparisonSupported", false);
+            }
             report.put("adapterExecution",
                 new tools.jackson.databind.ObjectMapper().readTree(run.getExecutionInput())
                     .path("adapterExecution"));

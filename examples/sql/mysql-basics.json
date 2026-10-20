@@ -1,0 +1,367 @@
+{
+  "formatVersion": 1,
+  "id": "mysql-basics",
+  "version": "1.0.0",
+  "description": "MySQL variants of the PostgreSQL example intentions. Explicit CAST syntax and duplicate-key error; no cross-product equivalence certification.",
+  "cases": [
+    {
+      "id": "basic.query",
+      "name": "Basic ordered query",
+      "tags": [
+        "query"
+      ],
+      "appliesTo": {
+        "products": [
+          "MySQL"
+        ],
+        "dialects": [
+          "mysql"
+        ],
+        "minMajor": 8,
+        "maxMajor": 8,
+        "modeDescription": "MySQL 8 with InnoDB. Expected duplicate primary-key error, not SELECT division by zero."
+      },
+      "timeoutSeconds": 10,
+      "prerequisites": [],
+      "variants": {
+        "mysql": {
+          "prepare": [],
+          "execute": [
+            {
+              "id": "query",
+              "sql": "SELECT 1 AS n",
+              "parameters": [],
+              "expect": {
+                "kind": "ROWS",
+                "order": "ORDERED",
+                "columns": [
+                  "INTEGER"
+                ],
+                "rows": [
+                  [
+                    "1"
+                  ]
+                ],
+                "decimalMode": "NUMERIC"
+              }
+            }
+          ],
+          "cleanup": []
+        }
+      }
+    },
+    {
+      "id": "null.parameter",
+      "name": "NULL, text and exact Decimal parameters",
+      "tags": [
+        "null",
+        "parameters",
+        "decimal"
+      ],
+      "appliesTo": {
+        "products": [
+          "MySQL"
+        ],
+        "dialects": [
+          "mysql"
+        ],
+        "minMajor": 8,
+        "maxMajor": 8,
+        "modeDescription": "MySQL 8 with InnoDB. Expected duplicate primary-key error, not SELECT division by zero."
+      },
+      "timeoutSeconds": 10,
+      "prerequisites": [],
+      "variants": {
+        "mysql": {
+          "prepare": [],
+          "execute": [
+            {
+              "id": "bind",
+              "sql": "SELECT CAST(? AS SIGNED), CAST(? AS CHAR), CAST(? AS CHAR), CAST(? AS DECIMAL(12,2))",
+              "parameters": [
+                {
+                  "type": "INTEGER",
+                  "value": "42"
+                },
+                {
+                  "type": "STRING",
+                  "value": null
+                },
+                {
+                  "type": "STRING",
+                  "value": "NULL"
+                },
+                {
+                  "type": "DECIMAL",
+                  "value": "1.20"
+                }
+              ],
+              "expect": {
+                "kind": "ROWS",
+                "order": "ORDERED",
+                "columns": [
+                  "INTEGER",
+                  "STRING",
+                  "STRING",
+                  "DECIMAL"
+                ],
+                "rows": [
+                  [
+                    "42",
+                    null,
+                    "NULL",
+                    "1.20"
+                  ]
+                ],
+                "decimalMode": "SCALE"
+              }
+            }
+          ],
+          "cleanup": []
+        }
+      }
+    },
+    {
+      "id": "join.aggregate",
+      "name": "JOIN, aggregate and duplicate multiset",
+      "tags": [
+        "join",
+        "aggregate",
+        "update"
+      ],
+      "appliesTo": {
+        "products": [
+          "MySQL"
+        ],
+        "dialects": [
+          "mysql"
+        ],
+        "minMajor": 8,
+        "maxMajor": 8,
+        "modeDescription": "MySQL 8 with InnoDB. Expected duplicate primary-key error, not SELECT division by zero."
+      },
+      "timeoutSeconds": 10,
+      "prerequisites": [],
+      "variants": {
+        "mysql": {
+          "prepare": [
+            {
+              "id": "create",
+              "sql": "CREATE TABLE {{items}} (id INTEGER PRIMARY KEY, amount DECIMAL(12,2)) ENGINE=InnoDB",
+              "parameters": [],
+              "expect": {
+                "kind": "UPDATE",
+                "count": 0
+              }
+            },
+            {
+              "id": "seed",
+              "sql": "INSERT INTO {{items}} (id, amount) VALUES (1,2.00),(2,3.00),(3,3.00)",
+              "parameters": [],
+              "expect": {
+                "kind": "UPDATE",
+                "count": 3
+              }
+            }
+          ],
+          "execute": [
+            {
+              "id": "join",
+              "sql": "SELECT a.id, b.amount FROM {{items}} a JOIN {{items}} b ON a.id = b.id",
+              "parameters": [],
+              "expect": {
+                "kind": "ROWS",
+                "order": "MULTISET",
+                "columns": [
+                  "INTEGER",
+                  "DECIMAL"
+                ],
+                "rows": [
+                  [
+                    "1",
+                    "2.00"
+                  ],
+                  [
+                    "2",
+                    "3.00"
+                  ],
+                  [
+                    "3",
+                    "3.00"
+                  ]
+                ],
+                "decimalMode": "NUMERIC"
+              }
+            },
+            {
+              "id": "aggregate",
+              "sql": "SELECT COUNT(*), SUM(amount) FROM {{items}}",
+              "parameters": [],
+              "expect": {
+                "kind": "ROWS",
+                "order": "ORDERED",
+                "columns": [
+                  "INTEGER",
+                  "DECIMAL"
+                ],
+                "rows": [
+                  [
+                    "3",
+                    "8.00"
+                  ]
+                ],
+                "decimalMode": "NUMERIC"
+              }
+            },
+            {
+              "id": "duplicates",
+              "sql": "SELECT amount FROM {{items}}",
+              "parameters": [],
+              "expect": {
+                "kind": "ROWS",
+                "order": "MULTISET",
+                "columns": [
+                  "DECIMAL"
+                ],
+                "rows": [
+                  [
+                    "3.0"
+                  ],
+                  [
+                    "2.00"
+                  ],
+                  [
+                    "3.00"
+                  ]
+                ],
+                "decimalMode": "NUMERIC"
+              }
+            },
+            {
+              "id": "update",
+              "sql": "UPDATE {{items}} SET amount = ? WHERE id = ?",
+              "parameters": [
+                {
+                  "type": "DECIMAL",
+                  "value": "4.50"
+                },
+                {
+                  "type": "INTEGER",
+                  "value": "1"
+                }
+              ],
+              "expect": {
+                "kind": "UPDATE",
+                "count": 1
+              }
+            },
+            {
+              "id": "updated",
+              "sql": "SELECT amount FROM {{items}} WHERE id = 1",
+              "parameters": [],
+              "expect": {
+                "kind": "ROWS",
+                "order": "ORDERED",
+                "columns": [
+                  "DECIMAL"
+                ],
+                "rows": [
+                  [
+                    "4.50"
+                  ]
+                ],
+                "decimalMode": "SCALE"
+              }
+            }
+          ],
+          "cleanup": [
+            "items"
+          ]
+        }
+      }
+    },
+    {
+      "id": "expected.error",
+      "name": "Expected error scoped to one execution step",
+      "tags": [
+        "error"
+      ],
+      "appliesTo": {
+        "products": [
+          "MySQL"
+        ],
+        "dialects": [
+          "mysql"
+        ],
+        "minMajor": 8,
+        "maxMajor": 8,
+        "modeDescription": "MySQL 8 with InnoDB. Expected duplicate primary-key error, not SELECT division by zero."
+      },
+      "timeoutSeconds": 10,
+      "prerequisites": [],
+      "variants": {
+        "mysql": {
+          "prepare": [
+            {
+              "id": "create",
+              "sql": "CREATE TABLE {{error_items}} (id INTEGER PRIMARY KEY) ENGINE=InnoDB",
+              "parameters": [],
+              "expect": {
+                "kind": "UPDATE",
+                "count": 0
+              }
+            },
+            {
+              "id": "seed",
+              "sql": "INSERT INTO {{error_items}} (id) VALUES (1)",
+              "parameters": [],
+              "expect": {
+                "kind": "UPDATE",
+                "count": 1
+              }
+            }
+          ],
+          "execute": [
+            {
+              "id": "duplicate",
+              "sql": "INSERT INTO {{error_items}} (id) VALUES (?)",
+              "parameters": [
+                {
+                  "type": "INTEGER",
+                  "value": "1"
+                }
+              ],
+              "expect": {
+                "kind": "ERROR",
+                "sqlState": "23000",
+                "vendorCode": 1062,
+                "exceptionType": "java.sql.SQLIntegrityConstraintViolationException"
+              }
+            },
+            {
+              "id": "recovered",
+              "sql": "SELECT 2",
+              "parameters": [],
+              "expect": {
+                "kind": "ROWS",
+                "order": "ORDERED",
+                "columns": [
+                  "INTEGER"
+                ],
+                "rows": [
+                  [
+                    "2"
+                  ]
+                ],
+                "decimalMode": "NUMERIC"
+              }
+            }
+          ],
+          "cleanup": [
+            "error_items"
+          ]
+        }
+      }
+    }
+  ]
+}

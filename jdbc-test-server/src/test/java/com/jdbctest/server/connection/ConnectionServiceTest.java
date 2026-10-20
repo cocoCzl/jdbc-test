@@ -52,7 +52,8 @@ class ConnectionServiceTest {
         service = new ConnectionService(mock(DatabaseConnectionProfileRepository.class), drivers,
             artifacts, mock(TestRunRepository.class), mock(DriverStorage.class),
             mock(CredentialEncryptionService.class), worker, properties, new ObjectMapper(),
-            transactions);
+            transactions, new AdapterService(mock(ImportedAdapterRepository.class),
+                mock(DatabaseConnectionProfileRepository.class), new ObjectMapper()));
     }
 
     @Test

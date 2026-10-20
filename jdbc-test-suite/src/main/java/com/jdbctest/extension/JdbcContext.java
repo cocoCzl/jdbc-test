@@ -160,6 +160,13 @@ public final class JdbcContext {
             evidence.put("driverName", driver);
             evidence.put("driverVersion", driverVersion);
             metadataEvidence = Map.copyOf(evidence);
+            System.out.println("[JDBC_TARGET] {\"databaseProductName\":\"" + json(product)
+                + "\",\"databaseProductVersion\":\"" + json(productVersion)
+                + "\",\"driverName\":\"" + json(driver)
+                + "\",\"driverVersion\":\"" + json(driverVersion)
+                + "\",\"timeZone\":\"" + json(java.util.TimeZone.getDefault().getID())
+                + "\",\"locale\":\"" + json(java.util.Locale.getDefault().toLanguageTag())
+                + "\",\"charset\":\"" + json(java.nio.charset.Charset.defaultCharset().name()) + "\"}");
             validateRegex("数据库产品", product, config.db.expectedDatabaseProductRegex);
             validateRegex("JDBC 驱动", driver, config.db.expectedDriverNameRegex);
             validateVersion("数据库版本", productVersion, config.db.databaseVersionMin,
@@ -343,7 +350,20 @@ public final class JdbcContext {
     }
 
     private static String json(String value) {
-        return value == null ? "" : value.replace("\\", "\\\\").replace("\"", "\\\"");
+        if (value == null) {
+            return "";
+        }
+        StringBuilder escaped = new StringBuilder();
+        for (char character : value.toCharArray()) {
+            if (character == '\\' || character == '"') {
+                escaped.append('\\').append(character);
+            } else if (character < 0x20) {
+                escaped.append(String.format(java.util.Locale.ROOT, "\\u%04x", (int) character));
+            } else {
+                escaped.append(character);
+            }
+        }
+        return escaped.toString();
     }
 
     private static String nullToEmpty(String value) {

@@ -16,6 +16,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import regression
+
 from adapter_runtime import (
     build_runtime_config,
     discover_adapters,
@@ -39,7 +41,7 @@ REPORT_SCHEMA_VERSION = "1.0.0"
 
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
-    if argv and argv[0] not in {"init", "init-custom", "run", "compare", "adapters", "coverage", "--help", "-h"}:
+    if argv and argv[0] not in {"init", "init-custom", "pack-adapter", "sql-validate", "sql-run", "run", "compare", "baseline", "adapters", "coverage", "--help", "-h"}:
         argv.insert(0, "run")
     parser = _parser()
     args = parser.parse_args(argv)
@@ -47,10 +49,24 @@ def main(argv: list[str] | None = None) -> int:
         return command_init(args)
     if args.command == "init-custom":
         return command_init_custom(args)
+    if args.command == "pack-adapter":
+        from adapter_archive import pack_adapter
+        try:
+            pack_adapter(PROJECT_ROOT, args.adapter, Path(args.output))
+            print(f"Adapter archive: {args.output}")
+            return 0
+        except (ValueError, OSError) as error:
+            print(f"Adapter archive failed: {error}", file=sys.stderr)
+            return 2
+    if args.command in {"sql-validate", "sql-run"}:
+        from sql_runner import command_sql
+        return command_sql(args, PROJECT_ROOT)
     if args.command == "run":
         return command_run(args)
     if args.command == "compare":
         return command_compare(args)
+    if args.command == "baseline":
+        return command_baseline(args)
     if args.command == "adapters":
         return command_adapters()
     if args.command == "coverage":
@@ -62,6 +78,15 @@ def main(argv: list[str] | None = None) -> int:
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="JDBC 4.3 driver compatibility assessment")
     sub = parser.add_subparsers(dest="command")
+    for sql_command in ("sql-validate", "sql-run"):
+        sql = sub.add_parser(sql_command, help="Validate/run declarative SQL feature package v1")
+        sql.add_argument("--package", required=True)
+        sql.add_argument("--worker", default=str(PROJECT_ROOT / "jdbc-test-worker/target/jdbc-test-worker-1.2.1-SNAPSHOT-all.jar"))
+        if sql_command == "sql-run":
+            sql.add_argument("--config", required=True)
+            sql.add_argument("--case", action="append", required=True, dest="cases")
+            sql.add_argument("--output", required=True)
+            sql.add_argument("--budget-seconds", type=int, default=300)
     init = sub.add_parser("init", help="Generate secure local configuration")
     init.add_argument("--adapter")
     init.add_argument("--url")
@@ -86,6 +111,10 @@ def _parser() -> argparse.ArgumentParser:
     custom.add_argument("--output")
     _add_connection_arguments(custom, "driver_manager")
 
+    archive = sub.add_parser("pack-adapter", help="Export a local adapter for Web import (no driver JARs)")
+    archive.add_argument("--adapter", required=True)
+    archive.add_argument("--output", required=True)
+
     run = sub.add_parser("run", help="Run compatibility assessment")
     run.add_argument("config")
     run.add_argument("--experimental-override", action="store_true")
@@ -98,6 +127,11 @@ def _parser() -> argparse.ArgumentParser:
     compare.add_argument("--baseline", required=True)
     compare.add_argument("--current", required=True)
     compare.add_argument("--output")
+    compare.add_argument("--scope", choices=("formal", "internal"), default="formal")
+    baseline = sub.add_parser("baseline", help="Explicitly select an internal driver-upgrade baseline")
+    baseline.add_argument("action", choices=("create",))
+    baseline.add_argument("--report", required=True)
+    baseline.add_argument("--output", required=True)
     sub.add_parser("adapters", help="List bundled adapters")
     return parser
 
@@ -324,6 +358,8 @@ def command_run(args: argparse.Namespace) -> int:
     runtime["evaluation_dependencies"] = dependencies
     execution: dict[str, Any]
     runtime_path: Path | None = None
+    report_workspace = tempfile.TemporaryDirectory(prefix="jdbc-test-surefire-")
+    runtime["integration_report_directory"] = report_workspace.name
     try:
         with tempfile.NamedTemporaryFile("w", suffix=".json", prefix="jdbc-test-", delete=False, encoding="utf-8") as handle:
             json.dump(runtime, handle, ensure_ascii=False)
@@ -333,7 +369,7 @@ def command_run(args: argparse.Namespace) -> int:
         except OSError:
             pass
         execution = _run_maven(runtime, runtime_path, list(driver["classpath"]))
-        suites, env_info = _parse_surefire_reports()
+        suites, env_info = _parse_surefire_reports(Path(report_workspace.name))
         report = build_v1_report(runtime, execution, suites, env_info, PROJECT_ROOT)
         report["report_schema_version"] = REPORT_SCHEMA_VERSION
         report["formal_eligible"] = _validated_formal_eligibility(report, adapter.manifest)
@@ -342,62 +378,50 @@ def command_run(args: argparse.Namespace) -> int:
         print(f"[结果] {report.get('target_outcome')} | formal_eligible={report.get('formal_eligible')}")
         return _assessment_exit_code(report)
     finally:
+        report_workspace.cleanup()
         if runtime_path is not None:
             runtime_path.unlink(missing_ok=True)
 
 
+def command_baseline(args: argparse.Namespace) -> int:
+    try:
+        snapshot = regression.select_baseline(load_v1_report(Path(args.report)))
+        with Path(args.output).open("x", encoding="utf-8") as stream:
+            json.dump(snapshot, stream, ensure_ascii=False, indent=2)
+            stream.write("\n")
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        print(f"[基线选择失败] {exc}", file=sys.stderr)
+        return 2
+    print(f"[内部基线] {args.output}; this is not official certification or endorsement")
+    return 0
+
+
 def command_compare(args: argparse.Namespace) -> int:
-    baseline = load_v1_report(Path(args.baseline))
-    current = load_v1_report(Path(args.current))
-    comparison = compare_reports(baseline, current)
-    payload = json.dumps(comparison, ensure_ascii=False, indent=2) + "\n"
-    if args.output:
-        Path(args.output).write_text(payload, encoding="utf-8")
-        print(f"[生成] {args.output}")
-    else:
-        print(payload, end="")
-    return 1 if comparison["blocking_changes"] else 0
+    try:
+        baseline = load_v1_report(Path(args.baseline))
+        current = load_v1_report(Path(args.current))
+        comparison = compare_reports(baseline, current, args.scope)
+        payload = json.dumps(comparison, ensure_ascii=False, indent=2) + "\n"
+        if args.output:
+            if Path(args.output).resolve() in {Path(args.baseline).resolve(), Path(args.current).resolve()}:
+                raise ValueError("Comparison output must not overwrite either input report")
+            Path(args.output).write_text(payload, encoding="utf-8")
+            print(f"[生成] {args.output}")
+            print(f"[比较] comparable={comparison['comparable']} "
+                  f"new_failures={len(comparison['new_failures'])} "
+                  f"unresolved={len(comparison['unresolved_failures'])} "
+                  f"all_selected_passed={comparison['all_selected_passed']}")
+        else:
+            print(payload, end="")
+        return comparison["exit_code"]
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        print(f"[比较失败] {exc}", file=sys.stderr)
+        return 2
 
 
-def compare_reports(baseline: dict[str, Any], current: dict[str, Any]) -> dict[str, Any]:
-    errors: list[str] = []
-    if baseline.get("compatibility_baseline_version") != current.get("compatibility_baseline_version"):
-        errors.append("测试套件版本不兼容；请在当前套件上重新建立基线")
-    if not baseline.get("formal_eligible"):
-        errors.append("基线报告不是正式可比较报告")
-    if not current.get("formal_eligible"):
-        errors.append("当前报告不是正式可比较报告")
-    if errors:
-        return {"comparable": False, "errors": errors, "changes": [], "blocking_changes": True}
-    previous = baseline.get("scenario_results", {})
-    now = current.get("scenario_results", {})
-    changes = []
-    blocking_statuses = {
-        CompatibilityStatus.COMPATIBILITY_FAILURE.value,
-        CompatibilityStatus.EXECUTION_ERROR.value,
-        CompatibilityStatus.UNKNOWN_CAPABILITY.value,
-        CompatibilityStatus.CAPABILITY_DECLARATION_MISMATCH.value,
-        CompatibilityStatus.NOT_RUN.value,
-    }
-    for scenario_id in sorted(set(previous) | set(now)):
-        before = (previous.get(scenario_id) or {}).get("compatibility_status", "not_run")
-        after = (now.get(scenario_id) or {}).get("compatibility_status", "not_run")
-        if before != after:
-            changes.append({
-                "scenario_id": scenario_id,
-                "before": before,
-                "after": after,
-                "blocking": after in blocking_statuses and before != after,
-            })
-    cleanup = current.get("environment_cleanup_issues") or []
-    return {
-        "comparable": True,
-        "baseline": _report_identity(baseline),
-        "current": _report_identity(current),
-        "changes": changes,
-        "cleanup_failures": cleanup,
-        "blocking_changes": any(change["blocking"] for change in changes) or bool(cleanup),
-    }
+def compare_reports(baseline: dict[str, Any], current: dict[str, Any],
+                    scope: str = "formal") -> dict[str, Any]:
+    return regression.compare(baseline, current, scope)
 
 
 def _preflight_dependencies() -> dict[str, str]:
@@ -419,15 +443,12 @@ def _preflight_dependencies() -> dict[str, str]:
 
 
 def _run_maven(runtime: dict[str, Any], runtime_path: Path, driver_classpath: list[str]) -> dict[str, Any]:
-    surefire = _surefire_reports_directory()
-    if surefire.exists():
-        for path in surefire.glob("TEST-*.xml"):
-            path.unlink(missing_ok=True)
     maven_command = str(PROJECT_ROOT / "mvnw") if (PROJECT_ROOT / "mvnw").exists() else "mvn"
     command = [
-        maven_command, "-q", "-Pintegration-tests", "test",
+        maven_command, "-q", "-pl", "jdbc-test-suite", "-am", "-Pintegration-tests", "test",
         f"-Dconfig.yaml={runtime_path}",
-        f"-Dsurefire.additionalClasspath={os.pathsep.join(driver_classpath)}",
+        f"-Djdbc.test.integrationReportsDirectory={runtime['integration_report_directory']}",
+        f"-Dmaven.test.additionalClasspath={','.join(driver_classpath)}",
     ]
     filters = runtime.get("test_filter") or {}
     includes = filters.get("include_tests") or []
@@ -442,7 +463,12 @@ def _run_maven(runtime: dict[str, Any], runtime_path: Path, driver_classpath: li
     if patterns:
         command.append(f"-Dtest={','.join(patterns)}")
     started = datetime.now(timezone.utc)
-    result = subprocess.run(command, cwd=PROJECT_ROOT, capture_output=True, text=True)
+    child_environment = os.environ.copy()
+    key_name = (runtime.get("regression") or {}).get("environment_key_env", "JDBC_TEST_REGRESSION_KEY")
+    child_environment.pop(key_name, None)
+    child_environment.pop("JDBC_TEST_REGRESSION_KEY", None)
+    result = subprocess.run(command, cwd=PROJECT_ROOT, capture_output=True, text=True,
+                            env=child_environment)
     ended = datetime.now(timezone.utc)
     return {
         "start_time": started.isoformat(),
@@ -472,8 +498,8 @@ def _profile_test_patterns(profile: str, includes: list[str], excludes: list[str
     return result
 
 
-def _parse_surefire_reports() -> tuple[list[dict[str, Any]], dict[str, str]]:
-    directory = _surefire_reports_directory()
+def _parse_surefire_reports(directory: Path | None = None) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    directory = directory or _surefire_reports_directory()
     suites: list[dict[str, Any]] = []
     env: dict[str, str] = {}
     for xml_file in sorted(directory.glob("TEST-*.xml")) if directory.exists() else []:
@@ -510,7 +536,17 @@ def _parse_surefire_reports() -> tuple[list[dict[str, Any]], dict[str, str]]:
                 case.update(status="skipped", skip_reason=skipped.get("message", "") or skipped.text or "", error_type=skipped.get("type", ""), error_text=skipped.text or "")
             else:
                 case["status"] = "passed"
+            output = node.findtext("system-out", default="")
+            case["capability_evidence"] = dict(re.findall(
+                r"\[JDBC_CAPABILITY\] ((?:metadata|behavior)\.[a-z_]+)=(true|false)", output))
             suite["testcases"].append(case)
+        for output in [suite["system_out"], *(n.findtext("system-out", default="") for n in root.findall("testcase"))]:
+            for payload in re.findall(r"\[JDBC_TARGET\] (\{[^\n]+\})", output):
+                for key, value in json.loads(payload).items():
+                    prop = "jdbc.test." + key
+                    if env.get(prop) and env[prop] != value:
+                        env["jdbc.test.evidenceConflict"] = "true"
+                    env[prop] = value
         suites.append(suite)
     return suites, env
 
@@ -519,17 +555,28 @@ def _archive_report(runtime: dict[str, Any], report: dict[str, Any], execution: 
     root = Path((runtime.get("report") or {}).get("output_dir", "report"))
     if not root.is_absolute():
         root = PROJECT_ROOT / root
-    stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S_%f")
     directory = root / f"{runtime['db']['adapter_id']}_{stamp}"
-    directory.mkdir(parents=True, exist_ok=True)
-    (directory / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    (directory / "report.md").write_text(_markdown(report), encoding="utf-8")
-    (directory / "report.html").write_text(_html(report), encoding="utf-8")
-    diagnostic = {
+    directory.mkdir(parents=True, exist_ok=False)
+    key_name = (runtime.get("regression") or {}).get("environment_key_env", "JDBC_TEST_REGRESSION_KEY")
+    comparison_key = os.environ.get(key_name, "")
+    def redact(value: Any) -> Any:
+        if isinstance(value, str):
+            return value.replace(comparison_key, "[REDACTED]") if len(comparison_key.encode()) >= 32 else value
+        if isinstance(value, dict):
+            return {redact(key): redact(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [redact(item) for item in value]
+        return value
+    safe_report = redact(report)
+    (directory / "report.json").write_text(json.dumps(safe_report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (directory / "report.md").write_text(_markdown(safe_report), encoding="utf-8")
+    (directory / "report.html").write_text(_html(safe_report), encoding="utf-8")
+    diagnostic = redact({
         "execution": execution,
         "test_suites": suites,
         "notice": "Local diagnostic log. Review before sharing.",
-    }
+    })
     (directory / "diagnostics.log").write_text(json.dumps(diagnostic, ensure_ascii=False, indent=2), encoding="utf-8")
     return directory
 
@@ -551,6 +598,8 @@ def _markdown(report: dict[str, Any]) -> str:
         "# JDBC 4.3 Compatibility Assessment", "",
         f"- Target outcome: `{report.get('target_outcome', '')}`",
         f"- Formal eligible: `{report.get('formal_eligible', False)}`",
+        f"- Plan requirements: `{json.dumps(report.get('plan_assessment', {}), ensure_ascii=False)}`",
+        "- Capability declarations are separate from observed behavior; see JSON capability_evidence/contract_basis.",
         f"- Database: `{(target.get('database_product') or {}).get('value', '')}`",
         f"- Database version: `{(target.get('database_version') or {}).get('value', '')}`",
         f"- Driver version: `{(target.get('jdbc_driver_version') or {}).get('value', '')}`",
@@ -578,6 +627,7 @@ def _html(report: dict[str, Any]) -> str:
         "td,th{border:1px solid #ddd;padding:.45rem;text-align:left}th{background:#f3f4f6}</style></head><body>"
         f"<h1>JDBC 4.3 Compatibility Assessment</h1><p>Target Outcome: <b>{html.escape(str(report.get('target_outcome', '')))}</b></p>"
         f"<p>Formal eligible: {str(report.get('formal_eligible', False)).lower()}</p>"
+        f"<pre>{html.escape(json.dumps(report.get('plan_assessment', {}), ensure_ascii=False, indent=2))}</pre>"
         f"<table><thead><tr><th>Scenario ID</th><th>Category</th><th>Outcome</th></tr></thead><tbody>{rows}</tbody></table>"
         "</body></html>"
     )
@@ -609,11 +659,14 @@ def _assessment_exit_code(report: dict[str, Any]) -> int:
         CompatibilityStatus.ADAPTER_INCOMPLETE.value,
         CompatibilityStatus.CLEANUP_FAILURE.value,
     }
+    if report.get("plan_assessment", {}).get("unmet") or report.get("plan_assessment", {}).get("not_evaluated"):
+        return 1
     if report.get("environment_cleanup_issues"):
         return 1
     if report.get("environment_preflight_issues"):
         return 1
-    return 1 if any(item.get("compatibility_status") in blocking for item in report.get("scenario_results", {}).values()) else 0
+    return 1 if any(item.get("compatibility_status") in blocking for item in report.get("scenario_results", {}).values()
+                    if item.get("conclusion") not in {"USER_EXCLUDED", "NOT_APPLICABLE"}) else 0
 
 
 def _report_identity(report: dict[str, Any]) -> dict[str, Any]:

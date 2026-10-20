@@ -3,6 +3,8 @@ package com.jdbctest.savepoint;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.jdbctest.config.ConfigLoader;
+import com.jdbctest.extension.CapabilityEvidence;
+import com.jdbctest.extension.JdbcContracts;
 import com.jdbctest.extension.JdbcContext;
 import com.jdbctest.extension.JdbcTestExtension;
 import com.jdbctest.extension.RequiresFeature;
@@ -28,10 +30,22 @@ class SavepointTest {
     @Test
     @Order(1)
     @DisplayName("setSavepoint 创建保存点")
-    void testSetSavepoint(Connection conn) throws SQLException {
+    void testSetSavepoint(Connection conn, TestReporter reporter) throws SQLException {
+        CapabilityEvidence.record(reporter, "metadata.savepoint",
+            conn.getMetaData().supportsSavepoints());
         conn.setAutoCommit(false);
         try {
-            Savepoint sp = conn.setSavepoint();
+            Savepoint sp = JdbcContracts.optional("Connection.setSavepoint", () -> {
+                try {
+                    Savepoint created = conn.setSavepoint();
+                    assertNotNull(created, "setSavepoint must return a Savepoint");
+                    CapabilityEvidence.record(reporter, "behavior.savepoint", true);
+                    return created;
+                } catch (SQLFeatureNotSupportedException error) {
+                    CapabilityEvidence.record(reporter, "behavior.savepoint", false);
+                    throw error;
+                }
+            });
             assertNotNull(sp, "setSavepoint 不应返回 null");
             conn.rollback(sp);
         } finally {

@@ -6,7 +6,7 @@ import { t } from "i18next";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { adaptersApi, adapterKeys } from "@/api/adapters";
 import { connectionsApi, connectionsKeys } from "@/api/connections";
@@ -34,13 +34,14 @@ import { AdapterDetails } from "./adapter-details";
 function Editor({ connection }: { connection?: Connection }) {
   useTranslation();
   const navigate = useNavigate();
+  const [search] = useSearchParams();
   const client = useQueryClient();
   const [form, setForm] = useState({
     name: connection?.name ?? "",
     executionDatabase: connection?.executionDatabase ?? "",
     executionSchema: connection?.executionSchema ?? "",
-    databaseType: connection?.databaseType ?? "",
-    adapterId: connection?.adapterId ?? "",
+    databaseType: connection?.databaseType ?? search.get("adapterId") ?? "",
+    adapterId: connection?.adapterId ?? search.get("adapterId") ?? "",
     jdbcUrl: connection?.jdbcUrl ?? "",
     username: connection?.username ?? "",
     description: connection?.description ?? "",

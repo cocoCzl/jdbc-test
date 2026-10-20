@@ -472,6 +472,11 @@ class DeterministicOrchestrationTest {
         mvc.perform(post("/api/runs/{id}/cancel", first)).andExpect(status().isNoContent());
         assertFalse(ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false));
         done(first, TestRunStatus.CANCELLED, null);
+        assertEquals("UNKNOWN", service.get(first).cleanupEvidence().get("status"));
+        mvc.perform(get("/api/runs/{id}/report.json", first)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.runStatus").value("CANCELLED"))
+            .andExpect(jsonPath("$.workerReportValidated").value(false))
+            .andExpect(jsonPath("$.cleanupEvidence.status").value("UNKNOWN"));
         started(second);
         done(second, TestRunStatus.SUCCEEDED, null);
         assertEquals(TestRunStatus.CANCELLED, state(first));
@@ -845,6 +850,44 @@ class DeterministicOrchestrationTest {
             Files.readString(workspace(response.id()).resolve("input-evidence.json")));
         assertEquals("custom.jdbc.Source", input.path("driver").path("dataSources")
             .path("dataSource").path("className").asString());
+    }
+
+    @Test
+    void queuedImportedPackageReachesWorkerAndReportAfterLibraryUpdate() throws Exception {
+        var adapters = context.getBean(com.jdbctest.server.connection.AdapterService.class);
+        var original = adapters.importPackage(
+            ImportedAdapterFlowTest.bundle("queued-private", "1", false), null);
+        UUID blocker = run("BLOCK", 1);
+        scheduler.enqueue(blocker);
+        started(blocker);
+        var connection = resource("NORMAL");
+        transactions.executeWithoutResult(tx -> {
+            var persistent = connections.findById(connection.getId()).orElseThrow();
+            persistent.update("Private", "Private", "queued-private", persistent.getJdbcUrl(),
+                "NORMAL", null, persistent.getDefaultDriver());
+        });
+        var response = service.create(new CreateTestRunRequest(connection.getId(), null, "CUSTOM",
+            List.of(), List.of("connection.is_valid"), List.of(), null, true));
+        created.add(response.id());
+        assertEquals(TestRunStatus.QUEUED, state(response.id()));
+        adapters.importPackage(ImportedAdapterFlowTest.bundle("queued-private", "2", false),
+            original.fingerprint());
+        release(blocker);
+        done(blocker, TestRunStatus.SUCCEEDED, null);
+        started(response.id());
+        done(response.id(), TestRunStatus.SUCCEEDED, null);
+        var mapper = new tools.jackson.databind.ObjectMapper();
+        var input = mapper.readTree(Files.readString(
+            workspace(response.id()).resolve("input-evidence.json")));
+        assertEquals(original.fingerprint(), input.at("/adapterPackage/fingerprint").asString());
+        var frozen = mapper.treeToValue(input.path("adapterPackage"),
+            com.jdbctest.catalog.AdapterPackageSnapshot.class);
+        assertEquals("1", frozen.definition().version());
+        mvc.perform(get("/api/runs/{id}/report.json", response.id())).andExpect(status().isOk())
+            .andExpect(jsonPath("$.adapterSnapshot.version").value("1"))
+            .andExpect(jsonPath("$.adapterSnapshot.status").value("LOCAL"))
+            .andExpect(jsonPath("$.adapterSnapshot.fingerprint").value(original.fingerprint()));
+        assertEquals("2", adapters.required("queued-private").version());
     }
 
     @Test

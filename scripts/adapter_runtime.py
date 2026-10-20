@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from regression import runtime_inputs
+
 from adapter_manifest import (
     MANAGED_CAPABILITIES, REQUIRED_ADAPTER_FIELDS, REQUIRED_ASSET_AREAS,
     KNOWN_DIFFERENCE_FIELDS, adapter_id, read_adapter_json, validate_adapter_metadata,
@@ -103,6 +105,7 @@ def build_runtime_config(
     user_config: dict[str, Any],
     adapter: AdapterPackage,
     driver_artifact: dict[str, Any],
+    *, regression_evidence: bool = True,
 ) -> dict[str, Any]:
     manifest = adapter.manifest
     db = user_config.get("db") or {}
@@ -203,6 +206,8 @@ def build_runtime_config(
         "pool": {"profile_dir": str(pool_root)},
         "execution": {"mode": (user_config.get("execution") or {}).get("mode", "local")},
         "report": user_config.get("report") or {"output_dir": "report", "format": ["json", "html", "markdown"]},
+        "regression": user_config.get("regression") or {},
+        "plan_requirements": user_config.get("plan_requirements") or {},
         "test_profile": str(user_config.get("test_profile", "full")),
         "test_filter": test_filter,
         "adapter": {
@@ -227,6 +232,11 @@ def build_runtime_config(
     concurrency = user_config.get("concurrency") or {}
     if concurrency.get("enabled"):
         raise ValueError("并发压测不属于 JDBC 4.3 兼容性基线；请移除 concurrency.enabled")
+    required = runtime["plan_requirements"].get("required_capabilities", [])
+    if not isinstance(required, list) or any(x not in {"transactions", "batch_updates", "savepoint"} for x in required):
+        raise ValueError("plan_requirements.required_capabilities supports transactions, batch_updates, savepoint")
+    if regression_evidence:
+        runtime["regression_inputs"] = runtime_inputs(project_root, runtime, manifest)
     return runtime
 
 
@@ -323,7 +333,10 @@ def _asset_root(project_root: Path, adapter_root: Path, value: str | None) -> Pa
     path = Path(value or "")
     if path.is_absolute():
         return path
+    package_path = adapter_root / path
+    if package_path.exists():
+        return package_path.resolve()
     project_path = project_root / path
     if project_path.exists():
         return project_path.resolve()
-    return (adapter_root / path).resolve()
+    return package_path.resolve()

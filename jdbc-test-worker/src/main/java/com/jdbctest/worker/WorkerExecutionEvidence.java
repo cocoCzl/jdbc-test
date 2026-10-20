@@ -304,6 +304,16 @@ final class WorkerExecutionEvidence implements TestExecutionListener {
         return fields;
     }
 
+    synchronized void sqlStarted(TestCaseDescriptor descriptor) {
+        started.put(descriptor.scenarioId(), System.nanoTime());
+        events.write("CASE_STARTED", runId, fields(descriptor));
+    }
+
+    synchronized void sqlFinished(Map<String, Object> row) {
+        results.put(row.get("scenarioId").toString(), Map.copyOf(row));
+        events.write("CASE_FINISHED", runId, row);
+    }
+
     synchronized List<Map<String, Object>> results() {
         return List.copyOf(results.values());
     }

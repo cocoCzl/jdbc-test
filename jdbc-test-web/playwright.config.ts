@@ -26,10 +26,10 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   projects: [
-    { name: "mocked", testMatch: ["**/smoke.spec.ts", "**/bilingual.spec.ts", "**/ui-migration.spec.ts", "**/theme.spec.ts", "**/test-selection.spec.ts", "**/run-history-status.spec.ts"] },
+    { name: "mocked", testMatch: ["**/sql-packages.spec.ts", "**/adapter-import.spec.ts", "**/smoke.spec.ts", "**/bilingual.spec.ts", "**/ui-migration.spec.ts", "**/theme.spec.ts", "**/test-selection.spec.ts", "**/run-history-status.spec.ts"] },
     { name: "primitives", testMatch: "**/primitives.spec.ts" },
     { name: "history-readonly", testMatch: ["**/history-readonly.spec.ts", "**/history-report-readonly.spec.ts"], use: { trace: "off" } },
-    { name: "real", testMatch: "**/real.spec.ts", use: { trace: "off" } },
+    { name: "real", testMatch: ["**/real.spec.ts", "**/*.real.spec.ts"], use: { trace: "off" } },
   ],
   webServer: production ? undefined : {
     command: preview ? "npm exec -- vite preview --host 127.0.0.1 --port 4173" : "npm run dev",

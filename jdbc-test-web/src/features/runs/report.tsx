@@ -1,3 +1,5 @@
+import { SqlPackageSnapshot } from "@/features/sql-packages/sql-package-snapshot";
+import { AdapterDetails } from "@/features/connections/adapter-details";
 import { CleanupEvidence } from "./cleanup-evidence";
 import { JdbcUrl } from "@/components/jdbc-url";
 import { Card } from "@/components/ui/card";
@@ -57,13 +59,14 @@ export default function Report({ run }: { run: Run }) {
       {summary.accounting ? <p className="mb-4 text-sm">
         {t("report.accounting", {notRun: summary.accounting.notRun, incomplete: summary.accounting.incomplete})}{summary.accounting.started === 0 ? t("ui.noScenarioExecutionWasVerifiedSkippedCases") : ""}
       </p> : null}
-      {summary.selectionSnapshot?.catalogCount != null ? <p className="mb-4 text-sm">{t("selection.coverage", {
+      {!summary.sqlPackage && summary.selectionSnapshot?.catalogCount != null ? <p className="mb-4 text-sm">{t("selection.coverage", {
         total: summary.selectionSnapshot.catalogCount, selected: summary.totalCases,
         executed: summary.contractSummary?.EXECUTED ?? 0, excluded: summary.selectionSnapshot.userExcluded?.length ?? 0,
       })}</p> : null}
       {summary.contractSummary ? <Card className="panel mb-4"><h2 className="mb-3 font-semibold">{t("selection.evidence")}</h2>
         <dl className="grid gap-3 sm:grid-cols-2">{Object.entries(summary.contractSummary).filter(([key]) => key !== "EXECUTED").map(([key, count]) => <div key={key}><dt className="text-sm text-muted-foreground">{t(`selection.${key}`, { defaultValue: key })}</dt><dd>{count}</dd></div>)}</dl>
       </Card> : null}
+      {summary.sqlPackage ? <SqlPackageSnapshot snapshot={summary.sqlPackage} /> : null}
       <CleanupEvidence evidence={summary.cleanupEvidence} />
       {summary.executionIssues?.length ? <Card className="panel mb-4"><h2>{t("ui.executionIssues")}</h2>
         {summary.executionIssues.map((issue, index) => <p key={index} className="break-words">{String(issue.level)}: {String(issue.message ?? issue.status)}</p>)}
@@ -109,6 +112,7 @@ export default function Report({ run }: { run: Run }) {
               </div>
             ))}
           </dl>
+          <div className="mt-5"><h3 className="mb-2 font-medium">{t("adapter.frozen")}</h3>{summary.adapterSnapshot ? <AdapterDetails adapter={summary.adapterSnapshot} /> : <p>{t("adapter.snapshotMissing")}</p>}</div>
           <div className="mt-5"><JdbcUrl value={summary.connection.jdbcUrl} /></div>
           <div className="mt-5 border-t pt-4">
             <h3 className="text-sm font-medium">{t("ui.selectedModules")}</h3>

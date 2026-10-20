@@ -44,6 +44,7 @@ class DistributionTest(unittest.TestCase):
         (web / "assets/app.js").write_text("fixture", encoding="utf-8")
         shutil.copytree(ROOT / "deploy", self.source / "deploy")
         shutil.copytree(ROOT / "docs", self.source / "docs")
+        shutil.copytree(ROOT / "examples/sql", self.source / "examples/sql")
         shutil.copy2(ROOT / "LICENSE", self.source / "LICENSE")
         for entry in ("jdbc-test", "jdbc-test.ps1", ".env.example"):
             shutil.copy2(ROOT / entry, self.source / entry)
@@ -58,7 +59,7 @@ class DistributionTest(unittest.TestCase):
 
     def test_archives_are_complete_and_exclude_runtime_secrets(self):
         directory, archive, windows_archive = self.bundle()
-        required = {"jdbc-test", "jdbc-test.ps1", ".env.example", "server/jdbc-test-server.jar", "worker/jdbc-test-worker.jar", "web/index.html", "web/assets/app.js", "start.sh", "start.ps1", "config/application.properties.example", "docs/deployment.md", "docs/deployment.zh-CN.md"}
+        required = {"jdbc-test", "jdbc-test.ps1", ".env.example", "server/jdbc-test-server.jar", "worker/jdbc-test-worker.jar", "web/index.html", "web/assets/app.js", "start.sh", "start.ps1", "config/application.properties.example", "docs/deployment.md", "docs/deployment.zh-CN.md", "docs/sql-packages.md", "docs/sql-packages.zh-CN.md", "examples/sql/postgresql-basics.json", "examples/sql/mysql-basics.json"}
         with zipfile.ZipFile(windows_archive) as bundle:
             contents = {name.split("/", 1)[1] for name in bundle.namelist()}
             self.assertTrue(required <= contents)

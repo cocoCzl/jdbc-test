@@ -54,6 +54,26 @@ class CredentialOutputTest {
     }
 
     @Test
+    void sqlInputsAndObservedRowsMaskKnownSecretsWithoutChangingIdentity() throws Exception {
+        String password = "SyntheticSqlSecret";
+        CredentialSanitizer.password(password);
+        var sql = Map.of("sql", "SELECT '" + password + "'",
+            "template", "SELECT '" + password + "'",
+            "parameters", List.of(Map.of("type", "STRING", "value", password)),
+            "expected", Map.of("rows", List.of(List.of(password, "NULL"))),
+            "actual", Map.of("rows", List.of(List.of(password, "NULL"))));
+        var input = Map.of("runId", password, "steps", List.of(sql), "sqlPackage",
+            Map.of("manifest", "{\"sql\":\"SELECT '" + password + "'\"}"));
+        var safe = (Map<?, ?>) CredentialSanitizer.project(input);
+        var mapper = new ObjectMapper();
+        assertFalse(mapper.writeValueAsString(safe.get("steps")).contains(password));
+        assertFalse(mapper.writeValueAsString(safe.get("sqlPackage")).contains(password));
+        assertEquals(password, safe.get("runId"));
+        assertEquals(safe, CredentialSanitizer.project(safe));
+        assertTrue(mapper.writeValueAsString(input.get("steps")).contains(password));
+    }
+
+    @Test
     void knownSecretInsideMaskDoesNotCorruptRepeatedProjection() {
         CredentialSanitizer.password("REDACTED");
         String safe = CredentialSanitizer.sanitize("driver echoed REDACTED");

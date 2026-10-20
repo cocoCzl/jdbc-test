@@ -3,6 +3,7 @@ package com.jdbctest.connection;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.jdbctest.config.ConfigLoader;
+import com.jdbctest.extension.CapabilityEvidence;
 import com.jdbctest.extension.JdbcContext;
 import com.jdbctest.extension.JdbcContracts;
 import com.jdbctest.extension.JdbcTestExtension;
@@ -70,7 +71,9 @@ class ConnectionTest {
     @Test
     @Order(4)
     @DisplayName("回滚事务")
-    void testRollback(Connection conn) throws SQLException {
+    void testRollback(Connection conn, TestReporter reporter) throws SQLException {
+        CapabilityEvidence.record(reporter, "metadata.transactions",
+            conn.getMetaData().supportsTransactions());
         conn.setAutoCommit(false);
         try (Statement stmt = conn.createStatement()) {
             stmt.execute(JdbcContext.sql("DELETE FROM {{connection_test}} WHERE id > 0"));
@@ -82,6 +85,7 @@ class ConnectionTest {
                 JdbcContext.sql("SELECT COUNT(*) FROM {{connection_test}}"))) {
             rs.next();
             assertTrue(rs.getInt(1) > 0, "回滚后数据应恢复");
+            CapabilityEvidence.record(reporter, "behavior.transactions", true);
         } finally {
             conn.setAutoCommit(true);
         }

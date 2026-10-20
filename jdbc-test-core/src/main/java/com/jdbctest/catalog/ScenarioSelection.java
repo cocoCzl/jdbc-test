@@ -13,7 +13,7 @@ public final class ScenarioSelection {
         List<String> applicableAdapters) {
 
         public boolean appliesTo(String adapterId) {
-            return category == TestCategory.STANDARD_JDBC
+            return category == TestCategory.STANDARD_JDBC || category == TestCategory.SQL_FEATURE
                 || adapterId != null && applicableAdapters.contains(adapterId);
         }
     }

@@ -45,6 +45,7 @@ export function FailureDetail({
                 {formatDuration(result.durationMs)}
               </span>
             </div>
+            {result.executionEvidence?.testDomain === "SQL_FEATURE" ? <section className="space-y-3 text-sm"><h3 className="font-semibold">{t("sql.stepEvidence")}</h3><p>{t("sql.boundary")} · {result.executionEvidence.variant}</p>{result.executionEvidence.steps?.map((step, index) => <div key={index} className="space-y-2 rounded-lg border p-3"><p>{step.id} · {step.phase} · {step.status}</p><pre className="overflow-auto whitespace-pre-wrap break-words">{step.sql}</pre><p>{t("sql.expected")}</p><pre className="overflow-auto whitespace-pre-wrap break-words">{JSON.stringify(step.expected, null, 2)}</pre><p>{t("sql.actual")}</p><pre className="overflow-auto whitespace-pre-wrap break-words">{JSON.stringify(step.actual ?? step.failure, null, 2)}</pre></div>)}</section> : null}
             {result.executionEvidence?.conclusion ? <section className="space-y-2 text-sm">
               <h3 className="font-semibold">{t("selection.evidence")}</h3>
               <p>{t("selection.conclusion")}: {t(`selection.${result.executionEvidence.conclusion}`, { defaultValue: result.executionEvidence.conclusion })}</p>
@@ -127,7 +128,7 @@ export default function Results({
             size="sm"
             onClick={() => setSelected(row.original)}
           >
-            {row.original.status === "SKIPPED" ? t("skip.title") : t("ui.inspectFailure")}</Button>
+            {row.original.executionEvidence?.testDomain === "SQL_FEATURE" ? t("sql.stepEvidence") : row.original.status === "SKIPPED" ? t("skip.title") : t("ui.inspectFailure")}</Button>
         ) : (
           "—"
         ),

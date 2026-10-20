@@ -1,7 +1,7 @@
 import i18n from "@/i18n";
 
 // Display-only mapping. Payloads, snapshots and cached records keep their original IDs.
-const moduleKeys = new Set(["advanced-type", "blob-clob", "callable-statement", "connection", "database-metadata", "datasource", "jdbc-type", "lifecycle", "parameter-metadata", "prepared-statement", "result-set", "result-set-metadata", "rowset", "savepoint", "sqlxml", "statement", "wrapper"]);
+const moduleKeys = new Set(["sql_feature", "advanced-type", "blob-clob", "callable-statement", "connection", "database-metadata", "datasource", "jdbc-type", "lifecycle", "parameter-metadata", "prepared-statement", "result-set", "result-set-metadata", "rowset", "savepoint", "sqlxml", "statement", "wrapper"]);
 export function moduleName(id: string, backendName = id) {
   return moduleKeys.has(id) ? i18n.t(`module.${id}`) : backendName;
 }

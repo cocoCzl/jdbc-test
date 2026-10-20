@@ -3,6 +3,7 @@ package com.jdbctest.databasemetadata;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.jdbctest.config.ConfigLoader;
+import com.jdbctest.extension.CapabilityEvidence;
 import com.jdbctest.extension.JdbcContext;
 import com.jdbctest.extension.JdbcTestExtension;
 import com.jdbctest.extension.UseSqlScripts;
@@ -246,27 +247,35 @@ class DatabaseMetaDataTest {
     @Order(15)
     @DisplayName("supportsTransactions 检查事务支持")
     @UseSqlScripts
-    void testSupportsTransactions(Connection conn) throws SQLException {
+    void testSupportsTransactions(Connection conn, TestReporter reporter) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
-        assertTrue(meta.supportsTransactions(), "应支持事务");
+        // DatabaseMetaData permits both boolean results; this is a declaration, not a probe.
+        boolean supported = meta.supportsTransactions();
+        CapabilityEvidence.record(reporter, "metadata.transactions", supported);
+        if (!supported) {
+            assertEquals(Connection.TRANSACTION_NONE, meta.getDefaultTransactionIsolation(),
+                "JDBC requires TRANSACTION_NONE when transactions are unsupported");
+        }
     }
 
     @Test
     @Order(16)
     @DisplayName("supportsBatchUpdates 检查批处理支持")
     @UseSqlScripts
-    void testSupportsBatchUpdates(Connection conn) throws SQLException {
+    void testSupportsBatchUpdates(Connection conn, TestReporter reporter) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
-        assertTrue(meta.supportsBatchUpdates(), "应支持批处理");
+        // DatabaseMetaData permits both boolean results; this is a declaration, not a probe.
+        CapabilityEvidence.record(reporter, "metadata.batch_updates", meta.supportsBatchUpdates());
     }
 
     @Test
     @Order(17)
     @DisplayName("supportsSavepoints 检查保存点支持")
     @UseSqlScripts
-    void testSupportsSavepoints(Connection conn) throws SQLException {
+    void testSupportsSavepoints(Connection conn, TestReporter reporter) throws SQLException {
         DatabaseMetaData meta = conn.getMetaData();
-        assertTrue(meta.supportsSavepoints(), "应支持保存点");
+        // DatabaseMetaData permits both boolean results; this is a declaration, not a probe.
+        CapabilityEvidence.record(reporter, "metadata.savepoint", meta.supportsSavepoints());
     }
 
     @Test

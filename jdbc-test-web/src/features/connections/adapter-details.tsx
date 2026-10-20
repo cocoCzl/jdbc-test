@@ -8,7 +8,11 @@ export function AdapterDetails({ adapter }: { adapter?: Adapter }) {
   return (
     <div className="space-y-2 rounded-xl border border-border bg-muted/30 p-4 text-sm">
       <p className="font-medium">{adapter.name} · {adapterStatus(adapter.status)}</p>
+      <p className="break-words">{adapter.id}{adapter.version ? ` · ${adapter.version} (${adapter.revision})` : ""}{adapter.origin ? ` · ${t(`adapter.origin.${adapter.origin}`)}` : ""}</p>
+      {adapter.fingerprint ? <p className="break-all font-mono text-xs">{t(adapter.fingerprintScope === "MANIFEST" ? "adapter.manifestFingerprint" : "adapter.packageFingerprint")}{": "}{adapter.fingerprint}</p> : null}
+      {adapter.matchConditions ? <dl className="space-y-1">{Object.entries(adapter.matchConditions).map(([key, value]) => <div key={key} className="break-all"><dt className="inline text-muted-foreground">{t(`adapter.match.${key}`, { defaultValue: key })}: </dt><dd className="inline">{value}</dd></div>)}</dl> : null}
       <p className="text-muted-foreground">{t("adapter.declarationBoundary")}</p>
+      {adapter.origin === "IMPORTED" ? <p className="text-muted-foreground">{t("adapter.unverified")}</p> : null}
       {adapter.qualificationNoteKey ? (
         <p className="text-muted-foreground">{t(adapter.qualificationNoteKey)}</p>
       ) : null}

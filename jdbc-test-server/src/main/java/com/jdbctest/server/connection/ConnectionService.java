@@ -1,6 +1,5 @@
 package com.jdbctest.server.connection;
 
-import com.jdbctest.catalog.AdapterCatalog;
 import com.jdbctest.server.driver.DriverPackageStatus;
 import com.jdbctest.server.driver.DriverStorage;
 import com.jdbctest.server.driver.DriverWorkerProperties;
@@ -41,12 +40,15 @@ final class ConnectionService {
     private final DriverWorkerProperties properties;
     private final ObjectMapper mapper;
     private final TransactionTemplate transactions;
+    private final AdapterService adapters;
 
     ConnectionService(DatabaseConnectionProfileRepository connections,
         JdbcDriverPackageRepository drivers, JdbcDriverArtifactRepository artifacts,
         TestRunRepository runs, DriverStorage storage, CredentialEncryptionService encryption,
         WorkerProcessRunner worker,
-        DriverWorkerProperties properties, ObjectMapper mapper, TransactionTemplate transactions) {
+        DriverWorkerProperties properties, ObjectMapper mapper, TransactionTemplate transactions,
+        AdapterService adapters) {
+        this.adapters = adapters;
         this.connections = connections;
         this.drivers = drivers;
         this.artifacts = artifacts;
@@ -67,6 +69,7 @@ final class ConnectionService {
             throw invalid("password is required when savePassword is true");
         }
         return transactions.execute(status -> {
+            adapters.lockForConnection(values.adapterId());
             JdbcDriverPackageEntity driver = requiredValidatedDriver(values.driverId());
             DatabaseConnectionProfileEntity entity = new DatabaseConnectionProfileEntity(
                 values.name(),
@@ -131,6 +134,7 @@ final class ConnectionService {
         }
         return transactions.execute(status -> {
             DatabaseConnectionProfileEntity entity = requiredConnection(id);
+            adapters.lockForConnection(values.adapterId());
             JdbcDriverPackageEntity driver = requiredValidatedDriver(values.driverId());
             entity.setExecutionScope(
                 request.executionDatabase() == null ? entity.getExecutionDatabase()
@@ -273,10 +277,7 @@ final class ConnectionService {
                 "CONNECTION_URL_CONTAINS_CREDENTIALS", "JDBC URL must not contain credentials");
         }
         String normalizedAdapter = required(adapterId, "adapterId");
-        if (!AdapterCatalog.contains(normalizedAdapter)) {
-            throw new ConnectionException(HttpStatus.UNPROCESSABLE_CONTENT, "ADAPTER_NOT_FOUND",
-                "Unknown adapter");
-        }
+        adapters.required(normalizedAdapter);
         return new Values(required(name, "name"), required(databaseType, "databaseType"),
             normalizedAdapter, normalizedUrl, optional(username), optional(description), driverId);
     }

@@ -980,7 +980,7 @@ scenarios:
   unsupported_policy: REQUIRED
 - scenario_id: database_metadata.supports_batch_updates
   category: core
-  contract: database metadata supports batch updates follows the JDBC-facing API contract.
+  contract: supportsBatchUpdates may return true or false; retain its declaration independently of observed batch behavior.
   source_class: com.jdbctest.databasemetadata.DatabaseMetaDataTest
   source_method: testSupportsBatchUpdates
   required_capabilities: []
@@ -1002,7 +1002,7 @@ scenarios:
   unsupported_policy: REQUIRED
 - scenario_id: database_metadata.supports_savepoints
   category: core
-  contract: database metadata supports savepoints follows the JDBC-facing API contract.
+  contract: supportsSavepoints may return true or false; retain its declaration independently of observed savepoint behavior.
   source_class: com.jdbctest.databasemetadata.DatabaseMetaDataTest
   source_method: testSupportsSavepoints
   required_capabilities: []
@@ -1013,7 +1013,7 @@ scenarios:
   unsupported_policy: REQUIRED
 - scenario_id: database_metadata.supports_transactions
   category: core
-  contract: database metadata supports transactions follows the JDBC-facing API contract.
+  contract: supportsTransactions may return true or false; false requires default isolation TRANSACTION_NONE.
   source_class: com.jdbctest.databasemetadata.DatabaseMetaDataTest
   source_method: testSupportsTransactions
   required_capabilities: []
@@ -2152,7 +2152,7 @@ scenarios:
   unsupported_policy: REQUIRED
 - scenario_id: savepoint.set_savepoint
   category: extended
-  contract: savepoint set savepoint follows the JDBC-facing API contract.
+  contract: Connection.setSavepoint returns a savepoint with auto-commit disabled, or explicitly reports SQLFeatureNotSupportedException.
   source_class: com.jdbctest.savepoint.SavepointTest
   source_method: testSetSavepoint
   required_capabilities:
@@ -2163,7 +2163,7 @@ scenarios:
   execution_prerequisites:
   - sql:savepoint_ddl.sql
   - sql:savepoint_dml.sql
-  unsupported_policy: REQUIRED
+  unsupported_policy: OPTIONAL
 - scenario_id: savepoint.set_savepoint_with_name
   category: extended
   contract: savepoint set savepoint with name follows the JDBC-facing API contract.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import regression
 import fnmatch
 import platform
 import re
@@ -391,6 +392,8 @@ def build_v1_report(
                 "error_type": case.get("error_type", ""),
                 "details": "local diagnostic log",
             },
+            "capability_evidence": case.get("capability_evidence", {}),
+            "contract_basis": metadata_contract_basis(case["scenario_id"]),
             "required_capabilities": case.get("required_capabilities", []),
             "known_deviations": deviations,
         }
@@ -440,6 +443,8 @@ def build_v1_report(
         "target_outcome": target_outcome.value,
         "target_identity_mismatch": identity_mismatch,
         "compatibility_target": target,
+        "regression_evidence": regression.build_evidence(project_root, config, env_info, chosen),
+        "plan_assessment": assess_capabilities(scenario_results, capability_declarations, config),
         "evaluation_context": evaluation_context,
         "scenario_results": dict(sorted(scenario_results.items())),
         "capability_profile": capability_profile,
@@ -462,6 +467,61 @@ def build_v1_report(
         },
     }
 
+
+
+def metadata_contract_basis(scenario_id: str) -> dict[str, Any]:
+    methods = {"database_metadata.supports_transactions": "supportsTransactions()",
+               "database_metadata.supports_batch_updates": "supportsBatchUpdates()",
+               "database_metadata.supports_savepoints": "supportsSavepoints()"}
+    if scenario_id == "savepoint.set_savepoint":
+        return {"source": "https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/Connection.html#setSavepoint()",
+                "jdbc_version": "4.3", "precondition": "open non-XA connection; auto-commit disabled; fixtures prepared",
+                "allowed_results": ["non-null Savepoint followed by rollback(savepoint)",
+                                    "SQLFeatureNotSupportedException from setSavepoint only"],
+                "reason": "Only setSavepoint is scoped as optional; metadata cannot suppress the call. "
+                          "Permission, fixture, rollback and cleanup errors retain their separate evidence."}
+    if scenario_id not in methods:
+        return {}
+    return {"source": "https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/DatabaseMetaData.html#"
+                      + methods[scenario_id],
+            "jdbc_version": "4.3", "precondition": "open connection; metadata call completed",
+            "allowed_results": [True, False],
+            "reason": "Boolean declares support; false alone is not a JDBC contract violation. "
+                      "supportsTransactions=false also requires default isolation TRANSACTION_NONE.",
+            "exceptions": "SQLException retains database access error; no unsupported permission inferred"}
+
+
+def assess_capabilities(results: dict, declarations: dict, config: dict) -> dict:
+    required = (config.get("plan_requirements") or {}).get("required_capabilities", [])
+    features = set(required) | {"transactions", "batch_updates", "savepoint"}
+    entries, unmet, unknown = [], [], []
+    for feature in sorted(features):
+        metadata, behavior = [], []
+        for scenario_id, row in results.items():
+            evidence = row.get("capability_evidence", {})
+            for kind, bucket in (("metadata", metadata), ("behavior", behavior)):
+                value = evidence.get(f"{kind}.{feature}")
+                if value in ("true", "false"):
+                    bucket.append({"scenario_id": scenario_id, "value": value == "true"})
+        observed = {item["value"] for item in behavior}
+        declared = {item["value"] for item in metadata}
+        # A declaration is never proof of an actual successful operation.
+        state = "not_required"
+        if feature in required:
+            state = "met" if observed == {True} else "unmet" if observed == {False} else "not_evaluated"
+            if state == "unmet":
+                unmet.append(feature)
+            elif state == "not_evaluated":
+                unknown.append(feature)
+        entries.append({"capability": feature, "plan_required": feature in required,
+                        "requirement_status": state, "adapter_declaration": declarations.get(feature),
+                        "metadata_declarations": metadata, "behavior_observations": behavior,
+                        "declaration_mismatch": bool(declared and observed and declared != observed),
+                        "adapter_metadata_mismatch": any(item["value"] != declarations[feature]
+                            for item in metadata) if feature in declarations else False})
+    return {"required_capabilities": required, "unmet": unmet, "not_evaluated": unknown,
+            "capabilities": entries,
+            "scope": "Observed support covers only the recorded API calls, not all operations of a feature."}
 
 def build_coverage_summary(scenario_results: dict[str, dict[str, Any]]) -> dict[str, Any]:
     """Summarize scenario outcomes by JDBC area and required capability."""

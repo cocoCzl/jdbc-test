@@ -103,6 +103,7 @@ export default function NewRun() {
         includeScenarios: selectedIds,
         excludeScenarios: excludedIds,
         catalogVersion: catalog.data?.catalogVersion,
+        expectedAdapterFingerprint: chosenAdapter?.fingerprint ?? undefined,
         budgetSeconds,
         destructiveConsent: consent,
         ...(emptyPassword ? { password: "" } : needsPassword ? { password } : {}),
@@ -333,6 +334,7 @@ export default function NewRun() {
                 </p>
                 {chosen ? <div className="mt-2"><JdbcUrl value={chosen.jdbcUrl} /></div> : null}
                 <p className="mt-2 text-sm">{t("ui.authorizedTestScope")} {chosen?.executionDatabase || "—"} / {chosen?.executionSchema || "—"}</p>
+                <div className="mt-3"><AdapterDetails adapter={chosenAdapter} /></div>
               </div>
               <div>
                 <p className="eyebrow">{t("ui.driverPackage")}</p>
