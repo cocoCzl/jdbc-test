@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtensionContext;
+import org.junit.jupiter.api.extension.ParameterContext;
 import org.junit.jupiter.api.io.TempDir;
 
 /** Packaged fixtures through real preparation/ownership; JDBC execution here is a fixture. */
@@ -116,6 +117,19 @@ class KingbasePreparationTest {
             for (Method method : methods) {
                 when(context.getRequiredTestMethod()).thenReturn(method);
                 extension.beforeEach(context);
+                UseSqlScripts fixture = method.getAnnotation(UseSqlScripts.class);
+                if (fixture == null) {
+                    fixture = scenario.getAnnotation(UseSqlScripts.class);
+                }
+                if (fixture != null && fixture.deferred()) {
+                    var parameter = mock(ParameterContext.class);
+                    var fixtureParameter = java.util.Arrays.stream(method.getParameters())
+                        .filter(item -> item.getType() == JdbcTestExtension.Fixtures.class)
+                        .findFirst().orElseThrow();
+                    when(parameter.getParameter()).thenReturn(fixtureParameter);
+                    ((JdbcTestExtension.Fixtures) extension.resolveParameter(parameter, context))
+                        .prepare();
+                }
             }
             int expected = scenario.getSimpleName().equals("MultipleResultsTest") ? 2 : 1;
             assertEquals(expected, objects.snapshot().size());

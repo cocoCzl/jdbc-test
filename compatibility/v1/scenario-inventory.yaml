@@ -128,7 +128,7 @@ scenarios:
   unsupported_policy: REQUIRED
 - scenario_id: jdbc_type.array_type_metadata
   category: extended
-  contract: ARRAY type metadata is exposed when array_type is declared.
+  contract: Suite requires ARRAY in supported type metadata; absence is not a generic JDBC violation.
   source_class: com.jdbctest.jdbctype.JdbcTypeCoverageTest
   source_method: testArrayTypeMetadata
   required_capabilities:
@@ -152,7 +152,7 @@ scenarios:
   unsupported_policy: OPTIONAL
 - scenario_id: jdbc_type.row_id_type_metadata
   category: extended
-  contract: ROWID type metadata is exposed when rowid_type is declared.
+  contract: Suite requires ROWID in supported type metadata; absence is not a generic JDBC violation.
   source_class: com.jdbctest.jdbctype.JdbcTypeCoverageTest
   source_method: testRowIdTypeMetadata
   required_capabilities:
@@ -164,7 +164,7 @@ scenarios:
   unsupported_policy: REQUIRED
 - scenario_id: jdbc_type.ref_type_metadata
   category: extended
-  contract: REF type metadata is exposed when ref_type is declared.
+  contract: Suite requires REF in supported type metadata; absence is not a generic JDBC violation.
   source_class: com.jdbctest.jdbctype.JdbcTypeCoverageTest
   source_method: testRefTypeMetadata
   required_capabilities:
@@ -176,7 +176,7 @@ scenarios:
   unsupported_policy: REQUIRED
 - scenario_id: jdbc_type.struct_type_metadata
   category: extended
-  contract: STRUCT type metadata is exposed when struct_type is declared.
+  contract: Suite requires STRUCT in supported type metadata; absence is not a generic JDBC violation.
   source_class: com.jdbctest.jdbctype.JdbcTypeCoverageTest
   source_method: testStructTypeMetadata
   required_capabilities:
@@ -199,7 +199,7 @@ scenarios:
   execution_prerequisites:
   - sql:advancedtype_ddl.sql
   - sql:advancedtype_dml.sql
-  unsupported_policy: REQUIRED
+  unsupported_policy: OPTIONAL
 - scenario_id: advanced_type.array_get_result_set
   category: extended
   contract: advanced type array get result set follows the JDBC-facing API contract.
@@ -213,7 +213,7 @@ scenarios:
   execution_prerequisites:
   - sql:advancedtype_ddl.sql
   - sql:advancedtype_dml.sql
-  unsupported_policy: REQUIRED
+  unsupported_policy: OPTIONAL
 - scenario_id: advanced_type.empty_array
   category: extended
   contract: advanced type empty array follows the JDBC-facing API contract.
@@ -227,7 +227,7 @@ scenarios:
   execution_prerequisites:
   - sql:advancedtype_ddl.sql
   - sql:advancedtype_dml.sql
-  unsupported_policy: REQUIRED
+  unsupported_policy: OPTIONAL
 - scenario_id: advanced_type.get_array
   category: extended
   contract: advanced type get array follows the JDBC-facing API contract.
@@ -241,7 +241,7 @@ scenarios:
   execution_prerequisites:
   - sql:advancedtype_ddl.sql
   - sql:advancedtype_dml.sql
-  unsupported_policy: REQUIRED
+  unsupported_policy: OPTIONAL
 - scenario_id: advanced_type.get_base_type
   category: extended
   contract: advanced type get base type follows the JDBC-facing API contract.
@@ -255,7 +255,7 @@ scenarios:
   execution_prerequisites:
   - sql:advancedtype_ddl.sql
   - sql:advancedtype_dml.sql
-  unsupported_policy: REQUIRED
+  unsupported_policy: OPTIONAL
 - scenario_id: advanced_type.get_base_type_name
   category: extended
   contract: advanced type get base type name follows the JDBC-facing API contract.
@@ -269,7 +269,7 @@ scenarios:
   execution_prerequisites:
   - sql:advancedtype_ddl.sql
   - sql:advancedtype_dml.sql
-  unsupported_policy: REQUIRED
+  unsupported_policy: OPTIONAL
 - scenario_id: advanced_type.set_array
   category: extended
   contract: advanced type set array follows the JDBC-facing API contract.
@@ -283,7 +283,7 @@ scenarios:
   execution_prerequisites:
   - sql:advancedtype_ddl.sql
   - sql:advancedtype_dml.sql
-  unsupported_policy: REQUIRED
+  unsupported_policy: OPTIONAL
 - scenario_id: advanced_type.string_array
   category: extended
   contract: advanced type string array follows the JDBC-facing API contract.
@@ -297,7 +297,7 @@ scenarios:
   execution_prerequisites:
   - sql:advancedtype_ddl.sql
   - sql:advancedtype_dml.sql
-  unsupported_policy: REQUIRED
+  unsupported_policy: OPTIONAL
 - scenario_id: blob_clob.binary_stream
   category: extended
   contract: blob clob binary stream follows the JDBC-facing API contract.
@@ -2792,7 +2792,7 @@ scenarios:
   unsupported_policy: REQUIRED
 - scenario_id: blob_clob.locator_update
   category: extended
-  contract: blob clob locator update follows the JDBC-facing API contract.
+  contract: LOB objects must retain exact local mutations; automatic persistence without rebinding is a suite feature requirement.
   source_class: com.jdbctest.blobclob.LobPersistenceTest
   source_method: testLocatorUpdate
   required_capabilities:
@@ -2803,8 +2803,8 @@ scenarios:
   applicable_adapters: []
   jdbc_version: '4.0'
   execution_prerequisites:
-  - sql:lob_persistence_ddl.sql
-  unsupported_policy: REQUIRED
+  - sql:lob_locator_ddl.sql
+  unsupported_policy: OPTIONAL
 - scenario_id: callable_statement.in_out_and_in_out
   category: extended
   contract: callable statement in out and in out follows the JDBC-facing API contract.
@@ -2871,10 +2871,10 @@ scenarios:
   - ref_cursor
   test_category: STANDARD_JDBC
   applicable_adapters: []
-  jdbc_version: '4.0'
+  jdbc_version: '4.2'
   execution_prerequisites:
   - sql:ref_cursor_ddl.sql
-  unsupported_policy: REQUIRED
+  unsupported_policy: OPTIONAL
 - scenario_id: connection.commit_visible_to_new_connection
   category: core
   contract: connection commit visible to new connection follows the JDBC-facing API contract.
@@ -3146,7 +3146,7 @@ scenarios:
   jdbc_version: '4.0'
   execution_prerequisites:
   - sql:rowid_behavior_ddl.sql
-  unsupported_policy: REQUIRED
+  unsupported_policy: OPTIONAL
 - scenario_id: result_set.update_and_delete_by_row_id
   category: extended
   contract: result set update and delete by row id follows the JDBC-facing API contract.
@@ -3159,7 +3159,7 @@ scenarios:
   jdbc_version: '4.0'
   execution_prerequisites:
   - sql:rowid_behavior_ddl.sql
-  unsupported_policy: REQUIRED
+  unsupported_policy: OPTIONAL
 - scenario_id: result_set.batch_row_id_binding
   category: extended
   contract: result set batch row id binding follows the JDBC-facing API contract.
@@ -3172,10 +3172,10 @@ scenarios:
   jdbc_version: '4.0'
   execution_prerequisites:
   - sql:rowid_behavior_ddl.sql
-  unsupported_policy: REQUIRED
+  unsupported_policy: OPTIONAL
 - scenario_id: statement.result_sequence
   category: extended
-  contract: statement result sequence follows the JDBC-facing API contract.
+  contract: Traverse exposed results and verify stored effects; exposing an internal one-row update count is a suite feature requirement.
   source_class: com.jdbctest.statement.MultipleResultsTest
   source_method: testResultSequence
   required_capabilities:

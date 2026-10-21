@@ -15,6 +15,9 @@ public @interface UseSqlScripts {
 
     String[] cleanup() default {};
 
+    /** Let a scenario observe an independent API before requesting its storage fixture. */
+    boolean deferred() default false;
+
     /** Fixture shape checks run before the JDBC contract, using managed object placeholders. */
     String[] checks() default {};
 }

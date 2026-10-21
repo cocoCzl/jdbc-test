@@ -14,14 +14,20 @@ import org.junit.jupiter.api.extension.ExtendWith;
 @Tag("integration")
 class ExecutionControlTest {
 
-    private String sleepSql(int seconds) {
-        return switch (ConfigLoader.load().db.dialect.toLowerCase(java.util.Locale.ROOT)) {
+    static String sleepSql(String dialect, int seconds) {
+        return switch (dialect.toLowerCase(java.util.Locale.ROOT)) {
             case "oracle" -> "BEGIN DBMS_SESSION.SLEEP(" + seconds + "); END;";
-            case "mysql" -> "SELECT SLEEP(" + seconds + ")";
+            // MySQL documents that standalone interrupted SLEEP returns 1 without an error.
+            // Use SLEEP inside a query so interruption produces the error this scenario tests.
+            case "mysql" -> "SELECT 1 WHERE SLEEP(" + seconds + ") = 0";
             case "sqlserver" -> "WAITFOR DELAY '00:00:0" + seconds + "'";
             case "postgresql", "gaussdb" -> "SELECT pg_sleep(" + seconds + ")";
             default -> throw new IllegalStateException("Adapter has no bounded sleep fixture");
         };
+    }
+
+    private String sleepSql(int seconds) {
+        return sleepSql(ConfigLoader.load().db.dialect, seconds);
     }
 
     private void assertConnectionUsable(Connection connection) throws SQLException {

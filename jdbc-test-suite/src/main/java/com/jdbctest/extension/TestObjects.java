@@ -240,12 +240,61 @@ public final class TestObjects {
         }
     }
 
+    /** PostgreSQL locators are OIDs, not BYTEA; journal them before their transaction commits. */
+    public synchronized long createPostgresqlLargeObject(Connection connection, String logical,
+        byte[] content) throws SQLException {
+        if (dialect != SqlDialect.POSTGRESQL || connection.getAutoCommit()
+            || !namespace.equals(connection.getSchema())) {
+            throw new SQLException("Large objects require the authorized PostgreSQL transaction");
+        }
+        String physical = name(logical);
+        if (journal.containsKey(logical)) {
+            throw new SQLException("Large object already reserved by this run");
+        }
+        Map<String, Object> entry = new LinkedHashMap<>();
+        entry.put("attempt", ++attempt);
+        entry.put("logicalName", logical);
+        entry.put("name", physical);
+        entry.put("namespace", namespace);
+        entry.put("kind", "LARGE_OBJECT");
+        entry.put("state", "CREATING");
+        journal.put(logical, entry);
+        persist();
+        try (PreparedStatement sql = connection.prepareStatement(
+            "SELECT pg_catalog.lo_from_bytea(0, ?)")) {
+            sql.setBytes(1, content);
+            try (ResultSet rows = sql.executeQuery()) {
+                if (!rows.next()) {
+                    throw new SQLException("Large object creation returned no OID");
+                }
+                long oid = rows.getLong(1);
+                if (rows.wasNull() || oid <= 0 || oid > 0xffff_ffffL) {
+                    throw new SQLException("Large object creation returned an invalid OID");
+                }
+                entry.put("oid", oid);
+                entry.put("state", "CREATED");
+                persist();
+                return oid;
+            }
+        } catch (SQLException exception) {
+            entry.put("state", "UNKNOWN");
+            entry.put("sqlState", safeSqlState(exception.getSQLState()));
+            persist();
+            throw exception;
+        }
+    }
+
     public synchronized void drop(Connection connection, String logical) throws SQLException {
         Map<String, Object> entry = journal.get(logical);
         if (entry == null || !"CREATED".equals(entry.get("state"))) {
             return;
         }
         String kind = entry.get("kind").toString();
+        if (kind.equals("INDEX") && dialect == SqlDialect.MYSQL
+            && journal.containsKey(entry.get("parent"))) {
+            // InnoDB may require this index for an FK. Its owned table removes it atomically.
+            return;
+        }
         String suffix = "";
         if (kind.equals("FUNCTION") && dialect == SqlDialect.POSTGRESQL) {
             suffix = switch (logical) {
@@ -260,6 +309,12 @@ public final class TestObjects {
             suffix = " PURGE";
         }
         String command = "DROP " + kind + " " + qualified(logical) + suffix;
+        if (kind.equals("LARGE_OBJECT")) {
+            long oid = (Long) entry.get("oid");
+            // A rollback may already have removed this exact owned OID. Never scan/unlink others.
+            command = "SELECT pg_catalog.lo_unlink(" + oid + ") WHERE EXISTS "
+                + "(SELECT 1 FROM pg_catalog.pg_largeobject_metadata WHERE oid = " + oid + ")";
+        }
         if (kind.equals("INDEX") && dialect.indexDropRequiresTable()) {
             command =
                 "DROP INDEX " + quote(name(logical)) + " ON " + qualified(
@@ -272,6 +327,17 @@ public final class TestObjects {
             statement.execute(command);
             entry.put("state", "DROPPED");
             entry.put("cleanupStatus", "SUCCESS");
+            if (kind.equals("TABLE") && dialect == SqlDialect.MYSQL) {
+                for (Map<String, Object> child : journal.values()) {
+                    if ("INDEX".equals(child.get("kind"))
+                        && logical.equals(child.get("parent"))
+                        && "CREATED".equals(child.get("state"))) {
+                        child.put("state", "DROPPED");
+                        child.put("cleanupStatus", "SUCCESS");
+                        child.put("cleanupVia", "OWNED_PARENT_TABLE");
+                    }
+                }
+            }
             persist();
         } catch (SQLException exception) {
             entry.put("state", "UNKNOWN");

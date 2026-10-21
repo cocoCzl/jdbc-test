@@ -22,7 +22,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 @RequiresFeature("sqlxml")
 @UseSqlScripts(
     ddl = {"sqlxml_ddl.sql"},
-    dml = {"sqlxml_dml.sql"}
+    dml = {"sqlxml_dml.sql"},
+    checks = {"SELECT id, name, xml_data FROM {{sqlxml_test}} WHERE 1 = 0"}
 )
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class SQLXMLTest {

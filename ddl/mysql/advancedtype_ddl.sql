@@ -1,8 +1,4 @@
--- MySQL 不原生支持数组类型
-
-CREATE TABLE {{array_test}} (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100),
-    int_data JSON,
-    text_data JSON
-);
+-- MySQL has no native SQL ARRAY storage for these scenarios.
+-- A JSON surrogate cannot satisfy ResultSet.getArray or SQL ARRAY binding.
+-- Leave the native-array shape prerequisite unmet; do not fabricate a feature pass
+-- or infer an allowed-unsupported outcome for APIs the scenario did not invoke.

@@ -16,7 +16,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 @ExtendWith(JdbcTestExtension.class)
 @Tag("integration")
 @RequiresFeature("sqlxml")
-@UseSqlScripts(ddl = "sqlxml_stream_ddl.sql")
+@UseSqlScripts(ddl = "sqlxml_stream_ddl.sql",
+    checks = "SELECT id, content FROM {{sqlxml_stream}} WHERE 1 = 0")
 class SqlXmlStreamTest {
 
     private static final String CONTENT = "<root><value>中文 &amp; streams</value></root>";

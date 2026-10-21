@@ -18,6 +18,25 @@ import org.junit.jupiter.api.extension.ExtendWith;
 @UseSqlScripts(ddl = "xa_behavior_ddl.sql")
 class XaBehaviorTest {
 
+    static void requirePreparedTransactions(Connection connection, boolean postgresql)
+        throws SQLException {
+        if (!postgresql) {
+            return;
+        }
+        try (Statement sql = connection.createStatement();
+            ResultSet rows = sql.executeQuery("SELECT current_setting('max_prepared_transactions')")) {
+            if (!rows.next()) {
+                throw new ExecutionPrerequisiteException(
+                    "POSTGRESQL_PREPARED_TRANSACTIONS_SETTING_UNAVAILABLE", null);
+            }
+            if (rows.getInt(1) == 0) {
+                throw new ExecutionPrerequisiteException(
+                    "POSTGRESQL_PREPARED_TRANSACTIONS_DISABLED: max_prepared_transactions=0; "
+                        + "XA prepare was not invoked; no global setting was changed", null);
+            }
+        }
+    }
+
     private static Xid newXid() {
         UUID id = UUID.randomUUID();
         byte[] global = ByteBuffer.allocate(16).putLong(id.getMostSignificantBits())
@@ -143,7 +162,8 @@ class XaBehaviorTest {
 
     @Test
     @DisplayName("XA prepare 后两阶段提交对新连接可见")
-    void testXaTwoPhaseCommit() throws Exception {
+    void testXaTwoPhaseCommit(Connection connection) throws Exception {
+        requirePreparedTransactions(connection, ConfigLoader.load().db.isDialect("postgresql"));
         try (Branch branch = new Branch()) {
             branch.insert(902);
             branch.prepare();
@@ -168,7 +188,8 @@ class XaBehaviorTest {
 
     @Test
     @DisplayName("XA 恢复扫描找到自己的 prepared 分支并回滚")
-    void testXaPreparedRecoveryRollback() throws Exception {
+    void testXaPreparedRecoveryRollback(Connection connection) throws Exception {
+        requirePreparedTransactions(connection, ConfigLoader.load().db.isDialect("postgresql"));
         try (Branch branch = new Branch()) {
             branch.insert(904);
             branch.prepare();

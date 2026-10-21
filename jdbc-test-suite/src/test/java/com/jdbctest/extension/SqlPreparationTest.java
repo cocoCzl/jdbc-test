@@ -112,6 +112,58 @@ class SqlPreparationTest {
     }
 
     @Test
+    void absentSqlXmlTableIsPreparationFailureAndDoesNotBlockIndependentApi()
+        throws Exception {
+        Config config = new Config();
+        config.db = new Config.DbConfig();
+        config.db.adapterId = "mysql";
+        config.db.assetId = "mysql";
+        config.db.url = "jdbc:fixture:sqlxml";
+        config.pool = new Config.PoolConfig();
+        config.adapter = new Config.AdapterConfig();
+        config.adapter.capabilities = com.jdbctest.catalog.AdapterExecutionConfig
+            .load("mysql").capabilities();
+        config.ddl = new Config.DdlConfig();
+        config.ddl.basePath = "classpath:ddl";
+        config.dml = new Config.DmlConfig();
+        config.dml.basePath = "classpath:dml";
+        config.namespace = new Config.NamespaceConfig();
+        var context = mock(ExtensionContext.class);
+        var store = mock(ExtensionContext.Store.class);
+        when(context.getStore(any())).thenReturn(store);
+        when(context.getParent()).thenReturn(Optional.of(context));
+        when(context.getRoot()).thenReturn(context);
+        Class<?> test = Class.forName("com.jdbctest.sqlxml.SQLXMLTest");
+        org.mockito.Mockito.doReturn(test).when(context).getRequiredTestClass();
+        when(context.getRequiredTestMethod()).thenReturn(
+            test.getDeclaredMethod("testGetSQLXML", Connection.class));
+        var connection = mock(Connection.class);
+        var statement = mock(Statement.class);
+        when(connection.createStatement()).thenReturn(statement);
+        when(statement.execute(anyString())).thenReturn(false);
+        when(statement.execute("SELECT id, name, xml_data FROM {{sqlxml_test}} WHERE 1 = 0"))
+            .thenThrow(new SQLException("missing table", "42S02"));
+        var objects = mock(TestObjects.class);
+        when(objects.sql(anyString())).thenAnswer(call -> call.getArgument(0));
+        try (var loader = mockStatic(ConfigLoader.class); var jdbc = mockStatic(JdbcContext.class)) {
+            loader.when(ConfigLoader::load).thenReturn(config);
+            jdbc.when(JdbcContext::getDataSource).thenReturn(mock(javax.sql.DataSource.class));
+            jdbc.when(JdbcContext::getConnection).thenReturn(connection);
+            jdbc.when(JdbcContext::objects).thenReturn(objects);
+            jdbc.when(() -> JdbcContext.sql(anyString())).thenAnswer(call -> call.getArgument(0));
+            var error = assertThrows(ExecutionPrerequisiteException.class,
+                () -> new JdbcTestExtension().beforeEach(context));
+            assertEquals("FIXTURE_SHAPE_UNAVAILABLE", error.getMessage());
+            assertEquals("42S02", ((SQLException) error.getCause()).getSQLState());
+            when(context.getRequiredTestMethod()).thenReturn(
+                test.getDeclaredMethod("testSetString", Connection.class));
+            new JdbcTestExtension().beforeEach(context);
+            verify(statement, times(1))
+                .execute("SELECT id, name, xml_data FROM {{sqlxml_test}} WHERE 1 = 0");
+        }
+    }
+
+    @Test
     void classSetupIsLazyAndFailedFixtureDoesNotBlockIndependentApi() throws Exception {
         Files.createDirectories(directory.resolve("postgresql"));
         Files.writeString(directory.resolve("postgresql/fixture.sql"), "SELECT 1;");

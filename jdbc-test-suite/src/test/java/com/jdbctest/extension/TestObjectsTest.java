@@ -111,6 +111,36 @@ class TestObjectsTest {
     }
 
     @Test
+    void mysqlForeignKeyIndexesAreConfirmedRemovedOnlyWithTheirOwnedTable() throws Exception {
+        Config value = config("j01234567890123456789");
+        value.db.dialect = "mysql";
+        TestObjects objects = new TestObjects(value);
+        List<String> commands = new ArrayList<>();
+        Statement sql = statement(commands, null);
+        objects.create(sql, "CREATE TABLE {{parent}} (id INTEGER)");
+        objects.create(sql, "CREATE INDEX {{local:fk_index}} ON {{parent}} (id)");
+        objects.cleanup(connection(statement(commands, "DROP TABLE")));
+        assertEquals("FAILED", objects.cleanupEvidence().get("status"));
+        assertEquals("CREATED", objects.snapshot().get(1).get("state"));
+        assertTrue(commands.stream().noneMatch(command -> command.startsWith("DROP INDEX")));
+
+        TestObjects successful = new TestObjects(configForMysql());
+        commands.clear();
+        successful.create(sql, "CREATE TABLE {{parent}} (id INTEGER)");
+        successful.create(sql, "CREATE INDEX {{local:fk_index}} ON {{parent}} (id)");
+        successful.cleanup(connection(sql));
+        assertEquals("SUCCESS", successful.cleanupEvidence().get("status"));
+        assertEquals("OWNED_PARENT_TABLE", successful.snapshot().get(1).get("cleanupVia"));
+        assertEquals(3, commands.size());
+    }
+
+    private Config configForMysql() {
+        Config value = config("j11234567890123456789");
+        value.db.dialect = "mysql";
+        return value;
+    }
+
+    @Test
     void sqlServerIndexCleanupNamesItsOwnedTable() throws Exception {
         Config value = config("j01234567890123456789");
         value.db.dialect = "sqlserver";

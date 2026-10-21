@@ -46,6 +46,19 @@ public class JdbcTestExtension implements BeforeAllCallback, BeforeEachCallback,
         if (annotation == null) {
             return;
         }
+        if (!annotation.deferred()) {
+            prepareFixtures(context, config, annotation);
+        }
+    }
+
+    public interface Fixtures {
+
+        void prepare();
+
+        void prepareDdl(String file);
+    }
+
+    private void prepareFixtures(ExtensionContext context, Config config, UseSqlScripts annotation) {
         var store = context.getParent().orElseThrow().getStore(ROOT_NAMESPACE);
         for (String ddl : annotation.ddl()) {
             prepare(context, store, resolvePath(config.ddl.basePath, config.db.assetId, ddl));
@@ -215,13 +228,43 @@ public class JdbcTestExtension implements BeforeAllCallback, BeforeEachCallback,
     public boolean supportsParameter(ParameterContext parameterContext,
         ExtensionContext extensionContext)
         throws ParameterResolutionException {
-        return parameterContext.getParameter().getType() == Connection.class;
+        Class<?> type = parameterContext.getParameter().getType();
+        return type == Connection.class || type == Fixtures.class;
     }
 
     @Override
     public Object resolveParameter(ParameterContext parameterContext,
         ExtensionContext extensionContext)
         throws ParameterResolutionException {
+        if (parameterContext != null && parameterContext.getParameter().getType() == Fixtures.class) {
+            Config config = ensureInitialized();
+            UseSqlScripts annotation = extensionContext.getRequiredTestMethod()
+                .getAnnotation(UseSqlScripts.class);
+            if (annotation == null) {
+                annotation = extensionContext.getRequiredTestClass().getAnnotation(UseSqlScripts.class);
+            }
+            if (annotation == null || !annotation.deferred()) {
+                throw new ParameterResolutionException("Fixtures requires deferred SQL preparation");
+            }
+            UseSqlScripts declared = annotation;
+            return new Fixtures() {
+                @Override
+                public void prepare() {
+                    enterPhase(extensionContext, "PREPARATION");
+                    prepareFixtures(extensionContext, config, declared);
+                    enterPhase(extensionContext, "EXECUTION");
+                }
+
+                @Override
+                public void prepareDdl(String file) {
+                    enterPhase(extensionContext, "PREPARATION");
+                    JdbcTestExtension.this.prepare(extensionContext,
+                        extensionContext.getParent().orElseThrow().getStore(ROOT_NAMESPACE),
+                        resolvePath(config.ddl.basePath, config.db.assetId, file));
+                    enterPhase(extensionContext, "EXECUTION");
+                }
+            };
+        }
         try {
             registerShutdownHook(extensionContext);
             Connection conn = JdbcContext.getConnection();

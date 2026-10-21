@@ -3,6 +3,7 @@ package com.jdbctest.resultset;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.jdbctest.extension.JdbcContext;
+import com.jdbctest.extension.JdbcContracts;
 import com.jdbctest.extension.JdbcTestExtension;
 import com.jdbctest.extension.RequiresFeature;
 import com.jdbctest.extension.UseSqlScripts;
@@ -14,8 +15,31 @@ import org.junit.jupiter.api.extension.ExtendWith;
 @ExtendWith(JdbcTestExtension.class)
 @Tag("integration")
 @RequiresFeature("rowid_operations")
-@UseSqlScripts(ddl = "rowid_behavior_ddl.sql")
+@UseSqlScripts(ddl = "rowid_behavior_ddl.sql", deferred = true)
 class RowIdBehaviorTest {
+
+    static void observeGetRowId(Connection connection, boolean oracle) throws SQLException {
+        try (Statement sql = connection.createStatement();
+            ResultSet rows = sql.executeQuery(oracle ? "SELECT NULL FROM DUAL" : "SELECT NULL")) {
+            assertTrue(rows.next());
+            assertNull(JdbcContracts.optional("ResultSet.getRowId", () -> rows.getRowId(1)),
+                "SQL NULL must remain null; this probe does not establish ROWID storage support");
+        }
+    }
+
+    private void prepare(Connection connection, JdbcTestExtension.Fixtures fixtures)
+        throws SQLException {
+        observeGetRowId(connection,
+            com.jdbctest.config.ConfigLoader.load().db.isDialect("oracle"));
+        fixtures.prepare();
+    }
+
+    private void bind(PreparedStatement sql, int index, RowId value) throws SQLException {
+        JdbcContracts.optional("PreparedStatement.setRowId", () -> {
+            sql.setRowId(index, value);
+            return null;
+        });
+    }
 
     private RowId insertAndRead(Connection connection, int id) throws SQLException {
         try (PreparedStatement sql = connection.prepareStatement(JdbcContext.sql(
@@ -29,7 +53,7 @@ class RowIdBehaviorTest {
             sql.setInt(1, id);
             try (ResultSet rows = sql.executeQuery()) {
                 assertTrue(rows.next());
-                RowId rowId = rows.getRowId(1);
+                RowId rowId = JdbcContracts.optional("ResultSet.getRowId", () -> rows.getRowId(1));
                 assertNotNull(rowId);
                 assertTrue(rowId.getBytes().length > 0);
                 assertFalse(rows.next());
@@ -40,17 +64,20 @@ class RowIdBehaviorTest {
 
     @Test
     @DisplayName("getRowId/setRowId 精确定位同一条记录")
-    void testRowIdRoundTrip(Connection connection) throws SQLException {
+    void testRowIdRoundTrip(Connection connection, JdbcTestExtension.Fixtures fixtures)
+        throws SQLException {
+        prepare(connection, fixtures);
         connection.setAutoCommit(false);
         try {
             RowId rowId = insertAndRead(connection, 1);
             try (PreparedStatement sql = connection.prepareStatement(JdbcContext.sql(
                 "SELECT id, ROWID FROM {{rowid_behavior}} WHERE ROWID = ?"))) {
-                sql.setRowId(1, rowId);
+                bind(sql, 1, rowId);
                 try (ResultSet rows = sql.executeQuery()) {
                     assertTrue(rows.next());
                     assertEquals(1, rows.getInt(1));
-                    assertArrayEquals(rowId.getBytes(), rows.getRowId(2).getBytes());
+                    RowId found = JdbcContracts.optional("ResultSet.getRowId", () -> rows.getRowId(2));
+                    assertArrayEquals(rowId.getBytes(), found.getBytes());
                     assertFalse(rows.next());
                 }
             }
@@ -61,13 +88,15 @@ class RowIdBehaviorTest {
 
     @Test
     @DisplayName("RowId 更新后读取并删除对应记录")
-    void testUpdateAndDeleteByRowId(Connection connection) throws SQLException {
+    void testUpdateAndDeleteByRowId(Connection connection, JdbcTestExtension.Fixtures fixtures)
+        throws SQLException {
+        prepare(connection, fixtures);
         connection.setAutoCommit(false);
         try {
             RowId rowId = insertAndRead(connection, 2);
             try (PreparedStatement update = connection.prepareStatement(JdbcContext.sql(
                 "UPDATE {{rowid_behavior}} SET value = 99 WHERE ROWID = ?"))) {
-                update.setRowId(1, rowId);
+                bind(update, 1, rowId);
                 assertEquals(1, update.executeUpdate());
             }
             try (Statement sql = connection.createStatement();
@@ -78,7 +107,7 @@ class RowIdBehaviorTest {
             }
             try (PreparedStatement delete = connection.prepareStatement(JdbcContext.sql(
                 "DELETE FROM {{rowid_behavior}} WHERE ROWID = ?"))) {
-                delete.setRowId(1, rowId);
+                bind(delete, 1, rowId);
                 assertEquals(1, delete.executeUpdate());
                 assertEquals(0, delete.executeUpdate());
             }
@@ -89,7 +118,9 @@ class RowIdBehaviorTest {
 
     @Test
     @DisplayName("批量 RowId 绑定不串行并可回滚")
-    void testBatchRowIdBinding(Connection connection) throws SQLException {
+    void testBatchRowIdBinding(Connection connection, JdbcTestExtension.Fixtures fixtures)
+        throws SQLException {
+        prepare(connection, fixtures);
         connection.setAutoCommit(false);
         try {
             List<RowId> ids = new ArrayList<>();
@@ -100,7 +131,7 @@ class RowIdBehaviorTest {
                 "UPDATE {{rowid_behavior}} SET value = ? WHERE ROWID = ?"))) {
                 for (int i = 0; i < ids.size(); i++) {
                     sql.setInt(1, i);
-                    sql.setRowId(2, ids.get(i));
+                    bind(sql, 2, ids.get(i));
                     sql.addBatch();
                 }
                 int[] counts = sql.executeBatch();
