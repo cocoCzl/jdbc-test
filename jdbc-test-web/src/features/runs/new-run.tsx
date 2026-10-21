@@ -8,7 +8,7 @@ import { profileName } from "@/lib/presentation";
 import { t } from "i18next";
 import { useTranslation } from "react-i18next";
 import { JdbcUrl } from "@/components/jdbc-url";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   useMutation,
   useQuery,
@@ -55,6 +55,7 @@ export default function NewRun() {
   const [password, setPassword] = useState("");
   const [emptyPassword, setEmptyPassword] = useState(false);
   const [error, setError] = useState<string | Error | null>(null);
+  const submitting = useRef(false);
   const params = { page, size: 12, sort: "name,asc", adapterId: adapterFilter || undefined };
   const adapters = useQuery({
     queryKey: adapterKeys.all,
@@ -114,7 +115,10 @@ export default function NewRun() {
       client.setQueryData(runsKeys.detail(run.id), run);
       navigate(`/runs/${run.id}`);
     },
-    onError: (failure) => setError(failure instanceof Error ? failure : new Error()),
+    onError: (failure) => {
+      submitting.current = false;
+      setError(failure instanceof Error ? failure : new Error());
+    },
     onSettled: () => { setPassword(""); setEmptyPassword(false); },
   });
   if (
@@ -422,6 +426,9 @@ export default function NewRun() {
               (needsPassword && !password && !emptyPassword)
             }
             onClick={() => {
+              if (submitting.current) return;
+              // Mutation state updates after this event; guard a second click immediately.
+              submitting.current = true;
               setError(null);
               create.mutate();
             }}

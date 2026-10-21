@@ -26,6 +26,31 @@ async function chooseConnectionAndDriver(
   await user.click(screen.getByRole("button", { name: /^Next:/ }));
 }
 describe("New Run wizard", () => {
+  it("submits once for two clicks before a render and permits retry after failure", async () => {
+    const user = userEvent.setup();
+    let release: (response: Response) => void = () => {};
+    let requests = 0;
+    mockApi((url, options) => {
+      if (url.pathname !== "/api/runs" || options.method !== "POST") return undefined;
+      requests++;
+      return new Promise<Response>(resolve => { release = resolve; });
+    });
+    const { router } = renderPage("/runs/new");
+    await chooseConnectionAndDriver(user);
+    await user.click(screen.getByRole("button", { name: /^Next:/ }));
+    await user.click(screen.getByRole("checkbox", { name: /I understand/ }));
+    const submit = screen.getByRole("button", { name: "Start test run" });
+    act(() => { submit.click(); submit.click(); });
+    await waitFor(() => expect(requests).toBe(1));
+    await act(async () => { release(problem("INVALID_SELECTION", 422)); });
+    await waitFor(() => expect(submit).toBeEnabled());
+    act(() => { submit.click(); submit.click(); });
+    await waitFor(() => expect(requests).toBe(2));
+    await act(async () => { release(json(run, 201)); });
+    await waitFor(() => expect(router.state.location.pathname).toBe("/runs/run-1"));
+    expect(requests).toBe(2);
+  });
+
   it("requires explicit intent before submitting empty credentials", async () => {
     const user = userEvent.setup();
     const api = mockApi((url, options) => {
