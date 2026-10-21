@@ -191,6 +191,9 @@ public final class TestObjects {
             }
             if (dialect == SqlDialect.ORACLE) {
                 queryDependents(connection,
+                    "SELECT table_name FROM all_nested_tables WHERE owner = ? AND parent_table_name = ?",
+                    logical, "NESTED_TABLE", dependents);
+                queryDependents(connection,
                     "SELECT sequence_name FROM all_tab_identity_cols WHERE owner = ? AND table_name = ?",
                     logical, "SEQUENCE", dependents);
                 queryDependents(connection,

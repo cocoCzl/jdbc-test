@@ -61,17 +61,21 @@ class OracleOwnershipIsolationTest {
                 when(rows.getString(1)).thenReturn("LOB_FIXTURE_A",
                     "LOB_FIXTURE_B");
             }
+            if (sql.startsWith("SELECT table_name FROM all_nested_tables")) {
+                when(rows.next()).thenReturn(true, false);
+                when(rows.getString(1)).thenReturn("NESTED_FIXTURE_A");
+            }
             queries.add(query);
             return query;
         });
         objects.create(statement, "CREATE TABLE {{owned}} (content CLOB)");
-        assertEquals(2, ((List<?>) objects.snapshot().getFirst().get("dependentObjects")).size());
+        assertEquals(3, ((List<?>) objects.snapshot().getFirst().get("dependentObjects")).size());
         String collision = "CREATE TABLE {{collision}} (content CLOB)";
         doThrow(new SQLException("ORA-00955: name already used", "42000", 955))
             .when(statement).executeUpdate(objects.sql(collision));
         assertThrows(SQLException.class, () -> objects.create(statement, collision));
         objects.cleanup(connection);
-        assertEquals(4, queries.size());
+        assertEquals(5, queries.size());
         for (PreparedStatement query : queries) {
             verify(query).setString(1, "ORACLE_FIXTURE");
             verify(query).setString(2, objects.name("owned"));
@@ -80,7 +84,7 @@ class OracleOwnershipIsolationTest {
             .filter(call -> call.getMethod().getName().equals("execute"))
             .map(call -> call.getArgument(0, String.class)).toList();
         assertEquals(List.of("DROP TABLE " + objects.qualified("owned") + " PURGE"), commands);
-        assertTrue(commands.stream().noneMatch(sql -> sql.contains("LOB_FIXTURE")));
+        assertTrue(commands.stream().noneMatch(sql -> sql.contains("LOB_FIXTURE") || sql.contains("NESTED_FIXTURE")));
         assertEquals("UNKNOWN", objects.cleanupEvidence().get("status"));
         assertEquals(1L, objects.cleanupEvidence().get("confirmedDeleted"));
         assertEquals("UNKNOWN", objects.snapshot().get(1).get("state"));
