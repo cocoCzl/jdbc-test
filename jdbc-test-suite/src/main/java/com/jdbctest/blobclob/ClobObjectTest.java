@@ -58,7 +58,14 @@ class ClobObjectTest {
             assertThrows(SQLException.class, () -> clob.truncate(-1));
             assertThrows(SQLException.class, () -> clob.getSubString(0, 1));
             assertThrows(SQLException.class, () -> clob.setString(0, "x"));
-            assertEquals("ab", clob.getSubString(1, 2));
+            try {
+                assertEquals("ab", clob.getSubString(1, 2));
+            } catch (SQLException | AssertionError evidence) {
+                throw new JdbcContracts.SuiteRequirementAssertionError(
+                    "Rejected invalid Clob calls must preserve readable contents; "
+                        + "the invalid-call contracts do not specify recovery of object state",
+                    evidence);
+            }
         } finally {
             clob.free();
         }

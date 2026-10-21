@@ -475,6 +475,8 @@ def _markdown(report: dict[str, Any]) -> str:
         f"- Formal eligible: `{report.get('formal_eligible', False)}`",
         f"- Plan requirements: `{json.dumps(report.get('plan_assessment', {}), ensure_ascii=False)}`",
         "- Capability declarations are separate from observed behavior; see JSON capability_evidence/contract_basis.",
+        f"- Contract conclusions: `{json.dumps(report.get('contract_summary', {}), ensure_ascii=False)}`",
+        "- SUITE_REQUIREMENT_UNMET is a subset of NOT_EVALUATED. Execution failures are not automatically JDBC violations; allowed unsupported is not a feature pass.",
         f"- Database: `{(target.get('database_product') or {}).get('value', '')}`",
         f"- Database version: `{(target.get('database_version') or {}).get('value', '')}`",
         f"- Driver version: `{(target.get('jdbc_driver_version') or {}).get('value', '')}`",
@@ -484,16 +486,18 @@ def _markdown(report: dict[str, Any]) -> str:
     for area, outcomes in (report.get("coverage_summary", {}).get("by_area", {}) or {}).items():
         summary = ", ".join(f"{status}: {count}" for status, count in sorted(outcomes.items()))
         lines.append(f"| {area} | {summary} |")
-    lines.extend(["", "## Outcome matrix", "", "| Scenario ID | Category | Outcome |", "|---|---|---|"])
+    lines.extend(["", "## Outcome matrix", "", "| Scenario ID | Category | Outcome | Contract conclusion | Requirement scope |", "|---|---|---|---|---|"])
     for scenario_id, result in report.get("scenario_results", {}).items():
-        lines.append(f"| {scenario_id} | {result.get('category', '')} | {result.get('compatibility_status', '')} |")
+        lines.append(f"| {scenario_id} | {result.get('category', '')} | {result.get('compatibility_status', '')} | {result.get('conclusion', 'NOT_EVALUATED')} | {result.get('requirement_scope', '')} |")
     return "\n".join(lines) + "\n"
 
 
 def _html(report: dict[str, Any]) -> str:
     rows = "".join(
         f"<tr><td>{html.escape(sid)}</td><td>{html.escape(str(result.get('category', '')))}</td>"
-        f"<td>{html.escape(str(result.get('compatibility_status', '')))}</td></tr>"
+        f"<td>{html.escape(str(result.get('compatibility_status', '')))}</td>"
+        f"<td>{html.escape(str(result.get('conclusion', 'NOT_EVALUATED')))}</td>"
+        f"<td>{html.escape(str(result.get('requirement_scope', '')))}</td></tr>"
         for sid, result in report.get("scenario_results", {}).items()
     )
     return (
@@ -502,8 +506,10 @@ def _html(report: dict[str, Any]) -> str:
         "td,th{border:1px solid #ddd;padding:.45rem;text-align:left}th{background:#f3f4f6}</style></head><body>"
         f"<h1>JDBC 4.3 Compatibility Assessment</h1><p>Target Outcome: <b>{html.escape(str(report.get('target_outcome', '')))}</b></p>"
         f"<p>Formal eligible: {str(report.get('formal_eligible', False)).lower()}</p>"
+        f"<pre>{html.escape(json.dumps(report.get('contract_summary', {}), ensure_ascii=False))}</pre>"
+        "<p>SUITE_REQUIREMENT_UNMET is a subset of NOT_EVALUATED. Execution failures are not automatically JDBC violations; allowed unsupported is not a feature pass.</p>"
         f"<pre>{html.escape(json.dumps(report.get('plan_assessment', {}), ensure_ascii=False, indent=2))}</pre>"
-        f"<table><thead><tr><th>Scenario ID</th><th>Category</th><th>Outcome</th></tr></thead><tbody>{rows}</tbody></table>"
+        f"<table><thead><tr><th>Scenario ID</th><th>Category</th><th>Outcome</th><th>Contract conclusion</th><th>Requirement scope</th></tr></thead><tbody>{rows}</tbody></table>"
         "</body></html>"
     )
 

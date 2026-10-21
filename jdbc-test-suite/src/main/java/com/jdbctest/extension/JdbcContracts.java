@@ -14,10 +14,28 @@ public final class JdbcContracts {
         T call() throws SQLException;
     }
 
+    /** A suite feature requirement is not itself a normative JDBC API obligation. */
+    public static final class SuiteRequirementAssertionError extends AssertionError {
+
+        public SuiteRequirementAssertionError(String requirement) {
+            super("Suite requirement not met: " + requirement);
+        }
+
+        public SuiteRequirementAssertionError(String requirement, Throwable evidence) {
+            this(requirement);
+            initCause(evidence);
+        }
+    }
+
     public static <T> T optional(String api, SqlCall<T> call) throws SQLException {
         if (!java.util.Set.of("Connection.createBlob", "Connection.createClob",
             "Connection.createSQLXML", "CommonDataSource.getParentLogger",
-            "Connection.setSavepoint").contains(api)) {
+            "Connection.setSavepoint", "Clob.setCharacterStream", "Blob.position(byte[],long)",
+            "Connection.createArrayOf", "ResultSet.getArray", "Array.getArray",
+            "Array.getBaseType", "Array.getBaseTypeName", "Array.getResultSet",
+            "PreparedStatement.setArray", "ResultSet.getRowId", "PreparedStatement.setRowId",
+            "CallableStatement.registerOutParameter(SQLType.REF_CURSOR)")
+            .contains(api)) {
             throw new IllegalArgumentException("No reviewed optional API contract: " + api);
         }
         try {

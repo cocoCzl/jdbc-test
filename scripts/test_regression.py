@@ -36,6 +36,31 @@ def fail(report, name="b"):
 
 
 class RegressionTest(unittest.TestCase):
+    def test_extra_suite_failure_is_separate_from_jdbc_failure_and_execution_issues(self):
+        base = synthetic_report()
+        current = copy.deepcopy(base)
+        fail(current)
+        current["scenario_results"]["b"].update(conclusion="NOT_EVALUATED", requirement_scope="SUITE")
+        current["scenario_results"]["b"].pop("contract_conforms")
+        result = regression.compare(regression.select_baseline(base), current)
+        self.assertEqual(1, result["exit_code"])
+        self.assertEqual([], result["new_failures"])
+        self.assertEqual([], result["execution_issues"])
+        self.assertEqual(["b"], result["suite_requirements"]["new_unmet"])
+        self.assertFalse(result["all_selected_passed"])
+        snapshot = regression.select_baseline(current)
+        unchanged = regression.compare(snapshot, current)
+        self.assertEqual(0, unchanged["exit_code"])
+        self.assertEqual(["b"], unchanged["suite_requirements"]["unmet"])
+        self.assertEqual([], unchanged["unresolved_failures"])
+        self.assertFalse(unchanged["all_selected_passed"])
+        resolved = regression.compare(snapshot, base)
+        self.assertEqual(["b"], resolved["suite_requirements"]["resolved"])
+        self.assertEqual([], resolved["fixed"])
+        # Unknown SQL/preparation failures cannot opt in merely by carrying a scope label.
+        current["scenario_results"]["b"]["execution_status"] = "error"
+        self.assertEqual(2, regression.compare(regression.select_baseline(base), current)["exit_code"])
+
     def test_historical_sql_reports_remain_excluded_after_package_retirement(self):
         report = synthetic_report()
         report["testDomain"] = "SQL_FEATURE"

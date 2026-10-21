@@ -125,6 +125,25 @@ class WorkerExecutionEvidenceTest {
     }
 
     @Test
+    void suiteRequirementFailureDoesNotClaimJdbcViolationOrSuccess() {
+        var result = WorkerExecutionEvidence.conclusion(TestExecutionResult.Status.FAILED,
+            new JdbcContracts.SuiteRequirementAssertionError("REF metadata required by suite"));
+        assertEquals("NOT_EVALUATED", result.get("conclusion"));
+        assertEquals("SUITE", result.get("requirementScope"));
+        assertFalse(result.containsKey("contractConforms"));
+        var exactReadback = new JdbcContracts.SuiteRequirementAssertionError(
+            "materialized LOB does not write through", new AssertionError("ABCDE != AXYDE"));
+        var retained = WorkerExecutionEvidence.conclusion(
+            TestExecutionResult.Status.FAILED, exactReadback);
+        assertEquals("NOT_EVALUATED", retained.get("conclusion"));
+        assertEquals("SUITE", retained.get("requirementScope"));
+        assertFalse(retained.containsKey("contractConforms"));
+        assertEquals("CONTRACT_VIOLATION", WorkerExecutionEvidence.conclusion(
+            TestExecutionResult.Status.FAILED, new AssertionError("reviewed API assertion"))
+            .get("conclusion"));
+    }
+
+    @Test
     void conclusionsSeparateOptionalUnsupportedRequiredUnsupportedFixturesAndTimeouts() {
         var unsupported = new java.sql.SQLFeatureNotSupportedException(
             "fixture unsupported", "0A000", 7);
@@ -149,7 +168,7 @@ class WorkerExecutionEvidenceTest {
         assertFalse(missing.containsKey("contractConforms"));
         assertEquals("TIMEOUT", WorkerExecutionEvidence.conclusion(TestExecutionResult.Status.FAILED,
             new java.util.concurrent.TimeoutException()).get("conclusion"));
-        assertEquals("CONTRACT_VIOLATION", WorkerExecutionEvidence.conclusion(
+        assertEquals("NOT_EVALUATED", WorkerExecutionEvidence.conclusion(
             TestExecutionResult.Status.FAILED,
             new java.sql.SQLException("fixture syntax", "42000")).get("conclusion"));
     }
@@ -169,6 +188,10 @@ class WorkerExecutionEvidenceTest {
         assertEquals("PLATFORM_ERROR", WorkerExecutionEvidence.conclusion(
             TestExecutionResult.Status.FAILED, new IllegalStateException("platform setup"),
             "PREPARATION").get("conclusion"));
+        var assertion = WorkerExecutionEvidence.conclusion(TestExecutionResult.Status.FAILED,
+            new AssertionError("fixture setup expectation"), "PREPARATION");
+        assertEquals("NOT_EVALUATED", assertion.get("conclusion"));
+        assertFalse(assertion.containsKey("contractConforms"));
     }
 
     @Test
@@ -195,12 +218,13 @@ class WorkerExecutionEvidenceTest {
     }
 
     @Test
-    void connectionFailureInTheTestBodyIsAnExecutedContractRatherThanMissingPreparation() {
+    void unscopedSqlFailureRetainsFailedInvocationWithoutAttributingContractFault() {
         var row = execute(BodyConnectionFailure.class).results().getFirst();
         assertEquals("EXECUTION", row.get("phase"));
         assertEquals(true, row.get("contractInvoked"));
-        assertEquals("CONTRACT_VIOLATION", row.get("conclusion"));
-        assertEquals(false, row.get("contractConforms"));
+        assertEquals("FAILED", row.get("status"));
+        assertEquals("NOT_EVALUATED", row.get("conclusion"));
+        assertFalse(row.containsKey("contractConforms"));
         assertEquals("28000", row.get("sqlState"));
     }
 

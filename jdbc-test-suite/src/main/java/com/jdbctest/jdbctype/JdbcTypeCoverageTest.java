@@ -14,6 +14,7 @@ import java.sql.Types;
 import java.util.HashSet;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestReporter;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 @ExtendWith(JdbcTestExtension.class)
@@ -31,8 +32,8 @@ class JdbcTypeCoverageTest {
 
     @Test
     @RequiresFeature("array_type")
-    void testArrayTypeMetadata(Connection connection) throws SQLException {
-        assertTrue(typeCodes(connection).contains(Types.ARRAY));
+    void testArrayTypeMetadata(Connection connection, TestReporter reporter) throws SQLException {
+        requireType(connection, Types.ARRAY, reporter);
     }
 
     @Test
@@ -45,20 +46,34 @@ class JdbcTypeCoverageTest {
 
     @Test
     @RequiresFeature("rowid_type")
-    void testRowIdTypeMetadata(Connection connection) throws SQLException {
-        assertTrue(typeCodes(connection).contains(Types.ROWID));
+    void testRowIdTypeMetadata(Connection connection, TestReporter reporter) throws SQLException {
+        requireType(connection, Types.ROWID, reporter);
     }
 
     @Test
     @RequiresFeature("ref_type")
-    void testRefTypeMetadata(Connection connection) throws SQLException {
-        assertTrue(typeCodes(connection).contains(Types.REF));
+    void testRefTypeMetadata(Connection connection, TestReporter reporter) throws SQLException {
+        requireType(connection, Types.REF, reporter);
     }
 
     @Test
     @RequiresFeature("struct_type")
-    void testStructTypeMetadata(Connection connection) throws SQLException {
-        assertTrue(typeCodes(connection).contains(Types.STRUCT));
+    void testStructTypeMetadata(Connection connection, TestReporter reporter) throws SQLException {
+        requireType(connection, Types.STRUCT, reporter);
+    }
+
+    private void requireType(Connection connection, int type, TestReporter reporter)
+        throws SQLException {
+        boolean present = typeCodes(connection).contains(type);
+        reporter.publishEntry("jdbc.type.required", Integer.toString(type));
+        reporter.publishEntry("jdbc.type.present", Boolean.toString(present));
+        reporter.publishEntry("jdbc.contract.source",
+            "https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/DatabaseMetaData.html#getTypeInfo()");
+        if (!present) {
+            throw new JdbcContracts.SuiteRequirementAssertionError(
+                "getTypeInfo must expose JDBC type " + type + " for this suite feature check; "
+                    + "JDBC does not require every database to support that type");
+        }
     }
 
     private Set<Integer> typeCodes(Connection connection) throws SQLException {

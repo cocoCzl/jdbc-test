@@ -17,6 +17,38 @@ const history: Run[] = Array.from({ length: 45 }, (_, index) => ({
   failureReason: ["FAILED", "INTERRUPTED"].includes(states[index % states.length]) ? "WORKER_EXITED_UNEXPECTEDLY" : null,
 }));
 
+test("TEST FIXTURE: extra requirements, allowed unsupported and downloaded evidence agree", async ({ page }) => {
+  const suite = { ...result, id: "suite", displayName: "TEST FIXTURE suite requirement", status: "FAILED",
+    executionEvidence: { conclusion: "NOT_EVALUATED", requirementScope: "SUITE", phase: "EXECUTION" } };
+  const allowed = { ...result, id: "allowed", displayName: "TEST FIXTURE optional API", status: "ABORTED",
+    executionEvidence: { conclusion: "UNSUPPORTED_ALLOWED", contractConforms: true } };
+  const summary = { ...finishedRun, passed: 0, failed: 1, aborted: 1, completedCases: 2,
+    contractSummary: { NOT_EVALUATED: 1, SUITE_REQUIREMENT_UNMET: 1, UNSUPPORTED_ALLOWED: 1 } };
+  const raw = { scenario_results: { suite: suite.executionEvidence, allowed: allowed.executionEvidence } };
+  await page.route(url => url.pathname.startsWith("/api/"), route => {
+    const path = new URL(route.request().url()).pathname;
+    return route.fulfill({ json: path.endsWith("/report.json") ? raw
+      : path.endsWith("/report") ? { summary, failures: [suite, allowed] } : summary });
+  });
+  await page.goto("/runs/run-1");
+  await page.getByRole("tab", { name: "Report", exact: true }).click();
+  await expect(page.getByText("Of not evaluated: extra suite requirement unmet")).toBeVisible();
+  await page.getByRole("button", { name: "Inspect failure" }).first().click();
+  await expect(page.getByRole("dialog")).toContainText("An extra suite requirement was not met.");
+  await page.screenshot({ path: test.info().outputPath("TEST-FIXTURE-suite-requirement.png") });
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Inspect failure" }).nth(1).click();
+  await expect(page.getByRole("dialog")).toContainText("The feature test was aborted, not passed.");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "View report JSON" }).click();
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download JSON", exact: true }).click();
+  const stream = await (await download).createReadStream();
+  const chunks = [];
+  for await (const chunk of stream!) chunks.push(chunk);
+  expect(JSON.parse(Buffer.concat(chunks).toString())).toEqual(raw);
+});
+
 for (const locale of ["en", "zh-CN"] as const) {
   for (const width of [1440, 390]) {
     test(`TEST FIXTURE: lifecycle filter, keyboard and rows ${locale} ${width}px`, async ({ page }) => {

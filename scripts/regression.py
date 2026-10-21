@@ -206,16 +206,22 @@ def identity(report: dict) -> dict:
             "report_sha256": fingerprint(report), "evidence": report.get("regression_evidence", {})}
 
 
+def suite_requirement(row: dict) -> bool:
+    return row.get("conclusion") == "NOT_EVALUATED" and row.get("requirement_scope") == "SUITE" \
+        and row.get("execution_status") == "failure" and row.get("phase") == "EXECUTION"
+
+
 def execution_issues(report: dict) -> list[dict]:
     selected = report.get("regression_evidence", {}).get("selected_scenarios", [])
     rows = report.get("scenario_results", {})
     issues = [{"scenario_id": name, "status": rows.get(name, {}).get("compatibility_status"),
                "conclusion": rows.get(name, {}).get("conclusion")}
-              for name in selected if rows.get(name, {}).get("compatibility_status") in ISSUES
+              for name in selected if not suite_requirement(rows.get(name, {})) and (
+              rows.get(name, {}).get("compatibility_status") in ISSUES
               or rows.get(name, {}).get("phase") != "EXECUTION"
               or rows.get(name, {}).get("conclusion") in {"NOT_EVALUATED", "PLATFORM_ERROR", "TIMEOUT",
                                                           "PREREQUISITE_UNMET", "BLOCKED_PREREQUISITE",
-                                                          "CONNECTION_FAILURE"}]
+                                                          "CONNECTION_FAILURE"})]
     for field in ("environment_cleanup_issues", "environment_preflight_issues"):
         issues.extend({"scope": field, "detail": item} for item in report.get(field, []) or [])
     maven_code = report.get("diagnostics", {}).get("maven_exit_code")
@@ -278,14 +284,22 @@ def compare(baseline: dict, current: dict, scope: str = "internal") -> dict:
         errors.append("baseline contains execution/preparation problems; select a complete baseline")
     current_issues = execution_issues(current) if not validate(current) else []
     changes, new_failures, fixed, unresolved = [], [], [], []
+    suite_before, suite_after = [], []
     for name in sorted(selected_before | selected_after):
-        a = baseline.get("scenario_results", {}).get(name, {}).get("compatibility_status", "not_run")
-        b = current.get("scenario_results", {}).get(name, {}).get("compatibility_status", "not_run")
+        old_row = baseline.get("scenario_results", {}).get(name, {})
+        new_row = current.get("scenario_results", {}).get(name, {})
+        old_suite, new_suite = suite_requirement(old_row), suite_requirement(new_row)
+        if old_suite:
+            suite_before.append(name)
+        if new_suite:
+            suite_after.append(name)
+        a = old_row.get("compatibility_status", "not_run")
+        b = new_row.get("compatibility_status", "not_run")
         if a != b:
             changes.append({"scenario_id": name, "before": a, "after": b})
-        if b in FAILURES:
-            (unresolved if a in FAILURES else new_failures).append(name)
-        elif a in FAILURES and b in GOOD:
+        if b in FAILURES and not new_suite:
+            (unresolved if a in FAILURES and not old_suite else new_failures).append(name)
+        elif a in FAILURES and not old_suite and b in GOOD:
             fixed.append(name)
     comparable = not errors
     # A formerly supported API becoming legally unsupported is still a regression in support.
@@ -294,13 +308,16 @@ def compare(baseline: dict, current: dict, scope: str = "internal") -> dict:
     unmet = current.get("plan_assessment", {}).get("unmet", [])
     uncertain = current.get("plan_assessment", {}).get("not_evaluated", [])
     new_unmet = sorted(set(unmet) - set(baseline.get("plan_assessment", {}).get("unmet", [])))
-    exit_code = 2 if errors or current_issues or uncertain else 1 if new_failures or support_losses or new_unmet else 0
+    new_suite = sorted(set(suite_after) - set(suite_before))
+    exit_code = 2 if errors or current_issues or uncertain else 1 if new_failures or support_losses or new_unmet or new_suite else 0
     all_passed = comparable and not current_issues and not unmet and not uncertain and bool(selected_after) \
         and all(current["scenario_results"][x]["compatibility_status"] == "passed" for x in selected_after)
     return {"comparison_schema_version": 1, "purpose": PURPOSE, "scope": scope,
             "allowed_changes": ALLOWED_CHANGES, "comparable": comparable, "checks": checks,
             "errors": errors, "coverage_changes": {"added": added, "removed": removed},
             "new_failures": new_failures, "fixed": fixed, "unresolved_failures": unresolved,
+            "suite_requirements": {"unmet": suite_after, "new_unmet": new_suite,
+                                   "resolved": sorted(set(suite_before) - set(suite_after))},
             "support_losses": support_losses, "execution_issues": current_issues,
             "baseline_execution_issues": baseline_issues, "changes": changes,
             "plan_assessment": current.get("plan_assessment", {}), "new_unmet_requirements": new_unmet,

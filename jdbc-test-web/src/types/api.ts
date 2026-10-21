@@ -238,7 +238,7 @@ export interface CreateRun {
   password?: string;
 }
 export interface CaseResult {
-  executionEvidence?: { testDomain?: string; variant?: string; steps?: { id: string; phase: string; sql: string; expected: unknown; actual?: unknown; status: string; failure?: unknown }[]; cleanupSteps?: unknown[]; conclusion?: string; contractConforms?: boolean; phase?: string; contractInvoked?: boolean; declaredCapabilities?: Record<string, boolean>; observations?: Record<string, string>; sqlState?: string; vendorCode?: number };
+  executionEvidence?: { testDomain?: string; variant?: string; steps?: { id: string; phase: string; sql: string; expected: unknown; actual?: unknown; status: string; failure?: unknown }[]; cleanupSteps?: unknown[]; conclusion?: string; requirementScope?: "SUITE"; contractConforms?: boolean; phase?: string; contractInvoked?: boolean; declaredCapabilities?: Record<string, boolean>; observations?: Record<string, string>; sqlState?: string; vendorCode?: number };
   id: string;
   scenarioId: string;
   moduleId: string;

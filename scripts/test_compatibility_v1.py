@@ -20,6 +20,7 @@ from compatibility_v1 import (
     aggregate_target_outcome,
     build_scenario_inventory,
     build_v1_report,
+    build_contract_summary,
     class_setup_errors,
     classify_run,
     collect_cleanup_issues,
@@ -52,7 +53,22 @@ class CompatibilityV1Test(unittest.TestCase):
                 imports = re.findall(r"^import (?:static )?([^;]+);", text, re.MULTILINE)
                 self.assertTrue(all(name.startswith(allowed) for name in imports), imports)
                 self.assertNotIn("Class.forName(", text)
-                self.assertNotIn("java.lang.reflect", text)
+                # java.lang.reflect.Array handles JDBC-permitted primitive arrays; it
+                # does not inspect driver classes or invoke vendor methods.
+                reflective_uses = re.findall(r"java\.lang\.reflect\.(\w+)", text)
+                self.assertTrue(all(name == "Array" for name in reflective_uses))
+
+    def test_source_discovery_retains_multiline_method_fixture_annotations(self):
+        source = '''
+            @Test
+            @UseSqlScripts(ddl = {"one.sql", "two.sql"},
+                checks = "SELECT (1) FROM {{fixture}}", deferred = true)
+            void testDeferred(Connection connection) throws SQLException {
+            }
+        '''
+        methods = compatibility_v1._test_methods(source)
+        self.assertEqual(["testDeferred"], [name for name, _ in methods])
+        self.assertIn('deferred = true', methods[0][1])
 
     def test_stable_enum_values(self):
         self.assertEqual("1.1.0", COMPATIBILITY_BASELINE_VERSION)
@@ -163,6 +179,33 @@ class CompatibilityV1Test(unittest.TestCase):
         self.assertEqual("passed", normalize_status({**case, "status": "passed"}, {"sqlxml": False}))
         self.assertEqual("adapter_incomplete", normalize_status({**case, "status": "skipped", "skip_reason": "PREREQUISITE_MISSING: Provider"}, {"sqlxml": True}))
         self.assertEqual("known_unsupported", normalize_status({**case, "status": "skipped", "error_type": "com.jdbctest.extension.JdbcContracts$UnsupportedAllowedException"}, {"sqlxml": False}))
+
+    def test_suite_feature_requirement_still_fails_without_claiming_contract_violation(self):
+        case = {"status": "failure", "category": "extended", "error_type":
+                "com.jdbctest.extension.JdbcContracts$SuiteRequirementAssertionError"}
+        self.assertEqual("compatibility_failure", normalize_status(case, {"ref_type": False}))
+        result = execution_conclusion(case)
+        self.assertEqual("failure", result["execution_status"])
+        self.assertEqual("NOT_EVALUATED", result["conclusion"])
+        self.assertEqual("SUITE", result["requirement_scope"])
+        self.assertNotIn("contract_conforms", result)
+        row = {**result, "category": "core", "compatibility_status": "compatibility_failure"}
+        self.assertEqual({"NOT_EVALUATED": 1, "SUITE_REQUIREMENT_UNMET": 1},
+                         build_contract_summary({"fixture": row}))
+        self.assertEqual(TargetOutcome.EVALUATION_INCONCLUSIVE,
+                         aggregate_target_outcome({"fixture": row}, classify_run({}), {}))
+        allowed = {**row, "conclusion": "UNSUPPORTED_ALLOWED", "compatibility_status": "known_unsupported"}
+        self.assertEqual(TargetOutcome.EVALUATION_INCONCLUSIVE,
+                         aggregate_target_outcome({"fixture": allowed}, classify_run({}), {}))
+        report = {"compatibility_baseline_version": "1.1.0", "scenario_results": {"fixture": row},
+                  "contract_summary": build_contract_summary({"fixture": row})}
+        for exported in (runner._markdown(report), runner._html(report)):
+            self.assertIn("NOT_EVALUATED", exported)
+            self.assertIn("SUITE", exported)
+            self.assertIn("not automatically JDBC violations", exported)
+        matrix = generate_matrix([report])["rows"][0]
+        self.assertEqual(["NOT_EVALUATED"], list(matrix["conclusions"].values()))
+        self.assertEqual(["SUITE"], list(matrix["requirement_scopes"].values()))
 
     def test_error_text_and_sqlstate_cannot_claim_optional_support(self):
         misleading = {"status": "error", "error_type": "java.sql.SQLException",

@@ -49,6 +49,8 @@ export function FailureDetail({
             {result.executionEvidence?.conclusion ? <section className="space-y-2 text-sm">
               <h3 className="font-semibold">{t("selection.evidence")}</h3>
               <p>{t("selection.conclusion")}: {t(`selection.${result.executionEvidence.conclusion}`, { defaultValue: result.executionEvidence.conclusion })}</p>
+              {result.executionEvidence.requirementScope === "SUITE" ? <p>{t("selection.suiteRequirementNote")}</p> : null}
+              {result.executionEvidence.conclusion === "UNSUPPORTED_ALLOWED" ? <p>{t("selection.unsupportedNote")}</p> : null}
               <p>{t("selection.phase")}: {result.executionEvidence.phase ?? "—"}</p>
               <pre className="overflow-auto whitespace-pre-wrap break-words text-xs">{JSON.stringify(result.executionEvidence, null, 2)}</pre>
             </section> : null}

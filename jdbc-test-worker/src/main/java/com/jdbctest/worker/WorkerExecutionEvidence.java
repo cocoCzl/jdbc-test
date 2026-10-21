@@ -245,15 +245,20 @@ final class WorkerExecutionEvidence implements TestExecutionListener {
             com.jdbctest.extension.JdbcContracts.UnsupportedRequiredException.class)) {
             value = "UNSUPPORTED_REQUIRED";
             conforms = false;
-        } else if (hasCause(error, java.sql.SQLFeatureNotSupportedException.class)
-            || !"EXECUTION".equals(phase) && hasCause(error, SQLException.class)) {
+        } else if (hasCause(error, SQLException.class)) {
+            // SQLState alone cannot distinguish a contract defect from permissions or fixtures.
             value = "NOT_EVALUATED";
         } else if (status == TestExecutionResult.Status.SUCCESSFUL) {
             value = "CONFORMS";
             conforms = true;
-        } else if (hasCause(error, AssertionError.class) || hasCause(error, SQLException.class)) {
-            value = "CONTRACT_VIOLATION";
-            conforms = false;
+        } else if (hasCause(error,
+            com.jdbctest.extension.JdbcContracts.SuiteRequirementAssertionError.class)) {
+            value = "NOT_EVALUATED";
+        } else if (hasCause(error, AssertionError.class)) {
+            value = "EXECUTION".equals(phase) ? "CONTRACT_VIOLATION" : "NOT_EVALUATED";
+            if ("EXECUTION".equals(phase)) {
+                conforms = false;
+            }
         } else {
             value = status == TestExecutionResult.Status.ABORTED ? "NOT_EVALUATED" : "PLATFORM_ERROR";
         }
@@ -261,6 +266,10 @@ final class WorkerExecutionEvidence implements TestExecutionListener {
         result.put("conclusion", value);
         if (conforms != null) {
             result.put("contractConforms", conforms);
+        }
+        if ("NOT_EVALUATED".equals(value) && hasCause(error,
+            com.jdbctest.extension.JdbcContracts.SuiteRequirementAssertionError.class)) {
+            result.put("requirementScope", "SUITE");
         }
         return result;
     }

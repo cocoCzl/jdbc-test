@@ -326,6 +326,9 @@ def execution_conclusion(case: dict[str, Any]) -> dict[str, Any]:
         result["contract_conforms"] = False
     elif "java.util.concurrent.TimeoutException" in types:
         conclusion = "TIMEOUT"
+    elif "com.jdbctest.extension.JdbcContracts$SuiteRequirementAssertionError" in types:
+        conclusion = "NOT_EVALUATED"
+        result["requirement_scope"] = "SUITE"
     elif "java.sql.SQLFeatureNotSupportedException" in types:
         conclusion = "NOT_EVALUATED"
     elif raw == "error" and "java.sql.SQLException" in types:
@@ -449,6 +452,7 @@ def build_v1_report(
         "scenario_results": dict(sorted(scenario_results.items())),
         "capability_profile": capability_profile,
         "coverage_summary": coverage_summary,
+        "contract_summary": build_contract_summary(scenario_results),
         "selection_summary": {"catalog": len(inventory), "selected": len(chosen),
                               "executed": sum(row.get("phase") == "EXECUTION" for row in scenario_results.values()),
                               "user_excluded": sum(row.get("conclusion") == "USER_EXCLUDED" for row in scenario_results.values()),
@@ -523,6 +527,19 @@ def assess_capabilities(results: dict, declarations: dict, config: dict) -> dict
             "capabilities": entries,
             "scope": "Observed support covers only the recorded API calls, not all operations of a feature."}
 
+def build_contract_summary(scenario_results: dict[str, dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in scenario_results.values():
+        conclusion = row.get("conclusion", "NOT_EVALUATED")
+        if conclusion in {"USER_EXCLUDED", "NOT_APPLICABLE"}:
+            continue
+        counts[conclusion] = counts.get(conclusion, 0) + 1
+        if regression.suite_requirement(row):
+            # Explicit subset of NOT_EVALUATED, never added to contract violations.
+            counts["SUITE_REQUIREMENT_UNMET"] = counts.get("SUITE_REQUIREMENT_UNMET", 0) + 1
+    return counts
+
+
 def build_coverage_summary(scenario_results: dict[str, dict[str, Any]]) -> dict[str, Any]:
     """Summarize scenario outcomes by JDBC area and required capability."""
     by_area: dict[str, dict[str, int]] = {}
@@ -553,6 +570,13 @@ def aggregate_target_outcome(
     if identity_mismatch.get("mismatch"):
         return TargetOutcome.EVALUATION_INCONCLUSIVE
     if run_kind == RunKind.DIAGNOSTIC_RUN:
+        return TargetOutcome.EVALUATION_INCONCLUSIVE
+
+    core = [row for row in scenario_results.values() if row["category"] == ScenarioCategory.CORE.value]
+    if any(row.get("conclusion") in {"CONTRACT_VIOLATION", "UNSUPPORTED_REQUIRED"} for row in core):
+        return TargetOutcome.TARGET_NOT_COMPATIBLE
+    if any(row.get("conclusion") in {"NOT_EVALUATED", "UNSUPPORTED_ALLOWED", "PLATFORM_ERROR",
+           "PREREQUISITE_UNMET", "BLOCKED_PREREQUISITE", "CONNECTION_FAILURE", "TIMEOUT"} for row in core):
         return TargetOutcome.EVALUATION_INCONCLUSIVE
 
     core_statuses = [
@@ -796,10 +820,12 @@ def generate_matrix(reports: list[dict[str, Any]]) -> dict[str, Any]:
     })
     rows = []
     for scenario_id in scenario_ids:
-        row = {"scenario_id": scenario_id, "cells": {}}
+        row = {"scenario_id": scenario_id, "cells": {}, "conclusions": {}, "requirement_scopes": {}}
         for label, report in zip(targets, reports):
             result = report.get("scenario_results", {}).get(scenario_id)
             row["cells"][label] = result.get("compatibility_status") if result else CompatibilityStatus.NOT_RUN.value
+            row["conclusions"][label] = result.get("conclusion", "NOT_EVALUATED") if result else "NOT_EVALUATED"
+            row["requirement_scopes"][label] = result.get("requirement_scope") if result else None
         rows.append(row)
     return {
         "compatibility_baseline_version": baseline,
@@ -838,10 +864,14 @@ def _normalize_junit_method_name(method_name: str) -> str:
 def _test_methods(text: str) -> list[tuple[str, str]]:
     matches: list[tuple[str, str]] = []
     annotations: list[str] = []
+    annotation_depth = 0
     for line in text.splitlines():
         stripped = line.strip()
-        if stripped.startswith("@"):
+        if stripped.startswith("@") or annotation_depth > 0:
             annotations.append(stripped)
+            # Parentheses in quoted SQL/annotation values do not delimit annotations.
+            syntax = re.sub(r'"(?:\\.|[^"\\])*"', "", stripped)
+            annotation_depth += syntax.count("(") - syntax.count(")")
             continue
         method_match = re.search(r"(?:public\s+|private\s+|protected\s+)?(?:static\s+)?void\s+(\w+)\s*\(", stripped)
         if method_match:

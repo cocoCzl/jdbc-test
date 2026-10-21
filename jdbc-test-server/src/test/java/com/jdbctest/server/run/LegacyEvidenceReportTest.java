@@ -120,6 +120,32 @@ class LegacyEvidenceReportTest {
     }
 
     @Test
+    void detailSummaryAndDownloadRetainDistinctContractOutcomes() throws Exception {
+        for (String conclusion : new String[] {"CONTRACT_VIOLATION", "UNSUPPORTED_ALLOWED",
+            "PREREQUISITE_UNMET", "PLATFORM_ERROR", "NOT_EVALUATED"}) {
+            var run = legacyRun(TestRunStatus.FAILED);
+            boolean suite = "NOT_EVALUATED".equals(conclusion);
+            String raw = mapper.writeValueAsString(java.util.Map.of(
+                "conclusion", conclusion, "requirementScope", suite ? "SUITE" : "",
+                "status", "UNSUPPORTED_ALLOWED".equals(conclusion) ? "ABORTED" : "FAILED"));
+            var row = result(run, "UNSUPPORTED_ALLOWED".equals(conclusion)
+                ? TestCaseResultStatus.ABORTED : TestCaseResultStatus.FAILED, raw);
+            var summary = mapper.readTree(mvc.perform(get("/api/runs/{id}/report", run.getId()))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            assertEquals(1, summary.path("summary").path("contractSummary")
+                .path(conclusion).asInt());
+            assertEquals(suite ? 1 : 0, summary.path("summary").path("contractSummary")
+                .path("SUITE_REQUIREMENT_UNMET").asInt());
+            assertEquals(conclusion, summary.path("failures").get(0)
+                .path("executionEvidence").path("conclusion").asString());
+            var downloaded = report(run.getId()).path("scenario_results").path("connection.fixture");
+            assertEquals(conclusion, downloaded.path("conclusion").asString());
+            assertEquals(suite ? "SUITE" : "", downloaded.path("requirementScope").asString());
+            assertEquals(raw, results.findById(row.getId()).orElseThrow().getExecutionEvidence());
+        }
+    }
+
+    @Test
     void historicalV2ReportProjectsCompleteResponseAndLedgerWithoutChangingStoredEvidence()
         throws Exception {
         var run = legacyRun(TestRunStatus.FAILED);

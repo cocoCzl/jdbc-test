@@ -24,8 +24,10 @@ class BlobObjectTest {
             assertEquals(2, blob.setBytes(2, new byte[] {8, 9, 10, 11}, 1, 2));
             assertEquals(5, blob.length());
             assertArrayEquals(new byte[] {1, 9, 10, 4, 5}, blob.getBytes(1, 5));
-            assertEquals(2, blob.position(new byte[] {9, 10}, 1));
-            assertEquals(-1, blob.position(new byte[] {99}, 1));
+            assertEquals(2, JdbcContracts.optional("Blob.position(byte[],long)",
+                () -> blob.position(new byte[] {9, 10}, 1)));
+            assertEquals(-1, JdbcContracts.optional("Blob.position(byte[],long)",
+                () -> blob.position(new byte[] {99}, 1)));
         } finally {
             blob.free();
         }
@@ -57,7 +59,14 @@ class BlobObjectTest {
             assertThrows(SQLException.class, () -> blob.truncate(-1));
             assertThrows(SQLException.class, () -> blob.getBytes(0, 1));
             assertThrows(SQLException.class, () -> blob.setBytes(0, new byte[] {1}));
-            assertArrayEquals(new byte[] {1, 2}, blob.getBytes(1, 2));
+            try {
+                assertArrayEquals(new byte[] {1, 2}, blob.getBytes(1, 2));
+            } catch (SQLException | AssertionError evidence) {
+                throw new JdbcContracts.SuiteRequirementAssertionError(
+                    "Rejected invalid Blob calls must preserve readable contents; "
+                        + "the invalid-call contracts do not specify recovery of object state",
+                    evidence);
+            }
         } finally {
             blob.free();
         }

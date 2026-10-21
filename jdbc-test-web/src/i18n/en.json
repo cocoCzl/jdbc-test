@@ -676,5 +676,8 @@
   "driverUpload.chooseFiles": "Choose JAR files",
   "driverUpload.dependencyHelp": "Which dependency JARs do I need?",
   "driverUpload.confirm": "Confirm upload",
-  "driverUpload.selectFirst": "Please choose JAR files first"
+  "driverUpload.selectFirst": "Please choose JAR files first",
+  "selection.SUITE_REQUIREMENT_UNMET": "Of not evaluated: extra suite requirement unmet",
+  "selection.suiteRequirementNote": "An extra suite requirement was not met. The case remains failed; this does not establish a general JDBC contract violation.",
+  "selection.unsupportedNote": "This API is unsupported as allowed by its contract. The feature test was aborted, not passed."
 }

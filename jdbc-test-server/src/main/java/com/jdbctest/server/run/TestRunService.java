@@ -440,6 +440,10 @@ final class TestRunService {
             if (evidence.has("conclusion")) {
                 counts.merge(evidence.path("conclusion").asString(), 1L, Long::sum);
             }
+            if ("NOT_EVALUATED".equals(evidence.path("conclusion").asString())
+                && "SUITE".equals(evidence.path("requirementScope").asString())) {
+                counts.merge("SUITE_REQUIREMENT_UNMET", 1L, Long::sum);
+            }
             if (evidence.path("contractInvoked").asBoolean(false)) {
                 counts.merge("EXECUTED", 1L, Long::sum);
             }

@@ -671,5 +671,8 @@
   "driverUpload.chooseFiles": "选择 JAR 文件",
   "driverUpload.dependencyHelp": "需要哪些依赖 JAR？",
   "driverUpload.confirm": "确认上传",
-  "driverUpload.selectFirst": "请先选择 JAR 文件"
+  "driverUpload.selectFirst": "请先选择 JAR 文件",
+  "selection.SUITE_REQUIREMENT_UNMET": "尚未判定中：额外方案要求未满足",
+  "selection.suiteRequirementNote": "额外方案要求未满足，用例仍失败；这不构成通用 JDBC 契约违规结论。",
+  "selection.unsupportedNote": "此 API 实测不支持，具体契约允许；功能测试中止，未计为通过。"
 }
