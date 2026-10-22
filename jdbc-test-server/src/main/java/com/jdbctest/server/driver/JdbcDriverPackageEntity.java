@@ -8,6 +8,17 @@ import java.util.UUID;
 @Table(name = "jdbc_driver_package")
 public class JdbcDriverPackageEntity {
 
+    @Column(name = "default_sql_dialect", length = 20)
+    private String defaultSqlDialect;
+
+    public String getDefaultSqlDialect() {
+        return defaultSqlDialect;
+    }
+
+    public void setDefaultSqlDialect(String value) {
+        defaultSqlDialect = value;
+    }
+
     @Id
     private UUID id;
     @Column(nullable = false, length = 200)

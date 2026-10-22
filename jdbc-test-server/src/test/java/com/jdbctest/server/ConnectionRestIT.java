@@ -114,7 +114,7 @@ class ConnectionRestIT {
                 post("/api/connections/{id}/test", connectionId).contentType(MediaType.APPLICATION_JSON)
                     .content("{\"password\":\"wrong-password\"}"))
             .andExpect(status().isUnprocessableContent())
-            .andExpect(jsonPath("$.code").value("CONNECTION_FAILED"));
+            .andExpect(jsonPath("$.code").value("CONNECTION_AUTHENTICATION_FAILED"));
         org.junit.jupiter.api.Assertions.assertEquals(encrypted,
             connections.findById(java.util.UUID.fromString(connectionId)).orElseThrow()
                 .getEncryptedPassword());

@@ -32,6 +32,14 @@ public record AdapterExecutionConfig(String id, String assetId, String dialect,
         return AdapterRegistry.bundled().required(id).execution();
     }
 
+    /** Resources, namespace rules and dialect form one supported execution configuration. */
+    public AdapterExecutionConfig requireDialect(String requested) {
+        if (requested != null && !sqlDialect().equals(SqlDialect.fromCode(requested))) {
+            throw new IllegalArgumentException("ADAPTER_DIALECT_UNSUPPORTED");
+        }
+        return this;
+    }
+
     public SqlDialect sqlDialect() {
         return SqlDialect.fromCode(dialect);
     }

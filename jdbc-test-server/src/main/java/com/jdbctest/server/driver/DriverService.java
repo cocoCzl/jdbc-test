@@ -63,6 +63,7 @@ final class DriverService {
                 DriverSourceType.UPLOAD);
             entity.setUrlPrefix(optional(request.urlPrefix()));
             entity.setDataSources(request.dataSources());
+            entity.setDefaultSqlDialect(defaultDialect(request.defaultSqlDialect()));
             entity.setPackageFingerprint(fingerprint);
             List<DriverStorage.StoredArtifact> stored = storage.moveToDriver(staged,
                 entity.getId());
@@ -126,6 +127,9 @@ final class DriverService {
             if (request.dataSources() != null) {
                 entity.setDataSources(request.dataSources());
             }
+            if (request.defaultSqlDialect() != null) {
+                entity.setDefaultSqlDialect(defaultDialect(request.defaultSqlDialect()));
+            }
             packages.save(entity);
             return response(entity, artifacts.findByDriver_Id(id));
         });
@@ -176,6 +180,17 @@ final class DriverService {
             }
             throw exception;
         }
+    }
+
+    private static String defaultDialect(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        if (!Set.of("oracle", "mysql", "postgresql").contains(value)) {
+            throw new DriverException(HttpStatus.BAD_REQUEST, "ADAPTER_DIALECT_INVALID",
+                "Select Oracle, MySQL or PostgreSQL");
+        }
+        return com.jdbctest.catalog.SqlDialect.fromCode(value).code();
     }
 
     private static String selectDriverClass(String requested, Set<String> detected) {
@@ -231,6 +246,6 @@ final class DriverService {
             entity.getStatus(), entity.getPackageFingerprint(), entity.getCreatedAt().toString(),
             entity.getUpdatedAt().toString(), records.stream().map(
             item -> new DriverArtifactResponse(item.getId(), item.getFileName(), item.getSize(),
-                item.getSha256())).toList(), entity.getDataSources());
+                item.getSha256())).toList(), entity.getDataSources(), entity.getDefaultSqlDialect());
     }
 }

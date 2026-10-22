@@ -4,6 +4,16 @@ English | [简体中文](development.zh-CN.md)
 
 For source edits use the unified development command below. To run the website without developing source, choose [Docker or a non-Docker deployment bundle](deployment.md). Native is a deployment bundle, not IDEA source startup.
 
+## Connection configuration and default SQL dialect
+
+An optional driver `defaultSqlDialect` prefills new connections only (Oracle, MySQL or PostgreSQL). A connection stores its final `sqlDialect`; existing null values continue to use the original adapter, independently of later driver defaults. Runs freeze the matching `adapterExecution`, including dialect, resource directory, identifier rules and metadata constraints. Historical inputs are not backfilled. V11 adds two nullable columns without rewriting existing configuration.
+
+Dialect, preparation and cleanup resources must match; arbitrary dialect switching within one bundled adapter is unsupported. Kingbase retains its dedicated `kingbase` resources and database-plus-schema scope. Its recorded Oracle compatibility mode still uses the adapter's `postgresql` base dialect; selecting `oracle` is explicitly rejected. Reusing an adapter for another product does not establish compatibility. Existing SQL Server connections retain their behavior.
+
+New connections save encrypted passwords by default. On edit, omitting `password` preserves the stored value, `""` explicitly supplies an empty password, and a nonempty value replaces it. Advanced settings provide opt-out and explicit clearing. `POST /api/connections/test` accepts `savedConnectionId` to reuse a saved credential only when the password is omitted, while testing current form settings without updating the saved configuration or test status. After probing, passwords remain in component memory only, never browser storage. Execution scope inputs authorize later runs; a pure connection probe neither creates objects nor checks scope privileges.
+
+Probe failures expose a bounded, redacted `properties.diagnostics` list with SQLState and vendor code, plus `properties.stage`. Only explicit SQL states are classified; unknown failures are not guessed to be password or URL errors. Driver loading, connecting and reading metadata are distinct stages. Oracle probes attempt a read-only query for the actual container/PDB; verify the URL's target service manually if unavailable.
+
 <a id="local-startup"></a>
 <a id="local-source-startup"></a>
 ## Local source startup

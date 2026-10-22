@@ -251,6 +251,7 @@ public final class WorkerMain {
         PrintStream originalOutput = System.out;
         PrintStream driverOutput = new PrintStream(new BoundedDiagnosticOutputStream(), true,
             StandardCharsets.UTF_8);
+        String stage = "LOADING_DRIVER";
         try {
             System.setOut(driverOutput);
             System.setErr(driverOutput);
@@ -263,22 +264,25 @@ public final class WorkerMain {
                 if (request.connection().password() != null) {
                     credentials.setProperty("password", request.connection().password());
                 }
+                stage = "ESTABLISHING_CONNECTION";
                 try (Connection connection = driver.connect(request.connection().jdbcUrl(),
                     credentials)) {
                     if (connection == null) {
                         events.write("CONNECTION_PROBE_FAILED", "",
                             Map.of("errorType", "DRIVER_DOES_NOT_ACCEPT_URL", "message",
-                                "Driver does not accept JDBC URL"));
+                                "Driver does not accept JDBC URL", "stage", stage));
                         return DRIVER_FAILURE;
                     }
+                    stage = "READING_METADATA";
                     Map<String, Object> metadata = probeMetadata(connection, driver);
                     events.write("CONNECTION_PROBED", "", metadata);
+                    stage = "CLOSING_CONNECTION";
                     return SUCCESS;
                 }
             }
-        } catch (Exception exception) {
+        } catch (Exception | LinkageError exception) {
             events.write("CONNECTION_PROBE_FAILED", "",
-                Map.of("errorType", "CONNECTION_FAILED", "message", "Connection test failed"));
+                ConnectionProbeFailure.describe(stage, exception));
             return DRIVER_FAILURE;
         } finally {
             System.setOut(originalOutput);
@@ -287,22 +291,35 @@ public final class WorkerMain {
         }
     }
 
-    private static Map<String, Object> probeMetadata(Connection connection, Driver driver) {
+    private static Map<String, Object> probeMetadata(Connection connection, Driver driver)
+        throws java.sql.SQLException {
         Map<String, Object> values = new LinkedHashMap<>();
-        DatabaseMetaData metadata;
-        try {
-            metadata = connection.getMetaData();
-        } catch (Exception exception) {
-            metadata = null;
+        DatabaseMetaData metadata = connection.getMetaData();
+        if (metadata == null) {
+            throw new java.sql.SQLException("Driver returned no database metadata");
         }
-        if (metadata != null) {
-            put(values, "databaseProductName", metadata::getDatabaseProductName);
-            put(values, "databaseProductVersion", metadata::getDatabaseProductVersion);
-            put(values, "driverName", metadata::getDriverName);
-            put(values, "driverVersion", metadata::getDriverVersion);
-            put(values, "jdbcMajorVersion", metadata::getJDBCMajorVersion);
-            put(values, "jdbcMinorVersion", metadata::getJDBCMinorVersion);
+        values.put("databaseProductName", metadata.getDatabaseProductName());
+        values.put("databaseProductVersion", metadata.getDatabaseProductVersion());
+        values.put("driverName", metadata.getDriverName());
+        values.put("driverVersion", metadata.getDriverVersion());
+        put(values, "currentCatalog", connection::getCatalog);
+        put(values, "currentSchema", connection::getSchema);
+        if (driver.getClass().getName().startsWith("oracle.jdbc.")) {
+            try (var statement = connection.createStatement()) {
+                statement.setQueryTimeout(5);
+                try (var rows = statement.executeQuery(
+                    "SELECT SYS_CONTEXT('USERENV', 'CON_NAME') FROM DUAL")) {
+                    if (rows.next()) {
+                        values.put("targetContainer", rows.getString(1));
+                    }
+                }
+            } catch (java.sql.SQLException exception) {
+                // Older Oracle servers may not expose CON_NAME; require manual verification.
+                values.put("containerVerification", "UNAVAILABLE");
+            }
         }
+        put(values, "jdbcMajorVersion", metadata::getJDBCMajorVersion);
+        put(values, "jdbcMinorVersion", metadata::getJDBCMinorVersion);
         values.putIfAbsent("driverName", safe(driver::toString));
         values.putIfAbsent("driverVersion",
             driver.getMajorVersion() + "." + driver.getMinorVersion());

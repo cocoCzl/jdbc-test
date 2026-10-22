@@ -255,6 +255,139 @@ class CredentialSemanticsTest {
         service.cleanupCredential(created.id());
     }
 
+    @Test
+    void driverDefaultsOnlySeedNewConnectionsAndFrozenRunsKeepEffectiveResources() throws Exception {
+        var driver = drivers.findById(driverId).orElseThrow();
+        driver.setDefaultSqlDialect("mysql");
+        drivers.save(driver);
+        var input = input();
+        input.put("password", "saved-fixture");
+        input.put("savePassword", true);
+        mvc.perform(post("/api/connections").contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(input)))
+            .andExpect(status().isUnprocessableContent())
+            .andExpect(jsonPath("$.code").value("ADAPTER_DIALECT_UNSUPPORTED"));
+        input.put("sqlDialect", "postgresql");
+        String body = mvc.perform(post("/api/connections").contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(input))).andExpect(status().isCreated())
+            .andExpect(jsonPath("$.sqlDialect").value("postgresql"))
+            .andReturn().getResponse().getContentAsString();
+        UUID id = UUID.fromString(json.readTree(body).path("id").asString());
+        var run = service.create(request(id, null));
+        String frozen = runs.findById(run.id()).orElseThrow().getExecutionInput();
+        assertEquals("postgresql", json.readTree(frozen).path("adapterExecution")
+            .path("dialect").asString());
+        assertEquals("postgresql", json.readTree(frozen).path("adapterExecution")
+            .path("assetId").asString());
+        driver.setDefaultSqlDialect("oracle");
+        drivers.save(driver);
+        assertEquals("postgresql", connections.findById(id).orElseThrow().getSqlDialect());
+        assertEquals(frozen, runs.findById(run.id()).orElseThrow().getExecutionInput());
+        assertEquals("saved-fixture", service.consumeCredential(run.id()));
+
+        input.remove("password");
+        mvc.perform(patch("/api/connections/{id}", id).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(input))).andExpect(status().isOk())
+            .andExpect(jsonPath("$.hasSavedPassword").value(true));
+        assertEquals("saved-fixture", encryption.decrypt(
+            connections.findById(id).orElseThrow().getEncryptedPassword()));
+        input.put("password", "replacement-fixture");
+        mvc.perform(patch("/api/connections/{id}", id).contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(input))).andExpect(status().isOk())
+            .andExpect(jsonPath("$.password").doesNotExist());
+        assertEquals("replacement-fixture", service.consumeCredential(service.create(request(id, null)).id()));
+        assertEquals(frozen, runs.findById(run.id()).orElseThrow().getExecutionInput());
+    }
+
+    @Test
+    void databaseScopesAndDraftProbesHaveSeparateValidation() throws Exception {
+        for (String adapter : List.of("mysql", "postgresql", "oracle", "kingbase")) {
+            var input = input();
+            input.put("adapterId", adapter);
+            input.put("databaseType", adapter);
+            input.put("savePassword", false);
+            if ("mysql".equals(adapter)) {
+                input.remove("executionSchema");
+            } else if ("oracle".equals(adapter)) {
+                input.remove("executionDatabase");
+            }
+            mvc.perform(post("/api/connections").contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(input))).andExpect(status().isCreated());
+            if (!"mysql".equals(adapter) && !"oracle".equals(adapter)) {
+                input.remove("executionDatabase");
+                mvc.perform(post("/api/connections").contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(input)))
+                    .andExpect(status().isUnprocessableContent())
+                    .andExpect(jsonPath("$.code").value("EXECUTION_SCOPE_REQUIRED"));
+            }
+            input.remove("executionSchema");
+            input.remove("executionDatabase");
+            input.put("driverId", driverId);
+            input.put("password", "probe-only");
+            mvc.perform(post("/api/connections/test").contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(input))).andExpect(status().isOk());
+        }
+    }
+
+    @Test
+    void anonymousJdbcUsersAndLegacyMissingDriversDoNotBecomeInternalErrors() throws Exception {
+        var input = input();
+        input.put("username", "");
+        input.put("savePassword", false);
+        mvc.perform(post("/api/connections").contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(input))).andExpect(status().isCreated())
+            .andExpect(jsonPath("$.username").value(""));
+        var entity = new com.jdbctest.server.connection.DatabaseConnectionProfileEntity(
+            "missing driver", "postgresql", "postgresql", "jdbc:fixture:legacy", "fixture");
+        UUID id = connections.save(entity).getId();
+        mvc.perform(get("/api/connections/{id}", id)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.defaultDriver").isEmpty());
+        mvc.perform(post("/api/connections/{id}/test", id).contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+            .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("DRIVER_NOT_FOUND"));
+    }
+
+    @Test
+    void legacySqlServerConnectionIgnoresNewDriverDefaultsAndKeepsItsResources() {
+        var driver = drivers.findById(driverId).orElseThrow();
+        driver.setDefaultSqlDialect("oracle");
+        drivers.save(driver);
+        var entity = new com.jdbctest.server.connection.DatabaseConnectionProfileEntity(
+            "legacy sqlserver", "sqlserver", "sqlserver", "jdbc:fixture:legacy", "fixture");
+        entity.setDefaultDriver(driver);
+        entity.setExecutionScope("fixture", "owned_scope");
+        entity.setEncryptedPassword(encryption.encrypt("legacy-fixture"));
+        UUID id = connections.save(entity).getId();
+        var created = service.create(request(id, null));
+        var frozen = json.readTree(runs.findById(created.id()).orElseThrow().getExecutionInput());
+        assertEquals("sqlserver", frozen.path("adapterExecution").path("dialect").asString());
+        assertEquals("sqlserver", frozen.path("adapterExecution").path("assetId").asString());
+        assertNull(connections.findById(id).orElseThrow().getSqlDialect());
+        assertEquals("legacy-fixture", service.consumeCredential(created.id()));
+    }
+
+    @Test
+    void editedDraftUsesSavedSecretWithoutReturningOrChangingIt() throws Exception {
+        var input = input();
+        input.put("password", "saved-draft-fixture");
+        input.put("savePassword", true);
+        String body = mvc.perform(post("/api/connections").contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(input))).andExpect(status().isCreated())
+            .andReturn().getResponse().getContentAsString();
+        UUID id = UUID.fromString(json.readTree(body).path("id").asString());
+        String envelope = connections.findById(id).orElseThrow().getEncryptedPassword();
+        input.remove("password");
+        input.put("driverId", driverId);
+        input.put("savedConnectionId", id);
+        input.put("jdbcUrl", "jdbc:fixture:edited");
+        mvc.perform(post("/api/connections/test").contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(input))).andExpect(status().isOk())
+            .andExpect(jsonPath("$.password").doesNotExist());
+        assertEquals("saved-draft-fixture", observed.getLast());
+        assertEquals(envelope, connections.findById(id).orElseThrow().getEncryptedPassword());
+        assertEquals("jdbc:fixture:literal", connections.findById(id).orElseThrow().getJdbcUrl());
+    }
+
     private CreateTestRunRequest request(UUID id, String password) {
         return new CreateTestRunRequest(id, null, "CUSTOM", List.of("connection"), List.of(),
             List.of(), password, true);

@@ -16,6 +16,14 @@ public record CreateConnectionRequest(
     @NotNull UUID defaultDriverId,
     @Size(max = 1000) String description,
     @Size(max = 63) String executionDatabase,
-    @Size(max = 63) String executionSchema) {
+    @Size(max = 63) String executionSchema,
+    @Size(max = 20) String sqlDialect) {
+
+    public CreateConnectionRequest(String name, String databaseType, String adapterId,
+        String jdbcUrl, String username, String password, Boolean savePassword, UUID defaultDriverId,
+        String description, String executionDatabase, String executionSchema) {
+        this(name, databaseType, adapterId, jdbcUrl, username, password, savePassword,
+            defaultDriverId, description, executionDatabase, executionSchema, null);
+    }
 
 }

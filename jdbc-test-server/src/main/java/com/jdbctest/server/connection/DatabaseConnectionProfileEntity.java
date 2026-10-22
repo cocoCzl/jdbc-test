@@ -9,6 +9,17 @@ import java.util.UUID;
 @Table(name = "database_connection_profile")
 public class DatabaseConnectionProfileEntity {
 
+    @Column(name = "sql_dialect", length = 20)
+    private String sqlDialect;
+
+    public String getSqlDialect() {
+        return sqlDialect;
+    }
+
+    public void setSqlDialect(String value) {
+        sqlDialect = value;
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;

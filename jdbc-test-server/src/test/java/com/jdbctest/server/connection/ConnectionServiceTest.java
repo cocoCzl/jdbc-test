@@ -128,7 +128,7 @@ class ConnectionServiceTest {
         respond(0, false, "not-json\nnull\n{}\n");
         ConnectionException exception = assertThrows(ConnectionException.class,
             () -> service.testDraft(request()));
-        assertEquals("CONNECTION_FAILED", exception.code());
+        assertEquals("CONNECTION_UNKNOWN", exception.code());
     }
 
     @Test
@@ -136,7 +136,7 @@ class ConnectionServiceTest {
         respond(1, false, "{\"type\":\"CONNECTION_PROBED\"}\n");
         ConnectionException exception = assertThrows(ConnectionException.class,
             () -> service.testDraft(request()));
-        assertEquals("CONNECTION_FAILED", exception.code());
+        assertEquals("CONNECTION_UNKNOWN", exception.code());
     }
 
     @Test
@@ -168,6 +168,33 @@ class ConnectionServiceTest {
             assertTrue(Thread.currentThread().isInterrupted());
         } finally {
             Thread.interrupted();
+        }
+    }
+
+    @Test
+    void structuredProbeFailureRetainsStageCodesAndRedactsSuppliedSecretAgain() throws Exception {
+        respond(3, false, "{\"type\":\"CONNECTION_PROBE_FAILED\","
+            + "\"errorType\":\"CONNECTION_METADATA_FAILED\",\"stage\":\"READING_METADATA\","
+            + "\"diagnostics\":[{\"sqlState\":\"ZZ999\",\"vendorCode\":71,"
+            + "\"message\":\"unlabelled fixture-only and password=other-secret\"}]}\n");
+        var error = assertThrows(ConnectionException.class, () -> service.testDraft(request()));
+        assertEquals("CONNECTION_METADATA_FAILED", error.code());
+        assertEquals("READING_METADATA", error.properties().get("stage"));
+        String json = new ObjectMapper().writeValueAsString(error.properties());
+        assertTrue(json.contains("ZZ999"));
+        assertTrue(json.contains("71"));
+        org.junit.jupiter.api.Assertions.assertFalse(json.contains("fixture-only"));
+        org.junit.jupiter.api.Assertions.assertFalse(json.contains("other-secret"));
+    }
+
+    @Test
+    void legacyGenericAndUnknownWorkerErrorsDoNotBecomeUrlRejections() throws Exception {
+        for (String type : List.of("CONNECTION_FAILED", "UNRECOGNIZED")) {
+            respond(3, false, "{\"type\":\"CONNECTION_PROBE_FAILED\",\"errorType\":\""
+                + type + "\"}\n");
+            var error = assertThrows(ConnectionException.class, () -> service.testDraft(request()));
+            assertEquals("CONNECTION_UNKNOWN", error.code());
+            org.junit.jupiter.api.Assertions.assertFalse(error.getMessage().contains("URL"));
         }
     }
 

@@ -17,6 +17,15 @@ public record UpdateConnectionRequest(
     @NotNull UUID defaultDriverId,
     @Size(max = 1000) String description,
     @Size(max = 63) String executionDatabase,
-    @Size(max = 63) String executionSchema) {
+    @Size(max = 63) String executionSchema,
+    @Size(max = 20) String sqlDialect) {
+
+    public UpdateConnectionRequest(String name, String databaseType, String adapterId,
+        String jdbcUrl, String username, String password, Boolean savePassword,
+        Boolean clearSavedPassword, UUID defaultDriverId, String description,
+        String executionDatabase, String executionSchema) {
+        this(name, databaseType, adapterId, jdbcUrl, username, password, savePassword,
+            clearSavedPassword, defaultDriverId, description, executionDatabase, executionSchema, null);
+    }
 
 }

@@ -49,6 +49,39 @@ class DriverServiceTest {
     }
 
     @Test
+    void explicitlySelectedPostgresqlDefaultIsSavedWithoutValidation() throws Exception {
+        var response = service.create(new CreateDriverRequest("Kingbase JDBC", "Kingbase", "9",
+            "com.kingbase8.Driver", "jdbc:kingbase8:", null, "postgresql"),
+            List.of(jar("com.kingbase8.Driver\n")));
+        assertEquals("postgresql", response.defaultSqlDialect());
+        org.mockito.Mockito.verify(packages).saveAndFlush(
+            org.mockito.ArgumentMatchers.argThat(entity ->
+                "postgresql".equals(entity.getDefaultSqlDialect())));
+        assertEquals(DriverPackageStatus.PENDING_VALIDATION, response.status());
+        verifyNoInteractions(validation);
+    }
+
+    @Test
+    void defaultDialectEditsPreserveValidationAndCanBeClearedExplicitly() {
+        var entity = new JdbcDriverPackageEntity("fixture", "fixture", "1", "fixture.Driver",
+            DriverSourceType.UPLOAD);
+        entity.setStatus(DriverPackageStatus.VALIDATED);
+        when(packages.findById(entity.getId())).thenReturn(java.util.Optional.of(entity));
+        var result = service.update(entity.getId(), new UpdateDriverRequest("fixture", "fixture",
+            "1", "fixture.Driver", null, null, "postgresql"));
+        assertEquals("postgresql", result.defaultSqlDialect());
+        assertEquals(DriverPackageStatus.VALIDATED, result.status());
+        assertEquals("postgresql", service.update(entity.getId(), new UpdateDriverRequest(
+            "fixture", "fixture", "1", "fixture.Driver", null)).defaultSqlDialect());
+        assertNull(service.update(entity.getId(), new UpdateDriverRequest("fixture", "fixture",
+            "1", "fixture.Driver", null, null, "")).defaultSqlDialect());
+        assertThrows(DriverException.class, () -> service.update(entity.getId(),
+            new UpdateDriverRequest("fixture", "fixture", "1", "fixture.Driver", null, null,
+                "unknown")));
+        verifyNoInteractions(validation);
+    }
+
+    @Test
     void savesActualCustomValuesEvenWhenSpiDeclaresAnotherClass() throws Exception {
         var response = service.create(new CreateDriverRequest("Private JDBC", "Private issuer",
             "custom-version", "private.jdbc.Driver", "jdbc:private:"),

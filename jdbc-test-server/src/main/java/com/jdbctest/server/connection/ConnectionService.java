@@ -75,6 +75,9 @@ final class ConnectionService {
                 values.databaseType(), values.adapterId(), values.jdbcUrl(), values.username());
             entity.setExecutionScope(optional(request.executionDatabase()),
                 optional(request.executionSchema()));
+            entity.setSqlDialect(effectiveDialect(values.adapterId(),
+                request.sqlDialect() == null ? driver.getDefaultSqlDialect() : request.sqlDialect()));
+            validateScope(entity);
             entity.setDescription(values.description());
             entity.setDefaultDriver(driver);
             if (Boolean.TRUE.equals(request.savePassword())) {
@@ -142,6 +145,9 @@ final class ConnectionService {
             entity.update(values.name(), values.databaseType(), values.adapterId(),
                 values.jdbcUrl(),
                 values.username(), values.description(), driver);
+            entity.setSqlDialect(effectiveDialect(values.adapterId(),
+                request.sqlDialect() == null ? entity.getSqlDialect() : request.sqlDialect()));
+            validateScope(entity);
             if (Boolean.TRUE.equals(request.clearSavedPassword())) {
                 entity.setEncryptedPassword(null);
             } else if (request.password() != null) {
@@ -173,11 +179,16 @@ final class ConnectionService {
             request.username(), null, request.driverId());
         DriverSnapshot driver = transactions.execute(
             status -> driverSnapshot(requiredValidatedDriver(values.driverId())));
-        if (request.password() == null) {
+        String password = request.password();
+        if (password == null && request.savedConnectionId() != null) {
+            password = transactions.execute(status -> encryption.decrypt(
+                requiredConnection(request.savedConnectionId()).getEncryptedPassword()));
+        }
+        if (password == null) {
             throw new ConnectionException(HttpStatus.BAD_REQUEST, "CONNECTION_PASSWORD_REQUIRED",
                 "A password is required to test this connection");
         }
-        return probe(driver, values.jdbcUrl(), values.username(), request.password());
+        return probe(driver, values.jdbcUrl(), values.username(), password);
     }
 
     ConnectionProbeResponse testSaved(UUID id, ConnectionTestRequest request) {
@@ -185,7 +196,8 @@ final class ConnectionService {
             DatabaseConnectionProfileEntity entity = requiredConnection(id);
             return new SavedSnapshot(entity.getJdbcUrl(), entity.getUsername(),
                 entity.getEncryptedPassword(),
-                driverSnapshot(requiredValidatedDriver(entity.getDefaultDriver().getId())));
+                driverSnapshot(requiredValidatedDriver(entity.getDefaultDriver() == null ? null
+                    : entity.getDefaultDriver().getId())));
         });
         String password = request == null ? null : request.password();
         if (password == null) {
@@ -230,12 +242,13 @@ final class ConnectionService {
                 .findFirst()
                 .orElse(null);
             if (result.exitCode() != 0 || event == null) {
-                throw failure(result);
+                throw failure(result, password);
             }
             return new ConnectionProbeResponse(true, text(event, "databaseProductName"),
                 text(event, "databaseProductVersion"), text(event, "driverName"),
                 text(event, "driverVersion"), integer(event, "jdbcMajorVersion"),
-                integer(event, "jdbcMinorVersion"));
+                integer(event, "jdbcMinorVersion"), text(event, "currentCatalog"),
+                text(event, "currentSchema"), text(event, "targetContainer"));
         } catch (IOException exception) {
             throw new ConnectionException(HttpStatus.SERVICE_UNAVAILABLE, "WORKER_UNAVAILABLE",
                 "Connection test worker is unavailable");
@@ -246,7 +259,7 @@ final class ConnectionService {
         }
     }
 
-    private ConnectionException failure(WorkerProcessRunner.Result result) {
+    private ConnectionException failure(WorkerProcessRunner.Result result, String password) {
         JsonNode event = result.lines().stream().map(this::read).filter(Objects::nonNull)
             .filter(node -> "CONNECTION_PROBE_FAILED".equals(node.path("type").asString()))
             .findFirst()
@@ -254,9 +267,70 @@ final class ConnectionService {
         String type =
             event == null ? "CONNECTION_FAILED"
                 : event.path("errorType").asString("CONNECTION_FAILED");
-        String code = "DRIVER_DOES_NOT_ACCEPT_URL".equals(type) ? type : "CONNECTION_FAILED";
+        Set<String> supported = Set.of("DRIVER_DOES_NOT_ACCEPT_URL", "CONNECTION_DRIVER_LOAD_FAILED",
+            "CONNECTION_METADATA_FAILED", "CONNECTION_AUTHENTICATION_FAILED",
+            "CONNECTION_DATABASE_NOT_FOUND", "CONNECTION_REJECTED", "CONNECTION_UNKNOWN");
+        String code = supported.contains(type) ? type : "CONNECTION_UNKNOWN";
+        Map<String, Object> details = new java.util.LinkedHashMap<>();
+        if (event != null) {
+            String stage = text(event, "stage");
+            if (Set.of("LOADING_DRIVER", "ESTABLISHING_CONNECTION", "READING_METADATA",
+                "CLOSING_CONNECTION").contains(stage == null ? "" : stage)) {
+                details.put("stage", stage);
+            }
+            var diagnostics = event.path("diagnostics");
+            if (diagnostics.isArray()) {
+                var safe = new java.util.ArrayList<Map<String, Object>>();
+                for (JsonNode item : diagnostics) {
+                    if (safe.size() >= 8) {
+                        break;
+                    }
+                    Map<String, Object> fields = new java.util.LinkedHashMap<>();
+                    for (String key : List.of("message", "exceptionType", "sqlState")) {
+                        String value = text(item, key);
+                        if (value != null) {
+                            if (password != null && !password.isEmpty()) {
+                                value = value.replace(password, "[REDACTED]");
+                            }
+                            value = JdbcUrlSanitizer.sanitize(value);
+                            fields.put(key, value.substring(0, Math.min(value.length(), 2000)));
+                        }
+                    }
+                    if (item.path("vendorCode").isNumber()) {
+                        fields.put("vendorCode", item.path("vendorCode").asInt());
+                    }
+                    safe.add(fields);
+                }
+                details.put("diagnostics", safe);
+            }
+        }
         return new ConnectionException(HttpStatus.UNPROCESSABLE_CONTENT, code,
-            code.equals(type) ? "Driver does not accept the JDBC URL" : "Connection test failed");
+            "Connection probe failed", details);
+    }
+
+    private String effectiveDialect(String adapterId, String requested) {
+        var execution = adapters.required(adapterId).execution();
+        try {
+            return execution.requireDialect(requested).sqlDialect().code();
+        } catch (IllegalArgumentException exception) {
+            throw new ConnectionException(HttpStatus.UNPROCESSABLE_CONTENT,
+                "ADAPTER_DIALECT_UNSUPPORTED", "Selected dialect has no matching adapter resources");
+        }
+    }
+
+    private void validateScope(DatabaseConnectionProfileEntity entity) {
+        // Legacy connections without a scope stay editable/probeable; runs still require one.
+        if (entity.getExecutionDatabase() == null && entity.getExecutionSchema() == null) {
+            return;
+        }
+        try {
+            new com.jdbctest.catalog.ExecutionScope(entity.getExecutionDatabase(),
+                entity.getExecutionSchema()).validate(adapters.required(entity.getAdapterId())
+                .execution().requireDialect(entity.getSqlDialect()).sqlDialect());
+        } catch (IllegalArgumentException exception) {
+            throw new ConnectionException(HttpStatus.UNPROCESSABLE_CONTENT,
+                "EXECUTION_SCOPE_REQUIRED", "Check the authorized database/schema scope");
+        }
     }
 
     private void recordTest(UUID id, ConnectionTestStatus status) {
@@ -277,10 +351,15 @@ final class ConnectionService {
         String normalizedAdapter = required(adapterId, "adapterId");
         adapters.required(normalizedAdapter);
         return new Values(required(name, "name"), required(databaseType, "databaseType"),
-            normalizedAdapter, normalizedUrl, optional(username), optional(description), driverId);
+            normalizedAdapter, normalizedUrl, username == null ? "" : username.trim(),
+            optional(description), driverId);
     }
 
     private JdbcDriverPackageEntity requiredValidatedDriver(UUID id) {
+        if (id == null) {
+            throw new ConnectionException(HttpStatus.NOT_FOUND, "DRIVER_NOT_FOUND",
+                "Connection has no driver");
+        }
         JdbcDriverPackageEntity driver = drivers.findById(id).orElseThrow(
             () -> new ConnectionException(HttpStatus.NOT_FOUND, "DRIVER_NOT_FOUND",
                 "Driver was not found"));
@@ -305,15 +384,16 @@ final class ConnectionService {
 
     private ConnectionResponse response(DatabaseConnectionProfileEntity entity) {
         JdbcDriverPackageEntity driver = entity.getDefaultDriver();
-        DriverSummaryResponse summary = new DriverSummaryResponse(driver.getId(), driver.getName(),
-            driver.getVendor(), driver.getVersion(), driver.getStatus());
+        DriverSummaryResponse summary = driver == null ? null : new DriverSummaryResponse(
+            driver.getId(), driver.getName(), driver.getVendor(), driver.getVersion(),
+            driver.getStatus(), driver.getDefaultSqlDialect());
         return new ConnectionResponse(entity.getId(), entity.getName(), entity.getDatabaseType(),
             entity.getAdapterId(), JdbcUrlSanitizer.sanitize(entity.getJdbcUrl()),
             entity.getUsername(),
             entity.getEncryptedPassword() != null, summary, entity.getDescription(),
             entity.getLastConnectionTestAt(), entity.getLastConnectionTestStatus(),
             entity.getCreatedAt(), entity.getUpdatedAt(), entity.getExecutionDatabase(),
-            entity.getExecutionSchema());
+            entity.getExecutionSchema(), entity.getSqlDialect());
     }
 
     private ConnectionException invalid(String message) {

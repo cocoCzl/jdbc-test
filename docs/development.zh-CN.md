@@ -4,6 +4,16 @@
 
 修改源码使用下面的统一开发命令；只运行网站请选择[Docker 或非 Docker 部署包](deployment.zh-CN.md)。Native 是部署包运行，不是 IDEA 源码启动。
 
+## 连接配置与默认 SQL 方言
+
+驱动的可选 `defaultSqlDialect` 仅预填新连接（Oracle、MySQL、PostgreSQL）；连接保存最终的 `sqlDialect`。已有连接的空值仍使用原适配，不读取后来修改的驱动默认值。任务冻结匹配的 `adapterExecution`，包含方言、资源目录、标识符及元数据约束；历史任务不回填。V11 仅添加两个可空列，不改写已有配置。
+
+方言与准备、清理资源必须匹配，暂不支持在一个内置适配上任意切换方言。Kingbase 保留 `kingbase` 专用资源及数据库＋schema 范围，其已记录的 Oracle 兼容模式仍使用适配声明的 `postgresql` 基础方言；选择 `oracle` 会明确报不支持。自研数据库复用某适配不证明产品兼容。已有 SQL Server 连接保持原行为。
+
+新建连接默认加密保存密码；编辑省略 `password` 保留原值，传 `""` 表示显式空密码，传非空值才替换。高级设置可选择不保存或显式清除。`POST /api/connections/test` 可附 `savedConnectionId`，仅在未提供密码时复用该连接的已存凭据，以测试当前表单配置；不更新已有配置或测试状态。测试后密码仅保留在当前组件内存，不写浏览器存储。范围输入用于后续运行授权，纯连接探测不执行建表或范围权限验证。
+
+连接失败响应通过 `properties.stage` 和有界 `properties.diagnostics` 保留脱敏异常、SQLState 与厂商错误码。仅对明确的 SQLState 分类，未知错误不推测为密码或 URL 问题；驱动加载、建立连接、读取元数据分别报告。Oracle 探测尝试只读查询实际容器／PDB；无法读取时须人工核对 URL 的目标服务。
+
 <a id="local-startup"></a>
 <a id="local-source-startup"></a>
 ## 本地源码启动

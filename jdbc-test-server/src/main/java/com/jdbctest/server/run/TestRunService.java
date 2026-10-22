@@ -106,7 +106,13 @@ final class TestRunService {
                 throw problem(HttpStatus.CONFLICT, "ADAPTER_CHANGED",
                     "Adapter changed; refresh and review its current version");
             }
-            var adapterExecution = definition.execution();
+            com.jdbctest.catalog.AdapterExecutionConfig adapterExecution;
+            try {
+                adapterExecution = definition.execution().requireDialect(connection.getSqlDialect());
+            } catch (IllegalArgumentException exception) {
+                throw problem(HttpStatus.UNPROCESSABLE_CONTENT, "ADAPTER_DIALECT_UNSUPPORTED",
+                    "Selected dialect has no matching adapter resources");
+            }
             if ("compatible".equals(connection.getDatabaseType())) {
                 // Explicit dialect reuse does not assert another product's metadata identity.
                 adapterExecution = new com.jdbctest.catalog.AdapterExecutionConfig(

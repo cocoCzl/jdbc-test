@@ -11,6 +11,11 @@ public record DraftConnectionTestRequest(
     @NotBlank @Size(max = 2000) String jdbcUrl,
     @Size(max = 200) String username,
     @Size(max = 2000) String password,
-    @NotNull UUID driverId) {
+    @NotNull UUID driverId, UUID savedConnectionId) {
+
+    public DraftConnectionTestRequest(String databaseType, String adapterId, String jdbcUrl,
+        String username, String password, UUID driverId) {
+        this(databaseType, adapterId, jdbcUrl, username, password, driverId, null);
+    }
 
 }

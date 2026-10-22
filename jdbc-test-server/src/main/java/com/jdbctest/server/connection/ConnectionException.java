@@ -7,9 +7,16 @@ public final class ConnectionException extends RuntimeException {
 
     private final HttpStatus status;
     private final String code;
+    private final Map<String, Object> properties;
 
     public ConnectionException(HttpStatus status, String code, String message) {
+        this(status, code, message, Map.of());
+    }
+
+    public ConnectionException(HttpStatus status, String code, String message,
+        Map<String, Object> properties) {
         super(message);
+        this.properties = Map.copyOf(properties);
         this.status = status;
         this.code = code;
     }
@@ -23,6 +30,6 @@ public final class ConnectionException extends RuntimeException {
     }
 
     public Map<String, Object> properties() {
-        return Map.of();
+        return properties;
     }
 }
