@@ -18,7 +18,9 @@ public record TestRunResponse(UUID id, TestRunStatus status, String profile,
     java.util.Map<String, Object> selectionSnapshot,
     java.util.Map<String, Long> contractSummary,
     com.jdbctest.server.connection.AdapterResponse adapterSnapshot,
-    tools.jackson.databind.JsonNode sqlPackage) {
+    tools.jackson.databind.JsonNode sqlPackage, String workerTerminationReason,
+    boolean workerReportValidated, String sqlDialect, String name, String executionOutcome,
+    boolean historicalOutcome, String workerArtifactSha256, Integer workerExitCode, tools.jackson.databind.JsonNode workerFinalEvent) {
 
     public record ConnectionSnapshot(String name, String databaseType, String adapterId,
         String jdbcUrl) {

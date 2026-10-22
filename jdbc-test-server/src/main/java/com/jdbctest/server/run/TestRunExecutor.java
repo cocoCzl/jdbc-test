@@ -129,6 +129,12 @@ final class TestRunExecutor {
             }
             stdout.join();
             stderr.join();
+            int exitCode = process.exitValue();
+            transactions.executeWithoutResult(tx -> {
+                TestRunEntity run = runs.findForUpdate(runId).orElseThrow();
+                run.recordWorkerExit(exitCode);
+                runs.save(run);
+            });
             finishedEvent = terminalEvent.get() != null;
             TestRunStatus current = status(runId);
             if (TestRunStateTransitions.terminal(current)) {
@@ -146,7 +152,22 @@ final class TestRunExecutor {
                 return;
             }
             if (process.exitValue() != 0 || "FAILED".equals(text(terminalEvent.get(), "status"))) {
-                fail(runId, "WORKER_EXECUTION_FAILED");
+                // Protocol 2 uses exit 4 for ordinary case failures as well as execution failures.
+                // The validated report, independent issues, accounting and cleanup must agree.
+                boolean caseFailuresOnly = process.exitValue() == 4
+                    && Boolean.TRUE.equals(transactions.execute(tx -> {
+                        TestRunEntity run = runs.findForUpdate(runId).orElseThrow();
+                        return "TEST_FAILURE".equals(run.getWorkerTerminationReason())
+                            && "SUCCESS".equals(mapper.readTree(run.getCleanupEvidence())
+                                .path("status").asString())
+                            && (run.getExecutionIssues() == null
+                                || mapper.readTree(run.getExecutionIssues()).isEmpty());
+                    }));
+                if (caseFailuresOnly) {
+                    transition(runId, TestRunStatus.SUCCEEDED, null);
+                } else {
+                    fail(runId, "WORKER_EXECUTION_FAILED");
+                }
                 return;
             }
             transition(runId, TestRunStatus.SUCCEEDED, null);
@@ -166,6 +187,14 @@ final class TestRunExecutor {
         } finally {
             if (process != null && process.isAlive()) {
                 terminateQuietly(process);
+            }
+            if (process != null && !process.isAlive()) {
+                int code = process.exitValue();
+                transactions.executeWithoutResult(tx -> {
+                    TestRunEntity run = runs.findForUpdate(runId).orElseThrow();
+                    run.recordWorkerExit(code);
+                    runs.save(run);
+                });
             }
             active.remove(runId);
             protocolStarted.remove(runId);
@@ -234,6 +263,19 @@ final class TestRunExecutor {
         return input.frozen().path("budgetMs").asLong(execution.getRunTimeout().toMillis());
     }
 
+    private static String workerFingerprint(Path executable) throws IOException {
+        try {
+            var digest = java.security.MessageDigest.getInstance("SHA-256");
+            try (var stream = new java.security.DigestInputStream(Files.newInputStream(executable),
+                digest)) {
+                stream.transferTo(OutputStream.nullOutputStream());
+            }
+            return java.util.HexFormat.of().formatHex(digest.digest());
+        } catch (java.security.NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
+        }
+    }
+
     private Process start(RunInput input, Path workspace) throws IOException, InterruptedException {
         new com.jdbctest.server.driver.WorkerProcessRunner(workerProperties,
             mapper).requireRunProtocol(input.frozen().has("adapterSnapshot"));
@@ -241,6 +283,12 @@ final class TestRunExecutor {
         if (executable == null || !Files.isRegularFile(executable)) {
             throw new IOException("Worker executable unavailable");
         }
+        String artifactSha256 = workerFingerprint(executable);
+        transactions.executeWithoutResult(tx -> {
+            TestRunEntity run = runs.findForUpdate(input.runId()).orElseThrow();
+            run.setWorkerArtifactSha256(artifactSha256);
+            runs.save(run);
+        });
         String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
         Process process = new ProcessBuilder(java, "-jar",
             executable.toAbsolutePath().toString()).start();
@@ -371,9 +419,11 @@ final class TestRunExecutor {
                     mapper.readValue(safe, Map.class)));
             });
             case "CASE_FINISHED" -> persistCase(runId, event);
-            case "RUN_FAILED" -> fail(runId,
-                text(event, "errorType") == null ? "WORKER_EXECUTION_FAILED"
+            case "RUN_FAILED" -> {
+                recordFinalEvent(runId, event);
+                fail(runId, text(event, "errorType") == null ? "WORKER_EXECUTION_FAILED"
                     : text(event, "errorType"));
+            }
             case "RUN_FINISHED" -> {
                 if (!List.of("PASSED", "FAILED").contains(required(event, "status")) || !event.path(
                     "scenarioCount").isInt()) {
@@ -381,6 +431,7 @@ final class TestRunExecutor {
                         org.springframework.http.HttpStatus.UNPROCESSABLE_CONTENT,
                         "WORKER_PROTOCOL_ERROR", "Invalid finish summary");
                 }
+                recordFinalEvent(runId, event);
                 return true;
             }
             case "MODULE_FINISHED" -> {
@@ -390,6 +441,20 @@ final class TestRunExecutor {
                     "WORKER_PROTOCOL_ERROR", "Unknown worker event");
         }
         return false;
+    }
+
+    private void recordFinalEvent(UUID runId, JsonNode event) {
+        transactions.executeWithoutResult(tx -> {
+            TestRunEntity run = runs.findForUpdate(runId).orElseThrow();
+            run.recordWorkerFinalEvent(JdbcUrlSanitizer.sanitizeJson(mapper.writeValueAsString(event)));
+            String reportedReason = text(event, "terminationReason");
+            if (reportedReason != null && reportedReason.length() <= 100) {
+                // Retain the Worker's declaration even when report validation later fails.
+                // It is not a server execution verdict; workerReportValidated remains independent.
+                run.setWorkerTerminationReason(sanitize(reportedReason));
+            }
+            runs.save(run);
+        });
     }
 
     private void persistCase(UUID runId, JsonNode event) {

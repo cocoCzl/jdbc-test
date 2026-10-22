@@ -223,6 +223,9 @@ public final class FakeWorkerMain {
             await(workspace.resolve("exit"));
         }
         Files.writeString(workspace.resolve("exited"), "done");
+        if ("FAILED_RUN".equals(mode)) {
+            System.exit(4);
+        }
     }
 
     private static void await(Path signal) throws java.io.IOException, InterruptedException {

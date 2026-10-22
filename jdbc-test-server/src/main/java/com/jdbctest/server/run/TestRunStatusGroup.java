@@ -5,6 +5,10 @@ import org.springframework.http.HttpStatus;
 
 /** History filters only; execution and terminal decisions use TestRunStatus. */
 public enum TestRunStatusGroup {
+    ACTIVE(TestRunStatus.QUEUED, TestRunStatus.PREPARING, TestRunStatus.PROBING,
+        TestRunStatus.RUNNING, TestRunStatus.GENERATING_REPORT),
+    ENDED(TestRunStatus.SUCCEEDED, TestRunStatus.FAILED, TestRunStatus.CANCELLED,
+        TestRunStatus.INTERRUPTED),
     WAITING(TestRunStatus.QUEUED),
     IN_PROGRESS(TestRunStatus.PREPARING, TestRunStatus.PROBING, TestRunStatus.RUNNING,
         TestRunStatus.GENERATING_REPORT),

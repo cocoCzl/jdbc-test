@@ -13,6 +13,48 @@ public class TestRunEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
+    @Column(length = 200)
+    private String name;
+    @Column(name = "worker_artifact_sha256", length = 64)
+    private String workerArtifactSha256;
+
+    public String getWorkerArtifactSha256() {
+        return workerArtifactSha256;
+    }
+
+    void setWorkerArtifactSha256(String value) {
+        workerArtifactSha256 = value;
+    }
+
+    @Column(name = "worker_exit_code")
+    private Integer workerExitCode;
+    @Column(name = "worker_final_event", columnDefinition = "text")
+    private String workerFinalEvent;
+
+    public String getName() {
+        return name;
+    }
+
+    void setName(String value) {
+        name = value;
+    }
+
+    public Integer getWorkerExitCode() {
+        return workerExitCode;
+    }
+
+    public String getWorkerFinalEvent() {
+        return workerFinalEvent;
+    }
+
+    void recordWorkerExit(int code) {
+        workerExitCode = code;
+    }
+
+    void recordWorkerFinalEvent(String value) {
+        workerFinalEvent = value;
+    }
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "connection_id", nullable = false)
     private DatabaseConnectionProfileEntity connection;

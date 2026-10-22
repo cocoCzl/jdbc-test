@@ -53,6 +53,10 @@ class RunStatusFilteringTest {
     @Autowired
     TestRunRepository runs;
     @Autowired
+    TestRunSelectedScenarioRepository selections;
+    @Autowired
+    jakarta.persistence.EntityManager entityManager;
+    @Autowired
     JdbcDriverPackageRepository drivers;
     @Autowired
     DatabaseConnectionProfileRepository connections;
@@ -86,6 +90,10 @@ class RunStatusFilteringTest {
     @Test
     void eachGroupHasExactlyItsDocumentedStates() throws Exception {
         Map<TestRunStatusGroup, List<TestRunStatus>> expected = Map.of(
+            TestRunStatusGroup.ACTIVE, List.of(TestRunStatus.QUEUED, TestRunStatus.PREPARING,
+                TestRunStatus.PROBING, TestRunStatus.RUNNING, TestRunStatus.GENERATING_REPORT),
+            TestRunStatusGroup.ENDED, List.of(TestRunStatus.SUCCEEDED, TestRunStatus.FAILED,
+                TestRunStatus.CANCELLED, TestRunStatus.INTERRUPTED),
             TestRunStatusGroup.WAITING, List.of(TestRunStatus.QUEUED),
             TestRunStatusGroup.IN_PROGRESS, List.of(TestRunStatus.PREPARING, TestRunStatus.PROBING,
                 TestRunStatus.RUNNING, TestRunStatus.GENERATING_REPORT),
@@ -104,6 +112,44 @@ class RunStatusFilteringTest {
             }
         }
         verifyNoInteractions(worker);
+    }
+
+    @Test
+    void validatedHistoricalCaseFailuresAreCompletedWithoutChangingRawStatus() throws Exception {
+        var run = runs.findAll().stream().filter(item -> item.getStatus() == TestRunStatus.FAILED)
+            .findFirst().orElseThrow();
+        run.setFailureReason("WORKER_EXECUTION_FAILED");
+        run.setWorkerTerminationReason("TEST_FAILURE");
+        run.markWorkerReportValidated();
+        run.setCleanupEvidence("{\"status\":\"SUCCESS\"}");
+        run.freezeExecutionInput("{\"scope\":{\"database\":\"db\",\"schema\":\"qa\"}}");
+        run.setTotalCases(1);
+        run.recordCase(TestCaseResultStatus.FAILED);
+        var scenario = new TestRunSelectedScenarioEntity(run, "connection.is_valid", "connection");
+        scenario.started();
+        scenario.finished("FAILED");
+        selections.saveAndFlush(scenario);
+        run.setName("Historical named run");
+        runs.saveAndFlush(run);
+        var id = run.getId();
+        entityManager.clear();
+        mvc.perform(get("/api/runs").param("statusGroup", "COMPLETED"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(2));
+        mvc.perform(get("/api/runs").param("statusGroup", "ABNORMAL"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1));
+        mvc.perform(get("/api/runs/{id}", id)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("FAILED"))
+            .andExpect(jsonPath("$.executionOutcome").value("COMPLETED"))
+            .andExpect(jsonPath("$.historicalOutcome").value(true))
+            .andExpect(jsonPath("$.name").value("Historical named run"));
+        assertEquals(TestRunStatus.FAILED, runs.findById(id).orElseThrow().getStatus());
+        run = runs.findById(id).orElseThrow();
+        run.setCleanupEvidence("{\"status\":\"FAILED\"}");
+        runs.saveAndFlush(run);
+        mvc.perform(get("/api/runs/{id}", id)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.executionOutcome").value("ABNORMAL"));
+        mvc.perform(get("/api/runs").param("statusGroup", "COMPLETED"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1));
     }
 
     @Test

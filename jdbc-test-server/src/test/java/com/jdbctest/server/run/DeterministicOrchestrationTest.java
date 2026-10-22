@@ -405,7 +405,7 @@ class DeterministicOrchestrationTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"NORMAL,SUCCEEDED,none", "FAILED_RUN,FAILED,WORKER_EXECUTION_FAILED",
+    @CsvSource({"NORMAL,SUCCEEDED,none", "FAILED_RUN,SUCCEEDED,none",
         "BLOCK,CANCELLED,none",
         "TIMEOUT,FAILED,RUN_TIMEOUT", "INVALID_JSON,FAILED,WORKER_PROTOCOL_ERROR",
         "WRONG_RUN_ID,FAILED,WORKER_PROTOCOL_ERROR",
@@ -428,6 +428,22 @@ class DeterministicOrchestrationTest {
             scheduler.cancel(first);
         }
         done(first, expected, "none".equals(reason) ? null : reason);
+        if ("FAILED_RUN".equals(mode)) {
+            assertEquals("TEST_FAILURE", service.get(first).workerTerminationReason());
+            assertTrue(service.get(first).workerReportValidated());
+            mvc.perform(get("/api/runs/{id}", first)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.workerTerminationReason").value("TEST_FAILURE"))
+                .andExpect(jsonPath("$.workerReportValidated").value(true))
+                .andExpect(jsonPath("$.executionOutcome").value("COMPLETED"))
+                .andExpect(jsonPath("$.workerExitCode").value(4))
+                .andExpect(jsonPath("$.workerFinalEvent.terminationReason").value("TEST_FAILURE"));
+            assertEquals("COMPLETED", service.report(first).summary().executionOutcome());
+        }
+        if ("REPORT_MISMATCH".equals(mode)) {
+            assertEquals("COMPLETED", service.get(first).workerTerminationReason());
+            assertFalse(service.get(first).workerReportValidated());
+            assertEquals("ABNORMAL", service.get(first).executionOutcome());
+        }
         execution.setRunTimeout(Duration.ofSeconds(20));
         started(second);
         assertFalse(ProcessHandle.of(firstPid).map(ProcessHandle::isAlive).orElse(false));
@@ -806,6 +822,33 @@ class DeterministicOrchestrationTest {
         scheduler.cancel(response.id());
         release(blocker);
         done(blocker, TestRunStatus.SUCCEEDED, null);
+    }
+
+    @Test
+    void customNameRoundTripsThroughCreateAndPersistedReads() throws Exception {
+        var resource = resource("NORMAL");
+        String payload = new tools.jackson.databind.ObjectMapper().writeValueAsString(Map.of(
+            "connectionId", resource.getId(), "profile", "CUSTOM", "modules", List.of(),
+            "includeScenarios", List.of("connection.is_valid"), "destructiveConsent", true,
+            "name", "Kingbase regression · custom name"));
+        var body = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                .post("/api/runs").contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content(payload)).andExpect(status().isCreated())
+            .andExpect(jsonPath("$.name").value("Kingbase regression · custom name"))
+            .andReturn().getResponse().getContentAsString();
+        UUID id = UUID.fromString(new tools.jackson.databind.ObjectMapper().readTree(body)
+            .path("id").asString());
+        created.add(id);
+        started(id);
+        done(id, TestRunStatus.SUCCEEDED, null);
+        // Independent service transactions must read the stored name, never a client-only label.
+        assertEquals("Kingbase regression · custom name", service.get(id).name());
+        assertEquals("Kingbase regression · custom name", service.report(id).summary().name());
+        mvc.perform(get("/api/runs/{id}", id)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.name").value("Kingbase regression · custom name"))
+            .andExpect(jsonPath("$.workerExitCode").value(0))
+            .andExpect(jsonPath("$.workerFinalEvent.status").value("PASSED"));
+        assertEquals(64, service.get(id).workerArtifactSha256().length());
     }
 
     @Test

@@ -140,6 +140,7 @@ final class TestRunService {
                 JdbcUrlSanitizer.sanitize(connection.getJdbcUrl()), driver.getName(),
                 driver.getVendor(),
                 driver.getVersion(), driver.getDriverClass(), driver.getPackageFingerprint());
+            run.setName(request.name() == null || request.name().isBlank() ? null : request.name().strip());
             run.setTotalCases(selection.scenarios().size());
             var execution = new java.util.LinkedHashMap<String, Object>();
             execution.put("testDomain", "JDBC_CONTRACT");
@@ -231,7 +232,7 @@ final class TestRunService {
         }
         var pageable = page(page, size, sort, RUN_SORTS, "createdAt,desc");
         return transactions.execute(tx -> {
-            var value = statusGroup != null ? runs.findByStatusIn(statusGroup.statuses(), pageable)
+            var value = statusGroup != null ? runs.findAll(groupFilter(statusGroup), pageable)
                 : status == null ? runs.findAll(pageable) : runs.findByStatus(status, pageable);
             return new PageResponse<>(
                 value.getContent().stream().map(item -> response(item, moduleIds(item.getId())))
@@ -386,9 +387,33 @@ final class TestRunService {
             .map(TestRunSelectedScenarioEntity::getModuleId).distinct().toList();
     }
 
+    private org.springframework.data.jpa.domain.Specification<TestRunEntity> groupFilter(
+        TestRunStatusGroup group) {
+        if (group != TestRunStatusGroup.COMPLETED && group != TestRunStatusGroup.ABNORMAL) {
+            return (root, query, builder) -> root.get("status").in(group.statuses());
+        }
+        // Only legacy failure candidates need evidence interpretation. Count and page use the same
+        // database predicate; do not filter an already paginated response or mutate old records.
+        var completedIds = runs.findCaseFailureCandidates().stream()
+            .filter(run -> RunExecutionOutcome.historicalCaseFailure(run,
+                ExecutionAccounting.of(run, selected.findByRun_IdOrderByScenarioId(run.getId()))))
+            .map(TestRunEntity::getId).toList();
+        return (root, query, builder) -> {
+            var states = root.get("status").in(group.statuses());
+            if (completedIds.isEmpty()) {
+                return states;
+            }
+            var completed = root.get("id").in(completedIds);
+            return group == TestRunStatusGroup.COMPLETED ? builder.or(states, completed)
+                : builder.and(states, builder.not(completed));
+        };
+    }
+
     private TestRunResponse response(TestRunEntity run, List<String> moduleIds) {
         Long duration = run.getStartedAt() == null ? null : Duration.between(run.getStartedAt(),
             run.getFinishedAt() == null ? Instant.now() : run.getFinishedAt()).toMillis();
+        var accounting = ExecutionAccounting.of(run,
+            selected.findByRun_IdOrderByScenarioId(run.getId()));
         return new TestRunResponse(run.getId(), run.getStatus(), run.getProfile(),
             new TestRunResponse.ConnectionSnapshot(run.getConnectionNameSnapshot(),
                 run.getDatabaseTypeSnapshot(), run.getAdapterIdSnapshot(),
@@ -400,10 +425,18 @@ final class TestRunService {
             run.getSkipped(), run.getCurrentModule(), run.getCurrentTestCase(), run.getCreatedAt(),
             run.getStartedAt(), run.getFinishedAt(), duration,
             JdbcUrlSanitizer.sanitize(run.getFailureReason()),
-            ExecutionAccounting.of(run, selected.findByRun_IdOrderByScenarioId(run.getId())),
+            accounting,
             scopeSnapshot(run), issueSnapshot(run), cleanupSnapshot(run), selectionSnapshot(run),
             contractSummary(run), adapterSnapshot(run),
-            frozenSqlPackage(run));
+            frozenSqlPackage(run), run.getWorkerTerminationReason(), run.isWorkerReportValidated(),
+            run.getExecutionInput() == null ? null
+                : new tools.jackson.databind.ObjectMapper().readTree(run.getExecutionInput())
+                    .path("adapterExecution").path("dialect").asString(null), run.getName(),
+            RunExecutionOutcome.of(run, accounting),
+            RunExecutionOutcome.historicalCaseFailure(run, accounting), run.getWorkerArtifactSha256(),
+            run.getWorkerExitCode(),
+            run.getWorkerFinalEvent() == null ? null
+                : new tools.jackson.databind.ObjectMapper().readTree(run.getWorkerFinalEvent()));
     }
 
     @SuppressWarnings("unchecked")

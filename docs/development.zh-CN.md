@@ -378,11 +378,11 @@ CLI 可通过 `db.driver` 指定其他固定版本（`kind: "maven"`、`coordina
 
 模块与配置的场景数量以当前目录为准；CUSTOM 自选模块/场景。这些目录数量不是已验证通过的数量。新任务要求明确授权范围和 `destructiveConsent: true`。入队时冻结场景选择和非敏感执行输入，不自动重新验证驱动或探测连接。
 
-历史列表支持 `statusGroup=WAITING`（QUEUED）、`IN_PROGRESS`（PREPARING、历史 PROBING、RUNNING、GENERATING_REPORT）、`COMPLETED`（SUCCEEDED）、`ABNORMAL`（FAILED、INTERRUPTED）、`CANCELLED`（CANCELLED）。两者都不传则查询全部；旧 `status` 精确查询继续有效。两者同时使用返回 HTTP 400 / `CONFLICTING_STATUS_FILTERS`；分组非法或为空返回 HTTP 400 / `INVALID_STATUS_GROUP`。分组条件在数据库分页及计数之前生效。响应保留内部状态，无需迁移历史数据。当前执行转换没有进入 PROBING 的路径，仍保留其历史显示与筛选兼容。
+运行记录支持 `statusGroup=WAITING`（QUEUED）、`IN_PROGRESS`（PREPARING、历史 PROBING、RUNNING、GENERATING_REPORT）、`COMPLETED`（正常执行完成，包含未通过用例）、`ABNORMAL`（执行、报告异常或中断）、`CANCELLED`。两者都不传查询全部。旧 `status` 精确查询保留原始状态语义；同时传入两种筛选返回 HTTP 400 / `CONFLICTING_STATUS_FILTERS`，分组非法或为空返回 `INVALID_STATUS_GROUP`。分组在数据库分页与计数前生效。历史协议 2 的 TEST_FAILURE 必须同时具备报告校验、完整执行计数、无独立执行问题、清理成功且已保留退出码无矛盾等证据，才生成只读的已完成结论。历史原始状态及报告不改写；列表、详情、报告摘要返回一致的 `executionOutcome`。旧 ACTIVE/ENDED 聚合组保留接口兼容，界面不再提供。
 
-正常状态：`QUEUED → PREPARING → RUNNING → GENERATING_REPORT → SUCCEEDED`。失败、取消和恢复分别进入 `FAILED`、`CANCELLED`、`INTERRUPTED`。本地 FIFO 调度器限制并发 Worker，工作目录为 `<data-dir>/runs/<run-id>`。任务行锁防止迟到结果与取消竞态覆盖终态。超时为 `FAILED / RUN_TIMEOUT`，进程清理完成前仍占用调度名额。用户主标签使用生命周期分组，活动阶段及已记录的异常原因另行显示。SUCCEEDED 显示“已完成”，不表示所有用例通过：现有完成检查仍拒绝失败断言和非允许型中止，契约明确允许的不支持则可正常完成。结果统计和证据保留原意，异常结束也可包含部分有效结果。展示分组不参与状态转换、终态判断、取消、轮询或 SSE 控制。
+正常状态：`QUEUED → PREPARING → RUNNING → GENERATING_REPORT → SUCCEEDED`。执行异常、取消与恢复分别进入 `FAILED`、`CANCELLED`、`INTERRUPTED`。本地 FIFO 调度器限制并发 Worker，工作目录为 `<data-dir>/runs/<run-id>`；行锁防止迟到结果与取消竞态覆盖终态。超时为 `FAILED / RUN_TIMEOUT`，进程清理结束前仍占用名额。SUCCEEDED 表示执行及报告处理正常完成，不表示用例全部通过；用例状态与契约结论独立保留。有未通过用例时界面明确显示“已完成 · 存在未通过用例”；100% 已处理不提前结束报告生成阶段。展示分组不参与状态转换、终态判断、取消、轮询或 SSE 控制。
 
-Server 在成功前核对事件、报告条目和数量。报告无效或不一致时返回 `REPORT_INCONSISTENT`；除明确允许的不支持外，即使退出码为 0，FAILED/ABORTED 结果仍导致 `WORKER_EXECUTION_FAILED`。报告 DTO 为 `{summary, failures}`。协议 v2 可从持久证据重建原始 JSON，通过 `source` 和 `workerReportValidated` 标明边界。统计规则见[执行安全](execution-safety.zh-CN.md)。
+Server 在成功前严格核对事件、报告条目、选择范围、计数、执行问题和清理。协议 2 中，Worker 退出 4 / FAILED / TEST_FAILURE 也用于普通用例未通过；仅在实际退出 4、报告校验通过、TEST_FAILURE、无独立执行问题且清理成功时，任务按正常执行完成处理。其他非零退出、报告无效或不一致（`REPORT_INCONSISTENT`）、独立执行问题和清理失败仍为异常。新任务保存实际退出码、脱敏最终事件、Worker 声明的终止原因（与报告校验结论独立）、Worker 制品 SHA-256 及原有执行证据。报告 DTO 为 `{summary, failures}`；由持久证据重建的协议 2 JSON 通过 `source`、`workerReportValidated` 标明边界。创建请求可传 `name`（最多 200 字符），通过 V12 新增列持久化；界面提供可修改默认值。旧无名记录仅按连接、测试选择与时间生成显示名称，不批量改写。统计规则见[执行安全](execution-safety.zh-CN.md)。
 
 ### 测试范围与执行语义（选择版本 2）
 

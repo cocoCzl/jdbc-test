@@ -6,7 +6,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface TestRunRepository extends JpaRepository<TestRunEntity, UUID> {
+public interface TestRunRepository extends JpaRepository<TestRunEntity, UUID>,
+    org.springframework.data.jpa.repository.JpaSpecificationExecutor<TestRunEntity> {
 
     @org.springframework.data.jpa.repository.Query("select run from TestRunEntity run where run.status = :status")
     Page<TestRunEntity> findByStatus(
@@ -17,6 +18,12 @@ public interface TestRunRepository extends JpaRepository<TestRunEntity, UUID> {
     @org.springframework.data.jpa.repository.Query("select run from TestRunEntity run where run.id = :id")
     java.util.Optional<TestRunEntity> findForUpdate(
         @org.springframework.data.repository.query.Param("id") UUID id);
+
+    @org.springframework.data.jpa.repository.Query("select run from TestRunEntity run where "
+        + "run.status = com.jdbctest.server.run.TestRunStatus.FAILED "
+        + "and run.workerReportValidated = true and run.workerTerminationReason = 'TEST_FAILURE' "
+        + "and run.failureReason in ('TEST_FAILURE', 'WORKER_EXECUTION_FAILED')")
+    List<TestRunEntity> findCaseFailureCandidates();
 
     long countByDriver_Id(UUID driverId);
 
