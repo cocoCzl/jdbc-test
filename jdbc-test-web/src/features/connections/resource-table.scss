@@ -14,7 +14,13 @@
   .resource-primary-link:hover { text-decoration: underline; text-underline-offset: 3px; }
   .resource-cell-text { color: var(--foreground); font-size: 12.5px; line-height: 1.4; overflow-wrap: anywhere; }
   .resource-code { font-size: 12px; font-weight: 400; line-height: 1.45; overflow-wrap: anywhere; }
-  .resource-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 4px; }
+  :is(th, td):last-child {
+    width: var(--resource-action-width);
+    padding-inline: 12px;
+    text-align: center;
+    vertical-align: middle;
+  }
+  .resource-actions { display: flex; align-items: center; justify-content: center; gap: 8px; }
   .resource-url-line { min-width: 0; }
   .resource-url-line > div {
     display: flex;
@@ -34,23 +40,23 @@
 }
 
 .resource-table--drivers {
-  th:nth-child(1) { width: 20%; }
-  th:nth-child(2) { width: 13%; }
-  th:nth-child(3) { width: 22%; }
-  th:nth-child(4) { width: 11%; }
-  th:nth-child(5) { width: 7%; }
-  th:nth-child(6) { width: 14%; }
-  th:nth-child(7) { width: 13%; }
-  :is(th, td):nth-child(5), :is(th, td):nth-child(6), :is(th, td):nth-child(7) { text-align: right; }
+  --resource-action-width: 128px;
+  th:nth-child(1) { width: calc((100% - var(--resource-action-width)) * .23); }
+  th:nth-child(2) { width: calc((100% - var(--resource-action-width)) * .15); }
+  th:nth-child(3) { width: calc((100% - var(--resource-action-width)) * .26); }
+  th:nth-child(4) { width: calc((100% - var(--resource-action-width)) * .13); }
+  th:nth-child(5) { width: calc((100% - var(--resource-action-width)) * .08); }
+  th:nth-child(6) { width: calc((100% - var(--resource-action-width)) * .15); }
+  :is(th, td):nth-child(5), :is(th, td):nth-child(6) { text-align: right; }
 }
 
 .resource-table--connections {
-  th:nth-child(1) { width: 14%; }
-  th:nth-child(2) { width: 10%; }
-  th:nth-child(3) { width: 25%; }
-  th:nth-child(4) { width: 13%; }
-  th:nth-child(5) { width: 12%; }
-  th:nth-child(6) { width: 11%; }
-  th:nth-child(7) { width: 15%; }
-  :is(th, td):nth-child(6), :is(th, td):nth-child(7) { text-align: right; }
+  --resource-action-width: 176px;
+  th:nth-child(1) { width: calc((100% - var(--resource-action-width)) * .16); }
+  th:nth-child(2) { width: calc((100% - var(--resource-action-width)) * .12); }
+  th:nth-child(3) { width: calc((100% - var(--resource-action-width)) * .28); }
+  th:nth-child(4) { width: calc((100% - var(--resource-action-width)) * .15); }
+  th:nth-child(5) { width: calc((100% - var(--resource-action-width)) * .15); }
+  th:nth-child(6) { width: calc((100% - var(--resource-action-width)) * .14); }
+  :is(th, td):nth-child(6) { text-align: right; }
 }

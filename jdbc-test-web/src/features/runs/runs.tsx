@@ -1,3 +1,4 @@
+import "./run-detail.scss";
 import { Card } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { t } from "i18next";
@@ -27,9 +28,10 @@ export default function Runs() {
   const query = useQuery({
     queryKey: runsKeys.list(params),
     queryFn: ({ signal }) => runsApi.list(params, signal),
+    refetchInterval: 10_000,
   });
   return (
-    <Card as="section" className="panel overflow-hidden p-0" aria-busy={query.isFetching}>
+    <Card as="section" className="panel run-history-panel overflow-hidden p-0" aria-busy={query.isFetching}>
       <div className="run-history-panel-header">
         <div>
           <h1 className="page-title">{t("ui.runHistory")}</h1>
@@ -100,7 +102,7 @@ export default function Runs() {
               />
             }
           />
-          <Pagination {...query.data} onPage={setPage} />
+          {query.data.totalElements > 0 ? <Pagination {...query.data} onPage={setPage} /> : null}
         </>
       )}
     </Card>

@@ -21,7 +21,10 @@ import {
 import { driverPresentation } from "@/lib/status";
 import { formatBytes, formatDateTime } from "@/lib/format";
 import type { Driver, DriverInput } from "@/types/api";
+import { DialectField } from "./dialect-field";
 import { DataSourceFields } from "./data-source-fields";
+import { DriverCheckResult } from "./driver-check-result";
+import { ResourceTechnicalInfo } from "@/components/resource-technical-info";
 
 function MetadataForm({
   driver,
@@ -38,6 +41,7 @@ function MetadataForm({
     driverClass: driver.driverClass,
     urlPrefix: driver.urlPrefix ?? "",
     dataSources: driver.dataSources ?? {},
+    defaultSqlDialect: driver.defaultSqlDialect ?? "",
   });
   const [error, setError] = useState<string | Error | null>(null);
   const client = useQueryClient();
@@ -72,10 +76,12 @@ function MetadataForm({
                 vendor: t("ui.vendor"),
                 version: t("ui.registeredDriverVersion"),
                 driverClass: t("ui.driverClass"),
-                urlPrefix: t("ui.urlPrefix"),
+                urlPrefix: t("ui.jdbcURLPrefix"),
               }[key]
             }
             required={key !== "urlPrefix"}
+            hint={key === "urlPrefix" ? t("driverPreset.urlPrefixHint") : undefined}
+            placeholder={key === "urlPrefix" ? "jdbc:kingbase8:" : undefined}
             value={form[key] ?? ""}
             onChange={(event) =>
               setForm((previous) => ({
@@ -86,7 +92,9 @@ function MetadataForm({
           />
         ))}
       </div>
-      <DataSourceFields value={form.dataSources ?? {}}
+      <DialectField driverDefault value={form.defaultSqlDialect ?? ""}
+        onChange={value => setForm(previous => ({ ...previous, defaultSqlDialect: value }))} />
+      <DataSourceFields title={t("ui.driverAdvancedInterfaces")} value={form.dataSources ?? {}}
         onChange={(dataSources) => setForm((previous) => ({ ...previous, dataSources }))} />
       <FormError message={error} />
       <div className="flex gap-2">
@@ -141,7 +149,7 @@ export default function DriverDetail() {
         title={driver.name}
         description={`${driver.vendor} · ${t("ui.registeredDriverVersion")}: ${driver.version}`}
         action={
-          <div className="flex gap-2">
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto">
             <Button variant="outline" onClick={() => setEditing(!editing)}>
               {t("ui.editMetadata")}</Button>
             <Button
@@ -153,130 +161,92 @@ export default function DriverDetail() {
           </div>
         }
       />
-      <div className="space-y-6">
+      <div className="space-y-4">
+        <FormError message={validate.error} />
+        {validate.isSuccess && validate.data ? (
+          <DriverCheckResult driver={driver} result={validate.data} />
+        ) : null}
         {editing ? (
           <MetadataForm driver={driver} close={() => setEditing(false)} />
         ) : null}
-        <Card as="section" className="panel">
-          <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">{t("ui.driverPackage")}</h2>
+        <Card as="section" className="panel min-w-0">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-semibold">{t("ui.driverBasicInfo")}</h2>
             <StatusBadge {...driverPresentation[driver.status]} />
           </div>
-          <dl className="grid gap-6 text-sm md:grid-cols-3">
-            {Object.entries({
-              [t("ui.driverClass")]: driver.driverClass,
-              [t("ui.jdbcURLPrefix")]: driver.urlPrefix ?? "—",
-              DataSource: driver.dataSources?.dataSource?.className ?? "—",
-              ConnectionPoolDataSource: driver.dataSources?.connectionPoolDataSource?.className ?? "—",
-              XADataSource: driver.dataSources?.xaDataSource?.className ?? "—",
-              [t("ui.source")]: t(`driverSource.${driver.sourceType}`),
-              [t("ui.created")]: formatDateTime(driver.createdAt),
-              [t("ui.updated")]: formatDateTime(driver.updatedAt),
-              [t("ui.registeredDriverVersion")]: driver.version,
-            }).map(([label, value]) => (
-              <div key={label}>
-                <dt className="mb-2 text-muted-foreground">{label}</dt>
-                <dd className="break-all">{value}</dd>
+          <dl className="grid gap-x-6 gap-y-4 text-sm md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)]">
+            {[
+              [t("ui.driverClass"), driver.driverClass],
+              [t("ui.jdbcURLPrefix"), driver.urlPrefix ?? "—"],
+              [t("ui.defaultSqlDialect"), driver.defaultSqlDialect
+                ? t(`driverPreset.${driver.defaultSqlDialect}`) : t("connection.followConnection")],
+            ].map(([label, value]) => (
+              <div key={label} className="min-w-0">
+                <dt className="text-muted-foreground">{label}</dt>
+                <dd className="mt-1 break-all font-medium">{value}</dd>
               </div>
             ))}
           </dl>
-          <div className="mt-6 border-t pt-5">
-            <p className="text-sm text-muted-foreground">{t("ui.packageFingerprint")}</p>
-            <div className="flex items-center gap-2">
-              <code className="break-all text-xs">
-                {driver.packageFingerprint ?? "—"}
-              </code>
-              {driver.packageFingerprint ? (
-                <CopyButton
-                  value={driver.packageFingerprint}
-                  label={t("ui.fingerprintInline")}
-                />
-              ) : null}
-            </div>
-          </div>
-        </Card>
-        <FormError message={validate.error} />
-        {validate.isSuccess && validate.data ? (
-          <Card as="section" role="status" className="panel border-success/20">
-            <h2 className="font-semibold text-success">
-              {t("ui.validatedInAnIsolatedWorker")}</h2>
-            <p className="mt-2 text-sm">{validate.data.driverClass}</p>
-            <p className="mt-2 text-sm">
-              {t("ui.driverReportedVersion")}: {validate.data.majorVersion}.{validate.data.minorVersion}
-            </p>
-            <p className="mt-2 text-xs text-muted-foreground">{t("ui.driverApiVersionSource")}</p>
-            {validate.data.majorVersion === 0 && validate.data.minorVersion === 0 ? (
-              <p className="mt-2 text-sm text-warning">{t("ui.driverZeroVersionHint")}</p>
-            ) : null}
-            <p className="mt-2 text-sm">{t("ui.driverReportedCompliance")}: {validate.data.jdbcCompliant ? t("ui.yes") : t("ui.no")}</p>
-            <p className="mt-2 text-xs text-muted-foreground">{t("ui.driverComplianceSource")}</p>
-            <dl className="mt-4 grid gap-4 text-sm md:grid-cols-2">
+          <dl className="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t pt-3 text-xs text-muted-foreground">
+            {[
+              [t("ui.source"), t(`driverSource.${driver.sourceType}`)],
+              [t("ui.created"), formatDateTime(driver.createdAt)],
+              [t("ui.updated"), formatDateTime(driver.updatedAt)],
+            ].map(([label, value]) => (
+              <div key={label} className="flex flex-wrap gap-x-2">
+                <dt>{label}</dt><dd>{value}</dd>
+              </div>
+            ))}
+          </dl>
+          <details className="mt-3 border-t pt-3" aria-labelledby="driver-advanced-interfaces-title">
+            <summary id="driver-advanced-interfaces-title" className="cursor-pointer text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-4">
+              {t("ui.driverAdvancedInterfaces")}
+            </summary>
+            <dl className="mt-3 grid gap-3 text-sm md:grid-cols-3">
               {Object.entries({
-                [t("ui.driverDefiningArtifact")]: driver.artifacts.find(item => item.sha256 === validate.data?.loadedArtifact?.sha256)?.fileName
-                  ?? validate.data.loadedArtifact?.fileName ?? t("ui.driverMetadataNotProvided"),
-                "SHA-256": validate.data.loadedArtifact?.sha256 ?? t("ui.driverMetadataNotProvided"),
-                "JAR manifest · Implementation-Version": validate.data.loadedArtifact?.implementationVersion ?? t("ui.driverMetadataNotProvided"),
-                "JAR manifest · Bundle-Version": validate.data.loadedArtifact?.bundleVersion ?? t("ui.driverMetadataNotProvided"),
+                DataSource: driver.dataSources?.dataSource?.className,
+                ConnectionPoolDataSource: driver.dataSources?.connectionPoolDataSource?.className,
+                XADataSource: driver.dataSources?.xaDataSource?.className,
               }).map(([label, value]) => (
-                <div key={label}>
-                  <dt className="text-muted-foreground">{label}</dt>
-                  <dd className="mt-1 break-all">{value}</dd>
+                <div key={label} className="min-w-0">
+                  <dt className="break-all text-muted-foreground">{label}</dt>
+                  <dd className="mt-1 break-all">{value ?? t("ui.driverInterfaceNotConfigured")}</dd>
                 </div>
               ))}
             </dl>
-            <p className="mt-2 text-xs text-muted-foreground">
-              {t("ui.metadataFromThisValidationResponseNotA")}</p>
-            {validate.data.warnings?.length ? (
-              <div role="alert" className="mt-4 text-sm text-warning">
-                <h3 className="font-semibold">{t("ui.driverValidatedWithWarnings")}</h3>
-                <ul className="mt-2 list-disc space-y-2 pl-5">
-                  {validate.data.warnings.map((warning) => (
-                    <li key={warning}>{t(`driverWarning.${warning}`, {
-                      defaultValue: t("ui.driverDependencyWarning"),
-                    })}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-          </Card>
-        ) : null}
-        <Card as="section" className="panel">
-          <h2 className="mb-5 text-lg font-semibold">{t("ui.artifacts")}</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b text-xs text-muted-foreground">
-                <tr>
-                  <th className="py-3">{t("ui.filename")}</th>
-                  <th>{t("ui.size")}</th>
-                  <th>SHA-256</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {driver.artifacts.map((artifact) => (
-                  <tr key={artifact.id}>
-                    <td className="py-4 pr-4">{artifact.fileName}</td>
-                    <td className="whitespace-nowrap pr-4">
-                      {formatBytes(artifact.size)}
-                    </td>
-                    <td>
-                      <div className="flex items-center">
-                        <code className="break-all text-xs">
-                          {artifact.sha256}
-                        </code>
-                        <CopyButton
-                          value={artifact.sha256}
-                          label={`${artifact.fileName} SHA-256`}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <p className="mt-5 text-xs text-muted-foreground">
-            {t("ui.binaryArtifactsAreImmutableToReplaceA")}</p>
+          </details>
         </Card>
+        <Card as="section" className="panel min-w-0" aria-labelledby="driver-artifacts-title">
+          <h2 id="driver-artifacts-title" className="mb-3 font-semibold">{t("ui.artifacts")}</h2>
+          <ul className="divide-y">
+            {driver.artifacts.map((artifact) => (
+              <li key={artifact.id} className="flex items-start justify-between gap-3 py-2 text-sm">
+                <span className="min-w-0 break-all font-medium">{artifact.fileName}</span>
+                <span className="shrink-0 text-muted-foreground">{formatBytes(artifact.size)}</span>
+              </li>
+            ))}
+          </ul>
+          <details className="mt-3 border-t pt-3" aria-labelledby="driver-fingerprints-title">
+            <summary id="driver-fingerprints-title" className="cursor-pointer text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-4">
+              {t("ui.driverFingerprints")}
+            </summary>
+            <dl className="mt-3 space-y-3 text-sm">
+              {[
+                [t("ui.packageFingerprint"), driver.packageFingerprint],
+                ...driver.artifacts.map(artifact => [`${artifact.fileName} · SHA-256`, artifact.sha256]),
+              ].map(([label, value]) => (
+                <div key={label} className="min-w-0">
+                  <dt className="break-all text-muted-foreground">{label}</dt>
+                  <dd className="mt-1 flex items-start gap-2">
+                    <code className="min-w-0 break-all text-xs">{value ?? "—"}</code>
+                    {value ? <CopyButton value={value} label={label!} /> : null}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </details>
+        </Card>
+        <ResourceTechnicalInfo id={driver.id} />
         <Button variant="destructive" onClick={() => setDeleting(true)}>
           {t("ui.deleteDriverPackage")}</Button>
       </div>

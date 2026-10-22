@@ -84,10 +84,10 @@ test("REAL PostgreSQL browser flow: external Driver → Statement/Connection →
   const driver = (await uploaded.json()) as Driver;
   expect(driver.packageFingerprint).toMatch(/^[a-f0-9]{64}$/);
   expect(driver.artifacts).toHaveLength(1);
-  await page.getByRole("button", { name: "Validate driver" }).click();
-  await expect(page.getByText("Driver loaded and metadata read in an isolated Worker")).toBeVisible();
+  await page.getByRole("button", { name: "Check driver files" }).click();
+  await expect(page.getByText("Load check passed")).toBeVisible();
   await page.reload();
-  await expect(page.getByRole("button", { name: "Validate driver" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Check driver files" })).toBeVisible();
   await page.getByRole("link", { name: "Connections", exact: true }).click();
   await page
     .getByRole("link", { name: "Add connection", exact: true })
@@ -118,14 +118,13 @@ test("REAL PostgreSQL browser flow: external Driver → Statement/Connection →
   await expect(page.getByText(/PostgreSQL JDBC Driver/)).toContainText(
     process.env.JDBC_TEST_E2E_DRIVER_VERSION ?? "42.7.5",
   );
-  await expect(page.getByLabel("Password", { exact: true })).toHaveValue("");
-  await page.getByLabel("Password", { exact: true }).fill(password);
-  await page.getByLabel("Save password", { exact: true }).check();
+  await expect(page.getByLabel("Password", { exact: true })).toHaveValue(password);
+  await expect(page.getByLabel("Save password", { exact: true })).toBeChecked();
   await page.getByRole("button", { name: "Save connection" }).click();
-  await expect(page.getByText("Saved password available")).toBeVisible();
+  await expect(page.getByText("Password saved")).toBeVisible();
   const connectionId = page.url().split("/").at(-1)!;
   await page.reload();
-  await expect(page.getByText("Saved password available")).toBeVisible();
+  await expect(page.getByText("Password saved")).toBeVisible();
   const catalogResponse = await request.get("/api/test-catalog");
   expect(catalogResponse.status()).toBe(200);
   const catalog = await catalogResponse.json() as Catalog;

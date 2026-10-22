@@ -1,10 +1,9 @@
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { adapterStatus } from "@/lib/presentation";
 import { t } from "i18next";
 import { useTranslation } from "react-i18next";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -22,7 +21,6 @@ import { ConfirmDialog } from "@/components/ui/alert-dialog";
 import {
   ErrorState,
   Field,
-  FormError,
   PendingPage,
   PageHeader,
   ProbeResult,
@@ -30,13 +28,16 @@ import {
 } from "@/components/common";
 import { connectionPresentation } from "@/lib/status";
 import { formatDateTime } from "@/lib/format";
-import { AdapterDetails } from "./adapter-details";
+import { DialectField } from "@/features/drivers/dialect-field";
+import { ProbeError } from "./probe-error";
+import { ResourceTechnicalInfo } from "@/components/resource-technical-info";
 function Editor({ connection }: { connection?: Connection }) {
   useTranslation();
   const navigate = useNavigate();
   const [search] = useSearchParams();
   const client = useQueryClient();
   const [form, setForm] = useState({
+    sqlDialect: connection?.sqlDialect ?? "",
     name: connection?.name ?? "",
     executionDatabase: connection?.executionDatabase ?? "",
     executionSchema: connection?.executionSchema ?? "",
@@ -51,10 +52,16 @@ function Editor({ connection }: { connection?: Connection }) {
   );
   const [password, setPassword] = useState("");
   const [emptyPassword, setEmptyPassword] = useState(false);
-  const [savePassword, setSavePassword] = useState(false);
+  const [savePassword, setSavePassword] = useState(true);
   const [clearSavedPassword, setClearSavedPassword] = useState(false);
   const [probe, setProbe] = useState<Probe | null>(null);
   const [error, setError] = useState<string | Error | null>(null);
+  const dialectEdited = useRef(false);
+  const databaseTypeEdited = useRef(false);
+  const formElement = useRef<HTMLFormElement>(null);
+  // Keep submitted credentials out of the mutation cache and browser storage.
+  const requestDraft = useRef<{ form: typeof form; password: string } | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [deleting, setDeleting] = useState(false);
   const adapters = useQuery({
     queryKey: adapterKeys.all,
@@ -62,45 +69,79 @@ function Editor({ connection }: { connection?: Connection }) {
     staleTime: 300_000,
   });
   const selectedAdapter = adapters.data?.find((item) => item.id === form.adapterId);
-  const change = (key: keyof typeof form, value: string) =>
+  const compatibleType = form.databaseType === "compatible" || (!!form.databaseType && !!selectedAdapter
+    && form.databaseType !== selectedAdapter.id && form.databaseType !== selectedAdapter.name);
+  const clearFieldError = (key: string) => setFieldErrors(previous => {
+    const next = { ...previous };
+    delete next[key];
+    return next;
+  });
+  const change = (key: keyof typeof form, value: string) => {
     setForm((previous) => ({ ...previous, [key]: value }));
+    clearFieldError(key);
+  };
+  const readDraft = () => {
+    const current = { ...form };
+    const fields = { name: "connection-name", jdbcUrl: "jdbc-url", username: "username",
+      executionDatabase: "execution-database", executionSchema: "execution-schema", description: "description" } as const;
+    for (const key of Object.keys(fields) as (keyof typeof fields)[]) {
+      const input = formElement.current?.elements.namedItem(fields[key]);
+      if (input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement) current[key] = input.value;
+    }
+    const input = formElement.current?.elements.namedItem("password");
+    return { form: current, password: input instanceof HTMLInputElement ? input.value : password };
+  };
+  const syncDraft = () => {
+    const draft = readDraft();
+    setForm(draft.form);
+    setPassword(draft.password);
+    setFieldErrors(previous => {
+      const next = { ...previous };
+      for (const key of Object.keys(draft.form) as (keyof typeof form)[]) {
+        if (draft.form[key] !== form[key]) delete next[key];
+      }
+      if (draft.password !== password) delete next.password;
+      return next;
+    });
+    return draft;
+  };
   const save = useMutation({
     mutationFn: () => {
+      const draft = requestDraft.current!;
       const input: ConnectionInput = {
-        ...form,
+        ...draft.form,
+        sqlDialect: draft.form.sqlDialect || selectedAdapter?.dialect,
         defaultDriverId: driver!.id,
         savePassword,
         ...(connection ? { clearSavedPassword } : {}),
-        ...(savePassword && (password || emptyPassword) ? { password: emptyPassword ? "" : password } : {}),
+        ...(savePassword && (draft.password || emptyPassword) ? { password: emptyPassword ? "" : draft.password } : {}),
       };
       return connection
         ? connectionsApi.update(connection.id, input)
         : connectionsApi.create(input);
     },
     onSuccess: (result) => {
+      setPassword(""); setEmptyPassword(false);
       toast.success(connection ? t("ui.connectionUpdated") : t("ui.connectionCreated"));
       void client.invalidateQueries({ queryKey: connectionsKeys.all });
       navigate(`/connections/${result.id}`);
     },
     onError: (failure) => setError(failure instanceof Error ? failure : new Error()),
-    onSettled: () => { setPassword(""); setEmptyPassword(false); },
+    onSettled: () => { requestDraft.current = null; },
   });
   const test = useMutation({
-    mutationFn: () =>
-      connection
-        ? connectionsApi.testSaved(connection.id, emptyPassword ? "" : password || undefined)
-        : connectionsApi.testDraft({
-            ...form,
-            driverId: driver!.id,
-            password: emptyPassword ? "" : password || undefined,
-          }),
+    mutationFn: () => connectionsApi.testDraft({
+      ...requestDraft.current!.form,
+      ...(connection && !clearSavedPassword ? { savedConnectionId: connection.id } : {}),
+      driverId: driver!.id,
+      password: emptyPassword ? "" : requestDraft.current!.password || undefined,
+    }),
     onSuccess: (result) => {
       setProbe(result);
       toast.success(t("ui.connectionEstablished"));
-      void client.invalidateQueries({ queryKey: connectionsKeys.all });
     },
     onError: (failure) => setError(failure instanceof Error ? failure : new Error()),
-    onSettled: () => { setPassword(""); setEmptyPassword(false); },
+    onSettled: () => { requestDraft.current = null; },
   });
   const remove = useMutation({
     mutationFn: () => connectionsApi.delete(connection!.id),
@@ -123,239 +164,228 @@ function Editor({ connection }: { connection?: Connection }) {
         retry={() => void adapters.refetch()}
       />
     );
+  const dialectMismatch = !!form.sqlDialect && !!selectedAdapter && form.sqlDialect !== selectedAdapter.dialect;
+  const databaseRequired = selectedAdapter?.requiresDatabase !== false;
+  const schemaRequired = selectedAdapter?.namespaceSelection !== "catalog";
+  const conflictingMysqlSchema = !schemaRequired && !!form.executionSchema && form.executionSchema !== form.executionDatabase;
+  const passwordRequired = !connection && savePassword && !clearSavedPassword && !emptyPassword;
+  const fieldError = (key: string) => {
+    const value = fieldErrors[key];
+    return value?.startsWith("required.") ? t("connection.fieldRequired", { field: t(value.slice(9)) }) : value ? t(value) : undefined;
+  };
+  const validate = (saving: boolean, draft: { form: typeof form; password: string }) => {
+    const { form, password } = draft;
+    const errors: Record<string, string> = {};
+    const required = (key: string, value: string | undefined, label: string) => {
+      if (!value?.trim()) errors[key] = `required.${label}`;
+    };
+    if (saving) required("name", form.name, "ui.name");
+    if (!form.databaseType || (form.databaseType !== "compatible" && !selectedAdapter))
+      errors.databaseType = "connection.selectDatabaseType";
+    if (!selectedAdapter && form.databaseType === "compatible") errors.adapterId = "connection.selectCompatibilityAdapter";
+    if (!driver || driver.status !== "VALIDATED") errors.driver = "connection.selectDriver";
+    required("jdbcUrl", form.jdbcUrl, "ui.jdbcURL");
+    if (!emptyPassword && !password && !(connection?.hasSavedPassword && !clearSavedPassword) && (!saving || (!connection && savePassword)))
+      errors.password = "required.ui.password";
+    if (saving && selectedAdapter) {
+      if (databaseRequired) required("executionDatabase", form.executionDatabase, "ui.authorizedTestDatabase");
+      if (schemaRequired) required("executionSchema", form.executionSchema, "ui.authorizedTestSchema");
+      for (const key of [databaseRequired ? "executionDatabase" : null, schemaRequired ? "executionSchema" : null] as const) {
+        if (key && form[key] && !/^[A-Za-z][A-Za-z0-9_]{0,62}$/.test(form[key])) errors[key] = "connection.identifierError";
+      }
+      if (conflictingMysqlSchema) errors.executionSchema = "connection.mysqlScopeConflict";
+    }
+    if (saving && dialectMismatch) errors.sqlDialect = "errors.ADAPTER_DIALECT_UNSUPPORTED";
+    setFieldErrors(errors);
+    if (Object.keys(errors).length) {
+      const ids: Record<string, string> = { name: "connection-name", databaseType: "database-type", adapterId: "adapter",
+        driver: "default-driver", jdbcUrl: "jdbc-url", password: "password", sqlDialect: "sql-dialect", executionDatabase: "execution-database", executionSchema: "execution-schema" };
+      const firstError = Object.keys(ids).find(key => errors[key]);
+      if (firstError) document.getElementById(ids[firstError])?.focus();
+      return false;
+    }
+    return true;
+  };
+  const submit = (saving: boolean) => {
+    if (busy || requestDraft.current) return;
+    const draft = syncDraft();
+    setError(null);
+    if (!saving) setProbe(null);
+    if (!validate(saving, draft)) return;
+    requestDraft.current = draft;
+    if (saving) save.mutate();
+    else test.mutate();
+  };
   return (
     <>
       <PageHeader
         title={connection ? connection.name : t("ui.addAConnection")}
-        description={t("ui.connectionMetadataStaysOnThePlatformJDBC")}
-        action={
-          connection ? (
-            <Button asChild>
-              <Link to={`/runs/new?connectionId=${connection.id}`}>
-                {t("ui.startRun")}</Link>
-            </Button>
-          ) : undefined
-        }
+        description=""
+        action={connection ? (
+          <div className="w-full sm:w-auto">
+            <Button asChild><Link to={`/runs/new?connectionId=${connection.id}`}>{t("ui.startRun")}</Link></Button>
+          </div>
+        ) : undefined}
       />
       <form
-        className="grid grid-cols-1 max-w-6xl gap-6 xl:grid-cols-[minmax(0,1fr)_320px]"
+        ref={formElement}
+        className="max-w-4xl space-y-5"
+        noValidate
+        aria-busy={busy}
+        onAnimationStart={event => {
+          if (event.animationName === "jdbc-autofill-sync") syncDraft();
+        }}
         onSubmit={(event) => {
           event.preventDefault();
-          if (!driver) {
-            setError("ui.selectAValidatedDriverSentence");
-            return;
-          }
-          if (savePassword && !password && !emptyPassword) {
-            setError("ui.enterAPasswordToSaveOrUncheck");
-            return;
-          }
-          setError(null);
-          save.mutate();
+          submit(true);
         }}
       >
-        <div className="space-y-6">
-          <Card as="section" className="panel">
-            <h2 className="mb-5 text-lg font-semibold">{t("ui.connectionIdentity")}</h2>
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field
-                id="connection-name"
-                label={t("ui.name")}
-                required
-                maxLength={200}
-                value={form.name}
-                onChange={(event) => change("name", event.target.value)}
-                placeholder={t("ui.postgresqlTestWorkspace")}
-              />
-              <Field id="database-type" label={t("ui.databaseType")} hint={t("adapter.typeHint")}>
-                <Select id="database-type" required
-                  value={form.databaseType === "compatible" ? "compatible" : selectedAdapter?.id ?? ""}
-                  onValueChange={(value) => setForm(previous => ({ ...previous,
-                    databaseType: value === "compatible" ? value : adapters.data.find(item => item.id === value)?.name ?? value,
-                    adapterId: value === "compatible" ? "" : value,
-                  }))}>
-                  <option value="">{t("ui.selectAnAdapter")}</option>
-                  {adapters.data.map(adapter => <option key={adapter.id} value={adapter.id}>{adapter.name} · {adapterStatus(adapter.status)}</option>)}
-                  <option value="compatible">{t("adapter.compatibleType")}</option>
-                </Select>
-              </Field>
-              {form.databaseType === "compatible" ? <Field id="adapter" label={t("adapter.compatibleDialect")} hint={t("adapter.compatibleHint")}>
-                <Select id="adapter" required value={form.adapterId} onValueChange={value => change("adapterId", value)}>
-                  <option value="">{t("ui.selectAnAdapter")}</option>
-                  {adapters.data.map(adapter => <option key={adapter.id} value={adapter.id}>{adapter.name} · {adapter.dialect}</option>)}
-                </Select>
-              </Field> : null}
-              {connection && !selectedAdapter ? <p role="alert">{t("adapter.legacyConnection")}</p> : null}
+        <Card as="section" aria-label={t("ui.connectionIdentity")} className="space-y-5">
+          <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2">
+            <Field id="connection-name" label={t("ui.name")} error={fieldError("name")} required maxLength={200}
+              value={form.name} onChange={(event) => change("name", event.target.value)}
+              placeholder={t("ui.postgresqlTestWorkspace")} />
+            <Field id="database-type" label={t("ui.databaseType")} required error={fieldError("databaseType")}
+              hint={!selectedAdapter && !fieldErrors.databaseType ? t("connection.selectDatabaseType") : undefined}>
+              <Select id="database-type" required
+                value={compatibleType ? "compatible" : selectedAdapter?.id ?? ""}
+                onValueChange={(value) => { databaseTypeEdited.current = true; clearFieldError("databaseType"); clearFieldError("adapterId"); setForm(previous => ({ ...previous,
+                  databaseType: value === "compatible" ? value : adapters.data.find(item => item.id === value)?.name ?? value,
+                  adapterId: value === "compatible" ? "" : value,
+                })); }}>
+                <option value="">{t("connection.selectDatabaseType")}</option>
+                {adapters.data.map(adapter => <option key={adapter.id} value={adapter.id}>{adapter.name}</option>)}
+                <option value="compatible">{t("adapter.compatibleType")}</option>
+              </Select>
+            </Field>
+            {compatibleType ? (
               <div className="sm:col-span-2">
-                <AdapterDetails adapter={selectedAdapter} />
+                <Field id="adapter" label={t("adapter.compatibleDialect")} hint={t("connection.compatibleHint")} required error={fieldError("adapterId")}>
+                  <Select id="adapter" required value={form.adapterId} onValueChange={value => change("adapterId", value)}>
+                    <option value="">{t("connection.selectCompatibilityAdapter")}</option>
+                    {adapters.data.map(adapter => <option key={adapter.id} value={adapter.id}>{adapter.name} · {adapter.dialect}</option>)}
+                  </Select>
+                </Field>
               </div>
-              <DriverSelect
-                value={driver?.id ?? ""}
-                selected={driver}
-                onChange={setDriver}
-              />
-              <div className="sm:col-span-2">
-                <Field
-                  id="jdbc-url"
-                  label={t("ui.jdbcURL")}
-                  required
-                  maxLength={2000}
-                  value={form.jdbcUrl}
-                  onChange={(event) => change("jdbcUrl", event.target.value)}
-                  placeholder="jdbc:postgresql://localhost:5432/test"
-                  hint={t("ui.doNotIncludePasswordsOrTokensIn")}
-                />
-              </div>
-              <Field
-                id="username"
-                label={t("ui.username")}
-                maxLength={200}
-                value={form.username}
-                onChange={(event) => change("username", event.target.value)}
-              />
-              <Field id="execution-database" label={t("ui.authorizedTestDatabase")} maxLength={63}
-                value={form.executionDatabase} onChange={(event) => change("executionDatabase", event.target.value)}
-                hint={t(selectedAdapter?.requiresDatabase === false ? "adapter.databaseOptional" : "adapter.databaseRequired")} />
-              <Field id="execution-schema" label={t("ui.authorizedTestSchema")} maxLength={63}
-                value={form.executionSchema} onChange={(event) => change("executionSchema", event.target.value)}
-                hint={t(selectedAdapter?.namespaceSelection === "catalog" ? "adapter.schemaOptional" : "ui.requiredForSchemaBasedAdaptersUseOnly")} />
-              <Field
-                id="password"
-                label={
-                  connection
-                    ? t("ui.passwordLeaveBlankToKeepSavedCredential")
-                    : t("ui.password")
+            ) : null}
+            {connection && !selectedAdapter ? <p role="alert" className="text-sm text-destructive sm:col-span-2">{t("adapter.legacyConnection")}</p> : null}
+            <DriverSelect value={driver?.id ?? ""} selected={driver} onChange={value => {
+              setDriver(value);
+              clearFieldError("driver");
+              // A dialect (or vendor label) is not a database identity. Prefill only
+              // from one adapter's exact declared driver class, before a manual choice.
+              if (!connection && !databaseTypeEdited.current && !form.databaseType && "driverClass" in value) {
+                const matches = adapters.data.filter(adapter => adapter.driverClass && adapter.driverClass === value.driverClass);
+                if (matches.length === 1) {
+                  setForm(previous => ({ ...previous, databaseType: matches[0].name, adapterId: matches[0].id }));
+                  clearFieldError("databaseType"); clearFieldError("adapterId");
                 }
-                type="password"
-                autoComplete="new-password"
-                maxLength={2000}
-                value={password}
-                disabled={clearSavedPassword || emptyPassword}
-                onChange={(event) => setPassword(event.target.value)}
-                hint={t("ui.neverReturnedByTheAPIUsedIn")}
-              />
-            </div>
-            <div className="mt-5 space-y-3">
-              {connection?.hasSavedPassword ? (
-                <p className="text-sm text-success">{t("ui.savedPasswordAvailable")}</p>
-              ) : null}
-              <label className="flex items-center gap-2 text-sm">
+              }
+              if (!connection && !dialectEdited.current) change("sqlDialect", value.defaultSqlDialect ?? "");
+            }}
+              hint={t("connection.driverHint")} error={fieldError("driver")} />
+            <Field id="jdbc-url" label={t("ui.jdbcURL")} error={fieldError("jdbcUrl")} required maxLength={2000}
+              value={form.jdbcUrl} onChange={(event) => change("jdbcUrl", event.target.value)}
+              placeholder="jdbc:postgresql://localhost:5432/test" hint={t(selectedAdapter?.id === "oracle" ? "connection.oracleServiceHint" : "connection.urlHint")} />
+            <Field id="username" label={t("ui.username")} autoComplete="username" maxLength={200}
+              value={form.username} onChange={(event) => change("username", event.target.value)} />
+            <Field id="password"
+              label={t("ui.password")} required={passwordRequired} error={fieldError("password")}
+              hint={connection?.hasSavedPassword ? t("connection.keepPassword") : undefined}
+              type="password" autoComplete="current-password" maxLength={2000}
+              value={password} disabled={clearSavedPassword || emptyPassword}
+              onChange={(event) => { setPassword(event.target.value); clearFieldError("password"); }} />
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-3 text-sm">
+              {connection?.hasSavedPassword ? <p className="text-success">{t("ui.savedPasswordAvailable")}</p> : null}
+              <label className="flex items-center gap-2">
                 <input type="checkbox" checked={emptyPassword} disabled={clearSavedPassword}
-                  onChange={(event) => { setEmptyPassword(event.target.checked); setPassword(""); }} />
+                  onChange={(event) => { setEmptyPassword(event.target.checked); setPassword(""); clearFieldError("password"); }} />
                 {t("credentials.emptyPassword")}
               </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={savePassword}
-                  disabled={clearSavedPassword}
-                  onChange={(event) => setSavePassword(event.target.checked)}
-                  className="size-4 accent-primary"
-                />
-                {t("ui.savePassword")}</label>
-              {connection?.hasSavedPassword ? (
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={clearSavedPassword}
-                    onChange={(event) => {
-                      setClearSavedPassword(event.target.checked);
-                      setPassword("");
-                      setSavePassword(false);
-                      setEmptyPassword(false);
-                    }}
-                    className="size-4 accent-primary"
-                  />
-                  {t("ui.clearSavedPassword")}</label>
-              ) : null}
+              </div>
+            <DialectField value={form.sqlDialect || selectedAdapter?.dialect || ""}
+              hint={!selectedAdapter ? t("connection.dialectNeedsDatabaseType") : undefined}
+              error={dialectMismatch ? t("errors.ADAPTER_DIALECT_UNSUPPORTED") : undefined}
+              onChange={value => { dialectEdited.current = true; change("sqlDialect", value); }} />
+            {selectedAdapter ? <fieldset className="space-y-3 border-t pt-4 sm:col-span-2">
+              <legend className="text-sm font-medium">{t("connection.scope")}</legend>
+              <p className="text-xs text-muted-foreground">{t("connection.scopeHint")}</p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {databaseRequired ? <Field id="execution-database" label={t("ui.authorizedTestDatabase")} required
+                  error={fieldError("executionDatabase")} maxLength={63} value={form.executionDatabase}
+                  onChange={event => change("executionDatabase", event.target.value)} /> : null}
+                {schemaRequired || conflictingMysqlSchema ? <Field id="execution-schema" label={t("ui.authorizedTestSchema")} required={schemaRequired}
+                  error={fieldError("executionSchema")} maxLength={63} value={form.executionSchema}
+                  onChange={event => change("executionSchema", event.target.value)} /> : null}
+              </div>
+              {conflictingMysqlSchema ? <p role="alert" className="text-sm text-destructive">{t("connection.mysqlScopeConflict")}</p> : null}
+            </fieldset> : null}
+          </div>
+          <ProbeError error={error} />
+          {probe ? <ProbeResult result={probe} /> : null}
+          <div className="space-y-3 border-t pt-4">
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline"
+                disabled={busy}
+                onClick={() => submit(false)}>
+                {test.isPending ? t("ui.testingConnection") : t("ui.testConnection")}
+              </Button>
+              <Button disabled={busy}>
+                {save.isPending ? t("ui.saving") : t("ui.saveConnection")}
+              </Button>
             </div>
-            <div className="mt-5">
+            <p className="text-xs leading-relaxed text-muted-foreground">{t("connection.saveTestHint")}</p>
+          </div>
+          <details className="border-t pt-4">
+              <summary className="cursor-pointer text-sm font-medium">{t("connection.advanced")}</summary>
+              <div className="mt-3 flex flex-wrap gap-4 text-sm">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={savePassword} disabled={clearSavedPassword}
+                  onChange={(event) => setSavePassword(event.target.checked)} className="size-4 accent-primary" />
+                {t("ui.savePassword")}
+              </label>
+              {connection?.hasSavedPassword ? <label className="flex items-center gap-2">
+                <input type="checkbox" checked={clearSavedPassword} className="size-4 accent-primary"
+                  onChange={(event) => {
+                    setClearSavedPassword(event.target.checked);
+                    setPassword(""); setSavePassword(!event.target.checked); setEmptyPassword(false);
+                  }} />
+                {t("ui.clearSavedPassword")}
+              </label> : null}
+              </div>
+            </details>
+          <details className="border-t pt-4">
+            <summary className="cursor-pointer text-sm font-medium">{t("ui.descriptionOptional")}</summary>
+            <div className="mt-3">
               <Field id="description" label={t("ui.descriptionOptional")}>
-                <Textarea
-                  id="description"
-                  className="min-h-24"
-                  maxLength={1000}
-                  value={form.description}
-                  onChange={(event) =>
-                    change("description", event.target.value)
-                  }
-                />
+                <Textarea id="description" className="min-h-20" maxLength={1000} value={form.description}
+                  onChange={(event) => change("description", event.target.value)} />
               </Field>
             </div>
-          </Card>
-          {probe ? <ProbeResult result={probe} /> : null}
-          {connection ? (
-            <Card as="section" className="panel">
-              <h2 className="font-semibold">{t("ui.savedConnection")}</h2>
-              <p className="my-3 text-sm text-muted-foreground">
-                {t("ui.savedTestUsesPersistedSettingsSaveEdited")}</p>
-              {connection.lastConnectionTestStatus ? (
-                <StatusBadge
-                  {...connectionPresentation[
-                    connection.lastConnectionTestStatus
-                  ]}
-                />
-              ) : (
-                <p className="text-sm text-muted-foreground">{t("ui.notTestedYet")}</p>
-              )}
-              <p className="mt-3 text-xs text-muted-foreground">
+          </details>
+        </Card>
+        {connection ? <ResourceTechnicalInfo id={connection.id} /> : null}
+        {connection ? (
+          <Card as="section" className="flex flex-wrap items-center justify-between gap-4">
+            <div className="space-y-2 text-sm">
+              <h2 className="font-medium">{t("ui.savedConnection")}</h2>
+              {connection.lastConnectionTestStatus ? <StatusBadge {...connectionPresentation[connection.lastConnectionTestStatus]} />
+                : <p className="text-muted-foreground">{t("ui.notTestedYet")}</p>}
+              <p className="text-xs text-muted-foreground">
                 {t("ui.lastTest")}{formatDateTime(connection.lastConnectionTestAt)} {t("ui.updatedInline")}{formatDateTime(connection.updatedAt)}
               </p>
-              <Button
-                type="button"
-                variant="destructive"
-                className="mt-5"
-                onClick={() => setDeleting(true)}
-              >
-                {t("ui.deleteConnection")}</Button>
-            </Card>
-          ) : null}
-        </div>
-        <Card as="aside" className="panel h-fit space-y-5">
-          <p className="eyebrow">{t("ui.connectWithConfidence")}</p>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            {t("ui.savingAndTestingAreIndependentYouCan")}</p>
-          <FormError message={error} />
-          <Button className="w-full" disabled={busy || !selectedAdapter}>
-            {save.isPending ? t("ui.saving") : t("ui.saveConnection")}
-          </Button>
-          <Button
-            type="button"
-            className="w-full"
-            variant="outline"
-            disabled={
-              busy ||
-              !driver ||
-              (!connection &&
-                (!form.jdbcUrl || !form.adapterId || !form.databaseType))
-            }
-            onClick={() => {
-              setError(null);
-              setProbe(null);
-              test.mutate();
-            }}
-          >
-            {test.isPending
-              ? t("ui.testingConnection")
-              : connection
-                ? t("ui.testSavedConnection")
-                : t("ui.testConnection")}
-          </Button>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            {t("ui.afterARequestCompletesThePasswordInput")}</p>
-        </Card>
+            </div>
+            <Button type="button" variant="destructive" onClick={() => setDeleting(true)}>{t("ui.deleteConnection")}</Button>
+          </Card>
+        ) : null}
       </form>
-      <ConfirmDialog
-        open={deleting}
-        onOpenChange={setDeleting}
-        title={t("ui.deleteConnectionQuestion")}
+      <ConfirmDialog open={deleting} onOpenChange={setDeleting} title={t("ui.deleteConnectionQuestion")}
         description={t("ui.connectionsWithHistoricalTestRunReferencesCannot")}
-        label={t("ui.deleteConnection")}
-        pending={remove.isPending}
-        onConfirm={() => remove.mutate()}
-      />
+        label={t("ui.deleteConnection")} pending={remove.isPending} onConfirm={() => remove.mutate()} />
     </>
   );
 }
+
 export default function ConnectionForm() {
   const { id } = useParams();
   const query = useQuery({
@@ -370,6 +400,6 @@ export default function ConnectionForm() {
       <ErrorState error={query.error} retry={() => void query.refetch()} />
     );
   return (
-    <Editor key={`${id}-${query.data.updatedAt}`} connection={query.data} />
+    <Editor key={id} connection={query.data} />
   );
 }

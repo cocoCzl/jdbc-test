@@ -128,7 +128,7 @@ describe("Switching language preserves the workspace", () => {
     const user = userEvent.setup();
     const fetch = mockApi(url => url.pathname === "/api/runs" ? json(page([finishedRun], {totalPages: 3, totalElements: 45, page: Number(url.searchParams.get("page") ?? 0)})) : undefined);
     const view = renderPage("/runs");
-    await screen.findByRole("heading", {name: "Run history"});
+    await screen.findByRole("heading", {name: "Run records"});
     await chooseOption(user, screen.getByLabelText("Filter run status"), "COMPLETED");
     await chooseOption(user, screen.getByLabelText("Sort runs"), "finishedAt,desc");
     await user.click(await screen.findByRole("button", {name: "Next page"}));
@@ -137,7 +137,7 @@ describe("Switching language preserves the workspace", () => {
     await user.keyboard("{Enter}");
     expect(await screen.findByRole("menuitemradio", {name: "English"})).toHaveAttribute("aria-checked", "true");
     await user.keyboard("{Home}{Enter}");
-    await screen.findByRole("heading", {name: "运行历史"});
+    await screen.findByRole("heading", {name: "运行记录"});
     expect(screen.getByRole("columnheader", {name: "连接"})).toBeVisible();
     expect(screen.getByLabelText("筛选运行状态")).toHaveAttribute("data-value", "COMPLETED");
     expect(screen.getByLabelText("运行排序")).toHaveAttribute("data-value", "finishedAt,desc");
@@ -152,13 +152,14 @@ describe("Switching language preserves the workspace", () => {
     await chooseOption(user, screen.getByLabelText("Built-in compatibility dialect"), "postgresql");
     await user.type(screen.getByLabelText("JDBC URL"), "jdbc:custom://fixture.invalid/mydb");
     await chooseOption(user, screen.getByLabelText("Driver package"), driver.id);
-    await user.click(screen.getByRole("checkbox", {name: "Save password"}));
+    await user.type(screen.getByLabelText("Authorized test database"), "test");
+    await user.type(screen.getByLabelText("Authorized test schema"), "owned_scope");
     await user.click(screen.getByRole("button", {name: "Save connection"}));
     await chooseChinese(user);
     expect(screen.getByLabelText("名称")).toHaveValue("My untouched name");
     expect(screen.getByLabelText("JDBC URL")).toHaveValue("jdbc:custom://fixture.invalid/mydb");
     expect(screen.getByLabelText("内置兼容方言")).toHaveAttribute("data-value", "postgresql");
-    expect(screen.getByRole("alert")).toHaveTextContent("请输入需要保存的密码");
+    expect(screen.getByRole("alert")).toHaveTextContent("请填写密码。");
     expect(fetch.mock.calls.filter(([,options]) => options?.method === "POST")).toHaveLength(0);
   });
   it("preserves Wizard choices, consent and exact API payload across switches", async () => {
@@ -186,19 +187,19 @@ describe("Switching language preserves the workspace", () => {
   it("keeps cached raw business data and a single SSE subscription while live status updates translate", async () => {
     const fetch = mockApi(url => url.pathname === "/api/runs/run-1" ? json(run) : undefined);
     const view = renderPage("/runs/run-1");
-    await screen.findAllByText("In progress");
+    await screen.findAllByText("Running");
     await waitFor(() => expect(TestEventSource.instances).toHaveLength(1));
     const before = structuredClone(view.client.getQueryData(runsKeys.detail(run.id)));
     const source = TestEventSource.instances[0];
     const requests = fetch.mock.calls.length;
     await change("zh-CN");
-    expect(screen.getAllByText("进行中")[0]).toBeVisible();
+    expect(screen.getAllByText("运行中")[0]).toBeVisible();
     expect(TestEventSource.instances).toHaveLength(1);
     expect(source.closed).toBe(false);
     expect(fetch.mock.calls).toHaveLength(requests);
     expect(view.client.getQueryData(runsKeys.detail(run.id))).toEqual(before);
     act(() => source.emit("run.status", {runId: run.id, status: "GENERATING_REPORT"}));
-    expect(await screen.findByText("生成报告")).toBeVisible();
+    expect(await screen.findByText("正在生成报告")).toBeVisible();
     expect(view.client.getQueryData(runsKeys.detail(run.id))).toHaveProperty("status", "GENERATING_REPORT");
   });
   it("retains opened skipped details, Results filters and original report JSON", async () => {
@@ -207,7 +208,7 @@ describe("Switching language preserves the workspace", () => {
     const view = renderPage("/runs/run-1");
     await user.click(await screen.findByRole("tab", {name: "Test cases"}));
     await chooseOption(user, screen.getByLabelText("Filter result status"), "SKIPPED");
-    await user.click(await screen.findByRole("button", {name: "Skip reason"}));
+    await user.click(await screen.findByRole("button", {name: "View details"}));
     await change("zh-CN");
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByText("capability arrays=false; skipSource=adapter")).toBeVisible();

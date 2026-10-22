@@ -14,20 +14,30 @@ export const driversApi = {
     request<Page<Driver>>(`/drivers${queryString(params)}`, { signal }),
   get: (id: string, signal?: AbortSignal) =>
     request<Driver>(`/drivers/${id}`, { signal }),
-  upload: (metadata: DriverInput, files: File[]) => {
+  upload: async (metadata: DriverInput, files: File[]) => {
     const body = new FormData();
     body.append(
       "metadata",
       new Blob([JSON.stringify(metadata)], { type: "application/json" }),
     );
     files.forEach((file) => body.append("files", file));
-    return request<Driver>("/drivers", { method: "POST", body });
+    const driver = await request<Driver>("/drivers", { method: "POST", body });
+    if (metadata.defaultSqlDialect && driver.defaultSqlDialect !== metadata.defaultSqlDialect) {
+      throw new ApiError(200, "DRIVER_DIALECT_NOT_SAVED", undefined, { driverId: driver.id });
+    }
+    return driver;
   },
-  update: (id: string, input: DriverInput) =>
-    request<Driver>(`/drivers/${id}`, {
+  update: async (id: string, input: DriverInput) => {
+    const driver = await request<Driver>(`/drivers/${id}`, {
       method: "PATCH",
       body: JSON.stringify(input),
-    }),
+    });
+    if (input.defaultSqlDialect !== undefined
+      && (driver.defaultSqlDialect ?? "") !== input.defaultSqlDialect) {
+      throw new ApiError(200, "DRIVER_DIALECT_UPDATE_FAILED");
+    }
+    return driver;
+  },
   validate: async (id: string) => {
     const value = await request<DriverValidation>(`/drivers/${id}/validate`, { method: "POST" });
     const version = (part: unknown) => typeof part === "number" && Number.isInteger(part)

@@ -4,7 +4,7 @@ import { formatNumber } from "@/lib/format";
 import { t } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Check, Copy, Inbox, TriangleAlert } from "lucide-react";
-import type { ReactNode } from "react";
+import { cloneElement, isValidElement, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Tooltip } from "./ui/tooltip";
 import { Button } from "./ui/button";
@@ -69,21 +69,25 @@ export function EmptyState({
   title,
   description,
   action,
+  compact = false,
 }: {
   title: string;
   description: string;
   action?: ReactNode;
+  compact?: boolean;
 }) {
   return (
-    <div className="jdbc-empty flex min-h-52 flex-col items-center justify-center p-8 text-center">
-      <div className="mb-4 rounded-2xl bg-accent p-4">
-        <Inbox className="size-7 text-primary" />
+    <div className={compact ? "jdbc-empty jdbc-empty-compact" : "jdbc-empty flex min-h-52 flex-col items-center justify-center p-8 text-center"}>
+      <div className={compact ? "rounded-xl bg-accent p-2" : "mb-4 rounded-2xl bg-accent p-4"}>
+        <Inbox className={compact ? "size-4 text-primary" : "size-7 text-primary"} />
       </div>
-      <h2 className="text-lg font-semibold">{title}</h2>
-      <p className="mb-5 mt-2 max-w-md text-sm text-muted-foreground">
-        {description}
-      </p>
-      {action}
+      <div className="min-w-0">
+        <h2 className={compact ? "text-sm font-semibold" : "text-lg font-semibold"}>{title}</h2>
+        <p className={compact ? "mt-1 text-xs text-muted-foreground" : "mb-5 mt-2 max-w-md text-sm text-muted-foreground"}>
+          {description}
+        </p>
+      </div>
+      {action ? <div className={compact ? "col-start-2" : undefined}>{action}</div> : null}
     </div>
   );
 }
@@ -105,19 +109,27 @@ export function Field({
   id,
   hint,
   children,
+  error,
   ...props
 }: React.ComponentProps<typeof Input> & {
   label: string;
   id: string;
   hint?: string;
+  error?: string;
   children?: ReactNode;
 }) {
   return (
     <div className="field">
-      <label htmlFor={id} className="text-sm font-medium">
-        {label}
-      </label>
-      {children ?? <Input id={id} {...props} />}
+      <div><label htmlFor={id} className="text-sm font-medium">{label}</label>
+        {props.required ? <span aria-hidden="true" className="ml-1 text-destructive">*</span> : null}
+      </div>
+      {children ? isValidElement<Record<string, unknown>>(children) ? cloneElement(children, {
+        ...(props.required ? { "aria-required": true } : {}),
+        ...(error ? { "aria-invalid": true,
+          "aria-describedby": [children.props["aria-describedby"], `${id}-error`].filter(Boolean).join(" ") } : {}),
+      }) : children : <Input id={id} aria-required={props.required || undefined}
+        aria-invalid={!!error || undefined} aria-describedby={error ? `${id}-error` : undefined} {...props} />}
+      {error ? <p id={`${id}-error`} role="alert" className="text-xs text-destructive">{error}</p> : null}
       {hint ? (
         <p className="text-xs leading-relaxed text-muted-foreground">{hint}</p>
       ) : null}
@@ -219,6 +231,8 @@ export function ProbeResult({
               : "—"}
           </dd>
         </div>
+        {([["currentCatalog", "ui.database"], ["currentSchema", "ui.authorizedTestSchema"], ["targetContainer", "connection.targetContainer"]] as const).map(([key, label]) =>
+          result[key] ? <div key={key}><dt className="text-muted-foreground">{t(label)}</dt><dd className="break-words">{result[key]}</dd></div> : null)}
       </dl>
     </div>
   );

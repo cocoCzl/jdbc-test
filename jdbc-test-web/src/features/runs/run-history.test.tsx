@@ -5,19 +5,19 @@ import { runsKeys } from "@/api/runs";
 import { finishedRun, page, run } from "@/test/fixtures";
 import { json, mockApi, renderPage } from "@/test/harness";
 import { chooseOption } from "@/test/select";
-import { getRunPresentation, runStageLabel } from "@/lib/status";
+import { outcomePresentation } from "./run-outcome";
 import type { RunStatus } from "@/types/api";
 
 describe("Run history lifecycle filters", () => {
-  it("has exactly six ordered options and defaults to an unfiltered server query", async () => {
+  it("has only six user-facing lifecycle options and defaults to an unfiltered server query", async () => {
     const user = userEvent.setup();
     const api = mockApi();
     renderPage("/runs");
     const trigger = await screen.findByRole("combobox", { name: "Filter run status" });
-    expect(trigger).toHaveTextContent("All statuses");
+    expect(trigger).toHaveTextContent("All");
     await user.click(trigger);
     expect(screen.getAllByRole("option").map(option => option.textContent)).toEqual([
-      "All statuses", "Waiting", "In progress", "Completed", "Ended abnormally", "Cancelled",
+      "All", "Waiting", "Running", "Completed", "Ended abnormally", "Cancelled",
     ]);
     const request = new URL(String(api.mock.calls.find(([url]) => String(url).includes("/api/runs?"))![0]), "http://localhost");
     expect(request.searchParams.has("status")).toBe(false);
@@ -71,15 +71,16 @@ describe("Run history lifecycle filters", () => {
   });
 
   it.each(["QUEUED", "PREPARING", "PROBING", "RUNNING", "GENERATING_REPORT", "SUCCEEDED", "FAILED", "INTERRUPTED", "CANCELLED"] as RunStatus[])(
-    "renders %s as a main lifecycle label with truthful stage/reason and result counts", async status => {
+    "renders %s with only its lifecycle badge in the separate status cell", async status => {
       mockApi(url => url.pathname === "/api/runs" ? json(page([{ ...finishedRun, status, passed: 19, failed: 3, skipped: 1,
         failureReason: ["FAILED", "INTERRUPTED"].includes(status) ? "WORKER_EXITED_UNEXPECTEDLY" : null }])) : undefined);
       renderPage("/runs");
       const table = await screen.findByRole("table");
-      expect(within(table).getByText(getRunPresentation(status).label, { selector: ".status-badge" })).toBeVisible();
-      const stage = runStageLabel(status);
-      if (stage) expect(within(table).getByText(stage)).toBeVisible();
-      if (["FAILED", "INTERRUPTED"].includes(status)) expect(within(table).getByText("WORKER_EXITED_UNEXPECTEDLY")).toBeVisible();
+      expect(within(table).getByText(outcomePresentation({ ...finishedRun, status, failed: 3 }).label, { selector: ".status-badge" })).toBeVisible();
+      const statusCell = within(table).getAllByRole("cell")[1];
+      expect(statusCell.children).toHaveLength(1);
+      expect(statusCell.querySelector(".status-badge")).not.toBeNull();
+      expect(within(table).queryByText("Inspect execution details")).not.toBeInTheDocument();
       expect(table.querySelector(".run-result-danger")).toHaveTextContent("Failed3");
     },
   );

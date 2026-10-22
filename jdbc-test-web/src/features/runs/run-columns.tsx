@@ -1,14 +1,21 @@
+import { Eye } from "lucide-react";
+import { ResourceAction } from "@/components/resource-action";
 import { t } from "i18next";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Run } from "@/types/api";
 import { formatDateTime, formatDuration, formatNumber } from "@/lib/format";
-import { RunIdentityCell, RunResultSummary } from "./run-cells";
+import { RunIdentityCell, RunStatusCell, RunResultSummary } from "./run-cells";
 import "./run-table.scss";
 
 const identity: ColumnDef<Run> = {
-  id: "ui.runStatus",
-  get header() { return t("ui.runStatus"); },
+  id: "record.taskName",
+  get header() { return t("record.taskName"); },
   cell: ({ row }) => <RunIdentityCell run={row.original} />,
+};
+const status: ColumnDef<Run> = {
+  id: "ui.status",
+  get header() { return t("ui.status"); },
+  cell: ({ row }) => <RunStatusCell run={row.original} />,
 };
 const connection: ColumnDef<Run> = {
   id: "ui.connection",
@@ -44,15 +51,22 @@ const duration: ColumnDef<Run> = {
   cell: ({ row }) => <span className="run-cell-number">{formatDuration(row.original.durationMs)}</span>,
 };
 const started: ColumnDef<Run> = {
-  id: "ui.startedCreated",
-  get header() { return t("ui.startedCreated"); },
-  cell: ({ row }) => <span className="run-cell-secondary run-cell-date">
-    {formatDateTime(row.original.startedAt ?? row.original.createdAt)}
-  </span>,
+  id: "ui.started",
+  get header() { return t("ui.started"); },
+  cell: ({ row }) => <div className="run-cell-stack">
+    <span className="run-cell-secondary run-cell-date">{formatDateTime(row.original.startedAt ?? row.original.createdAt)}</span>
+    {!row.original.startedAt ? <span className="run-cell-secondary">{t("ui.created")}</span> : null}
+  </div>,
+};
+
+const details: ColumnDef<Run> = {
+  id: "details",
+  get header() { return t("ui.actions"); },
+  cell: ({ row }) => <ResourceAction label={t("record.viewDetails")} icon={Eye} href={`/runs/${row.original.id}`} />,
 };
 
 export function getRunColumns({ compact = false }: { compact?: boolean } = {}): ColumnDef<Run>[] {
   return compact
-    ? [identity, connection, progress, results]
-    : [identity, connection, driver, progress, results, duration, started];
+    ? [identity, status, connection, progress, results]
+    : [identity, status, connection, driver, progress, results, duration, started, details];
 }

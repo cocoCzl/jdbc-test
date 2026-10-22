@@ -29,10 +29,10 @@ describe("Contract outcome evidence", () => {
     renderPage("/runs/run-1");
     await user.click(await screen.findByRole("tab", { name: locale === "en" ? "Report" : "报告" }));
     expect(await screen.findByText(i18n.t("selection.SUITE_REQUIREMENT_UNMET"))).toBeVisible();
-    await user.click(screen.getAllByRole("button", { name: i18n.t("ui.inspectFailure") })[0]);
+    await user.click(screen.getAllByRole("button", { name: i18n.t("record.viewDetails") })[0]);
     expect(await screen.findByText(i18n.t("selection.suiteRequirementNote"))).toBeVisible();
     await user.keyboard("{Escape}");
-    await user.click(screen.getAllByRole("button", { name: i18n.t("ui.inspectFailure") })[1]);
+    await user.click(screen.getAllByRole("button", { name: i18n.t("record.viewDetails") })[1]);
     expect(await screen.findByText(i18n.t("selection.unsupportedNote"))).toBeVisible();
     await user.keyboard("{Escape}");
     await user.click(screen.getByRole("button", { name: i18n.t("report.viewJSON") }));

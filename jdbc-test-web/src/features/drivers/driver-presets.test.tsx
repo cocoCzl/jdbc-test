@@ -33,6 +33,32 @@ async function metadata(api: ReturnType<typeof mockApi>) {
 }
 
 describe("New driver presets", () => {
+  it("preserves an explicit PostgreSQL default through preset changes, restore, file selection and upload", async () => {
+    const saved = { ...driver, defaultSqlDialect: "postgresql" as const };
+    const api = mockApi((_url, options) => options.method === "POST" ? json(saved, 201) : undefined);
+    const user = userEvent.setup();
+    const { router } = renderPage("/drivers/new");
+    await chooseOption(user, field("Default SQL dialect (optional)"), "postgresql");
+    await select(user, "postgresql");
+    await select(user, "kingbase");
+    await user.click(screen.getByRole("button", { name: "Restore current preset defaults" }));
+    await upload(user);
+    expect((await metadata(api)).defaultSqlDialect).toBe("postgresql");
+    await waitFor(() => expect(router.state.location.pathname).toBe("/drivers/driver-1"));
+  });
+
+  it("reports a stale backend that ignored the selected dialect without offering another upload", async () => {
+    mockApi((_url, options) => options.method === "POST" ? json(driver, 201) : undefined);
+    const user = userEvent.setup();
+    renderPage("/drivers/new");
+    await select(user, "kingbase");
+    await chooseOption(user, field("Default SQL dialect (optional)"), "postgresql");
+    await upload(user);
+    expect(await screen.findByRole("alert")).toHaveTextContent("DRIVER_DIALECT_NOT_SAVED");
+    expect(screen.getByRole("link", { name: "View uploaded driver" })).toHaveAttribute("href", "/drivers/driver-1");
+    expect(screen.getByRole("button", { name: "Confirm upload" })).toBeDisabled();
+  });
+
   it("applies Kingbase defaults without a version and protects a cleared class and edited prefix", async () => {
     mockApi();
     const user = userEvent.setup();
@@ -189,10 +215,10 @@ describe("New driver presets", () => {
     const api = mockApi((url) => url.pathname === "/api/drivers/driver-1" ? json(saved) : undefined);
     const user = userEvent.setup();
     renderPage("/drivers/driver-1");
-    await user.click(await screen.findByRole("button", { name: "Edit metadata" }));
+    await user.click(await screen.findByRole("button", { name: "Edit information" }));
     expect(vendor()).toHaveValue("Historical issuer");
     expect(field("Driver class")).toHaveValue("legacy.Driver");
-    expect(field("URL prefix")).toHaveValue("jdbc:legacy:");
+    expect(field("JDBC URL prefix")).toHaveValue("jdbc:legacy:");
     expect(screen.queryByLabelText("Driver preset")).not.toBeInTheDocument();
     expect(api.mock.calls.some(([url]) => String(url).includes("/presets"))).toBe(false);
   });

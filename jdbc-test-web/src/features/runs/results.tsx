@@ -1,3 +1,4 @@
+import "./run-detail.scss";
 import { Card } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { moduleName } from "@/lib/presentation";
@@ -45,28 +46,22 @@ export function FailureDetail({
                 {formatDuration(result.durationMs)}
               </span>
             </div>
-            {result.executionEvidence?.testDomain === "SQL_FEATURE" ? <section className="space-y-3 text-sm"><h3 className="font-semibold">{t("sql.stepEvidence")}</h3><p>{t("sql.boundary")} · {result.executionEvidence.variant}</p>{result.executionEvidence.steps?.map((step, index) => <div key={index} className="space-y-2 rounded-lg border p-3"><p>{step.id} · {step.phase} · {step.status}</p><pre className="overflow-auto whitespace-pre-wrap break-words">{step.sql}</pre><p>{t("sql.expected")}</p><pre className="overflow-auto whitespace-pre-wrap break-words">{JSON.stringify(step.expected, null, 2)}</pre><p>{t("sql.actual")}</p><pre className="overflow-auto whitespace-pre-wrap break-words">{JSON.stringify(step.actual ?? step.failure, null, 2)}</pre></div>)}</section> : null}
-            {result.executionEvidence?.conclusion ? <section className="space-y-2 text-sm">
-              <h3 className="font-semibold">{t("selection.evidence")}</h3>
-              <p>{t("selection.conclusion")}: {t(`selection.${result.executionEvidence.conclusion}`, { defaultValue: result.executionEvidence.conclusion })}</p>
-              {result.executionEvidence.requirementScope === "SUITE" ? <p>{t("selection.suiteRequirementNote")}</p> : null}
-              {result.executionEvidence.conclusion === "UNSUPPORTED_ALLOWED" ? <p>{t("selection.unsupportedNote")}</p> : null}
-              <p>{t("selection.phase")}: {result.executionEvidence.phase ?? "—"}</p>
-              <pre className="overflow-auto whitespace-pre-wrap break-words text-xs">{JSON.stringify(result.executionEvidence, null, 2)}</pre>
-            </section> : null}
-            <section>
-              <h3 className="mb-2 text-sm font-medium">{result.status === "SKIPPED" ? t("skip.title") : t("ui.message")}</h3>
-              {result.status === "SKIPPED" ? <p className="mb-2 text-sm text-muted-foreground">{t("skip.note")}</p> : null}
-              <pre className="whitespace-pre-wrap break-words rounded-xl bg-background p-4 font-mono text-xs">
-                {result.message ?? t("ui.noMessageProvided")}
-              </pre>
+            <section className="space-y-2 text-sm">
+              <h3 className="font-semibold">{t("record.caseConclusion")}</h3>
+              <p>{result.executionEvidence?.conclusion === "UNSUPPORTED_ALLOWED" ? t("selection.unsupportedNote") : t(`record.case.${result.status}`)}</p>
+              {result.executionEvidence?.conclusion ? <p>{t(`selection.${result.executionEvidence.conclusion}`, { defaultValue: result.executionEvidence.conclusion })}</p> : null}
+              {result.executionEvidence?.requirementScope === "SUITE" ? <p>{t("selection.suiteRequirementNote")}</p> : null}
+              {result.status === "SKIPPED" ? <p className="text-muted-foreground">{t("skip.note")}</p> : null}
+              {result.message ? <p className="whitespace-pre-wrap break-words">{result.message}</p> : null}
             </section>
-            <section>
-              <h3 className="mb-2 text-sm font-medium">{t("ui.stackTrace")}</h3>
-              <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-background p-4 font-mono text-xs">
-                {result.stackTrace ?? t("ui.noStackTraceProvided")}
-              </pre>
-            </section>
+            {result.executionEvidence?.testDomain === "SQL_FEATURE" ? <section className="space-y-3 text-sm"><h3 className="font-semibold">{t("sql.stepEvidence")}</h3>
+              {result.executionEvidence.steps?.map((step, index) => <details key={index} className="rounded-lg border p-3"><summary className="cursor-pointer">{step.id} · {step.phase} · {step.status}</summary>
+                {step.sql ? <pre className="run-evidence mt-2">{step.sql}</pre> : null}
+                {step.expected !== undefined ? <><p>{t("sql.expected")}</p><pre className="run-evidence">{JSON.stringify(step.expected, null, 2)}</pre></> : null}
+                {step.actual !== undefined || step.failure !== undefined ? <><p>{t("sql.actual")}</p><pre className="run-evidence">{JSON.stringify(step.actual !== undefined ? step.actual : step.failure, null, 2)}</pre></> : null}
+              </details>)}</section> : null}
+            {result.stackTrace ? <details><summary className="cursor-pointer text-sm font-medium">{t("ui.stackTrace")}</summary><pre className="run-evidence mt-2">{result.stackTrace}</pre></details> : null}
+            {result.executionEvidence ? <details><summary className="cursor-pointer text-sm font-medium">{t("record.rawEvidence")}</summary><pre className="run-evidence mt-2">{JSON.stringify(result.executionEvidence, null, 2)}</pre></details> : null}
           </>
         ) : null}
       </div>
@@ -76,13 +71,15 @@ export function FailureDetail({
 export default function Results({
   id,
   modules,
+  initialStatus = "",
 }: {
   id: string;
   modules: string[];
+  initialStatus?: ResultStatus | "";
 }) {
   useTranslation();
   const [page, setPage] = useState(0);
-  const [status, setStatus] = useState<ResultStatus | "">("");
+  const [status, setStatus] = useState<ResultStatus | "">(initialStatus);
   const [moduleId, setModule] = useState("");
   const [sort, setSort] = useState("scenarioId,asc");
   const [selected, setSelected] = useState<CaseResult | null>(null);
@@ -123,26 +120,16 @@ export default function Results({
     {
       id: "ui.detail",
       get header() { return t("ui.detail"); },
-      cell: ({ row }) =>
-        row.original.executionEvidence || ["FAILED", "ABORTED", "SKIPPED"].includes(row.original.status) ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setSelected(row.original)}
-          >
-            {row.original.executionEvidence?.testDomain === "SQL_FEATURE" ? t("sql.stepEvidence") : row.original.status === "SKIPPED" ? t("skip.title") : t("ui.inspectFailure")}</Button>
-        ) : (
-          "—"
-        ),
+      cell: ({ row }) => <Button variant="ghost" size="sm" className="text-primary" onClick={() => setSelected(row.original)}>{t("record.viewDetails")}</Button>,
     },
   ];
   return (
     <>
-      <div className="jdbc-toolbar">
+      <div className="run-result-toolbar">
         <label className="text-xs text-muted-foreground">
           {t("ui.status")}<Select
             aria-label={t("ui.filterResultStatus")}
-            className=" mt-1 w-40"
+
             value={status}
             onValueChange={(value) => {
               setStatus(value as ResultStatus | "");
@@ -160,7 +147,7 @@ export default function Results({
         <label className="text-xs text-muted-foreground">
           {t("ui.module")}<Select
             aria-label={t("ui.filterResultModule")}
-            className=" mt-1 w-48"
+
             value={moduleId}
             onValueChange={(value) => {
               setModule(value);
@@ -176,7 +163,7 @@ export default function Results({
         <label className="text-xs text-muted-foreground">
           {t("ui.sort")}<Select
             aria-label={t("ui.sortResults")}
-            className=" mt-1 w-48"
+
             value={sort}
             onValueChange={(value) => {
               setSort(value);
@@ -199,6 +186,7 @@ export default function Results({
           <DataTable
             rows={query.data.items}
             columns={columns}
+            className="run-case-table"
             empty={
               <EmptyState
                 title={t("ui.noCaseResultsYet")}
@@ -206,7 +194,7 @@ export default function Results({
               />
             }
           />
-          <Pagination {...query.data} onPage={setPage} />
+          {query.data.totalElements > 0 ? <Pagination {...query.data} onPage={setPage} /> : null}
         </Card>
       )}
       <FailureDetail result={selected} close={() => setSelected(null)} />

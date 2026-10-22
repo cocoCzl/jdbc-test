@@ -17,9 +17,18 @@ describe("Compact UI preserves execution semantics", () => {
     expect(counters.querySelector(`[data-stat="${status === "RUNNING" ? "Pending" : "Not run"}"]`)).toHaveTextContent("4");
     expect(counters.querySelector(`[data-stat="${status === "RUNNING" ? "Running" : "Incomplete"}"]`)).toHaveTextContent("2");
     expect(screen.getByRole("progressbar")).toHaveAttribute("value", "6");
-    expect(screen.getByText(/50% complete/)).toBeVisible();
+    expect(screen.getByText(/50% processed/)).toBeVisible();
     expect(screen.getByRole("region", {name: "Run outcome summary"}).querySelectorAll('[data-metric]')).toHaveLength(4);
     expect(screen.getByRole("heading", {level: 1})).toHaveTextContent(connection.name);
+  });
+  it("does not call the last case active while all results are processed", async () => {
+    const record = { ...finishedRun, status: "RUNNING", currentTestCase: "last.finished.case",
+      totalCases: 12, completedCases: 12, accounting: { ...accounting, running: 0 } };
+    mockApi(url => url.pathname === "/api/runs/run-1" ? json(record) : undefined);
+    renderPage("/runs/run-1");
+    expect(await screen.findByText("No case is currently running")).toBeVisible();
+    expect(screen.queryByText("last.finished.case")).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Execution accounting" }).querySelector("p")).toHaveTextContent("Running");
   });
   it("leaves missing historical evidence unknown", async () => {
     mockApi(); renderPage("/runs/run-1");
@@ -48,7 +57,7 @@ describe("Compact UI preserves execution semantics", () => {
     expect(screen.getByText("Select a connection to continue.")).toBeVisible();
     expect(document.querySelector('header a[href="/runs/new"]')).toBeNull();
     radio.focus(); await user.keyboard(" "); expect(radio).toBeChecked();
-    expect(screen.getByText("Selected")).toBeVisible();
+    expect(screen.getByText("Selected connection:").parentElement).toHaveTextContent(connection.name);
     await user.click(screen.getByRole("button", {name: /^Next:/}));
     const driverGroup = await screen.findByRole("group", {name: "Driver package"});
     expect(within(driverGroup).getByRole("radio")).toBeChecked();
@@ -66,8 +75,8 @@ it("keeps zero exceptions subdued and distinct interruption icons without changi
   mockApi(url => url.pathname === "/api/runs/run-1" ? json(record) : undefined);
   renderPage("/runs/run-1");
   const metrics = await screen.findByRole("region", {name: "Run outcome summary"});
-  expect(metrics.querySelector('[data-metric="Failed"]')).toHaveClass("metric-subdued");
-  expect(metrics.querySelector('[data-metric="Skipped"]')).not.toHaveClass("metric-subdued");
+  expect(metrics.querySelector('[data-metric="Failed"]')).toHaveTextContent("0");
+  expect(metrics.querySelector('[data-metric="Skipped"]')).toHaveTextContent("2");
   const counters = screen.getByLabelText("Execution counters");
   expect(counters.querySelector('[data-stat="Aborted"] .lucide-ban')).not.toBeNull();
   expect(counters.querySelector('[data-stat="Incomplete"] .lucide-triangle-alert')).not.toBeNull();

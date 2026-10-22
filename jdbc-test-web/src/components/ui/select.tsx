@@ -22,7 +22,7 @@ type Props = Omit<ComponentProps<"button">, "value" | "onChange" | "children"> &
 export function Select({ value, onValueChange, children, className, required, name, disabled, ...props }: Props) {
   const options = optionsFrom(children);
   return <Primitive.Root value={value || (required ? "" : EMPTY)} onValueChange={next => onValueChange(next === EMPTY ? "" : next)} disabled={disabled} required={required} name={name}>
-    <Primitive.Trigger {...props} data-value={value} className={cn("jdbc-select", className)}>
+    <Primitive.Trigger aria-required={required || undefined} {...props} data-value={value} className={cn("jdbc-select", className)}>
       <Primitive.Value placeholder={options.find(option => option.value === "")?.label} /><Primitive.Icon><ChevronDown className="size-4" /></Primitive.Icon>
     </Primitive.Trigger>
     <Primitive.Portal>

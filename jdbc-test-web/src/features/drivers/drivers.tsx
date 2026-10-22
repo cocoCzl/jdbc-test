@@ -17,6 +17,7 @@ import { errorMessage } from "@/api/client";
 import type { Driver } from "@/types/api";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/alert-dialog";
+import { ResourceAction } from "@/components/resource-action";
 import { DataTable, Pagination } from "@/components/data-table";
 import {
   EmptyState,
@@ -25,7 +26,7 @@ import {
   StatusBadge,
 } from "@/components/common";
 import { driverPresentation } from "@/lib/status";
-import { formatDateTime, plural, shortId } from "@/lib/format";
+import { formatDateTime, plural } from "@/lib/format";
 import "@/features/connections/resource-table.scss";
 export default function Drivers() {
   useTranslation();
@@ -63,12 +64,9 @@ export default function Drivers() {
       get header() { return t("ui.driverPackage"); },
       accessorKey: "name",
       cell: ({ row }) => (
-        <div className="run-cell-stack">
           <Link to={`/drivers/${row.original.id}`} className="resource-primary-link rounded-sm">
             {row.original.name}
           </Link>
-          <span className="run-cell-secondary" title={row.original.id}>{shortId(row.original.id)}</span>
-        </div>
       ),
     },
     {
@@ -117,22 +115,18 @@ export default function Drivers() {
       get header() { return t("ui.actions"); },
       cell: ({ row }) => (
         <div className="resource-actions">
-          <Button
-            size="sm"
-            variant="ghost"
+          <ResourceAction
+            label={t("resource.checkDriver", { name: row.original.name })} icon={ShieldCheck}
+            pending={validate.isPending && validate.variables === row.original.id}
             disabled={validate.isPending}
-            onClick={() => validate.mutate(row.original.id)}
-          >
-            <ShieldCheck />
-            {t("ui.validate")}</Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            aria-label={t("common.deleteName", {name: row.original.name})}
+            reason={t("ui.validating")}
+            onClick={() => { if (!validate.isPending) validate.mutate(row.original.id); }} />
+          <ResourceAction icon={Trash2} danger
+            label={t("common.deleteName", {name: row.original.name})}
+            disabled={remove.isPending || (validate.isPending && validate.variables === row.original.id)}
+            reason={t(remove.isPending ? "ui.pleaseWait" : "ui.validating")}
             onClick={() => setDeleting(row.original)}
-          >
-            <Trash2 />
-          </Button>
+          />
         </div>
       ),
     },

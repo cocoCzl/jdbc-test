@@ -60,16 +60,21 @@ describe("New Run wizard", () => {
     const { router } = renderPage("/runs/new");
     await user.click(await screen.findByRole("radio", { name: connection.name }));
     await user.click(screen.getByRole("button", { name: /^Next:/ }));
-    await screen.findByLabelText("Password for this run");
+    await screen.findByLabelText("Password");
     expect(screen.getByRole("button", { name: /^Next:/ })).toBeDisabled();
-    await user.click(screen.getByLabelText("Use an empty password explicitly"));
+    await user.click(screen.getByRole("radio", { name: "Use empty password" }));
     await user.click(screen.getByRole("button", { name: /^Next:/ }));
     await user.click(screen.getByRole("button", { name: /^Next:/ }));
+    const nameInput = screen.getByRole("textbox", {name: "Task name"});
+    expect((nameInput as HTMLInputElement).value).toContain(connection.name);
+    await user.clear(nameInput);
+    await user.type(nameInput, "Custom regression task");
     await user.click(screen.getByRole("checkbox", { name: /I understand/ }));
     await user.click(screen.getByRole("button", { name: "Start test run" }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/runs/run-1"));
     const body = JSON.parse(api.mock.calls.find(([, options]) => options?.method === "POST")![1]!.body as string);
     expect(body.password).toBe("");
+    expect(body.name).toBe("Custom regression task");
   });
   it("defaults to every implemented applicable scenario and uses case-level catalog data", async () => {
     const user = userEvent.setup();
@@ -106,6 +111,7 @@ describe("New Run wizard", () => {
     );
     expect(input).toMatchObject({ connectionId: connection.id, driverId: connection.defaultDriver!.id,
       profile: "CUSTOM", modules: [], destructiveConsent: true, catalogVersion: "fixture-v2", budgetSeconds: 1800 });
+    expect(input.name).toContain(connection.name);
     expect(input.includeScenarios).toEqual(catalog.scenarios.filter(item => item.moduleId === "statement").map(item => item.id));
     expect(input.excludeScenarios).toHaveLength(17);
   });
@@ -134,7 +140,7 @@ describe("New Run wizard", () => {
       await screen.findByRole("radio", { name: connection.name }),
     );
     await user.click(screen.getByRole("button", { name: /^Next:/ }));
-    const password = await screen.findByLabelText("Password for this run");
+    const password = await screen.findByLabelText("Password");
     expect(password).toHaveAttribute("type", "password");
     await user.type(password, "one-run-secret");
     await user.click(screen.getByRole("button", { name: /^Next:/ }));
@@ -200,7 +206,7 @@ describe("Run detail / results / report", () => {
       );
     });
     renderPage("/runs");
-    await screen.findByRole("heading", { name: "Run history" });
+    await screen.findByRole("heading", { name: "Run records" });
     await screen.findByText("21 records · Page 1 of 2");
     await user.click(screen.getByRole("button", { name: "Next page" }));
     await waitFor(() =>
@@ -242,7 +248,7 @@ describe("Run detail / results / report", () => {
       ).toBeVisible();
       if (status === "ABORTED") {
         await user.click(
-          screen.getByRole("button", { name: "Inspect failure" }),
+          screen.getByRole("button", { name: "View details" }),
         );
         expect(screen.getByRole("dialog")).toHaveTextContent("Aborted");
       }
@@ -283,7 +289,7 @@ describe("Run detail / results / report", () => {
         passed: 5,
       }),
     );
-    expect(await screen.findByText("5 / 23")).toBeVisible();
+    expect(await screen.findByText("Processed 5 / 23 cases")).toBeVisible();
     act(() =>
       source.emit("run.finished", {
         runId: run.id,
@@ -378,9 +384,11 @@ describe("Run detail / results / report", () => {
         ),
       ).toBe(true),
     );
-    await user.click(screen.getByRole("button", { name: "Inspect failure" }));
+    await user.click(screen.getByRole("button", { name: "View details" }));
     expect(screen.getByText("<script>unsafe</script>")).toBeVisible();
     expect(document.querySelector("script")).toBeNull();
+    expect(screen.getByText("sanitized trace")).not.toBeVisible();
+    await user.click(screen.getByText("Stack trace"));
     expect(screen.getByText("sanitized trace")).toBeVisible();
   });
   it("renders report and fetches raw JSON only on demand", async () => {

@@ -13,11 +13,15 @@ export function DriverSelect({
   selected,
   onChange,
   presentation = "select",
+  hint,
+  error,
 }: {
   value: string;
   presentation?: "select" | "cards";
   selected?: DriverSummary | null;
   onChange: (driver: DriverSummary) => void;
+  hint?: string;
+  error?: string;
 }) {
   useTranslation();
   const [page, setPage] = useState(0);
@@ -42,7 +46,7 @@ export function DriverSelect({
   return (
     <div className="min-w-0">
       {query.isError ? <ErrorState error={query.error} retry={() => void query.refetch()} /> : null}
-      {presentation === "cards" ? <fieldset className="space-y-3">
+      {presentation === "cards" ? <fieldset className="grid min-w-0 gap-3 md:grid-cols-2">
         <legend className="mb-3 text-sm font-medium">{t("ui.driverPackage")}</legend>
         {options.map((driver) => <label key={driver.id} className="step-card flex cursor-pointer items-start gap-3">
           <input type="radio" name="run-driver" aria-label={`${driver.name} · ${driver.version}`}
@@ -50,13 +54,15 @@ export function DriverSelect({
           <span className="min-w-0">
             <span className="block break-words font-semibold">{driver.name}</span>
             <span className="mt-1 block text-sm text-muted-foreground">{driver.vendor} · {driver.version}</span>
-            <span className="mt-2 block text-xs font-medium text-primary">{value === driver.id ? t("ui.selectedValidated") : t("ui.validated")}</span>
+            <span className={`mt-2 block text-xs font-medium ${value === driver.id ? "text-primary" : "text-[var(--success-text)]"}`}>{value === driver.id ? t("ui.selectedValidated") : t("ui.validated")}</span>
           </span>
         </label>)}
       </fieldset> : <Field
         id="default-driver"
         label={t("ui.driverPackage")}
-        hint={t("ui.onlyValidatedPackagesCanBeUsedBrowse")}
+        required
+        error={error}
+        hint={hint ?? t("ui.onlyValidatedPackagesCanBeUsedBrowse")}
       >
         <Select
           id="default-driver"

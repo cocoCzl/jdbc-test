@@ -17,7 +17,7 @@ export type RunStatus =
   | "CANCELLED"
   | "INTERRUPTED";
 export type ResultStatus = "PASSED" | "FAILED" | "SKIPPED" | "ABORTED";
-export type RunStatusGroup = "WAITING" | "IN_PROGRESS" | "COMPLETED" | "ABNORMAL" | "CANCELLED";
+export type RunStatusGroup = "ACTIVE" | "ENDED" | "WAITING" | "IN_PROGRESS" | "COMPLETED" | "ABNORMAL" | "CANCELLED";
 export type ConnectionTestStatus = "SUCCEEDED" | "FAILED";
 export interface Artifact {
   id: string;
@@ -25,7 +25,9 @@ export interface Artifact {
   size: number;
   sha256: string;
 }
+export type SqlDialect = "oracle" | "mysql" | "postgresql" | "sqlserver";
 export interface DriverSummary {
+  defaultSqlDialect?: SqlDialect | null;
   id: string;
   name: string;
   vendor: string;
@@ -61,6 +63,7 @@ export interface Driver extends DriverSummary {
   artifacts: Artifact[];
 }
 export interface DriverInput {
+  defaultSqlDialect?: SqlDialect | "";
   dataSources?: DataSourceProviders;
   name: string;
   vendor: string;
@@ -83,6 +86,7 @@ export interface DriverValidation {
   } | null;
 }
 export interface Connection {
+  sqlDialect?: SqlDialect | null;
   executionDatabase?: string | null;
   executionSchema?: string | null;
   id: string;
@@ -100,6 +104,7 @@ export interface Connection {
   updatedAt: string;
 }
 export interface ConnectionInput {
+  sqlDialect?: string;
   executionDatabase?: string;
   executionSchema?: string;
   name: string;
@@ -114,6 +119,7 @@ export interface ConnectionInput {
   clearSavedPassword?: boolean;
 }
 export interface DraftProbe {
+  savedConnectionId?: string;
   databaseType: string;
   adapterId: string;
   jdbcUrl: string;
@@ -122,6 +128,9 @@ export interface DraftProbe {
   driverId: string;
 }
 export interface Probe {
+  currentCatalog?: string | null;
+  currentSchema?: string | null;
+  targetContainer?: string | null;
   success: boolean;
   databaseProductName: string | null;
   databaseProductVersion: string | null;
@@ -185,6 +194,15 @@ export interface CleanupEvidence {
   retainedObjects?: Record<string, unknown>[];
 }
 export interface Run {
+  name?: string | null;
+  executionOutcome?: "WAITING" | "IN_PROGRESS" | "COMPLETED" | "ABNORMAL" | "CANCELLED";
+  historicalOutcome?: boolean;
+  workerArtifactSha256?: string | null;
+  workerExitCode?: number | null;
+  workerFinalEvent?: Record<string, unknown> | null;
+  workerTerminationReason?: string | null;
+  workerReportValidated?: boolean;
+  sqlDialect?: string | null;
   sqlPackage?: { manifest: string; fingerprint: string } | null;
   adapterSnapshot?: Adapter | null;
   selectionSnapshot?: { catalogVersion?: string; catalogCount?: number; userExcluded?: string[]; budgetMs?: number; caseTimeoutMs?: number };
@@ -225,6 +243,7 @@ export interface Run {
   failureReason: string | null;
 }
 export interface CreateRun {
+  name?: string;
   expectedAdapterFingerprint?: string;
   connectionId: string;
   driverId: string;
@@ -238,7 +257,7 @@ export interface CreateRun {
   password?: string;
 }
 export interface CaseResult {
-  executionEvidence?: { testDomain?: string; variant?: string; steps?: { id: string; phase: string; sql: string; expected: unknown; actual?: unknown; status: string; failure?: unknown }[]; cleanupSteps?: unknown[]; conclusion?: string; requirementScope?: "SUITE"; contractConforms?: boolean; phase?: string; contractInvoked?: boolean; declaredCapabilities?: Record<string, boolean>; observations?: Record<string, string>; sqlState?: string; vendorCode?: number };
+  executionEvidence?: { testDomain?: string; variant?: string; steps?: { id: string; phase: string; sql?: string; expected?: unknown; actual?: unknown; status: string; failure?: unknown }[]; cleanupSteps?: unknown[]; conclusion?: string; requirementScope?: "SUITE"; contractConforms?: boolean; phase?: string; contractInvoked?: boolean; declaredCapabilities?: Record<string, boolean>; observations?: Record<string, string>; sqlState?: string; vendorCode?: number };
   id: string;
   scenarioId: string;
   moduleId: string;

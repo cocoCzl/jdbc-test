@@ -1,4 +1,5 @@
 import i18n from "@/i18n";
+import { formatDateTime } from "./format";
 
 // Display-only mapping. Payloads, snapshots and cached records keep their original IDs.
 const moduleKeys = new Set(["sql_feature", "advanced-type", "blob-clob", "callable-statement", "connection", "database-metadata", "datasource", "jdbc-type", "lifecycle", "parameter-metadata", "prepared-statement", "result-set", "result-set-metadata", "rowset", "savepoint", "sqlxml", "statement", "wrapper"]);
@@ -20,8 +21,10 @@ export function runSelectionName(run: {profile: string; selectedModules: string[
     : i18n.t("runTitle.CUSTOM");
   return profileName(run.profile);
 }
-export function runTitle(run: {profile: string; selectedModules: string[]; connection: {name: string}}) {
-  return `${runSelectionName(run)} · ${run.connection.name}`;
+export function runTitle(run: {profile: string; selectedModules: string[]; connection: {name: string}; name?: string | null; createdAt?: string}) {
+  if (run.name?.trim()) return run.name;
+  const timestamp = run.createdAt ? formatDateTime(run.createdAt) : "";
+  return [run.connection.name, runSelectionName(run), timestamp].filter(Boolean).join(" · ");
 }
 
 export function moduleShortName(id: string) {

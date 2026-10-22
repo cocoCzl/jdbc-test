@@ -2,7 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { t } from "i18next";
 import { useTranslation } from "react-i18next";
-import { Plus } from "lucide-react";
+import { Cable, Play, Plus, Trash2 } from "lucide-react";
 import { JdbcUrl } from "@/components/jdbc-url";
 import { useState } from "react";
 import {
@@ -18,6 +18,7 @@ import { errorMessage } from "@/api/client";
 import type { Connection, Probe } from "@/types/api";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/alert-dialog";
+import { ResourceAction } from "@/components/resource-action";
 import { Dialog } from "@/components/ui/dialog";
 import { DataTable, Pagination } from "@/components/data-table";
 import {
@@ -30,7 +31,7 @@ import {
   StatusBadge,
 } from "@/components/common";
 import { connectionPresentation } from "@/lib/status";
-import { formatDateTime, plural, shortId } from "@/lib/format";
+import { formatDateTime, plural } from "@/lib/format";
 import "./resource-table.scss";
 export default function Connections() {
   useTranslation();
@@ -38,6 +39,7 @@ export default function Connections() {
   const [sort, setSort] = useState("createdAt,desc");
   const [deleting, setDeleting] = useState<Connection | null>(null);
   const [testing, setTesting] = useState<Connection | null>(null);
+  const [testingId, setTestingId] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [emptyPassword, setEmptyPassword] = useState(false);
   const [probe, setProbe] = useState<Probe | null>(null);
@@ -57,7 +59,7 @@ export default function Connections() {
       void client.invalidateQueries({ queryKey: connectionsKeys.all });
     },
     onError: (failure) => setError(failure instanceof Error ? failure : new Error()),
-    onSettled: () => setPassword(""),
+    onSettled: () => { setPassword(""); setTestingId(null); },
   });
   const remove = useMutation({
     mutationFn: () => connectionsApi.delete(deleting!.id),
@@ -76,12 +78,9 @@ export default function Connections() {
       id: "ui.connection",
       get header() { return t("ui.connection"); },
       cell: ({ row }) => (
-        <div className="run-cell-stack">
           <Link className="resource-primary-link rounded-sm" to={`/connections/${row.original.id}`}>
             {row.original.name}
           </Link>
-          <span className="run-cell-secondary" title={row.original.id}>{shortId(row.original.id)}</span>
-        </div>
       ),
     },
     {
@@ -143,27 +142,22 @@ export default function Connections() {
       get header() { return t("ui.actions"); },
       cell: ({ row }) => (
         <div className="resource-actions">
-          <Button
-            size="sm"
-            variant="ghost"
+          <ResourceAction icon={Cable} label={t("resource.testConnection", { name: row.original.name })}
+            pending={test.isPending && testingId === row.original.id}
+            disabled={test.isPending}
+            reason={t("ui.testingConnection")}
             onClick={() => {
               setTesting(row.original);
               setProbe(null);
               setError(null);
               setPassword(""); setEmptyPassword(false);
-            }}
-          >
-            {t("ui.test")}</Button>
-          <Button size="sm" variant="ghost" asChild>
-            <Link to={`/runs/new?connectionId=${row.original.id}`}>
-              {t("ui.startRun")}</Link>
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setDeleting(row.original)}
-          >
-            {t("ui.delete")}</Button>
+            }} />
+          <ResourceAction icon={Play} label={t("resource.startRun", { name: row.original.name })}
+            href={`/runs/new?connectionId=${row.original.id}`} />
+          <ResourceAction icon={Trash2} danger label={t("common.deleteName", { name: row.original.name })}
+            disabled={remove.isPending || (test.isPending && testingId === row.original.id)}
+            reason={t(remove.isPending ? "ui.pleaseWait" : "ui.testingConnection")}
+            onClick={() => setDeleting(row.original)} />
         </div>
       ),
     },
@@ -250,7 +244,7 @@ export default function Connections() {
             event.preventDefault();
             setError(null);
             setProbe(null);
-            test.mutate();
+            if (!test.isPending) { setTestingId(testing!.id); test.mutate(); }
           }}
         >
           <Field

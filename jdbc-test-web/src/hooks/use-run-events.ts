@@ -67,7 +67,7 @@ export function useRunEvents(id: string, run: Run | undefined) {
           return {
             ...previous,
             ...Object.fromEntries(
-              [...Object.keys(previous), "accounting", "executionScope", "executionIssues", "cleanupEvidence"]
+              [...Object.keys(previous), "accounting", "executionScope", "executionIssues", "cleanupEvidence", "workerTerminationReason", "workerReportValidated", "sqlDialect", "name", "executionOutcome", "historicalOutcome", "workerArtifactSha256", "workerExitCode", "workerFinalEvent"]
                 .filter((key) => key in body)
                 .map((key) => [key, body[key]]),
             ),

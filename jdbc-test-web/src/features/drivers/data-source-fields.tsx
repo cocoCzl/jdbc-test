@@ -6,14 +6,15 @@ const interfaces = ["dataSource", "connectionPoolDataSource", "xaDataSource"] as
 const properties = ["urlProperty", "userProperty", "passwordProperty"] as const;
 const defaults = { urlProperty: "URL", userProperty: "user", passwordProperty: "password" };
 
-export function DataSourceFields({ value, onChange }: {
+export function DataSourceFields({ value, onChange, title }: {
   value: DataSourceProviders;
   onChange: (value: DataSourceProviders) => void;
+  title?: string;
 }) {
   const { t } = useTranslation();
   return (
     <details className="rounded-lg border border-border p-4">
-      <summary className="cursor-pointer font-medium">{t("ui.dataSourceProviders")}</summary>
+      <summary className="cursor-pointer font-medium">{title ?? t("ui.dataSourceProviders")}</summary>
       <p className="mt-3 text-sm text-muted-foreground">{t("ui.dataSourceProvidersHint")}</p>
       <div className="mt-4 space-y-5">
         {interfaces.map((key) => (

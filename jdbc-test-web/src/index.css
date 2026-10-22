@@ -115,6 +115,6 @@
   .run-progress::-webkit-progress-bar { background: var(--color-secondary); border-radius: 999px; }
   .run-progress::-webkit-progress-value { background: var(--tone, var(--primary)); border-radius: 999px; }
   .run-progress::-moz-progress-bar { background: var(--tone, var(--primary)); border-radius: 999px; }
-  .step-card[data-selected="true"], .step-card:has(input:checked) { border-color: var(--primary); background: var(--color-accent); }
+  .step-card[data-selected="true"], .step-card:has(input:checked) { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 6%, var(--card)); }
   .step-card:focus-within { outline: 2px dashed var(--primary); outline-offset: 3px; }
 }

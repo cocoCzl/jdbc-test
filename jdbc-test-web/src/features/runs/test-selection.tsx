@@ -18,7 +18,7 @@ export function TestSelection({ catalog, selected, onChange }: {
   }
   return <div className="space-y-4">
     <p className="text-sm text-muted-foreground">{t("selection.scopeHint")}</p>
-    <label className="block text-sm">{t("selection.search")}
+    <label className="block max-w-xl text-sm">{t("selection.search")}
       <input type="search" value={search} onChange={event => setSearch(event.target.value)}
         className="mt-2 w-full rounded-md border bg-background p-2" />
     </label>
@@ -33,38 +33,40 @@ export function TestSelection({ catalog, selected, onChange }: {
       if (!rows.length) return null;
       return <section key={category} className="space-y-3" aria-label={t(`selection.${category}`)}>
         <h3 className="font-semibold">{t(`selection.${category}`)} <span className="text-muted-foreground">({rows.length})</span></h3>
-        {catalog.modules.map(module => {
-          const all = rows.filter(item => item.moduleId === module.id);
-          const visible = all.filter(item => `${item.id} ${item.displayName} ${module.name}`.toLocaleLowerCase().includes(needle));
-          if (!visible.length) return null;
-          const count = all.filter(item => selected.has(item.id)).length;
-          const label = moduleName(module.id, module.name);
-          return <div key={module.id} className="rounded-xl border p-3">
-            <div className="flex items-center gap-3">
-              <input type="checkbox" aria-label={label} aria-checked={count > 0 && count < all.length ? "mixed" : count === all.length}
-                ref={element => { if (element) element.indeterminate = count > 0 && count < all.length; }}
-                className="size-4 shrink-0 accent-primary" checked={count === all.length}
-                onChange={event => toggle(all.map(item => item.id), event.target.checked)} />
-              <span className="font-medium">{label}</span>
-              <span className="ml-auto whitespace-nowrap text-sm text-muted-foreground">{t("selection.moduleCount", { selected: count, total: all.length })}</span>
-            </div>
-            <p className="my-2 text-xs text-muted-foreground">{category === "STANDARD_JDBC"
-              ? t("selection.modulePurpose", { module: label }) : module.description}</p>
-            <details>
-              <summary className="cursor-pointer text-sm text-primary">{t("selection.expand")}</summary>
-              <div className="mt-3 max-h-96 space-y-2 overflow-auto">
-                {visible.map(item => <label key={item.id} className="flex cursor-pointer items-start gap-3 rounded-lg p-2 hover:bg-accent">
-                  <input type="checkbox" aria-label={`${item.displayName} (${item.id})`} className="mt-1 size-4 shrink-0 accent-primary" checked={selected.has(item.id)}
-                    onChange={event => toggle([item.id], event.target.checked)} />
-                  <span className="min-w-0 text-sm"><span className="block">{item.displayName}</span>
-                    <code className="break-all text-xs text-muted-foreground">{item.id}</code>
-                    <span className="block text-xs text-muted-foreground">{t("selection.jdbcVersion", { version: item.jdbcVersion ?? "—" })}{item.executionPrerequisites?.length ? ` · ${item.executionPrerequisites.join(", ")}` : ""}</span>
-                  </span>
-                </label>)}
+        <div className="test-module-grid">
+          {catalog.modules.map(module => {
+            const all = rows.filter(item => item.moduleId === module.id);
+            const visible = all.filter(item => `${item.id} ${item.displayName} ${module.name}`.toLocaleLowerCase().includes(needle));
+            if (!visible.length) return null;
+            const count = all.filter(item => selected.has(item.id)).length;
+            const label = moduleName(module.id, module.name);
+            return <div key={module.id} className="rounded-xl border p-3">
+              <div className="flex items-center gap-3">
+                <input type="checkbox" aria-label={label} aria-checked={count > 0 && count < all.length ? "mixed" : count === all.length}
+                  ref={element => { if (element) element.indeterminate = count > 0 && count < all.length; }}
+                  className="size-4 shrink-0 accent-primary" checked={count === all.length}
+                  onChange={event => toggle(all.map(item => item.id), event.target.checked)} />
+                <span className="font-medium">{label}</span>
+                <span className="ml-auto whitespace-nowrap text-sm text-muted-foreground">{t("selection.moduleCount", { selected: count, total: all.length })}</span>
               </div>
-            </details>
-          </div>;
-        })}
+              <p className="my-2 text-xs text-muted-foreground">{category === "STANDARD_JDBC"
+                ? t("selection.modulePurpose", { module: label }) : module.description}</p>
+              <details>
+                <summary className="cursor-pointer text-sm text-primary">{t("selection.expand")}</summary>
+                <div className="mt-3 max-h-96 space-y-2 overflow-auto">
+                  {visible.map(item => <label key={item.id} className="flex cursor-pointer items-start gap-3 rounded-lg p-2 hover:bg-accent">
+                    <input type="checkbox" aria-label={`${item.displayName} (${item.id})`} className="mt-1 size-4 shrink-0 accent-primary" checked={selected.has(item.id)}
+                      onChange={event => toggle([item.id], event.target.checked)} />
+                    <span className="min-w-0 text-sm"><span className="block">{item.displayName}</span>
+                      <code className="break-all text-xs text-muted-foreground">{item.id}</code>
+                      <span className="block text-xs text-muted-foreground">{t("selection.jdbcVersion", { version: item.jdbcVersion ?? "—" })}{item.executionPrerequisites?.length ? ` · ${item.executionPrerequisites.join(", ")}` : ""}</span>
+                    </span>
+                  </label>)}
+                </div>
+              </details>
+            </div>;
+          })}
+        </div>
       </section>;
     })}
   </div>;

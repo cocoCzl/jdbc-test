@@ -9,6 +9,8 @@ import type {
 export type Tone = "active" | "success" | "danger" | "neutral" | "warning";
 // History/presentation groups only. Execution controls continue to use RunStatus.
 export const runStatusGroups: Record<RunStatusGroup, { statuses: readonly RunStatus[]; label: string; tone: Tone }> = {
+  ACTIVE: { statuses: ["QUEUED", "PREPARING", "PROBING", "RUNNING", "GENERATING_REPORT"], get label() { return i18n.t("record.active"); }, tone: "active" },
+  ENDED: { statuses: ["SUCCEEDED", "FAILED", "INTERRUPTED", "CANCELLED"], get label() { return i18n.t("record.ended"); }, tone: "neutral" },
   WAITING: { statuses: ["QUEUED"], get label() { return i18n.t("run.group.waiting"); }, tone: "neutral" },
   IN_PROGRESS: { statuses: ["PREPARING", "PROBING", "RUNNING", "GENERATING_REPORT"], get label() { return i18n.t("run.group.inProgress"); }, tone: "active" },
   COMPLETED: { statuses: ["SUCCEEDED"], get label() { return i18n.t("run.succeeded"); }, tone: "success" },
@@ -18,7 +20,7 @@ export const runStatusGroups: Record<RunStatusGroup, { statuses: readonly RunSta
 export const runStatusGroupOrder: readonly RunStatusGroup[] = ["WAITING", "IN_PROGRESS", "COMPLETED", "ABNORMAL", "CANCELLED"];
 
 export function getRunPresentation(status: RunStatus) {
-  return Object.values(runStatusGroups).find(group => group.statuses.includes(status))
+  return runStatusGroupOrder.map(key => runStatusGroups[key]).find(group => group.statuses.includes(status))
     ?? { label: status, tone: "neutral" as const };
 }
 

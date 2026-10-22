@@ -142,13 +142,16 @@ test("API-mocked browser flow: upload → connection → Custom Statement → re
       buffer: Buffer.from("mocked artifact"),
     });
   await page.getByRole("button", { name: "Confirm upload" }).click();
-  await page.getByRole("button", { name: "Validate driver" }).click();
-  await expect(page.getByText("Driver loaded and metadata read in an isolated Worker")).toBeVisible();
+  await page.getByRole("button", { name: "Check driver files" }).click();
+  await expect(page.getByText("Load check passed")).toBeVisible();
   await page.goto("/connections/new");
   await page.getByLabel("Name", { exact: true }).fill("Test database");
   await chooseOption(page, page.getByLabel("Database type", { exact: true }), "postgresql");
   await chooseOption(page, page.getByLabel("Driver package", { exact: true }), driver.id);
   await page.getByLabel("JDBC URL", { exact: true }).fill(connection.jdbcUrl);
+  await page.getByLabel("Password", { exact: true }).fill("fixture-only-secret");
+  await page.getByLabel("Authorized test database", { exact: true }).fill("test");
+  await page.getByLabel("Authorized test schema", { exact: true }).fill("owned_scope");
   await page
     .getByRole("button", { name: "Test connection", exact: true })
     .click();
@@ -241,28 +244,30 @@ test("TEST FIXTURE ONLY: adapter declarations, filtered deep link and empty save
   for (const item of declarations) {
     await chooseOption(page, page.getByLabel("Database type", {exact: true}), item.id);
     await expect(page.getByLabel("Database type", {exact: true})).toHaveAttribute("data-value", item.id);
-    await expect(page.getByText("No validated version combinations declared.")).toBeVisible();
+    await expect(page.getByText("No validated version combinations declared.")).toHaveCount(0);
+    await expect(page.getByText("Adapter details", { exact: true })).toHaveCount(0);
   }
   await expect(page.getByRole("link", {name: "Upload a driver package"})).toBeVisible();
   expect(probes).toEqual([]);
   await page.goto("/connections/connection-1");
-  await page.getByLabel("Use an empty password explicitly").check();
-  await page.getByRole("button", {name: "Test saved connection"}).click();
+  await page.getByLabel("This account has no password").check();
+  await page.getByRole("button", {name: "Test connection"}).click();
   await expect(page.getByText("Connected", {exact:true})).toBeVisible();
-  expect(probes).toEqual([{password: ""}]);
+  expect(probes).toHaveLength(1);
+  expect(probes[0]).toMatchObject({ password: "", savedConnectionId: connection.id });
   await page.goto("/runs/new?connectionId=connection-1");
   await page.getByRole("button", {name: "Next page"}).click();
-  await chooseOption(page, page.getByLabel("Filter connections by database adapter"), "mysql");
+  await chooseOption(page, page.getByLabel("Filter connections"), "mysql");
   await expect(page.getByText("No matching connections")).toBeVisible();
   await expect(page.getByRole("button", {name: "Next: Choose driver"})).toBeDisabled();
   expect(requests.some(url => url.pathname === "/api/connections" && url.searchParams.get("adapterId") === "mysql"
     && url.searchParams.get("page") === "0")).toBe(true);
   await page.getByRole("button", {name: /^Theme:/}).click();
-  await expect(page.getByLabel("Filter connections by database adapter")).toHaveAttribute("data-value", "mysql");
+  await expect(page.getByLabel("Filter connections")).toHaveAttribute("data-value", "mysql");
   await page.setViewportSize({width: 390, height: 844});
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({path: "test-results/fixture-adapter-filter-mobile.png", fullPage: true});
-  await page.getByRole("button", {name: "Clear adapter filter"}).click();
+  await page.getByRole("button", {name: "Clear filter"}).click();
   await expect(page.getByRole("radio", {name: connection.name})).toBeChecked();
 });
 
@@ -315,7 +320,7 @@ test("TEST FIXTURE ONLY: bilingual driver presets preserve edits and render at d
   expect(errors).toEqual([]);
 });
 
-test("TEST FIXTURE ONLY: Kingbase official explains qualification in both languages", async ({ page }) => {
+test("TEST FIXTURE ONLY: Kingbase connection keeps historical qualification out of the form in both languages", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   const kingbase = {
     id: "kingbase", name: "KingbaseES", status: "OFFICIAL", dialect: "postgresql",
@@ -335,9 +340,11 @@ test("TEST FIXTURE ONLY: Kingbase official explains qualification in both langua
     const chinese = locale === "zh-CN";
     await chooseOption(page, page.locator("#database-type"), "kingbase");
     await expect(page.locator("#database-type")).toHaveAttribute("data-value", "kingbase");
-    await expect(page.getByText(chinese ? /正式平台适配仅限已验证组合/ : /Official platform integration for the validated combination only/)).toBeVisible();
-    await expect(page.locator("#database-type")).toContainText(chinese ? "KingbaseES · 官方" : "KingbaseES · Official");
-    await expect(page.getByText(chinese ? "数据库 12.1 · 驱动 V008R006B0001" : "Database 12.1 · Driver V008R006B0001")).toBeVisible();
+    await expect(page.getByText(chinese ? /正式平台适配仅限已验证组合/ : /Official platform integration for the validated combination only/)).toHaveCount(0);
+    await expect(page.locator("#database-type")).toContainText("KingbaseES");
+    await expect(page.locator("#database-type")).not.toContainText(chinese ? "官方" : "Official");
+    await expect(page.getByText(chinese ? "数据库 12.1 · 驱动 V008R006B0001" : "Database 12.1 · Driver V008R006B0001")).toHaveCount(0);
+    await expect(page.getByText(chinese ? "适配详情" : "Adapter details", { exact: true })).toHaveCount(0);
     await chooseOption(page, page.locator("#default-driver"), kingbaseDriver.id);
     await page.locator("#connection-name").fill("TEST FIXTURE — Kingbase official");
     await page.locator("#jdbc-url").fill("jdbc:kingbase8://fixture.invalid:4321/test");

@@ -11,12 +11,32 @@ function renderRuns(runs: Run[], compact = false) {
 }
 
 describe("shared run table cells", () => {
-  it("keeps the Custom module, profile, full ID and real detail link", () => {
+  it("has nine separate ordered columns, a name tooltip and an accessible eye action", () => {
+    const name = "A long saved task name that must not replace or share the status column";
+    renderRuns([{ ...finishedRun, name }]);
+    expect(screen.getAllByRole("columnheader").map(cell => cell.textContent)).toEqual([
+      "Task name", "Status", "Connection", "Driver", "Progress", "Results", "Duration", "Started", "Actions",
+    ]);
+    const cells = screen.getAllByRole("cell");
+    expect(within(cells[0]).getByRole("link", { name })).toHaveAttribute("title", name);
+    expect(cells[0].querySelector(".status-badge")).toBeNull();
+    expect(cells[1]).toHaveTextContent("Completed");
+    const action = within(cells[8]).getByRole("link", { name: "View details" });
+    expect(action).toHaveClass("resource-action");
+    expect(action.querySelector(".lucide-eye")).not.toBeNull();
+    expect(action).toHaveAttribute("href", `/runs/${finishedRun.id}`);
+  });
+  it("identifies creation time for tasks that have not started", () => {
+    renderRuns([{ ...finishedRun, status: "QUEUED", startedAt: null }]);
+    expect(screen.getAllByRole("cell")[7]).toHaveTextContent("Created");
+  });
+
+  it("uses a legacy display name and explicit details link without exposing the ID", () => {
     const run = { ...finishedRun, selectedModules: ["statement"], profile: "CUSTOM" };
     renderRuns([run]);
-    expect(screen.getByRole("link", { name: "Statement" })).toHaveAttribute("href", "/runs/run-1");
-    expect(screen.getByText(/Custom/)).toBeVisible();
-    expect(screen.getByText(/Run run-1/)).toHaveAttribute("title", "run-1");
+    expect(screen.getByRole("link", { name: /Statement/ })).toHaveAttribute("href", "/runs/run-1");
+    expect(screen.queryByText(/Run run-1/)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "View details" })).toHaveAttribute("href", "/runs/run-1");
     expect(screen.queryByRole("columnheader", { name: "Profile" })).not.toBeInTheDocument();
   });
 
@@ -37,17 +57,17 @@ describe("shared run table cells", () => {
     };
     renderRuns([run], true);
     const cells = screen.getAllByRole("cell");
-    const metrics = cells[3].querySelectorAll(".run-result-metric");
+    const metrics = cells[4].querySelectorAll(".run-result-metric");
     expect(Array.from(metrics, metric => metric.textContent)).toEqual([
       "Passed12", "Failed3", "Skipped4", "Aborted1", "Not run4", "Incomplete1",
     ]);
-    expect(within(cells[2]).getByText("20 / 25")).toBeVisible();
+    expect(within(cells[3]).getByText("20 / 25")).toBeVisible();
   });
 
   it("leaves missing legacy counts unknown instead of rendering zero", () => {
     const run = { ...finishedRun, completedCases: null, passed: null, failed: null, skipped: null, accounting: null } as unknown as Run;
     renderRuns([run], true);
-    const metrics = screen.getAllByRole("cell")[3].querySelectorAll(".run-result-metric");
+    const metrics = screen.getAllByRole("cell")[4].querySelectorAll(".run-result-metric");
     expect(Array.from(metrics, metric => metric.textContent)).toEqual([
       "Passed—", "Failed—", "Skipped—", "Aborted—",
     ]);

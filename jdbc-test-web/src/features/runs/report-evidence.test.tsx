@@ -12,8 +12,12 @@ describe("Report JSON provenance", () => {
     mockApi(url => url.pathname === "/api/runs/run-1" ? json(historical)
       : url.pathname.endsWith("/report") ? json({summary: historical, failures: []}) : undefined);
     renderPage("/runs/run-1");
-    expect(await screen.findByText("old-sql · 1 · Local import")).toBeVisible();
-    expect(screen.getByText("Historical SQL definition (read only)")).toBeVisible();
+    const user = userEvent.setup();
+    await user.click(await screen.findByText("Technical details"));
+    expect(screen.queryByText(/retained evidence/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", {name: "View original configuration"}));
+    expect(screen.getByRole("dialog")).toHaveTextContent("old-sql");
+    expect(screen.getByRole("dialog")).toHaveTextContent("retained evidence");
     expect(screen.queryByRole("link", {name: "SQL test packages"})).not.toBeInTheDocument();
     expect(screen.queryByRole("link", {name: "Database adapters"})).not.toBeInTheDocument();
   });

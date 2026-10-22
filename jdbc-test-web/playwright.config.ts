@@ -26,7 +26,7 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   projects: [
-    { name: "mocked", testMatch: ["**/driver-layout.spec.ts", "**/product-scope.spec.ts", "**/smoke.spec.ts", "**/bilingual.spec.ts", "**/ui-migration.spec.ts", "**/theme.spec.ts", "**/test-selection.spec.ts", "**/run-history-status.spec.ts"] },
+    { name: "mocked", testMatch: ["**/run-records-detail.spec.ts", "**/run-password.spec.ts", "**/run-connection-list.spec.ts", "**/resource-lists.spec.ts", "**/connection-validation.spec.ts", "**/wide-form-layout.spec.ts", "**/connection-layout.spec.ts", "**/driver-layout.spec.ts", "**/product-scope.spec.ts", "**/smoke.spec.ts", "**/bilingual.spec.ts", "**/ui-migration.spec.ts", "**/theme.spec.ts", "**/test-selection.spec.ts", "**/run-history-status.spec.ts"] },
     { name: "primitives", testMatch: "**/primitives.spec.ts" },
     { name: "history-readonly", testMatch: ["**/history-readonly.spec.ts", "**/history-report-readonly.spec.ts"], use: { trace: "off" } },
     { name: "real", testMatch: ["**/real.spec.ts", "**/*.real.spec.ts"], use: { trace: "off" } },

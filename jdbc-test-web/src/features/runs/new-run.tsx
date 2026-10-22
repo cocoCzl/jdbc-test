@@ -1,10 +1,11 @@
+import { RunPassword, type RunPasswordMode } from "./run-password";
 import { TestSelection } from "./test-selection";
 import { useTestSelection, missingPrerequisites } from "./test-selection-state";
 import { Card } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { adaptersApi, adapterKeys } from "@/api/adapters";
-import { AdapterDetails } from "@/features/connections/adapter-details";
-import { profileName } from "@/lib/presentation";
+import { ConnectionChoiceList } from "./connection-choice-list";
+import { profileName, runSelectionName } from "@/lib/presentation";
 import { t } from "i18next";
 import { useTranslation } from "react-i18next";
 import { JdbcUrl } from "@/components/jdbc-url";
@@ -33,9 +34,7 @@ import {
   Loading,
   PageHeader,
   PendingPage,
-  StatusBadge,
 } from "@/components/common";
-import { connectionPresentation } from "@/lib/status";
 import { formatDateTime, plural, shortId } from "@/lib/format";
 import { cn } from "@/lib/utils";
 export default function NewRun() {
@@ -45,15 +44,17 @@ export default function NewRun() {
   const [search] = useSearchParams();
   const presetId = search.get("connectionId");
   const [step, setStep] = useState(0);
+  const [name, setName] = useState<string | null>(null);
+  const [nameTime] = useState(() => new Date().toISOString());
   const [page, setPage] = useState(0);
   const [adapterFilter, setAdapterFilter] = useState("");
   const [connection, setConnection] = useState<Connection | null>(null);
   const [driver, setDriver] = useState<DriverSummary | null>(null);
   const [budgetSeconds, setBudgetSeconds] = useState(1800);
   const [consent, setConsent] = useState(false);
-  const [differentPassword, setDifferentPassword] = useState(false);
-  const [password, setPassword] = useState("");
-  const [emptyPassword, setEmptyPassword] = useState(false);
+  const [credentials, setCredentials] = useState<{
+    connectionId: string; mode: RunPasswordMode; password: string;
+  } | null>(null);
   const [error, setError] = useState<string | Error | null>(null);
   const submitting = useRef(false);
   const params = { page, size: 12, sort: "name,asc", adapterId: adapterFilter || undefined };
@@ -84,6 +85,8 @@ export default function NewRun() {
   const selectionCount = selectedIds.length;
   const excludedIds = catalog.data?.scenarios.filter(item => !selection.selected.has(item.id)).map(item => item.id) ?? [];
   const profile = excludedIds.length ? "CUSTOM" : "FULL";
+  const runName = name ?? `${chosen?.name ?? ""} · ${runSelectionName({profile, selectedModules: []})} · ${formatDateTime(nameTime)}`;
+  const nameValid = runName.trim().length > 0 && runName.trim().length <= 200;
   const budgetValid = Number.isInteger(budgetSeconds) && budgetSeconds >= 60 && budgetSeconds <= 7200;
   const outsideFilter = !!chosen && !!adapterFilter && chosen.adapterId !== adapterFilter;
   const chosenAdapter = adapters.data?.find((item) => item.id === chosen?.adapterId);
@@ -92,11 +95,18 @@ export default function NewRun() {
     queryFn: ({ signal }) => driversApi.get(chosenDriver!.id, signal),
     enabled: !!chosenDriver,
   });
-  const needsPassword =
-    !!chosen && (!chosen.hasSavedPassword || differentPassword);
+  // Scope transient credentials to their connection, including asynchronously loaded presets.
+  const currentCredentials = credentials?.connectionId === chosen?.id ? credentials : null;
+  const requestedPasswordMode = currentCredentials?.mode;
+  const passwordMode = requestedPasswordMode === "saved" && !chosen?.hasSavedPassword
+    ? "other" : requestedPasswordMode ?? (chosen?.hasSavedPassword ? "saved" : "other");
+  const password = currentCredentials?.password ?? "";
+  const passwordReady = passwordMode === "saved" ? !!chosen?.hasSavedPassword
+    : passwordMode === "empty" || password.length > 0;
   const create = useMutation({
     mutationFn: () =>
       runsApi.create({
+        name: runName.trim(),
         connectionId: chosen!.id,
         driverId: chosenDriver!.id,
         profile,
@@ -107,7 +117,7 @@ export default function NewRun() {
         expectedAdapterFingerprint: chosenAdapter?.fingerprint ?? undefined,
         budgetSeconds,
         destructiveConsent: consent,
-        ...(emptyPassword ? { password: "" } : needsPassword ? { password } : {}),
+        ...(passwordMode === "empty" ? { password: "" } : passwordMode === "other" ? { password } : {}),
       }),
     onSuccess: (run) => {
       toast.success(t("ui.runQueued"));
@@ -119,7 +129,7 @@ export default function NewRun() {
       submitting.current = false;
       setError(failure instanceof Error ? failure : new Error());
     },
-    onSettled: () => { setPassword(""); setEmptyPassword(false); },
+    onSettled: () => { setCredentials(previous => previous ? { ...previous, password: "" } : null); },
   });
   if (
     connections.isPending ||
@@ -142,35 +152,36 @@ export default function NewRun() {
     step === 0
       ? !!chosen && !!chosenAdapter && !outsideFilter
       : step === 1
-        ? chosenDriver?.status === "VALIDATED" && (!needsPassword || !!password || emptyPassword)
+        ? chosenDriver?.status === "VALIDATED" && passwordReady
         : step === 2
           ? !!catalog.data && selectionCount > 0 && budgetValid
           : false;
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="workspace-page">
       {connections.isError && connections.data ? <ErrorState error={connections.error} retry={() => void connections.refetch()} /> : null}
       {catalog.isError && catalog.data ? <ErrorState error={catalog.error} retry={() => void catalog.refetch()} /> : null}
       <PageHeader
         title={t("ui.newTestRun")}
         description={t("ui.chooseAConnectionAndDriverSelectTests")}
       />
-      <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-4">
+      <div className="wizard-steps" role="group" aria-label={t("wizard.steps")}>
         {[t("ui.connection"), t("ui.driver"), t("ui.testSelection"), t("ui.reviewConfirm")].map(
           (label, index) => (
             <button
               key={index}
               disabled={index > step}
+              aria-current={index === step ? "step" : undefined}
               onClick={() => setStep(index)}
               className={cn(
-                "flex items-center gap-3 rounded-xl border p-3 text-left text-sm",
+                "wizard-step",
                 index === step
-                  ? "border-primary bg-accent text-primary"
+                  ? "wizard-step-current"
                   : "border-border bg-card text-muted-foreground",
               )}
             >
               <span
                 className={cn(
-                  "flex size-7 items-center justify-center rounded-full text-xs font-semibold",
+                  "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
                   index === step ? "bg-primary text-primary-foreground" : "bg-secondary",
                 )}
               >
@@ -181,13 +192,17 @@ export default function NewRun() {
           ),
         )}
       </div>
-      <Card as="section" className="panel">
+      <Card as="section" className="wizard-panel">
         <p className="eyebrow mb-2">{t("wizard.step", {step: step + 1})}</p>
         {step === 0 ? (
           <>
-            <h2 className="mb-3 text-xl font-semibold">{t("ui.chooseAConnection")}</h2>
-            <div className="mb-4">
-              <Field id="run-adapter-filter" label={t("adapter.filter")} hint={t("adapter.filterHint")}>
+            <div className="run-connection-toolbar">
+              <div className="flex min-w-0 flex-wrap items-baseline gap-2">
+                <h2 className="text-lg font-semibold">{t("ui.chooseAConnection")}</h2>
+                <span className="text-xs text-muted-foreground">{plural(connections.data.totalElements, "record")}</span>
+              </div>
+              <div className="run-connection-filter">
+              <Field id="run-adapter-filter" label={t("adapter.filter")}>
                 <Select id="run-adapter-filter" value={adapterFilter}
                   disabled={!adapters.data}
                   onValueChange={(value) => { setAdapterFilter(value); setPage(0); }}>
@@ -195,132 +210,60 @@ export default function NewRun() {
                   {adapters.data?.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </Select>
               </Field>
-              {adapters.isError ? <ErrorState error={adapters.error} retry={() => void adapters.refetch()} /> : null}
+              </div>
             </div>
+            {adapters.isError ? <ErrorState error={adapters.error} retry={() => void adapters.refetch()} /> : null}
             {outsideFilter ? (
-              <div className="mb-4 rounded-xl border border-warning/30 p-4 text-sm" role="status">
+              <div id="selected-outside-filter" className="mb-4 rounded-xl border border-warning/30 p-4 text-sm" role="status">
                 <p>{t("adapter.selectedOutsideFilter", { name: chosen.name })}</p>
-                <Button variant="ghost" onClick={() => { setAdapterFilter(""); setPage(0); }}>{t("adapter.clearFilter")}</Button>
+                {connections.data.items.length ? <Button variant="ghost" onClick={() => { setAdapterFilter(""); setPage(0); }}>{t("adapter.clearFilter")}</Button> : null}
               </div>
             ) : null}
             {connections.data.items.length ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                {connections.data.items.map((item) => (
-                  <div key={item.id} data-selected={chosen?.id === item.id} className="step-card min-w-0 cursor-pointer"
-                    onClick={(event) => {
-                      if ((event.target as HTMLElement).closest("button, input, label")) return;
-                      setConnection(item); setDriver(null); setPassword(""); setEmptyPassword(false); setDifferentPassword(false);
-                    }}>
-                    <label className="mb-2 flex cursor-pointer items-center gap-2 text-sm font-medium text-primary">
-                      <input type="radio" name="run-connection" aria-label={item.name}
-                        className="size-4 accent-primary" checked={chosen?.id === item.id}
-                        onChange={() => { setConnection(item); setDriver(null); setPassword(""); setEmptyPassword(false); setDifferentPassword(false); }} />
-                      {chosen?.id === item.id ? t("ui.selected") : t("ui.selectConnection")}
-                    </label>
-                    <div className="flex items-center justify-between">
-                      <h3 className="min-w-0 break-words font-semibold">{item.name}</h3>
-                      {chosen?.id === item.id ? (
-                        <Check className="size-4 text-primary" />
-                      ) : null}
-                    </div>
-                    <p className="my-2 text-xs text-muted-foreground">
-                      {t("ui.databaseLabel")}{item.databaseType}  {t("ui.adapterInline")} {item.adapterId}
-                    </p>
-                    <div className="mb-3" onClick={(event) => event.stopPropagation()}>
-                      <JdbcUrl value={item.jdbcUrl} />
-                    </div>
-                    {item.lastConnectionTestStatus ? (
-                      <StatusBadge
-                        {...connectionPresentation[
-                          item.lastConnectionTestStatus
-                        ]}
-                      />
-                    ) : (
-                      <span className="text-xs text-muted-foreground">
-                        {t("ui.notTested")}</span>
-                    )}
-                    <p className="mt-2 text-xs text-muted-foreground">{t("ui.lastTestLabel")} {formatDateTime(item.lastConnectionTestAt)}</p>
-                  </div>
-                ))}
-              </div>
+              <ConnectionChoiceList items={connections.data.items} selectedId={chosen?.id}
+                onSelect={item => { setConnection(item); setDriver(null); setCredentials(null); }} />
             ) : (
-              <EmptyState
+              <EmptyState compact
                 title={t(adapterFilter ? "adapter.noMatchingConnections" : "ui.noConnectionsYet")}
-                description={t(adapterFilter ? "adapter.createMatchingConnection" : "ui.addATargetDatabaseConnectionFirst")}
+                description={t(adapterFilter ? "wizard.noFilterResultsHint" : "ui.addATargetDatabaseConnectionFirst")}
                 action={
-                  <Button asChild>
+                  adapterFilter ? <Button variant="outline" onClick={() => { setAdapterFilter(""); setPage(0); }}>
+                    {t("adapter.clearFilter")}
+                  </Button> : <Button asChild>
                     <Link to="/connections/new">{t("ui.addConnection")}</Link>
                   </Button>
                 }
               />
             )}
-            <Pagination {...connections.data} onPage={setPage} />
-            {chosen &&
-            !connections.data.items.some((item) => item.id === chosen.id) ? (
-              <p className="mt-4 text-sm">{t("ui.selectedConnection")} {chosen.name}</p>
-            ) : null}
-            {chosen ? <div className="mt-4"><AdapterDetails adapter={chosenAdapter} />
-              {chosen.databaseType === "compatible" ? <p className="mt-2 text-sm">{t("adapter.compatibleHint")}</p> : null}
-              {adapters.data && !chosenAdapter ? <p role="alert">{t("adapter.legacyConnection")}</p> : null}
-            </div> : null}
+            {connections.data.items.length && connections.data.totalPages > 1 ? <Pagination {...connections.data} onPage={setPage} /> : null}
+            {chosen && adapters.data && !chosenAdapter ? <p role="alert" className="mt-3 text-sm text-destructive">{t("adapter.legacyConnection")}</p> : null}
           </>
         ) : null}
         {step === 1 ? (
-          <div className="max-w-xl space-y-4">
-            <h2 className="text-xl font-semibold">{t("ui.chooseAValidatedDriver")}</h2>
+          <div className="wizard-driver-step">
+            <h2 className="text-lg font-semibold">{t("ui.chooseAValidatedDriver")}</h2>
             <DriverSelect
               presentation="cards"
               value={chosenDriver?.id ?? ""}
               selected={chosenDriver}
               onChange={setDriver}
             />
-            <p className="text-sm text-muted-foreground">{t("adapter.driverValidationBoundary")}</p>
-            {chosen?.hasSavedPassword ? (
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="size-4 accent-primary"
-                  checked={differentPassword}
-                  onChange={(event) => {
-                    setDifferentPassword(event.target.checked);
-                    setPassword("");
-                  }}
-                />
-                {t("ui.useADifferentPasswordForThisRun")}</label>
-            ) : null}
-            <label className="my-3 flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={emptyPassword}
-                onChange={(event) => { setEmptyPassword(event.target.checked); setPassword(""); }} />
-              {t("credentials.emptyPassword")}
-            </label>
-            {needsPassword ? (
-              <Field
-                id="run-password"
-                label={t("ui.passwordForThisRun")}
-                type="password"
-                autoComplete="new-password"
-                maxLength={2000}
-                disabled={emptyPassword}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                hint={t("ui.thisPasswordIsUsedOnlyForThis")}
-              />
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                {emptyPassword ? t("credentials.emptyPassword") : t("ui.theSavedConnectionPasswordWillBeUsed")}</p>
-            )}
+            <p className="text-xs text-muted-foreground">{t("adapter.driverValidationBoundary")}</p>
+            <RunPassword hasSavedPassword={!!chosen?.hasSavedPassword} mode={passwordMode} password={password}
+              onModeChange={mode => setCredentials({ connectionId: chosen!.id, mode, password: "" })}
+              onPasswordChange={value => setCredentials({ connectionId: chosen!.id, mode: "other", password: value })} />
           </div>
         ) : null}
         {step === 2 && !catalog.data ? (catalog.isError ? <ErrorState error={catalog.error} retry={() => void catalog.refetch()} /> : <Loading />) : null}
         {step === 2 && catalog.data ? (
           <>
-            <h2 className="mb-3 text-xl font-semibold">
+            <h2 className="mb-3 text-lg font-semibold">
               {t("ui.defineYourTestSelection")}</h2>
             <TestSelection catalog={catalog.data} selected={selection.selected} onChange={selection.setSelected} />
             {selection.removed ? <p role="status" className="mt-3 text-sm">{t("selection.removed", { count: selection.removed })}</p> : null}
-            <label className="mt-5 block text-sm">{t("selection.budget")}
+            <label className="mt-5 flex flex-wrap items-center gap-3 text-sm">{t("selection.budget")}
               <input type="number" min={60} max={7200} step={1} value={budgetSeconds}
-                className="mx-3 w-28 rounded-md border bg-background p-2"
+                className="w-28 rounded-md border bg-background p-2"
                 onChange={event => setBudgetSeconds(Number(event.target.value))} />
             </label>
             <p className="mt-2 text-xs text-muted-foreground">{t("selection.budgetHint")}</p>
@@ -330,9 +273,12 @@ export default function NewRun() {
         ) : null}
         {step === 3 ? (
           <>
-            <h2 className="mb-3 text-xl font-semibold">
+            <h2 className="mb-3 text-lg font-semibold">
               {t("ui.reviewBeforeYouRun")}</h2>
-            <div className="grid gap-6 md:grid-cols-3">
+            <div className="mb-5 max-w-2xl"><Field id="run-name" label={t("record.taskName")} required
+              maxLength={200} value={runName} onChange={event => setName(event.target.value)}
+              error={!nameValid ? t("record.nameRequired") : undefined} /></div>
+            <div className="grid min-w-0 gap-5 md:grid-cols-3 [&>div]:min-w-0">
               <div>
                 <p className="eyebrow">{t("ui.targetConnection")}</p>
                 <p className="mt-3 break-words font-semibold">{chosen?.name}</p>
@@ -341,7 +287,8 @@ export default function NewRun() {
                 </p>
                 {chosen ? <div className="mt-2"><JdbcUrl value={chosen.jdbcUrl} /></div> : null}
                 <p className="mt-2 text-sm">{t("ui.authorizedTestScope")} {chosen?.executionDatabase || "—"} / {chosen?.executionSchema || "—"}</p>
-                <div className="mt-3"><AdapterDetails adapter={chosenAdapter} /></div>
+                <p className="mt-2 text-sm">{t("ui.passwordForThisRun")}: {t(`runPassword.${passwordMode}`)}</p>
+                <p className="mt-2 text-sm">{t("connection.sqlDialect")}: {chosen?.sqlDialect ?? chosenAdapter?.dialect ?? "—"}</p>
               </div>
               <div>
                 <p className="eyebrow">{t("ui.driverPackage")}</p>
@@ -385,7 +332,7 @@ export default function NewRun() {
                 />
                 {t("ui.iUnderstandThatTheseJDBCTestsMay")}</label>
             </div>
-            {needsPassword && !password && !emptyPassword ? (
+            {!passwordReady ? (
               <p role="alert" className="mt-4 text-sm text-destructive">
                 {t("ui.reEnterTheTemporaryPasswordInThe")}</p>
             ) : null}
@@ -393,19 +340,25 @@ export default function NewRun() {
         ) : null}
       </Card>
       {error ? <div className="mt-3"><FormError message={error} /></div> : null}
-      <div className="mt-4 flex items-center justify-between gap-4">
+      <div className="wizard-actions">
+        <div className="wizard-back-selection flex min-w-0 flex-1 items-center gap-3">
         <Button
           variant="outline"
           disabled={step === 0 || create.isPending}
           onClick={() => setStep((previous) => previous - 1)}
         >
           {t("ui.back")}</Button>
+        {step === 0 ? <p className="wizard-current-connection min-w-0 text-sm" aria-live="polite">
+          <span className="text-muted-foreground">{t("ui.selectedConnection")} </span>
+          <strong className="break-words">{chosen?.name ?? t("wizard.noConnectionSelected")}</strong>
+        </p> : null}
+        </div>
         {step < 3 ? (
           <div className="flex flex-wrap items-center justify-end gap-3">
-          {!continueAllowed ? <p id="continue-reason" className="text-sm text-muted-foreground">
+          {!continueAllowed && !(step === 0 && outsideFilter) ? <p id="continue-reason" className="text-sm text-muted-foreground">
             {step === 0 ? t("ui.selectAConnectionToContinue") : step === 1 ? chosenDriver?.status !== "VALIDATED" ? t("ui.selectAValidatedDriverToContinue") : t("ui.enterThePasswordForThisRunTo") : t("ui.selectAtLeastOneModuleToContinue")}
           </p> : null}
-          <Button aria-describedby={!continueAllowed ? "continue-reason" : undefined}
+          <Button aria-describedby={!continueAllowed ? step === 0 && outsideFilter ? "selected-outside-filter" : "continue-reason" : undefined}
             disabled={!continueAllowed}
             onClick={() => setStep((previous) => previous + 1)}
           >
@@ -422,8 +375,9 @@ export default function NewRun() {
               selectionCount === 0 ||
               !catalog.data ||
               !budgetValid ||
+              !nameValid ||
               chosenDriver?.status !== "VALIDATED" ||
-              (needsPassword && !password && !emptyPassword)
+              (!passwordReady)
             }
             onClick={() => {
               if (submitting.current) return;

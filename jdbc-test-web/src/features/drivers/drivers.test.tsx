@@ -1,6 +1,6 @@
 import { chooseOption } from "@/test/select";
 import i18n from "@/i18n";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { driver, page } from "@/test/fixtures";
@@ -8,6 +8,18 @@ import { json, mockApi, problem, renderPage } from "@/test/harness";
 import { validateFiles } from "@/lib/driver-upload";
 
 describe("Driver UI", () => {
+  it("keeps the editor open when a stale backend ignores the selected default dialect", async () => {
+    const user = userEvent.setup();
+    mockApi((_url, options) => options.method === "PATCH" ? json(driver) : undefined);
+    renderPage("/drivers/driver-1");
+    await user.click(await screen.findByRole("button", { name: "Edit information" }));
+    await chooseOption(user, screen.getByLabelText("Default SQL dialect (optional)"), "postgresql");
+    await user.click(screen.getByRole("button", { name: "Save information" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("DRIVER_DIALECT_UPDATE_FAILED");
+    expect(screen.getByLabelText("Default SQL dialect (optional)")).toHaveTextContent("PostgreSQL");
+    expect(screen.getByRole("button", { name: "Save information" })).toBeVisible();
+  });
+
   it("shows backend-provided ambiguous class candidates for correction", async () => {
     const user = userEvent.setup();
     mockApi((_url, options) =>
@@ -43,20 +55,21 @@ describe("Driver UI", () => {
     const user = userEvent.setup();
     const api = mockApi((_url, options) =>
       options.method === "PATCH"
-        ? json({ ...driver, name: "Renamed" })
+        ? json({ ...driver, name: "Renamed", defaultSqlDialect: "oracle" })
         : undefined,
     );
     renderPage("/drivers/driver-1");
     await user.click(
-      await screen.findByRole("button", { name: "Edit metadata" }),
+      await screen.findByRole("button", { name: "Edit information" }),
     );
     await user.clear(screen.getByLabelText("Name"));
     await user.type(screen.getByLabelText("Name"), "Renamed");
-    await user.click(screen.getByText("Standard DataSource implementations (optional)"));
+    await chooseOption(user, screen.getByLabelText("Default SQL dialect (optional)"), "oracle");
+    await user.click(screen.getByText("Advanced interface configuration", { selector: "form summary" }));
     await user.type(screen.getByLabelText("dataSource — Implementation class"), "custom.jdbc.Source");
     await user.clear(screen.getByLabelText("URL property name"));
     await user.type(screen.getByLabelText("URL property name"), "jdbcUrl");
-    await user.click(screen.getByRole("button", { name: "Save metadata" }));
+    await user.click(screen.getByRole("button", { name: "Save information" }));
     await waitFor(() =>
       expect(
         api.mock.calls.some(([, options]) => options?.method === "PATCH"),
@@ -67,9 +80,68 @@ describe("Driver UI", () => {
         .body as string,
     );
     expect(body.name).toBe("Renamed");
+    expect(body.defaultSqlDialect).toBe("oracle");
     expect(body.dataSources.dataSource).toEqual({ className: "custom.jdbc.Source", urlProperty: "jdbcUrl" });
     expect(body).not.toHaveProperty("artifacts");
     expect(body).not.toHaveProperty("storageKey");
+  });
+  it.each(["en", "zh-CN"])("preserves a full stored URL and existing advanced providers when editing in %s", async language => {
+    await i18n.changeLanguage(language);
+    const user = userEvent.setup();
+    const saved = {
+      ...driver,
+      urlPrefix: "jdbc:kingbase8://192.0.2.20:4321/existing_database",
+      dataSources: {
+        dataSource: { className: "custom.jdbc.Source", urlProperty: "jdbcUrl", userProperty: "login", passwordProperty: "secret" },
+        connectionPoolDataSource: { className: "custom.jdbc.Pool" },
+        xaDataSource: { className: "custom.jdbc.XA", urlProperty: "connectionUrl" },
+      },
+    };
+    const api = mockApi((url, options) => {
+      if (url.pathname === "/api/drivers/driver-1") return json(saved);
+      if (options.method === "PATCH") return json(saved);
+    });
+    renderPage("/drivers/driver-1");
+    const summary = await screen.findByText(i18n.t("ui.driverAdvancedInterfaces"), { selector: "summary" });
+    expect(summary.closest("details")).not.toHaveAttribute("open");
+    expect(screen.getByText("custom.jdbc.Source")).not.toBeVisible();
+    await user.click(summary);
+    for (const provider of Object.values(saved.dataSources)) {
+      expect(screen.getByText(provider.className)).toBeVisible();
+    }
+    expect(screen.getByText(saved.urlPrefix)).toBeVisible();
+    expect(screen.queryByText(i18n.t("driverPreset.urlPrefixHint"))).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: i18n.t("ui.editMetadata") }));
+    const url = screen.getByLabelText(i18n.t("ui.jdbcURLPrefix"));
+    expect(url).toHaveValue(saved.urlPrefix);
+    expect(url).not.toBeRequired();
+    const editorSummary = screen.getByText(i18n.t("ui.driverAdvancedInterfaces"), { selector: "form summary" });
+    expect(editorSummary.closest("details")).not.toHaveAttribute("open");
+    await user.click(editorSummary);
+    expect(screen.getByLabelText(`dataSource — ${i18n.t("ui.implementationClass")}`)).toHaveValue("custom.jdbc.Source");
+    const property = within(editorSummary.closest("details")!).getAllByLabelText(i18n.t("ui.urlProperty"))[0];
+    await user.clear(property);
+    await user.type(property, "updatedUrl");
+    await user.click(screen.getByRole("button", { name: i18n.t("ui.saveMetadata") }));
+    await waitFor(() => expect(api.mock.calls.some(([, options]) => options?.method === "PATCH")).toBe(true));
+    const body = JSON.parse(api.mock.calls.find(([, options]) => options?.method === "PATCH")![1]!.body as string);
+    expect(body.urlPrefix).toBe(saved.urlPrefix);
+    expect(body.dataSources).toEqual({
+      ...saved.dataSources,
+      dataSource: { ...saved.dataSources.dataSource, urlProperty: "updatedUrl" },
+    });
+  });
+  it.each(["en", "zh-CN"])("shows optional unconfigured interfaces only after expanding in %s", async language => {
+    await i18n.changeLanguage(language);
+    const user = userEvent.setup();
+    mockApi();
+    renderPage("/drivers/driver-1");
+    const summary = await screen.findByText(i18n.t("ui.driverAdvancedInterfaces"), { selector: "summary" });
+    expect(summary.closest("details")).not.toHaveAttribute("open");
+    expect(screen.getByText("DataSource", { exact: true })).not.toBeVisible();
+    await user.click(summary);
+    expect(screen.getAllByText(i18n.t("ui.driverInterfaceNotConfigured"))).toHaveLength(3);
+    expect(screen.queryByText(i18n.t("ui.driverAdvancedInterfacesHint"))).not.toBeInTheDocument();
   });
   it("renders the paginated list and artifact counts", async () => {
     mockApi();
@@ -77,7 +149,7 @@ describe("Driver UI", () => {
     expect(
       await screen.findByRole("link", { name: driver.name }),
     ).toBeVisible();
-    expect(screen.getByText("Validated")).toBeVisible();
+    expect(screen.getAllByText("Load check passed").length).toBeGreaterThan(0);
   });
   it("shows an actionable empty state", async () => {
     mockApi((url) =>
@@ -176,13 +248,20 @@ describe("Driver UI", () => {
     );
     renderPage("/drivers/driver-1");
     await user.click(
-      await screen.findByRole("button", { name: "Validate driver" }),
+      await screen.findByRole("button", { name: "Check driver files" }),
     );
     expect(
-      await screen.findByText("Driver loaded and metadata read in an isolated Worker"),
+      await screen.findByRole("heading", { name: "Load check passed" }),
     ).toBeVisible();
-    expect(screen.getByText("Driver-reported major/minor version: 42.7")).toBeVisible();
-    expect(screen.getByText("Driver-reported JDBC compliance: No")).toBeVisible();
+    const result = within(screen.getByRole("region", { name: "Load check passed" }));
+    expect(result.getByText("Technical details").closest("details")).not.toHaveAttribute("open");
+    expect(result.getByText("Version declared in file").nextElementSibling).toHaveTextContent("Not provided");
+    expect(result.getByText("42.7")).not.toBeVisible();
+    expect(result.getAllByText("Not tested")).toHaveLength(2);
+    expect(result.getByRole("link", { name: "Configure connection" })).toHaveAttribute("href", "/connections/new");
+    await user.click(result.getByText("Technical details"));
+    expect(result.getByText("42.7")).toBeVisible();
+    expect(result.getByText("false", { exact: true })).toBeVisible();
     expect(document.body.textContent).not.toMatch(/storageKey|workspacePath/);
   });
   it.each(["en", "zh-CN"])("separates registered, API and defining-JAR versions in %s", async language => {
@@ -202,14 +281,19 @@ describe("Driver UI", () => {
     });
     renderPage("/drivers/driver-1");
     await user.click(await screen.findByRole("button", { name: i18n.t("ui.validateDriver") }));
-    expect(await screen.findByText(`${i18n.t("ui.driverReportedVersion")}: 0.0`)).toBeVisible();
-    expect(screen.getByText(i18n.t("ui.registeredDriverVersion"), { selector: "dt" }).nextElementSibling).toHaveTextContent("9.0.0");
-    expect(screen.getByText(i18n.t("ui.driverZeroVersionHint"))).toBeVisible();
-    expect(screen.getByText("JAR manifest · Implementation-Version").nextElementSibling).toHaveTextContent(i18n.t("ui.driverMetadataNotProvided"));
-    expect(screen.getByText("JAR manifest · Bundle-Version").nextElementSibling).toHaveTextContent("0.0.0.V009R002C016");
-    expect(screen.getByText("actual-driver.jar")).toBeVisible();
-    expect(screen.getByText(i18n.t("ui.driverComplianceSource"))).toBeVisible();
-    expect(screen.getByText(i18n.t("ui.metadataFromThisValidationResponseNotA"))).toBeVisible();
+    const result = within(await screen.findByRole("region", { name: i18n.t("ui.driverCheckPassed") }));
+    expect(result.getByText("0.0", { exact: true })).not.toBeVisible();
+    expect(result.getByText(i18n.t("ui.driverZeroVersionHint"))).not.toBeVisible();
+    expect(result.queryByText(i18n.t("ui.registeredDriverVersion"))).not.toBeInTheDocument();
+    expect(screen.getByText(/9\.0\.0/)).toBeVisible();
+    expect(result.getByText(i18n.t("ui.driverCheckFileVersion")).nextElementSibling).toHaveTextContent("0.0.0.V009R002C016");
+    expect(result.getByText("actual-driver.jar")).toBeVisible();
+    await user.click(result.getByText(i18n.t("ui.driverCheckDetails")));
+    expect(result.getByText("0.0", { exact: true })).toBeVisible();
+    expect(result.getByText(i18n.t("ui.driverZeroVersionHint"))).toBeVisible();
+    expect(result.getByText("Implementation-Version").nextElementSibling).toHaveTextContent(i18n.t("ui.driverMetadataNotProvided"));
+    expect(result.getByText("Bundle-Version").nextElementSibling).toHaveTextContent("0.0.0.V009R002C016");
+    expect(result.getByText(i18n.t("ui.driverComplianceSource"))).toBeVisible();
     await i18n.changeLanguage("en");
   });
   it.each([
@@ -224,14 +308,15 @@ describe("Driver UI", () => {
       status: "VALIDATED", driverClass: driver.driverClass, ...fields,
     }) : undefined);
     renderPage("/drivers/driver-1");
-    await user.click(await screen.findByRole("button", { name: "Validate driver" }));
+    await user.click(await screen.findByRole("button", { name: "Check driver files" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("INVALID_RESPONSE");
-    expect(screen.queryByText(/Driver-reported major\/minor version:/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Driver-reported JDBC compliance:/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Load check passed" })).not.toBeInTheDocument();
+    expect(screen.queryByText("API major/minor version")).not.toBeInTheDocument();
+    expect(screen.queryByText("JDBC compliance declaration (API value)")).not.toBeInTheDocument();
   });
   it.each([
-    ["/drivers", "Validate"],
-    ["/drivers/driver-1", "Validate driver"],
+    ["/drivers", `Check driver files: ${driver.name}`],
+    ["/drivers/driver-1", "Check driver files"],
   ])("refreshes the persisted invalid status after failed validation on %s", async (route, label) => {
     const user = userEvent.setup();
     let invalid = false;
@@ -247,7 +332,7 @@ describe("Driver UI", () => {
     });
     renderPage(route);
     await user.click(await screen.findByRole("button", { name: label }));
-    expect(await screen.findByText("Invalid", { exact: true })).toBeVisible();
+    expect(await screen.findByText("Load check failed", { exact: true })).toBeVisible();
   });
   it("shows companion dependency warnings without claiming complete compatibility", async () => {
     const user = userEvent.setup();
@@ -257,8 +342,10 @@ describe("Driver UI", () => {
       warnings: ["ORACLE_I18N_MISSING", "ORACLE_XML_MISSING"],
     }) : undefined);
     renderPage("/drivers/driver-1");
-    await user.click(await screen.findByRole("button", { name: "Validate driver" }));
+    await user.click(await screen.findByRole("button", { name: "Check driver files" }));
     const alert = await screen.findByRole("alert");
+    expect(alert).toBeVisible();
+    expect(screen.getByText("Technical details").closest("details")).not.toHaveAttribute("open");
     expect(alert).toHaveTextContent("orai18n.jar");
     expect(alert).toHaveTextContent("xdb.jar");
     expect(alert).toHaveTextContent("xmlparserv2.jar");

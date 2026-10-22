@@ -1,5 +1,5 @@
-import { LegacySqlSnapshot } from "./legacy-sql-snapshot";
-import { AdapterDetails } from "@/features/connections/adapter-details";
+import { RunTechnical } from "./run-technical";
+import { outcomePresentation, failureExplanation } from "./run-outcome";
 import { CleanupEvidence } from "./cleanup-evidence";
 import { JdbcUrl } from "@/components/jdbc-url";
 import { Card } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import { runsApi, runsKeys } from "@/api/runs";
 import type { CaseResult, Run } from "@/types/api";
 import { abortedCount } from "@/lib/outcomes";
-import { getRunPresentation, isTerminal, resultPresentation } from "@/lib/status";
+import { isTerminal, resultPresentation } from "@/lib/status";
 import { formatDateTime, formatDuration, formatNumber } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -47,14 +47,18 @@ export default function Report({ run }: { run: Run }) {
     return (
       <ErrorState error={query.error} retry={() => void query.refetch()} />
     );
-  const summary = query.data.summary;
+  const summary = { ...query.data.summary,
+    workerTerminationReason: query.data.summary.workerTerminationReason ?? run.workerTerminationReason,
+    workerReportValidated: query.data.summary.workerReportValidated ?? run.workerReportValidated,
+    sqlDialect: query.data.summary.sqlDialect ?? run.sqlDialect,
+  };
   const aborted = abortedCount(summary);
   return (
     <>
       {query.isError ? <ErrorState error={query.error} retry={() => void query.refetch()} /> : null}
       <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
-        <span>{t("ui.runStatus")}</span><StatusBadge {...getRunPresentation(summary.status)} />
-        <p className="text-xs text-muted-foreground">{t("run.lifecycleNote")}</p>
+        <span>{t("ui.runStatus")}</span><StatusBadge {...outcomePresentation(summary)} />
+        <p className="text-xs text-muted-foreground">{failureExplanation(summary) ?? t("run.lifecycleNote")}</p>
       </div>
       {summary.accounting ? <p className="mb-4 text-sm">
         {t("report.accounting", {notRun: summary.accounting.notRun, incomplete: summary.accounting.incomplete})}{summary.accounting.started === 0 ? t("ui.noScenarioExecutionWasVerifiedSkippedCases") : ""}
@@ -66,7 +70,6 @@ export default function Report({ run }: { run: Run }) {
       {summary.contractSummary ? <Card className="panel mb-4"><h2 className="mb-3 font-semibold">{t("selection.evidence")}</h2>
         <dl className="grid gap-3 sm:grid-cols-2">{Object.entries(summary.contractSummary).filter(([key]) => key !== "EXECUTED").map(([key, count]) => <div key={key}><dt className="text-sm text-muted-foreground">{t(`selection.${key}`, { defaultValue: key })}</dt><dd>{count}</dd></div>)}</dl>
       </Card> : null}
-      {summary.sqlPackage ? <LegacySqlSnapshot snapshot={summary.sqlPackage} /> : null}
       <CleanupEvidence evidence={summary.cleanupEvidence} />
       {summary.executionIssues?.length ? <Card className="panel mb-4"><h2>{t("ui.executionIssues")}</h2>
         {summary.executionIssues.map((issue, index) => <p key={index} className="break-words">{String(issue.level)}: {String(issue.message ?? issue.status)}</p>)}
@@ -112,7 +115,7 @@ export default function Report({ run }: { run: Run }) {
               </div>
             ))}
           </dl>
-          <div className="mt-5"><h3 className="mb-2 font-medium">{t("adapter.frozen")}</h3>{summary.adapterSnapshot ? <AdapterDetails adapter={summary.adapterSnapshot} /> : <p>{t("adapter.snapshotMissing")}</p>}</div>
+          <RunTechnical run={summary} />
           <div className="mt-5"><JdbcUrl value={summary.connection.jdbcUrl} /></div>
           <div className="mt-5 border-t pt-4">
             <h3 className="text-sm font-medium">{t("ui.selectedModules")}</h3>
@@ -146,9 +149,10 @@ export default function Report({ run }: { run: Run }) {
                 <Button
                   size="sm"
                   variant="ghost"
+                  className="text-primary"
                   onClick={() => setFailure(item)}
                 >
-                  {t("ui.inspectFailure")}</Button>
+                  {t("record.viewDetails")}</Button>
               </li>
             ))}
           </ul>

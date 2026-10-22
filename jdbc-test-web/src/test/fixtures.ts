@@ -42,6 +42,8 @@ export const driver: Driver = {
   ],
 };
 export const connection: Connection = {
+  executionDatabase: "test",
+  executionSchema: "owned_scope",
   id: "connection-1",
   name: "Test database",
   databaseType: "AcmeDB",
@@ -57,7 +59,7 @@ export const connection: Connection = {
   updatedAt: driver.updatedAt,
 };
 export const adapters: Adapter[] = [
-  { id: "postgresql", name: "PostgreSQL", status: "OFFICIAL" },
+  { id: "postgresql", name: "PostgreSQL", status: "OFFICIAL", dialect: "postgresql", namespaceSelection: "schema", requiresDatabase: true },
   { id: "vendor", name: "VendorDB", status: "CANDIDATE" },
 ];
 export const catalog: Catalog = {

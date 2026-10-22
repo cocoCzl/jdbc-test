@@ -11,11 +11,11 @@ describe("Usability without changing execution semantics", () => {
     const api = mockApi(); renderPage(path);
     const table = await screen.findByRole("table");
     const links = within(table).getAllByRole("link");
-    expect(links).toHaveLength(1);
+    expect(links).toHaveLength(path === "/runs" ? 2 : 1);
     expect(links[0]).toHaveTextContent("Statement");
     expect(links[0]).toHaveAttribute("href", "/runs/run-1");
-    expect(within(table).getByText(/Run run-1…/)).toHaveAttribute("title", "run-1");
-    expect(within(table).getByText(connection.name).closest("a")).toBeNull();
+    expect(within(table).queryByText(/Run run-1/)).not.toBeInTheDocument();
+    expect(within(table).getByText(connection.name, { selector: ".run-cell-primary" }).closest("a")).toBeNull();
     expect(api.mock.calls.some(([url]) => /\/api\/runs\//.test(String(url)))).toBe(false);
     expect(document.querySelector("header a")).toHaveAttribute("href", "/");
     expect(within(table).getByText("Failed").closest(".run-result-metric")).not.toHaveClass("run-result-danger");
@@ -46,11 +46,13 @@ describe("Usability without changing execution semantics", () => {
     await user.click(await screen.findByRole("button", {name: "View URL"}));
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveTextContent("SERVICE_NAME=fixture_service");
+    expect(within(dialog).queryByRole("button", { name: "Language" })).not.toBeInTheDocument();
     expect(dialog).not.toHaveTextContent("fixture-only");
     expect(dialog).toHaveTextContent("[REDACTED]");
     await user.click(within(dialog).getByRole("button", {name: "Copy sanitized URL"}));
     expect(await navigator.clipboard.readText()).toBe(redactJdbcUrl(url));
     await user.keyboard("{Escape}");
+    expect(screen.getByRole("button", { name: "View URL" })).toHaveFocus();
     expect(screen.getByRole("radio", {name: connection.name})).not.toBeChecked();
     await user.click(screen.getByRole("heading", {name: connection.name}));
     expect(screen.getByRole("radio", {name: connection.name})).toBeChecked();

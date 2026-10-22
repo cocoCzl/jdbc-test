@@ -1,0 +1,61 @@
+.run-connection-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin-bottom: 16px;
+}
+.run-connection-filter {
+  width: 260px;
+  max-width: 100%;
+  .field { gap: 4px; }
+  label { font-size: 12px; color: var(--ink-muted); }
+}
+.run-connection-list { display: grid; gap: 8px; }
+.run-connection-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  cursor: pointer;
+  &:hover { border-color: var(--border-hover); }
+  &[data-selected='true'] { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 6%, var(--card)); }
+  &:focus-within { outline: 2px solid color-mix(in srgb, var(--primary) 35%, transparent); outline-offset: 2px; }
+}
+.run-connection-radio { width: 16px; height: 16px; margin: 0; }
+.run-connection-name { min-width: 0; cursor: pointer; overflow-wrap: anywhere; font-size: 13px; font-weight: 650; }
+.run-connection-name h3 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.run-connection-type { grid-column: 2; justify-self: start; max-width: 100%; padding: 3px 7px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink-muted); font-size: 11px; line-height: 1.4; overflow-wrap: anywhere; }
+.run-connection-url { grid-column: 1 / -1; min-width: 0; }
+.run-connection-status { grid-column: 1 / -1; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; min-width: 0; }
+.jdbc-url-compact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  .jdbc-button { width: 36px; height: 36px; min-height: 36px; padding: 0; color: var(--primary); }
+  .jdbc-button:hover { color: var(--primary); background: color-mix(in srgb, var(--primary) 9%, var(--card)); }
+}
+.wizard-actions:has(.wizard-current-connection) { flex-wrap: wrap; }
+.wizard-actions .wizard-back-selection { flex-basis: 200px; }
+@media (min-width: 640px) and (max-width: 1023px) {
+  .run-connection-row { grid-template-columns: 18px minmax(0, 1fr) auto; }
+  .run-connection-type { grid-column: 3; grid-row: 1; }
+  .run-connection-url, .run-connection-status { grid-column: 2 / -1; }
+}
+@media (min-width: 1024px) {
+  .run-connection-row { grid-template-columns: 18px minmax(140px, 1fr) minmax(80px, .55fr) minmax(200px, 1.6fr) minmax(130px, .8fr); gap: 16px; }
+  .run-connection-type, .run-connection-url, .run-connection-status { grid-column: auto; }
+  .run-connection-status { align-items: flex-start; flex-direction: column; }
+}
+@media (max-width: 639px) {
+  .run-connection-filter { width: 100%; }
+  .wizard-actions:has(.wizard-current-connection) > div { width: 100%; }
+}

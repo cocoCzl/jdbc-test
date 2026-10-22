@@ -4,9 +4,10 @@ import { Copy, Expand } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
 import { Dialog } from "./ui/dialog";
+import { Tooltip } from "./ui/tooltip";
 import { redactJdbcUrl } from "@/lib/jdbc-url";
 
-export function JdbcUrl({ value }: { value: string }) {
+export function JdbcUrl({ value, compact = false }: { value: string; compact?: boolean }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const safe = redactJdbcUrl(value);
@@ -17,12 +18,17 @@ export function JdbcUrl({ value }: { value: string }) {
       () => toast.error(t("ui.clipboardUnavailable")),
     );
   };
-  return <div className="min-w-0" onClick={event => event.stopPropagation()}>
+  return <div className={compact ? "jdbc-url-compact" : "min-w-0"} onClick={event => {
+    if (!compact || (event.target as HTMLElement).closest("button, [role='dialog']")) event.stopPropagation();
+  }}>
     <p className="truncate font-mono text-xs leading-relaxed" title={safe}>{safe}</p>
-    <div className="mt-2 flex flex-wrap gap-1">
+    {compact ? <div className="flex items-center gap-1">
+      <Tooltip label={t("url.view")}><Button type="button" variant="ghost" size="icon-sm" aria-label={t("url.view")} onClick={() => setOpen(true)}><Expand aria-hidden="true" /></Button></Tooltip>
+      <Tooltip label={t("ui.copySanitizedURL")}><Button type="button" variant="ghost" size="icon-sm" aria-label={t("ui.copySanitizedURL")} onClick={copy}><Copy aria-hidden="true" /></Button></Tooltip>
+    </div> : <div className="mt-2 flex flex-wrap gap-1">
       <Button type="button" variant="outline" size="xs" onClick={() => setOpen(true)}><Expand />{t("url.view")}</Button>
       <Button type="button" variant="outline" size="xs" onClick={copy}><Copy />{t("url.copy")}</Button>
-    </div>
+    </div>}
     <Dialog open={open} onOpenChange={setOpen} title={t("ui.jdbcURL")} description={t("ui.fullTargetAddressRecognizedCredentialsAreMasked")}>
       <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-all rounded-2xl border bg-muted p-4 font-mono text-sm leading-relaxed select-text">{safe}</pre>
       <div className="mt-4 flex justify-end"><Button type="button" variant="outline" size="sm" onClick={copy}><Copy />{t("ui.copySanitizedURL")}</Button></div>

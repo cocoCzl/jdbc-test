@@ -4,7 +4,7 @@ import { t } from "i18next";
 import { useTranslation } from "react-i18next";
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { FileArchive, UploadCloud, X } from "lucide-react";
 import { toast } from "sonner";
 import { driversApi, driversKeys } from "@/api/drivers";
@@ -13,8 +13,9 @@ import { Button } from "@/components/ui/button";
 import { Field, FormError, PageHeader } from "@/components/common";
 import { formatBytes } from "@/lib/format";
 import { validateFiles } from "@/lib/driver-upload";
+import { DialectField } from "./dialect-field";
 import { DataSourceFields } from "./data-source-fields";
-import type { DataSourceProviders, DriverPreset } from "@/types/api";
+import type { DataSourceProviders, DriverPreset, SqlDialect } from "@/types/api";
 
 const presetFields = ["vendor", "driverClass", "urlPrefix"] as const;
 type PresetField = (typeof presetFields)[number];
@@ -39,16 +40,19 @@ export default function DriverForm() {
     version: "",
     driverClass: "",
     urlPrefix: "",
+    defaultSqlDialect: "" as SqlDialect | "",
   });
   const [dataSources, setDataSources] = useState<DataSourceProviders>({});
   const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | Error | null>(null);
+  const [uploadedId, setUploadedId] = useState<string>();
   const [candidates, setCandidates] = useState<string[]>([]);
   const upload = useMutation({
     mutationFn: () =>
       driversApi.upload(
         {
           ...form,
+          defaultSqlDialect: form.defaultSqlDialect || undefined,
           dataSources,
           driverClass: form.driverClass || undefined,
           urlPrefix: form.urlPrefix || undefined,
@@ -62,6 +66,11 @@ export default function DriverForm() {
     },
     onError: (failure) => {
       setError(failure instanceof Error ? failure : new Error());
+      if (failure instanceof ApiError && failure.code === "DRIVER_DIALECT_NOT_SAVED"
+        && typeof failure.properties.driverId === "string") {
+        setUploadedId(failure.properties.driverId);
+        void client.invalidateQueries({ queryKey: driversKeys.all });
+      }
       if (
         failure instanceof ApiError &&
         Array.isArray(failure.properties.candidates)
@@ -89,21 +98,21 @@ export default function DriverForm() {
     });
   };
   return (
-    <div className="mx-auto w-full max-w-7xl">
+    <div className="workspace-page">
       <PageHeader
         title={t("ui.addADriver")}
         description={t("driverUpload.description")}
       />
       <form
-        className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]"
+        className="upload-layout"
         onSubmit={(event) => {
           event.preventDefault();
           const failure = validateFiles(files);
           setError(failure);
-          if (!failure) upload.mutate();
+          if (!failure && !uploadedId) upload.mutate();
         }}
       >
-        <div className="min-w-0 space-y-6">
+        <div className="min-w-0 space-y-4">
           <Card as="section" className="panel min-w-0" aria-labelledby="driver-files-heading">
             <h2 id="driver-files-heading" className="mb-3 text-lg font-semibold">{t("ui.driverArtifacts")}</h2>
             <input
@@ -148,7 +157,7 @@ export default function DriverForm() {
               <summary className="cursor-pointer">{t("driverUpload.dependencyHelp")}</summary>
               <p className="mt-2 leading-relaxed">{t("ui.driverCompanionHint")}</p>
             </details>
-            <ul className="mt-4 divide-y divide-border">
+            <ul className={files.length ? "mt-3 divide-y divide-border" : undefined}>
               {files.map((file, index) => (
                 <li
                   key={`${file.name}-${index}`}
@@ -180,8 +189,8 @@ export default function DriverForm() {
             </ul>
           </Card>
           <Card as="section" className="panel">
-            <h2 className="mb-5 text-lg font-semibold">{t("ui.packageIdentity")}</h2>
-            <div className="mb-5 space-y-3">
+            <h2 className="mb-4 text-lg font-semibold">{t("ui.packageIdentity")}</h2>
+            <div className="mb-4 grid items-start gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
               <Field id="driver-preset" label={t("driverPreset.label")}
                 hint={t("driverPreset.hint")}>
                 <Select id="driver-preset" value={presetCode}
@@ -199,7 +208,7 @@ export default function DriverForm() {
               </Field>
               {selectedPreset ? (
                 <Button type="button" variant="outline" size="sm"
-                  onClick={() => applyPreset(selectedPreset, true)}>
+                  className="md:mt-7" onClick={() => applyPreset(selectedPreset, true)}>
                   {t("driverPreset.restore")}
                 </Button>
               ) : null}
@@ -209,7 +218,7 @@ export default function DriverForm() {
                 </p>
               ) : null}
             </div>
-            <div className="grid gap-5 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2">
               <Field
                 label={t("ui.name")}
                 id="driver-name"
@@ -237,14 +246,19 @@ export default function DriverForm() {
                 onChange={(event) => change("version", event.target.value)}
                 placeholder={t("ui.yourDriverVersion")}
               />
-              <Field
-                label={t("ui.jdbcURLPrefixOptional")}
-                id="driver-prefix"
-                maxLength={200}
-                value={form.urlPrefix}
-                onChange={(event) => change("urlPrefix", event.target.value)}
-                hint={t("driverPreset.urlPrefixHint")}
-              />
+              <DialectField driverDefault value={form.defaultSqlDialect}
+                onChange={value => setForm(previous => ({ ...previous, defaultSqlDialect: value }))} />
+              <div className="sm:col-span-2">
+                <Field
+                  label={t("ui.jdbcURLPrefixOptional")}
+                  id="driver-prefix"
+                  placeholder="jdbc:kingbase8:"
+                  maxLength={200}
+                  value={form.urlPrefix}
+                  onChange={(event) => change("urlPrefix", event.target.value)}
+                  hint={t("driverPreset.urlPrefixHint")}
+                />
+              </div>
               <div className="sm:col-span-2">
                 <Field
                   label={t("ui.driverClassOptional")}
@@ -280,20 +294,21 @@ export default function DriverForm() {
           </Card>
           <DataSourceFields value={dataSources} onChange={setDataSources} />
         </div>
-        <Card as="aside" className="panel min-w-0 h-fit lg:sticky lg:top-24">
+        <Card as="aside" className="upload-summary">
           <p className="eyebrow">{t("ui.readyToPackage")}</p>
-          <p className="mt-5 text-2xl font-semibold">
+          <p className="mt-3 text-xl font-semibold">
             {files.length} {t("ui.artifactsInline")}</p>
           <p className="mt-1 text-sm text-muted-foreground">
             {formatBytes(files.reduce((total, file) => total + file.size, 0))}{" "}
             {t("ui.totalInline")}</p>
-          <p className="my-6 text-sm leading-relaxed text-muted-foreground">
-            {t("ui.artifactsCannotBeReplacedAfterUploadTo")}</p>
           {!files.length ? (
-            <p className="mb-3 text-sm font-medium" role="status">{t("driverUpload.selectFirst")}</p>
+            <p className="mt-3 text-xs text-muted-foreground" role="status">{t("driverUpload.selectFirst")}</p>
           ) : null}
           <FormError message={error} />
-          <Button className="mt-4 w-full" disabled={upload.isPending}>
+          {uploadedId ? <Button asChild variant="outline">
+            <Link to={`/drivers/${encodeURIComponent(uploadedId)}`}>{t("ui.openUploadedDriver")}</Link>
+          </Button> : null}
+          <Button className="mt-4 w-full" disabled={upload.isPending || !!uploadedId}>
             {upload.isPending ? t("ui.uploadingPackage") : t("driverUpload.confirm")}
           </Button>
         </Card>

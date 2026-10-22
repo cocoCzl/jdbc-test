@@ -1,0 +1,14 @@
+.resource-action-trigger { display: inline-flex; flex: 0 0 44px; border-radius: var(--control-radius); }
+.resource-action.jdbc-button {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: var(--primary);
+  border-radius: var(--control-radius);
+  box-shadow: none;
+  svg { width: 18px; height: 18px; }
+  &:hover:not(:disabled) { color: var(--primary); background: color-mix(in srgb, var(--primary) 9%, var(--card)); }
+  &[data-danger] { color: var(--danger); }
+  &[data-danger]:hover:not(:disabled) { color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, var(--card)); }
+  &:disabled { color: var(--ink-muted); opacity: .45; background: transparent; }
+}
