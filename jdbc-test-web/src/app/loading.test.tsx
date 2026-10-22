@@ -11,7 +11,7 @@ afterEach(()=>document.querySelector('meta[name="jdbc-environment"]')?.remove())
 describe("Resource loading and preserved history",()=>{
  it("shows the initial title and navigation while data is slow, then renders real data",async()=>{
   const pending=deferred<Response>();mockApi(url=>url.pathname==='/api/runs'?pending.promise:undefined);renderPage('/runs');
-  expect(screen.getByRole('heading',{name:'Run history'})).toBeVisible();
+  expect(screen.getByRole('heading',{name:'Run records'})).toBeVisible();
   expect(screen.getByRole('navigation',{name:'Main navigation'})).toBeVisible();
   expect(screen.queryByRole('table')).not.toBeInTheDocument();
   expect(screen.getByLabelText('Loading data…')).toBeVisible();
@@ -44,7 +44,7 @@ describe("Resource loading and preserved history",()=>{
  });
  it("keeps the title and offers retry after a cold read fails",async()=>{
   mockApi(url=>url.pathname==='/api/runs'?problem('HTTP_ERROR',503):undefined);renderPage('/runs');
-  expect(await screen.findByRole('alert')).toBeVisible();expect(screen.getByRole('heading',{name:'Run history'})).toBeVisible();expect(screen.getByRole('button',{name:'Try again'})).toBeEnabled();
+  expect(await screen.findByRole('alert')).toBeVisible();expect(screen.getByRole('heading',{name:'Run records'})).toBeVisible();expect(screen.getByRole('button',{name:'Try again'})).toBeEnabled();
  });
  it("surfaces read timeouts and preserves cancellation semantics",async()=>{
   const timer=new AbortController();vi.spyOn(AbortSignal,'timeout').mockReturnValue(timer.signal);

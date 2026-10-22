@@ -19,7 +19,7 @@ describe("resource list presentation", () => {
     expect(within(panel).getByRole("combobox", { name: "Sort drivers" })).toBeVisible();
     expect(within(panel).getByRole("button", { name: "Next page" })).toBeVisible();
     expect(within(panel).getByRole("link", { name: driver.name })).toHaveAttribute("href", "/drivers/driver-1");
-    expect(within(panel).getByText(/driver-1…/)).toHaveAttribute("title", "driver-1");
+    expect(table).not.toHaveTextContent(driver.id);
     await user.click(within(panel).getByRole("button", { name: "Next page" }));
     await waitFor(() => expect(api.mock.calls.some(([url]) => String(url).includes("page=1"))).toBe(true));
   });

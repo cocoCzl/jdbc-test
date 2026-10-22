@@ -39,7 +39,7 @@ test("preserved viewer has no global badge and identifies report JSON", async ({
     }
     await page.getByRole("link", {name: locale === "en" ? "Drivers" : "驱动管理", exact: true}).click();
     await expect(page).toHaveURL(/\/drivers$/);
-    await page.getByRole("link", {name: locale === "en" ? "Run history" : "运行历史", exact: true}).click();
+    await page.getByRole("link", {name: locale === "en" ? "Run records" : "运行记录", exact: true}).click();
     await expect(page).toHaveURL(/\/runs$/);
     await page.goto(`/runs/${runId}`);
     await page.getByRole("tab", {name: locale === "en" ? "Report" : "报告", exact: true}).click();

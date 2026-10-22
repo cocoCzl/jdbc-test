@@ -239,7 +239,7 @@ test("REAL PostgreSQL browser flow: external Driver → Statement/Connection →
       path: `test-results/real-${module.toLowerCase()}-report.png`,
       fullPage: true,
     });
-    await page.getByRole("link", { name: "Run history", exact: true }).click();
+    await page.getByRole("link", { name: "Run records", exact: true }).click();
     if (module === "Statement") {
       const filteredRuns = page.waitForResponse(
         (response) =>
