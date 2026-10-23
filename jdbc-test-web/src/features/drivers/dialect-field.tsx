@@ -14,6 +14,7 @@ export function DialectField({ value, onChange, driverDefault = false, hint, err
     hint={hint ?? (driverDefault ? t("connection.defaultDialectHint") : undefined)} error={error}>
     <Select id="sql-dialect" value={value} onValueChange={next => onChange(next as SqlDialect | "")}>
       <option value="">{t(driverDefault ? "connection.followConnection" : "connection.adapterDialect")}</option>
+      <option value="dm">{t("driverPreset.dm")}</option>
       <option value="oracle">{t("driverPreset.oracle")}</option>
       <option value="mysql">{t("driverPreset.mysql")}</option>
       <option value="postgresql">{t("driverPreset.postgresql")}</option>

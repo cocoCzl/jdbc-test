@@ -9,7 +9,8 @@ class AdapterExecutionConfigTest {
 
     @Test
     void packagedOfficialManifestsCarryCompleteBooleanDeclarations() {
-        for (String id : List.of("mysql", "postgresql", "oracle", "sqlserver", "gaussdb", "kingbase")) {
+        for (String id : List.of("mysql", "postgresql", "oracle", "sqlserver", "gaussdb",
+            "kingbase", "dm")) {
             var config = AdapterExecutionConfig.load(id);
             assertTrue(
                 config.capabilities().keySet()

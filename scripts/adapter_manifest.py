@@ -160,7 +160,7 @@ def validate_adapter_metadata(manifest: Any, *, allow_external_asset_paths=False
     if "db_type" in manifest:
         text(manifest, "db_type")  # Unknown classifications remain in the retained declaration.
     trust = choice(manifest, "trust", {"official", "candidate", "local"})
-    choice(manifest, "dialect", {"postgresql", "mysql", "oracle", "sqlserver"})
+    choice(manifest, "dialect", {"postgresql", "mysql", "oracle", "sqlserver", "dm"})
     quote = manifest.get("identifier_quote", '"')
     if not isinstance(quote, str) or quote not in {'"', "`", "["}:
         invalid("identifier_quote")

@@ -44,8 +44,8 @@ class ResultSetMetaDataTest {
             ResultSet rs = stmt.executeQuery(
                 JdbcContext.sql("SELECT id, name, value FROM {{resultset_test}}"))) {
             ResultSetMetaData meta = rs.getMetaData();
-            if (isOracle()) {
-                // Oracle returns uppercase column names by default
+            if (isOracle() || ConfigLoader.load().db.isDialect("dm")) {
+                // These fixtures declare unquoted column names on uppercase-folding databases.
                 assertEquals("ID", meta.getColumnName(1));
                 assertEquals("NAME", meta.getColumnName(2));
                 assertEquals("VALUE", meta.getColumnName(3));

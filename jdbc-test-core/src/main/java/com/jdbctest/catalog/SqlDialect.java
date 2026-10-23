@@ -9,6 +9,7 @@ public enum SqlDialect {
     POSTGRESQL("postgresql"),
     MYSQL("mysql"),
     ORACLE("oracle"),
+    DM("dm"),
     SQL_SERVER("sqlserver"),
     GENERIC("generic");
 
@@ -27,6 +28,7 @@ public enum SqlDialect {
             case "postgresql" -> POSTGRESQL;
             case "mysql" -> MYSQL;
             case "oracle" -> ORACLE;
+            case "dm" -> DM;
             case "sqlserver" -> SQL_SERVER;
             default -> throw new IllegalArgumentException("ADAPTER_DIALECT_INVALID");
         };
@@ -49,7 +51,7 @@ public enum SqlDialect {
     }
 
     public boolean requiresDatabase() {
-        return this != ORACLE;
+        return this != ORACLE && this != DM;
     }
 
     public String normalizeIdentifier(String value) {

@@ -24,6 +24,14 @@ class StatementTest {
         return ConfigLoader.load().db.isDialect("oracle");
     }
 
+    private static String booleanLiteral(boolean value) {
+        var database = ConfigLoader.load().db;
+        if (database.isDialect("oracle") || database.isDialect("dm")) {
+            return value ? "1" : "0";
+        }
+        return Boolean.toString(value);
+    }
+
     @Test
     @Order(1)
     @DisplayName("execute 执行 SELECT 查询")
@@ -40,7 +48,7 @@ class StatementTest {
     @DisplayName("execute 执行 INSERT 语句")
     void testExecuteInsert(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement()) {
-            String activeVal = isOracle() ? "1" : "true";
+            String activeVal = booleanLiteral(true);
             boolean hasResultSet = stmt.execute(JdbcContext.sql(
                 "INSERT INTO {{statement_test}} (name, value, active) VALUES ('execute测试', 99, ")
                 + activeVal + ")");
@@ -105,8 +113,8 @@ class StatementTest {
         CapabilityEvidence.record(reporter, "metadata.batch_updates",
             conn.getMetaData().supportsBatchUpdates());
         try (Statement stmt = conn.createStatement()) {
-            String t = isOracle() ? "1" : "true";
-            String f = isOracle() ? "0" : "false";
+            String t = booleanLiteral(true);
+            String f = booleanLiteral(false);
             stmt.addBatch(JdbcContext.sql(
                 "INSERT INTO {{statement_test}} (name, value, active) VALUES ('批处理A', 1, ") + t
                 + ")");
@@ -352,7 +360,7 @@ class StatementTest {
     @DisplayName("executeLargeBatch 批处理")
     void testExecuteLargeBatch(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement()) {
-            String t = isOracle() ? "1" : "true";
+            String t = booleanLiteral(true);
             stmt.addBatch(JdbcContext.sql(
                 "INSERT INTO {{statement_test}} (name, value, active) VALUES ('大批处理A', 11, ")
                 + t

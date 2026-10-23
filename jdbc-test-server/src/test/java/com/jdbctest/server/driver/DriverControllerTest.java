@@ -32,6 +32,8 @@ class DriverControllerTest {
                    "urlPrefix":"jdbc:sqlserver:"},
                   {"code":"kingbase","nameKey":"driverPreset.kingbase","vendor":"Kingbase",
                    "driverClass":"com.kingbase8.Driver","urlPrefix":"jdbc:kingbase8:"},
+                  {"code":"dm","nameKey":"driverPreset.dm","vendor":"Dameng",
+                   "driverClass":"dm.jdbc.driver.DmDriver","urlPrefix":"jdbc:dm:"},
                   {"code":"custom","nameKey":"driverPreset.custom","vendor":"",
                    "driverClass":"","urlPrefix":""}
                 ]

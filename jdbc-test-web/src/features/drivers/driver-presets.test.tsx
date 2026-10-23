@@ -33,6 +33,19 @@ async function metadata(api: ReturnType<typeof mockApi>) {
 }
 
 describe("New driver presets", () => {
+  it("prefills editable DM suggestions without inferring a release version", async () => {
+    mockApi();
+    const user = userEvent.setup();
+    renderPage("/drivers/new");
+    await select(user, "dm");
+    expect(vendor()).toHaveValue("Dameng");
+    expect(driverClass()).toHaveValue("dm.jdbc.driver.DmDriver");
+    expect(prefix()).toHaveValue("jdbc:dm:");
+    expect(field("Registered version")).toHaveValue("");
+    await user.clear(prefix());
+    await user.type(prefix(), "jdbc:dm:custom:");
+    expect(prefix()).toHaveValue("jdbc:dm:custom:");
+  });
   it("preserves an explicit PostgreSQL default through preset changes, restore, file selection and upload", async () => {
     const saved = { ...driver, defaultSqlDialect: "postgresql" as const };
     const api = mockApi((_url, options) => options.method === "POST" ? json(saved, 201) : undefined);

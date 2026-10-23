@@ -7,6 +7,7 @@ import java.util.Optional;
  * Known product classifications, independent of adapter registration and SQL behavior.
  */
 public enum DbType {
+    DM("dm"),
     GAUSSDB("gaussdb"),
     KINGBASE("kingbase"),
     MYSQL("mysql"),

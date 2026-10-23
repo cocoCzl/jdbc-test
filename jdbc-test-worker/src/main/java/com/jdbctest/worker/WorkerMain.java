@@ -304,6 +304,9 @@ public final class WorkerMain {
         values.put("driverVersion", metadata.getDriverVersion());
         put(values, "currentCatalog", connection::getCatalog);
         put(values, "currentSchema", connection::getSchema);
+        if ("dm.jdbc.driver.DmDriver".equals(driver.getClass().getName())) {
+            probeDmConfiguration(connection, values);
+        }
         if (driver.getClass().getName().startsWith("oracle.jdbc.")) {
             try (var statement = connection.createStatement()) {
                 statement.setQueryTimeout(5);
@@ -324,6 +327,34 @@ public final class WorkerMain {
         values.putIfAbsent("driverVersion",
             driver.getMajorVersion() + "." + driver.getMinorVersion());
         return values;
+    }
+
+    private static void probeDmConfiguration(Connection connection, Map<String, Object> values) {
+        put(values, "storesUpperCaseIdentifiers", () -> connection.getMetaData()
+            .storesUpperCaseIdentifiers());
+        put(values, "storesMixedCaseQuotedIdentifiers", () -> connection.getMetaData()
+            .storesMixedCaseQuotedIdentifiers());
+        try (var statement = connection.createStatement()) {
+            statement.setQueryTimeout(5);
+            try (var rows = statement.executeQuery(
+                "SELECT PARA_VALUE FROM V$DM_INI WHERE PARA_NAME = 'COMPATIBLE_MODE'")) {
+                if (rows.next()) {
+                    values.put("dmCompatibleMode", rows.getString(1));
+                }
+            }
+        } catch (java.sql.SQLException exception) {
+            values.put("dmCompatibleMode", "UNAVAILABLE");
+        }
+        try (var statement = connection.createStatement()) {
+            statement.setQueryTimeout(5);
+            try (var rows = statement.executeQuery("SELECT SF_GET_CASE_SENSITIVE_FLAG() FROM DUAL")) {
+                if (rows.next()) {
+                    values.put("dmCaseSensitive", rows.getInt(1));
+                }
+            }
+        } catch (java.sql.SQLException exception) {
+            values.put("dmCaseSensitive", "UNAVAILABLE");
+        }
     }
 
     private static void put(Map<String, Object> values, String key, ThrowingSupplier supplier) {

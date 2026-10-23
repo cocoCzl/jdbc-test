@@ -125,7 +125,8 @@ class BatchBehaviorTest {
     @RequiresFeature({"generated_keys", "batch_generated_keys"})
     @DisplayName("按列名获取批量返回键并核对记录")
     void testBatchKeysByColumnName(Connection connection) throws SQLException {
-        String column = ConfigLoader.load().db.isDialect("oracle") ? "ID" : "id";
+        String column = ConfigLoader.load().db.isDialect("oracle")
+            || ConfigLoader.load().db.isDialect("dm") ? "ID" : "id";
         try (PreparedStatement sql = connection.prepareStatement(insertSql(),
             new String[] {column})) {
             assertBatchKeys(connection, sql);

@@ -19,6 +19,8 @@ public record DriverPreset(String code, String nameKey, String vendor, String dr
             "com.microsoft.sqlserver.jdbc.SQLServerDriver", "jdbc:sqlserver:"),
         new DriverPreset("kingbase", "driverPreset.kingbase", "Kingbase", "com.kingbase8.Driver",
             "jdbc:kingbase8:"),
+        new DriverPreset("dm", "driverPreset.dm", "Dameng", "dm.jdbc.driver.DmDriver",
+            "jdbc:dm:"),
         new DriverPreset("custom", "driverPreset.custom", "", "", ""));
 
     static List<DriverPreset> defaults() {

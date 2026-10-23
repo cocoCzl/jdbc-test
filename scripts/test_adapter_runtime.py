@@ -25,7 +25,7 @@ class AdapterRuntimeTest(unittest.TestCase):
             for scenario in build_scenario_inventory(PROJECT_ROOT).values()
             for capability in scenario.required_capabilities
         }
-        for adapter_id in ("mysql", "postgresql", "oracle", "sqlserver", "gaussdb", "kingbase"):
+        for adapter_id in ("mysql", "postgresql", "oracle", "sqlserver", "gaussdb", "kingbase", "dm"):
             package = load_adapter(PROJECT_ROOT, adapter_id)
             self.assertTrue(required <= set(package.manifest["capabilities"]), adapter_id)
 
@@ -49,7 +49,7 @@ class AdapterRuntimeTest(unittest.TestCase):
     def test_bundled_adapters_are_discoverable_and_valid(self):
         adapters = discover_adapters(PROJECT_ROOT)
         self.assertEqual(
-            {"postgresql", "mysql", "oracle", "gaussdb", "sqlserver", "kingbase"},
+            {"postgresql", "mysql", "oracle", "gaussdb", "sqlserver", "kingbase", "dm"},
             set(adapters),
         )
         for adapter_id in adapters:

@@ -25,7 +25,7 @@ export interface Artifact {
   size: number;
   sha256: string;
 }
-export type SqlDialect = "oracle" | "mysql" | "postgresql" | "sqlserver";
+export type SqlDialect = "oracle" | "mysql" | "postgresql" | "sqlserver" | "dm";
 export interface DriverSummary {
   defaultSqlDialect?: SqlDialect | null;
   id: string;

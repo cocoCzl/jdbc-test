@@ -838,5 +838,7 @@
   "record.reason.INCOMPLETE_EXECUTION": "Some cases did not finish, so the overall result is incomplete. Review aborted and unexecuted cases and execution diagnostics.",
   "record.reason.NO_TESTS_EXECUTED": "No cases actually ran, so no compatibility conclusion is available. Review skip reasons and execution configuration.",
   "record.workerFingerprint": "Worker artifact SHA-256",
-  "record.adapterFingerprint": "Adapter manifest SHA-256"
+  "record.adapterFingerprint": "Adapter manifest SHA-256",
+  "driverPreset.dm": "Dameng / 达梦",
+  "connection.dmUrlHint": "Use jdbc:dm://host:port?schema=SCHEMA. The path or schema parameter selects a schema, not a database. Enter the exact authorized schema name (case-sensitive quoted names are preserved)."
 }

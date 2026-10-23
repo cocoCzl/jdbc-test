@@ -186,9 +186,9 @@ final class DriverService {
         if (value == null || value.isBlank()) {
             return null;
         }
-        if (!Set.of("oracle", "mysql", "postgresql").contains(value)) {
+        if (!Set.of("oracle", "mysql", "postgresql", "dm").contains(value)) {
             throw new DriverException(HttpStatus.BAD_REQUEST, "ADAPTER_DIALECT_INVALID",
-                "Select Oracle, MySQL or PostgreSQL");
+                "Select Oracle, MySQL, PostgreSQL or Dameng");
         }
         return com.jdbctest.catalog.SqlDialect.fromCode(value).code();
     }

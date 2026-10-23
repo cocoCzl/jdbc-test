@@ -16,6 +16,7 @@ class ExecutionControlTest {
 
     static String sleepSql(String dialect, int seconds) {
         return switch (dialect.toLowerCase(java.util.Locale.ROOT)) {
+            case "dm" -> "CALL DBMS_LOCK.SLEEP(" + seconds + ")";
             case "oracle" -> "BEGIN DBMS_SESSION.SLEEP(" + seconds + "); END;";
             // MySQL documents that standalone interrupted SLEEP returns 1 without an error.
             // Use SLEEP inside a query so interruption produces the error this scenario tests.

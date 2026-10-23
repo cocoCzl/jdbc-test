@@ -62,6 +62,17 @@ class DriverServiceTest {
     }
 
     @Test
+    void dmUploadStoresTheIndependentDialectWithoutLoadingTheDriver() throws Exception {
+        var response = service.create(new CreateDriverRequest("DM JDBC", "Dameng", "8.1.2.192",
+            "dm.jdbc.driver.DmDriver", "jdbc:dm:", null, "dm"),
+            List.of(jar("dm.jdbc.driver.DmDriver\n")));
+        assertEquals("dm", response.defaultSqlDialect());
+        assertEquals("dm.jdbc.driver.DmDriver", response.driverClass());
+        assertEquals(DriverPackageStatus.PENDING_VALIDATION, response.status());
+        verifyNoInteractions(validation);
+    }
+
+    @Test
     void defaultDialectEditsPreserveValidationAndCanBeClearedExplicitly() {
         var entity = new JdbcDriverPackageEntity("fixture", "fixture", "1", "fixture.Driver",
             DriverSourceType.UPLOAD);

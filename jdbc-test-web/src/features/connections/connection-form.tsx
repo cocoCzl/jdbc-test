@@ -286,7 +286,7 @@ function Editor({ connection }: { connection?: Connection }) {
               hint={t("connection.driverHint")} error={fieldError("driver")} />
             <Field id="jdbc-url" label={t("ui.jdbcURL")} error={fieldError("jdbcUrl")} required maxLength={2000}
               value={form.jdbcUrl} onChange={(event) => change("jdbcUrl", event.target.value)}
-              placeholder="jdbc:postgresql://localhost:5432/test" hint={t(selectedAdapter?.id === "oracle" ? "connection.oracleServiceHint" : "connection.urlHint")} />
+              placeholder="jdbc:postgresql://localhost:5432/test" hint={t(selectedAdapter?.id === "dm" ? "connection.dmUrlHint" : selectedAdapter?.id === "oracle" ? "connection.oracleServiceHint" : "connection.urlHint")} />
             <Field id="username" label={t("ui.username")} autoComplete="username" maxLength={200}
               value={form.username} onChange={(event) => change("username", event.target.value)} />
             <Field id="password"

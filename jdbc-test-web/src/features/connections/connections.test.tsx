@@ -470,11 +470,11 @@ describe("Connection UI", () => {
   });
 
   it.each([
-    ["mysql", false, true], ["postgresql", true, true], ["oracle", true, false], ["kingbase", true, true],
+    ["mysql", false, true], ["postgresql", true, true], ["oracle", true, false], ["dm", true, false], ["kingbase", true, true],
   ])("renders %s scope requirements while allowing scope-free probes", async (id, schema, database) => {
     const user = userEvent.setup();
     const api = mockApi(url => url.pathname === "/api/adapters" ? json([{ id, name: id, status: "OFFICIAL",
-      dialect: id === "kingbase" ? "postgresql" : id, namespaceSelection: id === "mysql" ? "catalog" : "schema", requiresDatabase: id !== "oracle" }]) : undefined);
+      dialect: id === "kingbase" ? "postgresql" : id, namespaceSelection: id === "mysql" ? "catalog" : "schema", requiresDatabase: id !== "oracle" && id !== "dm" }]) : undefined);
     renderPage("/connections/new");
     await chooseOption(user, await screen.findByLabelText("Database type"), String(id));
     await chooseOption(user, screen.getByLabelText("Driver package"), driver.id);

@@ -54,7 +54,7 @@ class TestObjectsTest {
 
     @Test
     void oracleProcedureCallsUseTheVerifiedCurrentSchemaToAvoidLocalTableShadowing() {
-        for (String dialect : List.of("oracle", "postgresql", "mysql", "sqlserver", "gaussdb")) {
+        for (String dialect : List.of("oracle", "postgresql", "mysql", "sqlserver", "gaussdb", "dm")) {
             Config value = config("j01234567890123456789");
             value.db.dialect = dialect;
             value.namespace.name = "DEVELOP";

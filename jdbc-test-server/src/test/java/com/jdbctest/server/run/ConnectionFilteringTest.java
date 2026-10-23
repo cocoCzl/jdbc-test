@@ -104,7 +104,7 @@ class ConnectionFilteringTest {
     @Test
     void catalogHasAdditiveHintsWithoutProbingOrChangingLegacyFields() throws Exception {
         mvc.perform(get("/api/adapters"))
-            .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(6))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(7))
             .andExpect(jsonPath("$[3].id").value("postgresql"))
             .andExpect(jsonPath("$[3].status").value("OFFICIAL"))
             .andExpect(jsonPath("$[3].namespaceSelection").value("schema"))
@@ -119,7 +119,11 @@ class ConnectionFilteringTest {
             .andExpect(jsonPath("$[5].validatedCombinations[0].databaseVersion").value("12.1"))
             .andExpect(jsonPath("$[5].validatedCombinations[0].driverVersion")
                 .value("V008R006B0001"))
-            .andExpect(jsonPath("$[5].qualificationNoteKey").value("adapter.kingbaseQualification"));
+            .andExpect(jsonPath("$[5].qualificationNoteKey").value("adapter.kingbaseQualification"))
+            .andExpect(jsonPath("$[6].id").value("dm"))
+            .andExpect(jsonPath("$[6].dialect").value("dm"))
+            .andExpect(jsonPath("$[6].requiresDatabase").value(false))
+            .andExpect(jsonPath("$[6].namespaceSelection").value("schema"));
         verifyNoInteractions(worker);
     }
 }

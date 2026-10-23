@@ -4,5 +4,6 @@
   "oracle",
   "postgresql",
   "sqlserver",
-  "kingbase"
+  "kingbase",
+  "dm"
 ]

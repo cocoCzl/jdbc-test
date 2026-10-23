@@ -1,0 +1,113 @@
+{
+  "id": "dm",
+  "name": "\u8fbe\u68a6 / Dameng",
+  "version": "1.0.0",
+  "revision": "1.0.0",
+  "trust": "candidate",
+  "dialect": "dm",
+  "identifier_quote": "\"",
+  "driver": {
+    "class": "dm.jdbc.driver.DmDriver",
+    "source": {
+      "kind": "local",
+      "path": "data/dm-jdbc.jar"
+    }
+  },
+  "identity": {
+    "database_product_regex": "^DM DBMS$",
+    "driver_name_regex": "^dm\\.jdbc\\.driver\\.DmDriver$"
+  },
+  "supported_versions": {
+    "database": {
+      "min": "8.1.3.162",
+      "max": "8.1.3.162"
+    },
+    "driver": {
+      "min": "8.1.2.192",
+      "max": "8.1.2.192"
+    }
+  },
+  "validated_combinations": [],
+  "capabilities": {
+    "savepoint": true,
+    "callable_statement": true,
+    "array_type": true,
+    "ref_type": true,
+    "struct_type": true,
+    "rowid_type": false,
+    "sqlxml": true,
+    "rowset": true,
+    "blobs": true,
+    "clobs": true,
+    "nclobs": true,
+    "parameter_metadata": true,
+    "updatable_result_set": true,
+    "scrollable_result_set": true,
+    "generated_keys": true,
+    "multiple_result_sets": true,
+    "statement_cancel": true,
+    "query_timeout": true,
+    "network_timeout": true,
+    "client_info": true,
+    "request_boundaries": false,
+    "sharding": false,
+    "data_source": false,
+    "connection_pool": false,
+    "xa_data_source": false,
+    "java_time": true,
+    "lob_objects": true,
+    "lob_locator_updates": true,
+    "batch_generated_keys": false,
+    "generated_keys_by_index": true,
+    "callable_inout": true,
+    "ref_cursor": true,
+    "rowid_operations": true,
+    "multiple_result_sequences": true
+  },
+  "assets": {
+    "ddl": "ddl",
+    "dml": "dml",
+    "pool": "pool",
+    "areas": [
+      "connection",
+      "statement",
+      "preparedstatement",
+      "callablestatement",
+      "resultset",
+      "metadatatest",
+      "savepoint",
+      "rowset",
+      "blobclob",
+      "sqlxml",
+      "advancedtype"
+    ]
+  },
+  "namespace": {
+    "mode": "existing",
+    "selection": "schema",
+    "drop_on_exit": false
+  },
+  "minimum_privileges": [
+    "CREATE TABLE",
+    "CREATE PROCEDURE",
+    "CREATE TYPE"
+  ],
+  "privilege_checks": [
+    {
+      "privilege": "CREATE TABLE",
+      "sql": "CREATE TABLE {probe}_t (id INTEGER)",
+      "cleanup_sql": "DROP TABLE {probe}_t"
+    },
+    {
+      "privilege": "CREATE PROCEDURE",
+      "sql": "CREATE PROCEDURE {probe}_p AS BEGIN NULL; END;",
+      "cleanup_sql": "DROP PROCEDURE {probe}_p"
+    },
+    {
+      "privilege": "CREATE TYPE",
+      "sql": "CREATE TYPE {probe}_a AS VARRAY(10) OF INTEGER",
+      "cleanup_sql": "DROP TYPE {probe}_a"
+    }
+  ],
+  "known_differences": []
+}

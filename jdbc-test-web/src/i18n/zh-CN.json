@@ -833,5 +833,7 @@
   "record.reason.INCOMPLETE_EXECUTION": "部分用例未执行完毕，整体结果不完整。请查看中止和未执行用例及执行诊断。",
   "record.reason.NO_TESTS_EXECUTED": "没有用例实际执行，不能得出兼容性结论。请查看跳过原因和执行配置。",
   "record.workerFingerprint": "Worker 制品 SHA-256",
-  "record.adapterFingerprint": "适配清单 SHA-256"
+  "record.adapterFingerprint": "适配清单 SHA-256",
+  "driverPreset.dm": "达梦 / Dameng",
+  "connection.dmUrlHint": "使用 jdbc:dm://主机:端口?schema=SCHEMA；路径或 schema 参数表示模式，不是数据库。授权 schema 填写实际名称（保留带引号名称的大小写）。"
 }

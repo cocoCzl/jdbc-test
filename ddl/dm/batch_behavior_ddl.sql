@@ -1,0 +1,6 @@
+CREATE TABLE {{batch_behavior}} (
+  id INTEGER IDENTITY(1, 1) PRIMARY KEY,
+  name VARCHAR2(100) NOT NULL UNIQUE,
+  value INTEGER
+);
+/
