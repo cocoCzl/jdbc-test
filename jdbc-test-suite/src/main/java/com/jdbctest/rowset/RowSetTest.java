@@ -135,27 +135,36 @@ class RowSetTest {
             setupRowSet(rowSet, JdbcContext.sql("SELECT * FROM {{rowset_test}}"));
 
             rowSet.execute();
-            assertTrue(rowSet.first());
+            updateAndVerify(conn, rowSet);
+        }
+    }
 
-            String originalName = rowSet.getString("name");
+    static void updateAndVerify(Connection connection, JdbcRowSet rowSet) throws SQLException {
+        assertTrue(rowSet.first());
+        int id = rowSet.getInt("id");
+        String originalName = rowSet.getString("name");
+        try {
             rowSet.updateString("name", "RowSet更新测试");
             rowSet.updateRow();
-
-            // 验证更新
-            rowSet.beforeFirst();
-            boolean found = false;
-            while (rowSet.next()) {
-                if ("RowSet更新测试".equals(rowSet.getString("name"))) {
-                    found = true;
-                    break;
+            // updateRow changes the database; cursor visibility is separately described by
+            // DatabaseMetaData.ownUpdatesAreVisible and is not required for this scenario.
+            try (Connection observer = JdbcContext.getConnection();
+                PreparedStatement query = observer.prepareStatement(JdbcContext.sql(
+                    "SELECT name FROM {{rowset_test}} WHERE id = ?"))) {
+                query.setInt(1, id);
+                try (ResultSet rows = query.executeQuery()) {
+                    assertTrue(rows.next(), "更新后的记录应存在");
+                    assertEquals("RowSet更新测试", rows.getString(1), "数据库应保留精确更新值");
+                    assertFalse(rows.next(), "主键查询只能返回一条记录");
                 }
             }
-            assertTrue(found, "更新后的数据应可查询到");
-
-            // 恢复
-            rowSet.absolute(1);
-            rowSet.updateString("name", originalName);
-            rowSet.updateRow();
+        } finally {
+            try (PreparedStatement restore = connection.prepareStatement(JdbcContext.sql(
+                "UPDATE {{rowset_test}} SET name = ? WHERE id = ?"))) {
+                restore.setString(1, originalName);
+                restore.setInt(2, id);
+                assertEquals(1, restore.executeUpdate(), "应恢复同一条记录");
+            }
         }
     }
 

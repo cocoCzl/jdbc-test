@@ -93,17 +93,35 @@ class SQLXMLTest {
     @Test
     @Order(4)
     @DisplayName("SQLXML.setString 设置字符串")
-    @UseSqlScripts
     void testSetString(Connection conn) throws SQLException {
-        SQLXML xml = JdbcContracts.optional("Connection.createSQLXML", conn::createSQLXML);
+        conn.setAutoCommit(false);
         try {
-            xml.setString("<test>hello</test>");
-            if (!isOracle()) {
-                assertEquals("<test>hello</test>", xml.getString());
+            SQLXML xml = JdbcContracts.optional("Connection.createSQLXML", conn::createSQLXML);
+            try (PreparedStatement insert = conn.prepareStatement(JdbcContext.sql(
+                "INSERT INTO {{sqlxml_test}} (name, xml_data) VALUES (?, ?)"))) {
+                xml.setString("<test>hello</test>");
+                insert.setString(1, "setString-contract");
+                insert.setSQLXML(2, xml);
+                assertEquals(1, insert.executeUpdate());
+            } finally {
+                xml.free();
             }
-            // Oracle XMLType setString sets content in write mode; getString reads after DB round-trip
+            // SQLXML.setString may make its object unreadable. Read a fresh database value.
+            try (PreparedStatement select = conn.prepareStatement(JdbcContext.sql(
+                "SELECT xml_data FROM {{sqlxml_test}} WHERE name = 'setString-contract'"));
+                ResultSet rows = select.executeQuery()) {
+                assertTrue(rows.next());
+                SQLXML actual = rows.getSQLXML(1);
+                assertNotNull(actual);
+                try {
+                    assertEquals("<test>hello</test>", actual.getString());
+                } finally {
+                    actual.free();
+                }
+                assertFalse(rows.next());
+            }
         } finally {
-            xml.free();
+            conn.rollback();
         }
     }
 
