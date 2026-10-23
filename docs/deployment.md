@@ -17,7 +17,7 @@ Editing/debugging source? Use [Development → local source startup](development
 
 A **platform database** stores website state/encrypted credentials. A **target database** is separately configured for JDBC tests; it is not needed to start the site. The **database password** authenticates PG; the independent **`JDBC_TEST_MASTER_KEY`** encrypts stored target credentials and must survive restarts/restores.
 
-Source development has exactly three steps: **source-root `.env.example` → `.env` (no overwrite), edit the three datasource fields in the actual `.env`, run `./jdbc-test dev`**. See [Development](development.md#local-source-startup). The same example now includes Docker network notes; duplicate `.env.external.example` is merged, with no template choice. Bundle users copy it in their bundle root. Bundled Docker must not copy this external-PG template; the unified Docker command generates its `POSTGRES_*` mode. One configuration per environment; do not mix modes.
+Source development has exactly three steps: **source-root `.env.example` → `.env` (no overwrite), edit the three datasource fields in the actual `.env`, run `./jdbc-test dev`**. See [Development](development.md#local-source-startup). Bundle users copy it in their bundle root. Bundled Docker must not copy this external-PG template; the unified Docker command generates its `POSTGRES_*` mode. One configuration per environment; do not mix modes.
 
 <a id="docker-bundled"></a>
 ## 1. Docker + bundled PG
@@ -147,17 +147,33 @@ The unified entry supports `--project`, `--port`, `--host-pg`, `--new-install` (
 
 It always selects the requested PG mode, rejects mode/project mismatches and never rewrites the URL. Saved custom networks/Compose storage definitions must be restored/reviewed with their original project/config; the default wrapper cannot infer a moved/renamed historical deployment. `JDBC_TEST_SETUP_NETWORK` selects an existing setup network; ensure actual Server uses the same network via a reviewed Compose override. `JDBC_TEST_SETUP_IMAGE` is an advanced locally built **current-revision** image override; it is not a promised public image or a standard-build verification.
 
-## Recovery, checks and operations
+<a id="operations"></a>
+## Backup, recovery and upgrades
 
 Read-only preflight authenticates PG and checks new-install emptiness; it does not migrate. Formal dev/start/Compose up performs migrations. Startup checks never run target tests. Missing `.env` is not proof of new installation: selected actual Compose project/path/volumes, effective data directory and supplied PG schema are checked. Existing state with missing Key means restore **original config/Key**, not generate a replacement. Secure-random failures stop immediately. Locked, private staged atomic writes prevent partial/concurrent replacements; on a stale lock first establish no initializer/launcher is running before manual recovery. No DROP, volume deletion, password reset or privilege elevation.
 
 Stop via Ctrl+C (dev/bundle) or matching Docker command with `--stop`. It retains all data/config. Back up **platform PG + application files + original Key/config** together, stopping Server for a consistent snapshot. Restore them as a set before starting. For upgrades replace source/bundle while preserving project/storage/config/Key; do not reinitialize or run two Servers against one platform. Historical migrations are unchanged.
 
-Invalid URLs/passwords/Key formats and occupied ports produce actionable errors. A valid 32-byte Key of the wrong value cannot be identified statically: retain the original Key to decrypt existing credentials. Do not fix startup failures by deleting state. UI has no authentication; keep loopback defaults or use controlled proxy/VPN and trusted drivers. See [Execution safety](execution-safety.md).
+Invalid URLs/passwords/Key formats and occupied ports produce actionable errors. A valid 32-byte Key of the wrong value cannot be identified statically: retain the original Key to decrypt existing credentials. Do not fix startup failures by deleting state. UI has no authentication; keep loopback defaults or use controlled proxy/VPN and trusted drivers. See [Usage](usage.md).
+
+### Storage and upgrade checklist
+
+Native/source files default to `data/` (or `JDBC_TEST_DATA_DIRECTORY`), including uploaded
+`drivers/` and task `runs/`. Docker mounts the Compose project's `jdbc_test_data` volume at
+`/data/jdbc-test`; bundled PG also uses its own project volume. Record actual project/volume names
+and custom mounts before backup. A database-only backup cannot recover driver binaries or run files.
+
+Before upgrading, stop the Server/Workers, take a consistent PG/files/config/Key backup, check the
+new version's requirements and checksum, then replace the complete matching Server/Worker/web bundle.
+Start once to apply Flyway migrations and verify saved connection decryption and historical reports.
+Do not edit old migrations or assume an older binary can read a migrated database. Rollback requires
+the corresponding pre-upgrade database/files/config snapshot and matching old binaries.
 
 <a id="validation-limits"></a>
 ## Validation limits
 
-This revision was tested on macOS/JDK21/Node24 against independent temporary platform PG: copying the example and editing its three fields, one-command source dev with backend/Vite/Catalog/proxy/page readiness, repeated dev with the original Key, Ctrl+C cleanup and retained data, unified build, bundle copy/edit/start, saved-credential decryption after restart and missing-Key recovery refusal. Historical start forwards also passed with existing properties and environment configurations. Both consolidated Docker entries passed real Compose/Spring/PG authentication using this build’s artifacts in an alternate local runtime image, including exact special UTF-8 passwords and matching generated PG/application passwords. Stop/restart retained original configuration/Key/volumes, and missing configuration with existing project state refused regeneration.
-
-**Standard Docker source build was retried and blocked by Docker Hub OAuth token timeout for the Temurin21 JDK base image**; the alternate runtime tests do not count as standard-build success. Windows host ACL/process behavior, this revision’s PowerShell runtime and IDEA UI Run/Debug remain unverified. No target tests, QA or historical-copy acceptance were performed.
+Windows host ACL/PowerShell process behavior and IDEA UI Run/Debug remain unverified.
+Standard Docker source build has no successful retained validation after a registry authentication
+request timed out. Alternate local-runtime-image checks do not establish standard source-build success.
+Target database verification is separate; see [database configuration](usage.md#database-configuration)
+and [known limitations](development.md#known-limitations).

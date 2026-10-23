@@ -64,11 +64,18 @@ def build(output: Path) -> tuple[Path, Path, Path]:
         shutil.copy2(PROJECT_ROOT / ".env.example", staging / ".env.example")
         shutil.copy2(PROJECT_ROOT / "LICENSE", staging / "LICENSE")
         (staging / "docs").mkdir()
-        for document in ("deployment.md", "deployment.zh-CN.md", "execution-safety.md", "execution-safety.zh-CN.md"):
+        for document in (
+            "deployment.md", "deployment.zh-CN.md", "usage.md", "usage.zh-CN.md",
+            "jdbc-capability-contracts.md", "jdbc-capability-contracts.zh-CN.md",
+        ):
             content = (PROJECT_ROOT / "docs" / document).read_text(encoding="utf-8")
             # Development sources are available online, outside the runtime bundle.
-            for guide in ("development.md", "development.zh-CN.md"):
-                content = content.replace(f"({guide}#", f"(https://github.com/cocoCzl/jdbc-test/blob/master/docs/{guide}#")
+            for guide in (
+                "development.md", "development.zh-CN.md",
+                "internal-regression.md", "internal-regression.zh-CN.md",
+            ):
+                content = content.replace(f"({guide}", f"(https://github.com/cocoCzl/jdbc-test/blob/master/docs/{guide}")
+            content = content.replace("(../adapters/", "(https://github.com/cocoCzl/jdbc-test/blob/master/adapters/")
             (staging / "docs" / document).write_text(content, encoding="utf-8")
         (staging / "README.md").write_text(
             "# JDBC Test Server\n\n"
@@ -77,11 +84,12 @@ def build(output: Path) -> tuple[Path, Path, Path]:
             "2. Edit that actual `.env` locally: fill SPRING_DATASOURCE_URL, SPRING_DATASOURCE_USERNAME and SPRING_DATASOURCE_PASSWORD.\n"
             "URL example: jdbc:postgresql://localhost:5432/jdbc_test (replace host/port/database; no credentials in URL).\n"
             "3. Run `./jdbc-test start` (PowerShell: `./jdbc-test.ps1 start`); the entry protects the local file and checks configuration.\n"
-            "After authenticating and confirming NEW empty platform, the tool saves a persistent independent Master Key in .env; existing data requires the original Key.\n"
+            "After authenticating and verifying an empty platform, the tool automatically saves a persistent independent Master Key in .env; existing data requires the original Key.\n"
             "Startup checks configuration and ports, runs migrations and prints the ready website URL. Ctrl+C stops this launch; data/configuration are retained.\n"
             "Next time run `./jdbc-test start` again, reusing the original .env and Key. Do not repeat --new-install.\n\n"
-            "在本部署包目录复制 .env.example 为 .env（不覆盖），编辑实际 .env 三项，再执行 ./jdbc-test start。全新空平台确认 NEW 后自动保存 Key；恢复必须使用原 Key。\n\n"
+            "在本部署包目录复制 .env.example 为 .env（不覆盖），编辑实际 .env 三项，再执行 ./jdbc-test start。验证全新空平台后自动保存 Key；恢复必须使用原 Key。\n\n"
             "Existing properties/environment configurations are read by the same unified start; historical start scripts only forward to it. Full guide: [English](docs/deployment.md#native) | [简体中文](docs/deployment.zh-CN.md#native).\n"
+            "First test: [Usage](docs/usage.md) | [使用指南](docs/usage.zh-CN.md).\n"
             "Never source/eval .env; quoted strings use JSON escapes, single quotes are literal, unquoted values retain spaces/#/$ without expansion. Keep .env private and backed up with PG/data.\n",
             encoding="utf-8",
         )

@@ -86,8 +86,12 @@ class AdapterRuntimeTest(unittest.TestCase):
             self.assertEqual(preparation[scenario_id]["recorded_conclusion"],
                              followup["recorded_conclusion"])
             self.assertTrue(preparation[scenario_id]["message"].endswith(followup["resource"]))
-            for guide in ("development.md", "development.zh-CN.md"):
-                self.assertIn(scenario_id, (PROJECT_ROOT / "docs" / guide).read_text())
+        # Detailed historical cases stay in the maintained evidence resource, linked from usage.
+        for guide in ("usage.md", "usage.zh-CN.md"):
+            content = (PROJECT_ROOT / "docs" / guide).read_text()
+            self.assertIn(f"../adapters/kingbase/{combination['evidence']}", content)
+            self.assertIn(combination["server_version"], content)
+            self.assertIn(combination["driver_version"], content)
         self.assertEqual("SUCCESS", evidence["cleanup_status"])
         self.assertEqual(0, evidence["cleanup_failures"])
         self.assertTrue(all(c["review"] for c in cases))

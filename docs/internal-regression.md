@@ -25,7 +25,7 @@ Add these fields to the configuration (replace the example identity/build/mode):
     "environment_key_env": "JDBC_TEST_REGRESSION_KEY"
   },
   "db": {
-    "driver": {"kind": "local", "path": "/private/drivers/A"}
+    "driver": {"kind": "local", "path": "local-drivers/A"}
   }
 }
 ```
@@ -109,15 +109,11 @@ prevents a successful comparison even if the same issue was present before. Unse
 `USER_EXCLUDED`/`NOT_APPLICABLE` and are not counted as executed or as assessment failures.
 No comparison writes to the database or rewrites source reports.
 
-## Scope of this phase
+## Scope and key management
 
-This workflow is CLI-only. The existing Worker/Server/Web result model and provenance remain intact;
-Suite evidence also uses existing JUnit report entries consumed by Worker. Shared catalog labels
-state that boolean metadata is a declaration, and mark only the reviewed savepoint creation API as
-optional. See [capability contract decisions](jdbc-capability-contracts.md).
-
-It does not implement SQL feature, product compatibility or vendor extension scoring, independent
-server identity attestation, remote baseline storage/signatures, or Web baseline management.
+This workflow is CLI-only; it does not provide Web baseline management, independent physical-server
+attestation, remote baseline storage/signatures, or SQL/product/vendor certification.
+See [JDBC decision reference](jdbc-capability-contracts.md) for method-level interpretation.
 
 Keep the key in your existing CI secret store or another private secret manager, and inject it only
 through the named environment variable. Do not commit it, put it in adapter/report JSON, echo it or
@@ -126,7 +122,7 @@ report-signing key or certification token. Its key ID is a SHA-256 identifier; t
 contain the original key. The baseline and current run must use the same retained key; rotation or
 loss makes their configuration fingerprints incomparable and requires rerunning/selecting a new
 baseline. Deleting a key does not invalidate old report contents, but prevents producing matching
-new comparison evidence. See the [exact six-case PostgreSQL validation scope](jdbc-capability-contracts.md).
+new comparison evidence.
 
 The CLI removes the configured comparison key and the default key variable from the Maven/driver
 child environment. Retained report and diagnostic serialization also redacts unexpected echoes

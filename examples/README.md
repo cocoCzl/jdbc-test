@@ -16,7 +16,7 @@ python3 -B scripts/runner.py run configs/config.local.json
 
 Supply `DB_PASSWORD` through your secret mechanism before execution. `--adapter` accepts built-in
 IDs from `adapters/catalog.json` only. MySQL uses `--adapter mysql` and a dedicated database; Oracle
-uses `--adapter oracle` and its dedicated account schema. See [Execution safety](../docs/execution-safety.md).
+uses `--adapter oracle` and its dedicated account schema. See [Usage](../docs/usage.md).
 
 For a proprietary product explicitly reuse a built-in dialect:
 

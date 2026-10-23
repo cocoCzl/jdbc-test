@@ -23,7 +23,7 @@
     "environment_key_env": "JDBC_TEST_REGRESSION_KEY"
   },
   "db": {
-    "driver": {"kind": "local", "path": "/private/drivers/A"}
+    "driver": {"kind": "local", "path": "local-drivers/A"}
   }
 }
 ```
@@ -97,24 +97,16 @@ Maven 坐标选择该制品 JAR，多 JAR 驱动请使用本地目录；框架�
 未选用例保留 `USER_EXCLUDED`/`NOT_APPLICABLE`，不会算作已执行，也不导致单次评估失败。
 比较过程不连接数据库、不重写原报告。
 
-## 本阶段边界
+## 范围与密钥管理
 
-内部基线管理仅在 CLI 实现。Suite 沿用 Worker 已消费的 JUnit report entries 保存独立证据，
-Core/Worker/Server/Web 结果模型和来源含义不变；共享目录已明确布尔元数据是声明，
-仅本次审查的保存点创建调用允许明确不支持。参见[能力与契约依据](jdbc-capability-contracts.md)。
-本阶段未实现 SQL 功能、产品兼容或厂商扩展评分、独立服务端身份核验、远端/签名基线存储和 Web 基线页面。
+本流程仅用于 CLI，不提供 Web 基线管理、物理服务身份独立证明、远程基线存储/签名或 SQL/产品/厂商认证。
+具体方法解释见 [JDBC 判定参考](jdbc-capability-contracts.zh-CN.md)。
 
-比较密钥应保存在现有 CI 密钥库或私有密钥管理工具中，仅通过指定环境变量注入。
+密钥应保存在现有 CI 密钥库或私有密钥管理工具中，仅通过指定环境变量注入。
 不要提交到 Git、写入适配包/报告 JSON、回显或在开启 shell 跟踪时运行上述命令。
 它用于配置 HMAC，不是数据库密码、报告签名或认证令牌。报告只含 SHA-256 密钥 ID 和配置摘要，
 不含原密钥。A/B 及后续 CI 必须保留并使用同一密钥；丢失或更换后配置指纹不可比，需要重新运行并
 选择新基线。删除密钥不改变旧报告内容，但无法再生成匹配的新比较证据。
-第一阶段仅在临时 PostgreSQL 16、驱动 42.7.2→42.7.5 上各执行六个用例（其余 264 排除）：
-`database_metadata.supports_transactions`、`database_metadata.supports_batch_updates`、
-`database_metadata.supports_savepoints`、`savepoint.set_savepoint`、`connection.rollback`、
-`statement.execute_batch`。A/B 和内部比较均返回 0。未验证完整 JDBC、全部 SQL/清理路径、
-其他连接池/模式/平台及 MySQL、Oracle、Kingbase、私有驱动；之后的输出控制字符转义修复只做了 mock
-Suite 测试，未重新实测。参见[契约说明](jdbc-capability-contracts.md)。
 
 CLI 会从 Maven/驱动子进程环境移除当前比较密钥及默认密钥变量；保存报告和诊断日志前也会
 脱敏意外回显的当前密钥，包括需要 JSON 转义的值。

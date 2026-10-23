@@ -15,7 +15,7 @@ python3 -B scripts/runner.py run configs/config.local.json
 
 执行前通过秘密管理方式设置 `DB_PASSWORD`。`--adapter` 仅接受 `adapters/catalog.json` 内置 ID。
 MySQL 使用 `--adapter mysql` 和专用库；Oracle 使用 `--adapter oracle` 和专用账号的 schema。
-命名空间授权、对象归属和清理规则见[执行安全](../docs/execution-safety.zh-CN.md)。
+命名空间授权、对象归属和清理规则见[使用指南](../docs/usage.zh-CN.md)。
 
 自研数据库可显式复用已有方言；例如：
 

@@ -4,6 +4,7 @@ import hashlib
 import http.server
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -59,6 +60,10 @@ class DistributionTest(unittest.TestCase):
     def test_archives_are_complete_and_exclude_runtime_secrets(self):
         directory, archive, windows_archive = self.bundle()
         required = {"jdbc-test", "jdbc-test.ps1", ".env.example", "server/jdbc-test-server.jar", "worker/jdbc-test-worker.jar", "web/index.html", "web/assets/app.js", "start.sh", "start.ps1", "config/application.properties.example", "docs/deployment.md", "docs/deployment.zh-CN.md"}
+        required.update({
+            "docs/usage.md", "docs/usage.zh-CN.md",
+            "docs/jdbc-capability-contracts.md", "docs/jdbc-capability-contracts.zh-CN.md",
+        })
         with zipfile.ZipFile(windows_archive) as bundle:
             contents = {name.split("/", 1)[1] for name in bundle.namelist()}
             self.assertTrue(required <= contents)
@@ -66,6 +71,7 @@ class DistributionTest(unittest.TestCase):
             self.assertTrue({"init.sh", "init.ps1", "check.sh", "check.ps1"}.isdisjoint(contents))
             self.assertNotIn("config/application.properties", contents)
             self.assertFalse(any(name.startswith("data/") for name in contents))
+            self.assertFalse(any("acceptance-" in name or "execution-safety" in name or "dameng.md" in name for name in contents))
         with tarfile.open(archive) as bundle:
             self.assertTrue(bundle.getmember(f"{directory.name}/start.sh").mode & 0o111)
         for path in (archive, windows_archive):
@@ -73,6 +79,18 @@ class DistributionTest(unittest.TestCase):
                 path.with_name(path.name + ".sha256").read_text().split()[0],
                 hashlib.sha256(path.read_bytes()).hexdigest(),
             )
+
+    def test_packaged_document_links_resolve_without_source_checkout(self):
+        directory, _, _ = self.bundle()
+        documents = [directory / "README.md", *(directory / "docs").glob("*.md")]
+        for document in documents:
+            content = re.sub(r"```.*?```", "", document.read_text(encoding="utf-8"), flags=re.S)
+            for target in re.findall(r"\]\(([^\s)]+)", content):
+                if "://" in target or target.startswith("#"):
+                    continue
+                path = (document.parent / target.split("#", 1)[0]).resolve()
+                self.assertTrue(path.is_relative_to(directory), f"Outside bundle: {document}: {target}")
+                self.assertTrue(path.is_file(), f"Missing bundle link: {document}: {target}")
 
     def test_tar_launcher_is_executable_without_host_execute_bits(self):
         gettarinfo = tarfile.TarFile.gettarinfo

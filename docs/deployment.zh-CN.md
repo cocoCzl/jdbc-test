@@ -17,7 +17,7 @@
 
 **平台数据库**保存网站状态和加密凭据；**目标数据库**另行配置用于 JDBC 测试，启动网站不需要。**数据库密码**用于 PG 认证；独立的 **`JDBC_TEST_MASTER_KEY`** 加密已保存的目标库凭据，必须在重启/恢复时保留。
 
-源码开发固定三步：**源码根目录 `.env.example` → `.env`（不覆盖），编辑实际 `.env` 数据库三项，执行 `./jdbc-test dev`**。详见[开发指南](development.zh-CN.md#local-source-startup)。同一模板包含 Docker 地址注释，重复 `.env.external.example` 已合并，不需再选模板。部署包在自己的根目录复制同一模板；Docker 自带 PG 则不复制外部 PG 模板，由统一 Docker 命令生成 `POSTGRES_*`。每套环境一份配置，模式不能混用。
+源码开发固定三步：**源码根目录 `.env.example` → `.env`（不覆盖），编辑实际 `.env` 数据库三项，执行 `./jdbc-test dev`**。详见[开发指南](development.zh-CN.md#local-source-startup)。部署包在自己的根目录复制同一模板；Docker 自带 PG 则不复制外部 PG 模板，由统一 Docker 命令生成 `POSTGRES_*`。每套环境一份配置，模式不能混用。
 
 <a id="docker-bundled"></a>
 ## 1. Docker + 自带 PG
@@ -147,17 +147,30 @@ if (-not (Test-Path '.env')) { Copy-Item .env.example .env }
 
 始终选择明确 PG 模式，拒绝模式/project 冲突，不改 URL。自定义网络/Compose 存储必须按原 project/配置恢复和审查；默认入口无法推断已移动/更名的历史部署。`JDBC_TEST_SETUP_NETWORK` 选择已有 setup 网络，实际 Server 也需通过审查后的 Compose override 加入同一网络。`JDBC_TEST_SETUP_IMAGE` 仅为高级用户指定本地构建的**当前版本**镜像，不是公共镜像承诺，也不能作为标准构建通过证明。
 
+<a id="operations"></a>
 ## 恢复、检查和日常管理
 
 只读 preflight 验证 PG 认证、新装空状态，不执行 migration。正式 dev/start/Compose up 执行 migration；启动检查不跑目标库测试。缺 `.env` 不等于新装：检查所选实际 Compose project/路径/卷、有效数据路径以及提供的 PG schema。已有状态缺 Key 必须恢复**原配置/Key**，不能生成替代。安全随机源失败立即退出；私有 staging、锁和原子写保护半成品与并发覆盖。残留锁须先确认无初始化/启动进程再手工恢复。不执行 DROP、删除卷、重置密码或权限提升。
 
 dev/部署包 Ctrl+C 停止，Docker 用对应命令追加 `--stop`，保留配置和数据。**平台 PG + 应用文件 + 原 Key/配置**一起备份，先停 Server 保持一致快照；恢复整套后再启动。升级替换源码/部署包，保留 project/存储/配置/Key，不重新初始化，不让两个 Server 同时连接同一平台。历史 migration 不变。
 
-错误 URL/密码/Key 格式及端口占用会给可理解错误。格式正确但值错误的32字节 Key 静态无法识别，必须保留原 Key 才能解密；不能通过删除状态解决错误。UI 无认证，保持 loopback 或使用受控代理/VPN，仅加载可信驱动。见[执行安全](execution-safety.zh-CN.md)。
+错误 URL/密码/Key 格式及端口占用会给可理解错误。格式正确但值错误的32字节 Key 静态无法识别，必须保留原 Key 才能解密；不能通过删除状态解决错误。UI 无认证，保持 loopback 或使用受控代理/VPN，仅加载可信驱动。见[使用指南](usage.zh-CN.md)。
+
+### 存储与升级检查
+
+源码/部署包文件默认为 `data/`，或由 `JDBC_TEST_DATA_DIRECTORY` 指定，包括上传的 `drivers/`
+和任务 `runs/`。Docker 将 Compose project 的 `jdbc_test_data` 卷挂载到 `/data/jdbc-test`，
+自带 PG 另有 project 数据卷。备份前记录实际 project/卷名和自定义挂载；仅备份数据库不能恢复驱动和任务文件。
+
+升级前停止 Server/Worker，一致备份 PG/文件/配置/Key，核对新版本要求和校验和，
+再整体替换匹配的 Server/Worker/Web 部署包。启动执行 Flyway 后检查保存连接解密及历史报告。
+不修改旧迁移，不假设旧二进制能读取已迁移数据库；回退需相应升级前数据库/文件/配置快照和匹配旧二进制。
 
 <a id="validation-limits"></a>
 ## 验证边界
 
-本轮在 macOS/JDK21/Node24、独立临时平台 PG 中实测：复制示例并编辑三项，一条 dev 命令完成构建及源码后端/Vite/Catalog/代理/页面就绪，再次 dev 复用原 Key，Ctrl+C 收尾并保留数据；统一 build、部署包复制/编辑/start、重启后已保存凭据解密、缺 Key 恢复保护均通过。历史 start 转发也通过已有 properties 和纯环境配置启动。两种整理后的 Docker 入口用本轮构建产物和替代本地运行时镜像，通过实际 Compose/Spring/PG 认证，包括特殊 UTF-8 密码完整传递、自带 PG 与应用读取同一自动生成密码。停止/重启保留配置/Key/卷；已有 project 状态缺配置时拒绝重新生成。
-
-**标准 Docker 源码构建本轮重试，仍被 Temurin21 JDK 基础镜像的 Docker Hub OAuth token 超时阻塞**；替代运行时测试不算标准构建成功。Windows 宿主机 ACL/进程、本轮 PowerShell 运行链路及 IDEA UI Run/Debug 尚未实测。本轮没有执行目标测试、QA 或历史副本验收。
+Windows 主机 ACL/PowerShell 进程行为及 IDEA UI Run/Debug 尚未实测。
+标准 Docker 源码构建在镜像仓库认证请求超时后没有成功验证记录，
+替代本地运行镜像检查不能证明标准源码构建成功。
+目标数据库验证另行界定，见[数据库配置](usage.zh-CN.md#database-configuration)
+及[已知限制](development.zh-CN.md#known-limitations)。
