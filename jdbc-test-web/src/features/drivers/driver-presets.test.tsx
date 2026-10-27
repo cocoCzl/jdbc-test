@@ -142,11 +142,11 @@ describe("New driver presets", () => {
     expect(vendor()).toHaveValue("PostgreSQL");
     expect(driverClass()).toHaveValue("org.postgresql.Driver");
     expect(prefix()).toHaveValue("jdbc:private:");
-    await select(user, "sqlserver");
+    await select(user, "mysql");
     await user.click(screen.getByRole("button", { name: "Restore current preset defaults" }));
-    expect(vendor()).toHaveValue("Microsoft");
-    expect(driverClass()).toHaveValue("com.microsoft.sqlserver.jdbc.SQLServerDriver");
-    expect(prefix()).toHaveValue("jdbc:sqlserver:");
+    expect(vendor()).toHaveValue("MySQL");
+    expect(driverClass()).toHaveValue("com.mysql.cj.jdbc.Driver");
+    expect(prefix()).toHaveValue("jdbc:mysql:");
     await select(user, "oracle");
     expect(vendor()).toHaveValue("Oracle");
     expect(driverClass()).toHaveValue("oracle.jdbc.OracleDriver");

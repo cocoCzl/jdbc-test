@@ -10,8 +10,7 @@ class SqlDialectTest {
 
     @Test
     void scopeUsesDeclaredBehaviorRatherThanProductIdentity() {
-        for (String id : java.util.List.of("gaussdb", "mysql", "oracle", "postgresql",
-            "sqlserver")) {
+        for (String id : java.util.List.of("gaussdb", "mysql", "oracle", "postgresql")) {
             SqlDialect dialect = AdapterExecutionConfig.load(id).sqlDialect();
             ExecutionScope scope =
                 dialect == SqlDialect.ORACLE ? new ExecutionScope(null, "owned_scope")

@@ -1,2 +1,0 @@
-CREATE TABLE {{temporal_precision}} (id INTEGER PRIMARY KEY, ts3 DATETIME2(3), ts6 DATETIME2(6));
-GO

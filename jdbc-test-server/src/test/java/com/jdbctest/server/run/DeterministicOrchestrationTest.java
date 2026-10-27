@@ -961,6 +961,32 @@ class DeterministicOrchestrationTest {
     }
 
     @Test
+    void retiredSqlServerQueueAndFrozenDialectCannotStartWorkerAndHistoryRemainsReadable() throws Exception {
+        var mapper = new tools.jackson.databind.ObjectMapper();
+        for (boolean snapshotOnly : List.of(true, false)) {
+            UUID id = run("NORMAL", 1);
+            transactions.executeWithoutResult(tx -> {
+                var row = runs.findById(id).orElseThrow();
+                var frozen = (tools.jackson.databind.node.ObjectNode) mapper.readTree(row.getExecutionInput());
+                if (snapshotOnly) {
+                    frozen.putObject("adapterExecution").put("id", "sqlserver").put("dialect", "sqlserver");
+                } else {
+                    org.springframework.test.util.ReflectionTestUtils.setField(row, "adapterIdSnapshot", "sqlserver");
+                }
+                row.freezeExecutionInput(mapper.writeValueAsString(frozen));
+            });
+            scheduler.enqueue(id);
+            done(id, TestRunStatus.FAILED, "DATABASE_SUPPORT_RETIRED");
+            assertFalse(Files.exists(workspace(id).resolve("input-evidence.json")));
+            assertFalse(credentials.existsById(id));
+            mvc.perform(get("/api/runs/{id}", id)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FAILED"));
+            mvc.perform(get("/api/runs/{id}/report", id)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.summary.failureReason").value("DATABASE_SUPPORT_RETIRED"));
+        }
+    }
+
+    @Test
     void retiredQueuedPackagesFailWithoutStartingWorker() throws Exception {
         var mapper = new tools.jackson.databind.ObjectMapper();
         for (String field : List.of("sqlPackage", "adapterPackage")) {

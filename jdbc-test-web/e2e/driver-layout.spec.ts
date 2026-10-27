@@ -99,6 +99,7 @@ for (const language of ["en", "zh-CN"]) {
     await page.addInitScript(locale => localStorage.setItem("jdbc-test.locale", locale), language);
     await page.route(url => url.pathname.startsWith("/api/"), async route => {
       const path = new URL(route.request().url()).pathname;
+      if (path === "/api/adapters") return route.fulfill({ json: adapters });
       if (path === "/api/drivers/driver-1") {
         if (route.request().method() === "PATCH") {
           const input = route.request().postDataJSON();
@@ -166,6 +167,7 @@ test("TEST FIXTURE ONLY: first-screen file picker, file operations and unchanged
   const uploads: string[] = [];
   await page.route(url => url.pathname.startsWith("/api/"), async route => {
     const path = new URL(route.request().url()).pathname;
+    if (path === "/api/adapters") return route.fulfill({ json: adapters });
     if (path === "/api/drivers/presets") return route.fulfill({ json: driverPresets });
     if (path === "/api/drivers" && route.request().method() === "POST") {
       uploads.push(route.request().postData() ?? "");

@@ -40,7 +40,7 @@ class MigrationAssetsTest {
             Map.entry("multiple_results",
                 List.of("callable_statement", "multiple_result_sets",
                     "multiple_result_sequences")));
-        for (String adapter : List.of("mysql", "postgresql", "oracle", "sqlserver", "gaussdb")) {
+        for (String adapter : List.of("mysql", "postgresql", "oracle", "gaussdb")) {
             var execution = AdapterExecutionConfig.load(adapter);
             for (var fixture : fixtures.entrySet()) {
                 if (!fixture.getValue().stream().allMatch(execution.capabilities()::get)) {
@@ -54,7 +54,6 @@ class MigrationAssetsTest {
                 }
                 String[] statements =
                     adapter.equals("oracle") ? JdbcTestExtension.splitBySlash(content)
-                        : adapter.equals("sqlserver") ? JdbcTestExtension.splitByGo(content)
                             : JdbcTestExtension.splitBySemicolon(content);
                 Config config = new Config();
                 config.db = new Config.DbConfig();

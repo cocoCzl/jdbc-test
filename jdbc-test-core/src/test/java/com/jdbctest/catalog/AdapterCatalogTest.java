@@ -8,8 +8,9 @@ class AdapterCatalogTest {
 
     @Test
     void packagedCatalogReadsExistingAdapterManifests() {
-        assertEquals(7, AdapterCatalog.list().size());
+        assertEquals(6, AdapterCatalog.list().size());
         assertTrue(AdapterCatalog.contains("postgresql"));
+        assertFalse(AdapterCatalog.contains("sqlserver"));
         assertFalse(AdapterCatalog.contains("postgrsql"));
         AdapterCatalog.AdapterMetadata postgres = AdapterCatalog.list().stream()
             .filter(item -> item.id().equals("postgresql")).findFirst().orElseThrow();

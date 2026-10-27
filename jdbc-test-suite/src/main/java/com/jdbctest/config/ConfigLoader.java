@@ -79,6 +79,8 @@ public class ConfigLoader {
             db.get("data_sources"));
         config.db.url = str(db.get("url"));
         config.db.driverClass = str(db.get("driver_class"));
+        com.jdbctest.catalog.ExecutionSupport.requireActive(config.db.type, config.db.adapterId,
+            config.db.assetId, config.db.dialect, config.db.url, config.db.driverClass);
         config.db.connectionMode = nonBlank(str(db.get("connection_mode")), "hikari");
         if (!config.db.connectionMode.equalsIgnoreCase("hikari")
             && !config.db.connectionMode.equalsIgnoreCase("driver_manager")) {

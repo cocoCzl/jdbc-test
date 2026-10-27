@@ -130,8 +130,8 @@ class PlatformUpgradeIT {
     @Test
     void populatedV4PreservesCredentialsArtifactsAndLegacySemantics() throws Exception {
         var mvc = MockMvcBuilders.webAppContextSetup(context).build();
-        assertEquals("5",
-            sql.queryForObject("select max(version) from flyway_schema_history where success",
+        assertEquals("12",
+            sql.queryForObject("select max(version::integer)::text from flyway_schema_history where success",
                 String.class));
         var connection = connections.findById(CONNECTION).orElseThrow();
         assertEquals(envelope, connection.getEncryptedPassword());

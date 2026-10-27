@@ -22,6 +22,16 @@ async function fillDraft(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText("Authorized test schema"), "owned_scope");
 }
 describe("Connection UI", () => {
+  it("identifies a retired SQL Server connection without offering it for new execution", async () => {
+    const user = userEvent.setup();
+    const api = mockApi(url => url.pathname === "/api/connections/connection-1"
+      ? json({ ...connection, databaseType: "sqlserver", adapterId: "sqlserver", sqlDialect: "sqlserver" }) : undefined);
+    renderPage("/connections/connection-1");
+    expect(await screen.findByLabelText("Database type")).toHaveTextContent("SQL Server (support retired)");
+    expect(screen.getByRole("alert")).toHaveTextContent("SQL Server execution is no longer supported");
+    await user.click(screen.getByRole("button", { name: "Test connection" }));
+    expect(api.mock.calls.some(([url]) => String(url).endsWith("/test"))).toBe(false);
+  });
   it("shows an existing custom database as compatible without relabeling its saved identity as PostgreSQL", async () => {
     mockApi();
     renderPage("/connections/connection-1");

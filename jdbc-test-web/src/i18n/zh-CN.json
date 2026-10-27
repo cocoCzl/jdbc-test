@@ -1,4 +1,6 @@
 {
+  "record.reason.DATABASE_SUPPORT_RETIRED": "SQL Server 已停止执行支持，此排队任务未执行；历史结果仍可读取。",
+  "run.reason.DATABASE_SUPPORT_RETIRED": "SQL Server 已停止执行支持。",
   "wizard.noConnectionSelected": "未选择",
   "resource.technicalInfo": "技术信息",
   "resource.internalId": "内部 ID",
@@ -608,7 +610,8 @@
   "driverPreset.postgresql": "PostgreSQL",
   "driverPreset.mysql": "MySQL",
   "driverPreset.oracle": "Oracle",
-  "driverPreset.sqlserver": "SQL Server",
+  "database.sqlServerRetired": "SQL Server（已停止支持）",
+  "errors.DATABASE_SUPPORT_RETIRED": "SQL Server 已停止执行支持，历史记录仍可读取。",
   "driverPreset.custom": "自定义",
   "driverPreset.kingbase": "KingbaseES（金仓数据库）",
   "adapter.kingbaseQualification": "正式平台适配仅限已验证组合：KingbaseES V009R002C016、oracle 模式、JDBC 数据库版本 12.1、驱动 V008R006B0001。真实 FULL 任务有 270 项终态结果记录，261 项实际调用契约，9 项因准备直接缺失（4 项）或连带阻塞（5 项）未调用；原状态为 252 通过、9 失败、9 中止，清理成功。正式不代表 JDBC 全部通过；缺失 SQL 准备资产、XA 配置限制和实际 JDBC 失败均保留，其他版本、模式及驱动尚未验证。",

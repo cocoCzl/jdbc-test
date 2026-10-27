@@ -236,6 +236,18 @@ final class TestRunExecutor {
                 throw new IllegalArgumentException("EXECUTION_SCOPE_REQUIRED");
             }
             JsonNode frozen = mapper.readTree(run.getExecutionInput());
+            try {
+                com.jdbctest.catalog.ExecutionSupport.requireActive(run.getAdapterIdSnapshot(),
+                    run.getDatabaseTypeSnapshot(), run.getDriverClassSnapshot(),
+                    frozen.path("jdbcUrl").asString(),
+                    frozen.path("adapterExecution").path("id").asString(),
+                    frozen.path("adapterExecution").path("assetId").asString(),
+                    frozen.path("adapterExecution").path("dialect").asString());
+                com.jdbctest.catalog.AdapterRegistry.bundled().required(run.getAdapterIdSnapshot());
+            } catch (IllegalArgumentException exception) {
+                transition(run, TestRunStatus.FAILED, "DATABASE_SUPPORT_RETIRED");
+                return null;
+            }
             if (frozen.has("sqlPackage") || frozen.has("adapterPackage")) {
                 transition(run, TestRunStatus.FAILED, "RETIRED_PACKAGE_EXECUTION");
                 return null;

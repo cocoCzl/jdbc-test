@@ -24,6 +24,7 @@ public record AdapterExecutionConfig(String id, String assetId, String dialect,
         "rowid_operations", "multiple_result_sequences", "data_source");
 
     public AdapterExecutionConfig {
+        ExecutionSupport.requireActive(id, assetId, dialect);
         capabilities = validateCapabilities(capabilities);
         metadataConstraints = Map.copyOf(metadataConstraints);
     }
@@ -34,6 +35,7 @@ public record AdapterExecutionConfig(String id, String assetId, String dialect,
 
     /** Resources, namespace rules and dialect form one supported execution configuration. */
     public AdapterExecutionConfig requireDialect(String requested) {
+        ExecutionSupport.requireActive(requested);
         if (requested != null && !sqlDialect().equals(SqlDialect.fromCode(requested))) {
             throw new IllegalArgumentException("ADAPTER_DIALECT_UNSUPPORTED");
         }

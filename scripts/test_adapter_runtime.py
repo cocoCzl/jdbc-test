@@ -25,7 +25,7 @@ class AdapterRuntimeTest(unittest.TestCase):
             for scenario in build_scenario_inventory(PROJECT_ROOT).values()
             for capability in scenario.required_capabilities
         }
-        for adapter_id in ("mysql", "postgresql", "oracle", "sqlserver", "gaussdb", "kingbase", "dm"):
+        for adapter_id in ("mysql", "postgresql", "oracle", "gaussdb", "kingbase", "dm"):
             package = load_adapter(PROJECT_ROOT, adapter_id)
             self.assertTrue(required <= set(package.manifest["capabilities"]), adapter_id)
 
@@ -49,12 +49,30 @@ class AdapterRuntimeTest(unittest.TestCase):
     def test_bundled_adapters_are_discoverable_and_valid(self):
         adapters = discover_adapters(PROJECT_ROOT)
         self.assertEqual(
-            {"postgresql", "mysql", "oracle", "gaussdb", "sqlserver", "kingbase", "dm"},
+            {"postgresql", "mysql", "oracle", "gaussdb", "kingbase", "dm"},
             set(adapters),
         )
         for adapter_id in adapters:
             self.assertEqual(adapter_id, load_adapter(PROJECT_ROOT, adapter_id).adapter_id)
 
+
+    def test_active_support_and_documented_database_rows_follow_catalog(self):
+        active = discover_adapters(PROJECT_ROOT)
+        self.assertNotIn("sqlserver", active)
+        with self.assertRaisesRegex(ValueError, "BUILTIN_ADAPTER_REQUIRED"):
+            load_adapter(PROJECT_ROOT, "sqlserver")
+        for area in ("adapters", "ddl", "dml"):
+            self.assertFalse((PROJECT_ROOT / area / "sqlserver").exists())
+        self.assertFalse((PROJECT_ROOT / "pool/sqlserver.yaml").exists())
+        # Keep the human-readable support declarations tied to the source registry.
+        names = {"postgresql": "PostgreSQL", "mysql": "MySQL", "oracle": "Oracle",
+                 "gaussdb": "GaussDB", "kingbase": "KingbaseES", "dm": "Dameng"}
+        self.assertEqual(set(names), set(active))
+        for document in ("README.md", "README.zh-CN.md", "docs/usage.md", "docs/usage.zh-CN.md"):
+            text = (PROJECT_ROOT / document).read_text(encoding="utf-8")
+            for adapter, name in names.items():
+                self.assertIn("达梦" if adapter == "dm" and "zh-CN" in document else name, text)
+            self.assertNotIn("| SQL Server |", text)
 
     def test_kingbase_official_records_real_scope_without_claiming_all_tests_passed(self):
         package = load_adapter(PROJECT_ROOT, "kingbase")

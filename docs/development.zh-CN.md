@@ -176,7 +176,7 @@ Optimize Imports 和 IDE inspection 仍需独立审查。
 普通注册项无需增加产品枚举或前端分支。驱动预设是独立可编辑提示，不决定适配身份或能力。
 
 新方言需实现 `SqlDialect` 的范围、引号、URL 解析、资源定位及归属清理，并覆盖失败路径。
-当前有限行为为 `postgresql`、`mysql`、`oracle`、`sqlserver`、`dm`，产品身份独立。
+当前有限行为为 `postgresql`、`mysql`、`oracle`、`dm`，产品身份独立。
 DM 保留 schema 精确大小写且不要求 catalog，与 Oracle 折叠和 MySQL catalog 选择不同。
 修改共享逻辑需回归已有产品。仅增加枚举不能实现支持，不得修改公共断言或减少 FULL 选择制造兼容。
 扩大支持声明前需要真实授权验证。
@@ -361,3 +361,10 @@ V9/V10 及其他历史迁移保留，撤回包的表和历史仍可读且不重�
 
 准备不足不等于驱动缺陷，允许不支持不算功能通过。REF/ROWID 类型存在、LOB 自动持久化、
 非法操作后恢复和内部更新计数要求分别定界，见 [JDBC 判定参考](jdbc-capability-contracts.zh-CN.md)。
+
+### 执行与查询边界
+
+SQL Server 已停止新建连接、连接探测和执行支持；`adapters/catalog.json` 是活动支持的唯一索引。
+数据库类型/方言枚举只保留历史解析值，历史连接、任务、原始报告和原始结论不改写。
+新任务及队列中的旧快照均校验退役策略，旧 SQL Server 输入以 `DATABASE_SUPPORT_RETIRED` 失败。
+文档契约检查活动目录、发布资源和中英文支持声明；驱动默认方言及界面选项复用活动目录。

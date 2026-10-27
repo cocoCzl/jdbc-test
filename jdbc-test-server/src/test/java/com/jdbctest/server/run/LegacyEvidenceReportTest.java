@@ -120,6 +120,26 @@ class LegacyEvidenceReportTest {
     }
 
     @Test
+    void retiredSqlServerHistoryStillListsAndDownloadsOriginalConclusions() throws Exception {
+        var run = legacyRun(TestRunStatus.FAILED);
+        org.springframework.test.util.ReflectionTestUtils.setField(run, "databaseTypeSnapshot", "sqlserver");
+        org.springframework.test.util.ReflectionTestUtils.setField(run, "adapterIdSnapshot", "sqlserver");
+        run.freezeExecutionInput("{\"adapterExecution\":{\"id\":\"sqlserver\",\"dialect\":\"sqlserver\"},\"scope\":{}}");
+        String original = "{\"conclusion\":\"CONTRACT_VIOLATION\",\"contractInvoked\":true}";
+        var row = result(run, TestCaseResultStatus.FAILED, original);
+        var listed = service.list(0, 100, null, null).items().stream()
+            .filter(item -> item.id().equals(run.getId())).findFirst().orElseThrow();
+        assertEquals("sqlserver", listed.connection().adapterId());
+        assertEquals(TestRunStatus.FAILED, listed.status());
+        mvc.perform(get("/api/runs/{id}", run.getId())).andExpect(status().isOk());
+        mvc.perform(get("/api/runs/{id}/report", run.getId())).andExpect(status().isOk());
+        assertEquals("CONTRACT_VIOLATION", report(run.getId()).path("scenario_results")
+            .path("connection.fixture").path("conclusion").asString());
+        assertEquals(original, results.findById(row.getId()).orElseThrow().getExecutionEvidence());
+        assertEquals(TestRunStatus.FAILED, runs.findById(run.getId()).orElseThrow().getStatus());
+    }
+
+    @Test
     void detailSummaryAndDownloadRetainDistinctContractOutcomes() throws Exception {
         for (String conclusion : new String[] {"CONTRACT_VIOLATION", "UNSUPPORTED_ALLOWED",
             "PREREQUISITE_UNMET", "PLATFORM_ERROR", "NOT_EVALUATED"}) {

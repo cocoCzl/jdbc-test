@@ -201,7 +201,7 @@ registry entry. Driver presets are independent editable form hints, not adapter 
 
 A distinct dialect requires implemented `SqlDialect` scope, quoting, URL parsing, fixture lookup and
 ownership cleanup with failure tests. Current finite behaviors are `postgresql`, `mysql`, `oracle`,
-`sqlserver` and `dm`; product identity remains independent. DM preserves exact schema case and requires
+`dm`; product identity remains independent. DM preserves exact schema case and requires
 no catalog, unlike Oracle folding or MySQL catalog selection. Audit shared logic for existing products.
 A product enum alone does not implement support. Never change public assertions or deselect FULL
 cases to manufacture compatibility. Real authorized verification is required before widening claims.
@@ -408,3 +408,11 @@ and historical reports; a targeted follow-up never changes an earlier FULL pass 
 Missing fixtures are not driver defects; legal unsupported is not a feature pass. REF/ROWID type
 presence, automatic LOB persistence, invalid-call recovery and internal update-count requirements
 remain separately scoped, as specified in [JDBC reference](jdbc-capability-contracts.md).
+
+### Execution and query boundaries
+
+SQL Server no longer supports new connections, probes or executions. `adapters/catalog.json` is the
+active support index. Product/dialect enum values remain for historical parsing; existing connections,
+run statuses, evidence and raw reports are not rewritten. New runs and queued frozen inputs enforce
+retirement; old SQL Server inputs fail with `DATABASE_SUPPORT_RETIRED`. Contract checks tie packaged
+resources and bilingual support declarations to the registry; driver default dialects and UI options use it.

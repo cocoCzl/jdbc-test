@@ -10,6 +10,7 @@ public enum SqlDialect {
     MYSQL("mysql"),
     ORACLE("oracle"),
     DM("dm"),
+    // Historical parsing only; ExecutionSupport rejects all new execution.
     SQL_SERVER("sqlserver"),
     GENERIC("generic");
 

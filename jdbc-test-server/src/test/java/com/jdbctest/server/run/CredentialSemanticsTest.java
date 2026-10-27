@@ -348,7 +348,20 @@ class CredentialSemanticsTest {
     }
 
     @Test
-    void legacySqlServerConnectionIgnoresNewDriverDefaultsAndKeepsItsResources() {
+    void newSqlServerConnectionAndCompatibilityDialectAreRejectedByApi() throws Exception {
+        for (String field : java.util.List.of("adapterId", "databaseType", "jdbcUrl", "sqlDialect")) {
+            var draft = input();
+            draft.put("savePassword", false);
+            draft.put(field, field.equals("jdbcUrl") ? "jdbc:sqlserver://fixture.invalid" : "sqlserver");
+            mvc.perform(post("/api/connections").contentType(MediaType.APPLICATION_JSON)
+                    .content(json.writeValueAsString(draft)))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.code").value("DATABASE_SUPPORT_RETIRED"));
+        }
+    }
+
+    @Test
+    void legacySqlServerConnectionRemainsReadableButCannotCreateRuns() {
         var driver = drivers.findById(driverId).orElseThrow();
         driver.setDefaultSqlDialect("oracle");
         drivers.save(driver);
@@ -358,12 +371,26 @@ class CredentialSemanticsTest {
         entity.setExecutionScope("fixture", "owned_scope");
         entity.setEncryptedPassword(encryption.encrypt("legacy-fixture"));
         UUID id = connections.save(entity).getId();
-        var created = service.create(request(id, null));
-        var frozen = json.readTree(runs.findById(created.id()).orElseThrow().getExecutionInput());
-        assertEquals("sqlserver", frozen.path("adapterExecution").path("dialect").asString());
-        assertEquals("sqlserver", frozen.path("adapterExecution").path("assetId").asString());
-        assertNull(connections.findById(id).orElseThrow().getSqlDialect());
-        assertEquals("legacy-fixture", service.consumeCredential(created.id()));
+        var error = assertThrows(com.jdbctest.server.connection.ConnectionException.class,
+            () -> service.create(request(id, null)));
+        assertEquals("DATABASE_SUPPORT_RETIRED", error.code());
+        assertEquals("sqlserver", connections.findById(id).orElseThrow().getAdapterId());
+
+    }
+
+    @Test
+    void activeConnectionCannotReuseAHistoricalSqlServerDriver() {
+        var driver = drivers.findById(driverId).orElseThrow();
+        org.springframework.test.util.ReflectionTestUtils.setField(driver, "driverClass",
+            "com.microsoft.sqlserver.jdbc.SQLServerDriver");
+        drivers.save(driver);
+        var connection = new com.jdbctest.server.connection.DatabaseConnectionProfileEntity(
+            "active connection", "postgresql", "postgresql", "jdbc:fixture:legacy", "fixture");
+        connection.setDefaultDriver(driver);
+        connection.setExecutionScope("fixture", "owned_scope");
+        UUID id = connections.save(connection).getId();
+        var error = assertThrows(RunException.class, () -> service.create(request(id, "fixture")));
+        assertEquals("DATABASE_SUPPORT_RETIRED", error.code());
     }
 
     @Test

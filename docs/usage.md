@@ -37,12 +37,13 @@ Review diagnostics before sharing; text redaction cannot recognize every arbitra
 Use actual endpoints and separate credential fields. The database/catalog and schema have different
 meanings; the following scope requirements apply before a writable run, not merely a probe.
 
+SQL Server execution and connection creation/probes are retired; existing connections and historical runs/reports remain readable.
+
 | Database | Driver class / URL example | Required authorized scope |
 |---|---|---|
 | PostgreSQL | `org.postgresql.Driver` / `jdbc:postgresql://host:5432/test_db` | Database and existing schema |
 | MySQL | `com.mysql.cj.jdbc.Driver` / `jdbc:mysql://host:3306/test_db` | Database (JDBC catalog) |
 | Oracle | `oracle.jdbc.OracleDriver` / `jdbc:oracle:thin:@//host:1521/service` | Existing dedicated schema; URL selects a service, not a schema |
-| SQL Server | `com.microsoft.sqlserver.jdbc.SQLServerDriver` / `jdbc:sqlserver://host:1433;databaseName=test_db` | Database and existing schema |
 | GaussDB | Select the class/URL required by the supplied driver | Database and existing schema; built-in PostgreSQL infrastructure |
 | KingbaseES | `com.kingbase8.Driver` / `jdbc:kingbase8://host:4321/test_db` | Database and existing schema |
 | Dameng / DM | `dm.jdbc.driver.DmDriver` / `jdbc:dm://host:5236?schema=TEST_SCHEMA` | Exact existing schema; no database/catalog required |

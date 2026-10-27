@@ -69,6 +69,7 @@ function Editor({ connection }: { connection?: Connection }) {
     staleTime: 300_000,
   });
   const selectedAdapter = adapters.data?.find((item) => item.id === form.adapterId);
+  const retiredSqlServer = form.adapterId === "sqlserver";
   const compatibleType = form.databaseType === "compatible" || (!!form.databaseType && !!selectedAdapter
     && form.databaseType !== selectedAdapter.id && form.databaseType !== selectedAdapter.name);
   const clearFieldError = (key: string) => setFieldErrors(previous => {
@@ -248,13 +249,14 @@ function Editor({ connection }: { connection?: Connection }) {
             <Field id="database-type" label={t("ui.databaseType")} required error={fieldError("databaseType")}
               hint={!selectedAdapter && !fieldErrors.databaseType ? t("connection.selectDatabaseType") : undefined}>
               <Select id="database-type" required
-                value={compatibleType ? "compatible" : selectedAdapter?.id ?? ""}
+                value={retiredSqlServer ? "sqlserver" : compatibleType ? "compatible" : selectedAdapter?.id ?? ""}
                 onValueChange={(value) => { databaseTypeEdited.current = true; clearFieldError("databaseType"); clearFieldError("adapterId"); setForm(previous => ({ ...previous,
                   databaseType: value === "compatible" ? value : adapters.data.find(item => item.id === value)?.name ?? value,
                   adapterId: value === "compatible" ? "" : value,
                 })); }}>
                 <option value="">{t("connection.selectDatabaseType")}</option>
                 {adapters.data.map(adapter => <option key={adapter.id} value={adapter.id}>{adapter.name}</option>)}
+                {retiredSqlServer ? <option value="sqlserver" disabled>{t("database.sqlServerRetired")}</option> : null}
                 <option value="compatible">{t("adapter.compatibleType")}</option>
               </Select>
             </Field>
@@ -268,7 +270,7 @@ function Editor({ connection }: { connection?: Connection }) {
                 </Field>
               </div>
             ) : null}
-            {connection && !selectedAdapter ? <p role="alert" className="text-sm text-destructive sm:col-span-2">{t("adapter.legacyConnection")}</p> : null}
+            {connection && !selectedAdapter ? <p role="alert" className="text-sm text-destructive sm:col-span-2">{t(retiredSqlServer ? "errors.DATABASE_SUPPORT_RETIRED" : "adapter.legacyConnection")}</p> : null}
             <DriverSelect value={driver?.id ?? ""} selected={driver} onChange={value => {
               setDriver(value);
               clearFieldError("driver");

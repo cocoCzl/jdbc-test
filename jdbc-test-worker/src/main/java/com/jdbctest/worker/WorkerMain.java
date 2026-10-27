@@ -78,8 +78,9 @@ public final class WorkerMain {
                     && exception.getMessage() != null && exception.getMessage()
                     .startsWith("WORKER_PROTOCOL_MISMATCH")
                     ? "WORKER_PROTOCOL_MISMATCH" : "INVALID_REQUEST"));
-            events.write("RUN_FAILED", "",
-                Map.of("errorType", "INVALID_REQUEST", "message", "Invalid worker request"));
+            String errorType = retired(exception) ? "DATABASE_SUPPORT_RETIRED" : "INVALID_REQUEST";
+            events.write("RUN_FAILED", "", Map.of("errorType", errorType, "message",
+                retired(exception) ? "SQL Server execution is no longer supported" : "Invalid worker request"));
             return INVALID_REQUEST;
         }
 
@@ -178,13 +179,25 @@ public final class WorkerMain {
         }
     }
 
+    private static boolean retired(Throwable error) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (cause instanceof IllegalArgumentException && cause.getMessage() != null
+                && cause.getMessage().startsWith("DATABASE_SUPPORT_RETIRED:")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private int validateDriver() {
         DriverValidationRequest request;
         try {
             request = mapper.readValue(System.in, DriverValidationRequest.class);
+            com.jdbctest.catalog.ExecutionSupport.requireActive(request.driverClass());
         } catch (Exception exception) {
             events.write("DRIVER_VALIDATION_FAILED", "",
-                Map.of("errorType", "INVALID_REQUEST", "message", "Invalid validation request"));
+                Map.of("errorType", retired(exception) ? "DATABASE_SUPPORT_RETIRED" : "INVALID_REQUEST",
+                    "message", retired(exception) ? "SQL Server execution is no longer supported" : "Invalid validation request"));
             return INVALID_REQUEST;
         }
         if (blank(request.driverClass())) {
@@ -226,10 +239,14 @@ public final class WorkerMain {
         ConnectionProbeRequest request;
         try {
             request = mapper.readValue(System.in, ConnectionProbeRequest.class);
+            if (request.driver() != null && request.connection() != null) {
+                com.jdbctest.catalog.ExecutionSupport.requireActive(request.driver().driverClass(),
+                    request.connection().jdbcUrl());
+            }
         } catch (Exception exception) {
             events.write("CONNECTION_PROBE_FAILED", "",
-                Map.of("errorType", "INVALID_REQUEST", "message",
-                    "Invalid connection probe request"));
+                Map.of("errorType", retired(exception) ? "DATABASE_SUPPORT_RETIRED" : "INVALID_REQUEST", "message",
+                    retired(exception) ? "SQL Server execution is no longer supported" : "Invalid connection probe request"));
             return INVALID_REQUEST;
         }
         if (request.driver() == null || request.connection() == null || blank(
@@ -539,6 +556,8 @@ public final class WorkerMain {
             blank(request.connection().adapterId()) ? "worker" : request.connection().adapterId();
         db.put("type", adapterId);
         db.put("adapter_id", adapterId);
+        com.jdbctest.catalog.ExecutionSupport.requireActive(request.connection().adapterId(),
+            request.connection().jdbcUrl(), request.driver().driverClass());
         var adapter = request.adapterExecution() == null
             ? com.jdbctest.catalog.AdapterExecutionConfig.load(adapterId)
             : request.adapterExecution();
@@ -635,6 +654,8 @@ public final class WorkerMain {
             || !request.objectPrefix().matches("j[0-9a-f]{20}")) {
             throw new IllegalArgumentException("EXECUTION_SCOPE_REQUIRED");
         }
+        com.jdbctest.catalog.ExecutionSupport.requireActive(request.connection().adapterId(),
+            request.connection().jdbcUrl(), request.driver().driverClass());
         var adapter = request.adapterExecution() == null
             ? com.jdbctest.catalog.AdapterExecutionConfig.load(request.connection().adapterId())
             : request.adapterExecution();

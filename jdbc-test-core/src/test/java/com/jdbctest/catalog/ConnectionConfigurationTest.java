@@ -33,9 +33,7 @@ class ConnectionConfigurationTest {
         assertThrows(IllegalArgumentException.class, () -> kingbase.requireDialect("oracle"));
         assertThrows(IllegalArgumentException.class,
             () -> AdapterExecutionConfig.load("mysql").requireDialect("postgresql"));
-        assertEquals(SqlDialect.SQL_SERVER,
-            AdapterExecutionConfig.load("sqlserver").requireDialect(null).sqlDialect());
-        assertEquals(SqlDialect.SQL_SERVER,
-            AdapterExecutionConfig.load("sqlserver").requireDialect("sqlserver").sqlDialect());
+        assertThrows(IllegalArgumentException.class, () -> AdapterExecutionConfig.load("sqlserver"));
+        assertEquals(SqlDialect.SQL_SERVER, SqlDialect.fromCode("sqlserver"));
     }
 }

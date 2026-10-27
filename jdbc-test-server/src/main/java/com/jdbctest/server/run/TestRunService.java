@@ -79,11 +79,7 @@ final class TestRunService {
                     request.connectionId())
                 .orElseThrow(() -> problem(HttpStatus.NOT_FOUND, "CONNECTION_NOT_FOUND",
                     "Connection was not found"));
-            if (JdbcUrlSanitizer.containsCredentials(connection.getJdbcUrl())) {
-                throw problem(HttpStatus.UNPROCESSABLE_CONTENT,
-                    "CONNECTION_URL_CONTAINS_CREDENTIALS",
-                    "JDBC URL must not contain credentials");
-            }
+            requireActiveConnection(connection);
             if (request.driverId() == null && connection.getDefaultDriver() == null) {
                 throw problem(HttpStatus.UNPROCESSABLE_CONTENT, "DRIVER_NOT_FOUND",
                     "Connection has no default driver");
@@ -93,6 +89,13 @@ final class TestRunService {
                     : request.driverId();
             JdbcDriverPackageEntity driver = drivers.findById(driverId).orElseThrow(
                 () -> problem(HttpStatus.NOT_FOUND, "DRIVER_NOT_FOUND", "Driver was not found"));
+            try {
+                com.jdbctest.catalog.ExecutionSupport.requireActive(driver.getDriverClass(),
+                    driver.getUrlPrefix(), driver.getDefaultSqlDialect());
+            } catch (IllegalArgumentException exception) {
+                throw problem(HttpStatus.UNPROCESSABLE_CONTENT, "DATABASE_SUPPORT_RETIRED",
+                    "SQL Server execution is no longer supported");
+            }
             if (driver.getStatus() != DriverPackageStatus.VALIDATED) {
                 throw problem(HttpStatus.CONFLICT, "DRIVER_NOT_VALIDATED",
                     "Driver must be validated before use");
@@ -201,6 +204,21 @@ final class TestRunService {
         });
         scheduler.enqueue(response.id());
         return response;
+    }
+
+    private void requireActiveConnection(DatabaseConnectionProfileEntity connection) {
+        if (JdbcUrlSanitizer.containsCredentials(connection.getJdbcUrl())) {
+            throw problem(HttpStatus.UNPROCESSABLE_CONTENT, "CONNECTION_URL_CONTAINS_CREDENTIALS",
+                "JDBC URL must not contain credentials");
+        }
+        adapters.required(connection.getAdapterId());
+        try {
+            com.jdbctest.catalog.ExecutionSupport.requireActive(connection.getDatabaseType(),
+                connection.getSqlDialect(), connection.getJdbcUrl());
+        } catch (IllegalArgumentException exception) {
+            throw problem(HttpStatus.UNPROCESSABLE_CONTENT, "DATABASE_SUPPORT_RETIRED",
+                "SQL Server execution is no longer supported");
+        }
     }
 
     TestRunResponse get(UUID id) {

@@ -88,7 +88,7 @@ export default function Connections() {
       get header() { return t("ui.databaseAdapter"); },
       cell: ({ row }) => (
         <div className="run-cell-stack">
-          <span className="resource-cell-text">{t("ui.databaseLabel")} {row.original.databaseType}</span>
+          <span className="resource-cell-text">{t("ui.databaseLabel")} {row.original.adapterId === "sqlserver" ? t("database.sqlServerRetired") : row.original.databaseType}</span>
           <span className="run-cell-secondary">
             {t("ui.adapterLabel")} {row.original.adapterId}
           </span>

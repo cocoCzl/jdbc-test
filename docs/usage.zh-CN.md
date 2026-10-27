@@ -33,12 +33,13 @@ Server 将包保存在 `<data-dir>/drivers/`，不加载上传的类。
 使用实际地址和独立凭据字段。database/catalog 与 schema 含义不同；下列授权范围要求用于写入任务，
 不是仅建立连接的必要条件。
 
+SQL Server 已停止新建、连接探测和执行支持，已有连接和历史任务/报告继续可读。
+
 | 数据库 | 驱动类 / URL 示例 | 必须授权的范围 |
 |---|---|---|
 | PostgreSQL | `org.postgresql.Driver` / `jdbc:postgresql://host:5432/test_db` | 数据库和已有 schema |
 | MySQL | `com.mysql.cj.jdbc.Driver` / `jdbc:mysql://host:3306/test_db` | 数据库，即 JDBC catalog |
 | Oracle | `oracle.jdbc.OracleDriver` / `jdbc:oracle:thin:@//host:1521/service` | 已有专用 schema；URL 选择服务而非 schema |
-| SQL Server | `com.microsoft.sqlserver.jdbc.SQLServerDriver` / `jdbc:sqlserver://host:1433;databaseName=test_db` | 数据库和已有 schema |
 | GaussDB | 使用所提供驱动要求的类名和 URL | 数据库和已有 schema；内置 PostgreSQL 基础设施 |
 | KingbaseES | `com.kingbase8.Driver` / `jdbc:kingbase8://host:4321/test_db` | 数据库和已有 schema |
 | 达梦 / DM | `dm.jdbc.driver.DmDriver` / `jdbc:dm://host:5236?schema=TEST_SCHEMA` | 大小写准确的已有 schema；不要求 database/catalog |

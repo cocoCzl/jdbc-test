@@ -15,7 +15,6 @@ export const driverPresets: DriverPreset[] = [
   { code: "postgresql", nameKey: "driverPreset.postgresql", vendor: "PostgreSQL", driverClass: "org.postgresql.Driver", urlPrefix: "jdbc:postgresql:" },
   { code: "mysql", nameKey: "driverPreset.mysql", vendor: "MySQL", driverClass: "com.mysql.cj.jdbc.Driver", urlPrefix: "jdbc:mysql:" },
   { code: "oracle", nameKey: "driverPreset.oracle", vendor: "Oracle", driverClass: "oracle.jdbc.OracleDriver", urlPrefix: "jdbc:oracle:" },
-  { code: "sqlserver", nameKey: "driverPreset.sqlserver", vendor: "Microsoft", driverClass: "com.microsoft.sqlserver.jdbc.SQLServerDriver", urlPrefix: "jdbc:sqlserver:" },
   { code: "kingbase", nameKey: "driverPreset.kingbase", vendor: "Kingbase", driverClass: "com.kingbase8.Driver", urlPrefix: "jdbc:kingbase8:" },
   { code: "dm", nameKey: "driverPreset.dm", vendor: "Dameng", driverClass: "dm.jdbc.driver.DmDriver", urlPrefix: "jdbc:dm:" },
   { code: "custom", nameKey: "driverPreset.custom", vendor: "", driverClass: "", urlPrefix: "" },
@@ -62,6 +61,9 @@ export const connection: Connection = {
 export const adapters: Adapter[] = [
   { id: "postgresql", name: "PostgreSQL", status: "OFFICIAL", dialect: "postgresql", namespaceSelection: "schema", requiresDatabase: true },
   { id: "vendor", name: "VendorDB", status: "CANDIDATE" },
+  { id: "oracle", name: "Oracle", status: "OFFICIAL", dialect: "oracle", namespaceSelection: "schema", requiresDatabase: false },
+  { id: "mysql", name: "MySQL", status: "OFFICIAL", dialect: "mysql", namespaceSelection: "catalog", requiresDatabase: true },
+  { id: "dm", name: "Dameng", status: "CANDIDATE", dialect: "dm", namespaceSelection: "schema", requiresDatabase: false },
 ];
 export const catalog: Catalog = {
   profiles: [

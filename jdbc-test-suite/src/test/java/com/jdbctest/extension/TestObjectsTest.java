@@ -54,7 +54,7 @@ class TestObjectsTest {
 
     @Test
     void oracleProcedureCallsUseTheVerifiedCurrentSchemaToAvoidLocalTableShadowing() {
-        for (String dialect : List.of("oracle", "postgresql", "mysql", "sqlserver", "gaussdb", "dm")) {
+        for (String dialect : List.of("oracle", "postgresql", "mysql", "gaussdb", "dm")) {
             Config value = config("j01234567890123456789");
             value.db.dialect = dialect;
             value.namespace.name = "DEVELOP";
@@ -140,20 +140,7 @@ class TestObjectsTest {
         return value;
     }
 
-    @Test
-    void sqlServerIndexCleanupNamesItsOwnedTable() throws Exception {
-        Config value = config("j01234567890123456789");
-        value.db.dialect = "sqlserver";
-        TestObjects objects = new TestObjects(value);
-        List<String> commands = new ArrayList<>();
-        Statement sql = statement(commands, null);
-        objects.create(sql, "CREATE TABLE {{parent}} (id INTEGER)");
-        objects.create(sql, "CREATE INDEX {{local:owned_index}} ON {{parent}} (id)");
-        objects.cleanup(connection(sql));
-        assertEquals(objects.sql("DROP INDEX {{local:owned_index}} ON {{parent}}"),
-            commands.get(2));
-        assertEquals("DROP TABLE " + objects.qualified("parent"), commands.get(3));
-    }
+
 
     @Test
     void ownedViewIsDroppedBeforeItsParentAndFailedViewIsRetained() throws Exception {

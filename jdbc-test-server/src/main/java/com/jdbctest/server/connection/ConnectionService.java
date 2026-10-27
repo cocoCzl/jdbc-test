@@ -194,6 +194,7 @@ final class ConnectionService {
     ConnectionProbeResponse testSaved(UUID id, ConnectionTestRequest request) {
         SavedSnapshot saved = transactions.execute(status -> {
             DatabaseConnectionProfileEntity entity = requiredConnection(id);
+            adapters.required(entity.getAdapterId());
             return new SavedSnapshot(entity.getJdbcUrl(), entity.getUsername(),
                 entity.getEncryptedPassword(),
                 driverSnapshot(requiredValidatedDriver(entity.getDefaultDriver() == null ? null
@@ -224,6 +225,12 @@ final class ConnectionService {
         if (JdbcUrlSanitizer.containsCredentials(jdbcUrl)) {
             throw new ConnectionException(HttpStatus.UNPROCESSABLE_CONTENT,
                 "CONNECTION_URL_CONTAINS_CREDENTIALS", "JDBC URL must not contain credentials");
+        }
+        try {
+            com.jdbctest.catalog.ExecutionSupport.requireActive(jdbcUrl, driver.driverClass());
+        } catch (IllegalArgumentException exception) {
+            throw new ConnectionException(HttpStatus.UNPROCESSABLE_CONTENT,
+                "DATABASE_SUPPORT_RETIRED", "SQL Server execution is no longer supported");
         }
         try {
             WorkerProcessRunner.Result result = worker.run("--probe-connection", Map.of(
@@ -311,6 +318,12 @@ final class ConnectionService {
     private String effectiveDialect(String adapterId, String requested) {
         var execution = adapters.required(adapterId).execution();
         try {
+            com.jdbctest.catalog.ExecutionSupport.requireActive(requested);
+        } catch (IllegalArgumentException exception) {
+            throw new ConnectionException(HttpStatus.UNPROCESSABLE_CONTENT,
+                "DATABASE_SUPPORT_RETIRED", "SQL Server execution is no longer supported");
+        }
+        try {
             return execution.requireDialect(requested).sqlDialect().code();
         } catch (IllegalArgumentException exception) {
             throw new ConnectionException(HttpStatus.UNPROCESSABLE_CONTENT,
@@ -348,6 +361,12 @@ final class ConnectionService {
             throw new ConnectionException(HttpStatus.UNPROCESSABLE_CONTENT,
                 "CONNECTION_URL_CONTAINS_CREDENTIALS", "JDBC URL must not contain credentials");
         }
+        try {
+            com.jdbctest.catalog.ExecutionSupport.requireActive(databaseType, adapterId, jdbcUrl);
+        } catch (IllegalArgumentException exception) {
+            throw new ConnectionException(HttpStatus.UNPROCESSABLE_CONTENT,
+                "DATABASE_SUPPORT_RETIRED", "SQL Server execution is no longer supported");
+        }
         String normalizedAdapter = required(adapterId, "adapterId");
         adapters.required(normalizedAdapter);
         return new Values(required(name, "name"), required(databaseType, "databaseType"),
@@ -363,6 +382,12 @@ final class ConnectionService {
         JdbcDriverPackageEntity driver = drivers.findById(id).orElseThrow(
             () -> new ConnectionException(HttpStatus.NOT_FOUND, "DRIVER_NOT_FOUND",
                 "Driver was not found"));
+        try {
+            com.jdbctest.catalog.ExecutionSupport.requireActive(driver.getDriverClass(), driver.getUrlPrefix(), driver.getDefaultSqlDialect());
+        } catch (IllegalArgumentException exception) {
+            throw new ConnectionException(HttpStatus.UNPROCESSABLE_CONTENT,
+                "DATABASE_SUPPORT_RETIRED", "SQL Server execution is no longer supported");
+        }
         if (driver.getStatus() != DriverPackageStatus.VALIDATED) {
             throw new ConnectionException(HttpStatus.CONFLICT, "DRIVER_NOT_VALIDATED",
                 "Driver must be validated before use");

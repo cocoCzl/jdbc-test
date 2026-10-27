@@ -115,7 +115,11 @@ class AdapterManifestTest {
         assertSame(registry.required("mysql"), registry.required("mysql"));
         for (DbType type : DbType.values()) {
             assertEquals(type, DbType.fromCode(type.code()).orElseThrow());
-            assertEquals(type, registry.required(type.code()).dbType().orElseThrow());
+            if (type != DbType.SQL_SERVER) {
+                assertEquals(type, registry.required(type.code()).dbType().orElseThrow());
+            } else {
+                assertFalse(registry.contains(type.code()));
+            }
         }
         assertTrue(DbType.fromCode("private-db").isEmpty());
         AdapterDefinition gauss = registry.required("gaussdb");

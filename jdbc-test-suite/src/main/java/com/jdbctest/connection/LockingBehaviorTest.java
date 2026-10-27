@@ -130,8 +130,7 @@ class LockingBehaviorTest {
     static boolean isDeadlock(SQLException error, String dialect) {
         return error != null && ("40P01".equals(error.getSQLState())
             || "40001".equals(error.getSQLState()) || error.getErrorCode() == 60
-            || error.getErrorCode() == 1213 || (error.getErrorCode() == 1205
-            && "sqlserver".equals(dialect)) || ("dm".equals(dialect)
+            || error.getErrorCode() == 1213 || ("dm".equals(dialect)
             && "22000".equals(error.getSQLState()) && error.getErrorCode() == -6403));
     }
 

@@ -1,4 +1,6 @@
 {
+  "record.reason.DATABASE_SUPPORT_RETIRED": "SQL Server execution has been retired. This queued task was not executed; historical results remain readable.",
+  "run.reason.DATABASE_SUPPORT_RETIRED": "SQL Server execution is no longer supported.",
   "wizard.noConnectionSelected": "None",
   "resource.technicalInfo": "Technical information",
   "resource.internalId": "Internal ID",
@@ -613,7 +615,8 @@
   "driverPreset.postgresql": "PostgreSQL",
   "driverPreset.mysql": "MySQL",
   "driverPreset.oracle": "Oracle",
-  "driverPreset.sqlserver": "SQL Server",
+  "database.sqlServerRetired": "SQL Server (support retired)",
+  "errors.DATABASE_SUPPORT_RETIRED": "SQL Server execution is no longer supported. Historical records remain readable.",
   "driverPreset.custom": "Custom",
   "driverPreset.kingbase": "KingbaseES",
   "adapter.kingbaseQualification": "Official platform integration for the validated combination only: KingbaseES V009R002C016, oracle mode, JDBC database version 12.1, driver V008R006B0001. A real FULL task has 270 terminal result records: 261 contracts invoked and 9 not invoked due to missing or blocked preparation (4 direct, 5 blocked); 252 passed, 9 failed and 9 aborted, with successful cleanup. Official does not mean all JDBC tests passed. Missing SQL fixtures, XA configuration limits and observed JDBC failures remain documented; other builds, modes and drivers are unvalidated.",

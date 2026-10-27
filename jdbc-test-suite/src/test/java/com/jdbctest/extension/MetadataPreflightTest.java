@@ -66,6 +66,26 @@ class MetadataPreflightTest {
     }
 
     @Test
+    void compatibleDialectCannotExecuteAgainstRetiredProductIdentity() throws Exception {
+        Config config = config();
+        config.db.expectedDatabaseProductRegex = null;
+        DatabaseMetaData metadata = mock(DatabaseMetaData.class);
+        when(metadata.getDatabaseProductName()).thenReturn("Microsoft SQL Server");
+        Connection connection = mock(Connection.class);
+        when(connection.getMetaData()).thenReturn(metadata);
+        Driver driver = mock(Driver.class);
+        when(driver.connect(anyString(), any())).thenReturn(connection);
+        JdbcContext.setIsolatedDriver(driver);
+        try {
+            assertThrows(IllegalStateException.class, () -> JdbcContext.init(config));
+            verify(connection, never()).createStatement();
+            verify(connection, never()).prepareStatement(anyString());
+        } finally {
+            JdbcContext.shutdown();
+        }
+    }
+
+    @Test
     void kingbaseIdentityRejectsOtherProductsAndDriversBeforeWrites() throws Exception {
         var constraints = com.jdbctest.catalog.AdapterExecutionConfig.load("kingbase")
             .metadataConstraints();

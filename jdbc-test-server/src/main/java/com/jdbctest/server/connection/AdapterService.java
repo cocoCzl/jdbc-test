@@ -15,6 +15,12 @@ public class AdapterService {
     }
 
     public AdapterDefinition required(String id) {
+        try {
+            com.jdbctest.catalog.ExecutionSupport.requireActive(id);
+        } catch (IllegalArgumentException exception) {
+            throw new ConnectionException(HttpStatus.UNPROCESSABLE_CONTENT,
+                "DATABASE_SUPPORT_RETIRED", "SQL Server execution is no longer supported");
+        }
         if (id == null || !AdapterRegistry.bundled().contains(id)) {
             throw new ConnectionException(HttpStatus.UNPROCESSABLE_CONTENT,
                 "BUILTIN_ADAPTER_REQUIRED",

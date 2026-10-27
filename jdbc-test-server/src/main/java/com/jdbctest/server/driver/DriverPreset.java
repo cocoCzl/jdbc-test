@@ -15,8 +15,6 @@ public record DriverPreset(String code, String nameKey, String vendor, String dr
             "jdbc:mysql:"),
         new DriverPreset("oracle", "driverPreset.oracle", "Oracle", "oracle.jdbc.OracleDriver",
             "jdbc:oracle:"),
-        new DriverPreset("sqlserver", "driverPreset.sqlserver", "Microsoft",
-            "com.microsoft.sqlserver.jdbc.SQLServerDriver", "jdbc:sqlserver:"),
         new DriverPreset("kingbase", "driverPreset.kingbase", "Kingbase", "com.kingbase8.Driver",
             "jdbc:kingbase8:"),
         new DriverPreset("dm", "driverPreset.dm", "Dameng", "dm.jdbc.driver.DmDriver",

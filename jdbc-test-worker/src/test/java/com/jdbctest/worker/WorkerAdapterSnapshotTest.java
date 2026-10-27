@@ -23,7 +23,7 @@ class WorkerAdapterSnapshotTest {
     @Test
     void builtinFrozenDialectDrivesScopeAndKeepsProtocolShape() throws Exception {
         ObjectMapper mapper = new ObjectMapper();
-        for (String dialect : List.of("mysql", "oracle", "postgresql", "sqlserver")) {
+        for (String dialect : List.of("mysql", "oracle", "postgresql")) {
             var original = AdapterExecutionConfig.load(dialect);
             var snapshot = new AdapterExecutionConfig(dialect, original.assetId(),
                 original.dialect(),
@@ -109,6 +109,31 @@ class WorkerAdapterSnapshotTest {
         }
         assertEquals(WorkerMain.INVALID_REQUEST,
             new WorkerMain().run(new String[] {"--validate-sql-package"}));
+    }
+
+    @Test
+    void retiredFrozenInputAndDisguisedRequestsFailBeforeDriverLoading() throws Exception {
+        var mapper = new ObjectMapper();
+        var base = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.valueToTree(
+            request(AdapterExecutionConfig.load("postgresql"), new ExecutionScope("owned_db", "owned_schema")));
+        for (String field : List.of("id", "assetId", "dialect")) {
+            var changed = base.deepCopy();
+            ((com.fasterxml.jackson.databind.node.ObjectNode) changed.path("adapterExecution")).put(field, "sqlserver");
+            assertThrows(com.fasterxml.jackson.databind.JsonMappingException.class,
+                () -> mapper.treeToValue(changed, WorkerRunRequest.class));
+        }
+        var validate = WorkerMain.class.getDeclaredMethod("validate", WorkerRunRequest.class);
+        validate.setAccessible(true);
+        for (String field : List.of("jdbcUrl", "adapterId", "driverClass")) {
+            var changed = base.deepCopy();
+            var node = (com.fasterxml.jackson.databind.node.ObjectNode) changed.path(
+                field.equals("driverClass") ? "driver" : "connection");
+            node.put(field, field.equals("jdbcUrl") ? "jdbc:sqlserver://fixture.invalid"
+                : field.equals("driverClass") ? "com.microsoft.sqlserver.jdbc.SQLServerDriver" : "sqlserver");
+            var error = assertThrows(InvocationTargetException.class,
+                () -> validate.invoke(null, mapper.treeToValue(changed, WorkerRunRequest.class)));
+            org.junit.jupiter.api.Assertions.assertTrue(error.getCause().getMessage().contains("DATABASE_SUPPORT_RETIRED"));
+        }
     }
 
     private WorkerRunRequest request(AdapterExecutionConfig snapshot, ExecutionScope scope) {

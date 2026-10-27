@@ -37,8 +37,6 @@ class LockingBehaviorFixtureTest {
             new SQLException("deadlock", "HY000", 60), "oracle"));
         assertTrue(LockingBehaviorTest.isDeadlock(
             new SQLException("deadlock", "HY000", 1213), "mysql"));
-        assertTrue(LockingBehaviorTest.isDeadlock(
-            new SQLException("deadlock", "HY000", 1205), "sqlserver"));
         assertFalse(LockingBehaviorTest.isDeadlock(
             new SQLException("lock timeout", "HY000", 1205), "mysql"));
     }

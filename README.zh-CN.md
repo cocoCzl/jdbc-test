@@ -7,7 +7,7 @@
 
 从这里开始：[使用指南](docs/usage.zh-CN.md) · [部署指南](docs/deployment.zh-CN.md)。
 
-项目内置 PostgreSQL、MySQL、Oracle、SQL Server、GaussDB、KingbaseES 和达梦适配。
+项目内置 PostgreSQL、MySQL、Oracle、GaussDB、KingbaseES 和达梦适配。
 内置适配提供准备与执行规则，不代表全部 JDBC 测试通过。
 各数据库的配置与验证边界见[使用指南](docs/usage.zh-CN.md#database-configuration)。
 

@@ -1,2 +1,0 @@
-CREATE TABLE {{xa_behavior}} (id INTEGER PRIMARY KEY, value INTEGER);
-GO

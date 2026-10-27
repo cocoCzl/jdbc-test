@@ -13,6 +13,7 @@ public enum DbType {
     MYSQL("mysql"),
     ORACLE("oracle"),
     POSTGRESQL("postgresql"),
+    // Historical parsing only; ExecutionSupport rejects all new execution.
     SQL_SERVER("sqlserver");
 
     private final String code;

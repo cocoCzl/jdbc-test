@@ -8,7 +8,7 @@ The CLI also supports driver A/B regression comparisons.
 
 Start here: [Usage](docs/usage.md) · [Deployment](docs/deployment.md).
 
-Built-in adapters include PostgreSQL, MySQL, Oracle, SQL Server, GaussDB, KingbaseES and Dameng.
+Built-in adapters include PostgreSQL, MySQL, Oracle, GaussDB, KingbaseES and Dameng.
 An adapter provides preparation and execution rules; it does not promise that all JDBC tests pass.
 See [database configuration and verification limits](docs/usage.md#database-configuration).
 

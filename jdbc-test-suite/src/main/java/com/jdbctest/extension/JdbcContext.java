@@ -145,6 +145,7 @@ public final class JdbcContext {
         try (Connection connection = dataSource.getConnection()) {
             DatabaseMetaData meta = connection.getMetaData();
             String product = nullToEmpty(meta.getDatabaseProductName());
+            com.jdbctest.catalog.ExecutionSupport.requireActive(product);
             String productVersion = nullToEmpty(meta.getDatabaseProductVersion());
             String driver = nullToEmpty(meta.getDriverName());
             String driverVersion = nullToEmpty(meta.getDriverVersion());

@@ -104,26 +104,26 @@ class ConnectionFilteringTest {
     @Test
     void catalogHasAdditiveHintsWithoutProbingOrChangingLegacyFields() throws Exception {
         mvc.perform(get("/api/adapters"))
-            .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(7))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(6))
             .andExpect(jsonPath("$[3].id").value("postgresql"))
             .andExpect(jsonPath("$[3].status").value("OFFICIAL"))
             .andExpect(jsonPath("$[3].namespaceSelection").value("schema"))
             .andExpect(jsonPath("$[3].driverClass").value("org.postgresql.Driver"))
             .andExpect(jsonPath("$[3].validatedCombinations[0].databaseVersion").value("15.2"))
             .andExpect(jsonPath("$[3].declaration").doesNotExist())
-            .andExpect(jsonPath("$[5].id").value("kingbase"))
-            .andExpect(jsonPath("$[5].status").value("OFFICIAL"))
-            .andExpect(jsonPath("$[5].driverClass").value("com.kingbase8.Driver"))
-            .andExpect(jsonPath("$[5].recommendedMavenCoordinate").isEmpty())
-            .andExpect(jsonPath("$[5].validatedCombinations.length()").value(1))
-            .andExpect(jsonPath("$[5].validatedCombinations[0].databaseVersion").value("12.1"))
-            .andExpect(jsonPath("$[5].validatedCombinations[0].driverVersion")
+            .andExpect(jsonPath("$[4].id").value("kingbase"))
+            .andExpect(jsonPath("$[4].status").value("OFFICIAL"))
+            .andExpect(jsonPath("$[4].driverClass").value("com.kingbase8.Driver"))
+            .andExpect(jsonPath("$[4].recommendedMavenCoordinate").isEmpty())
+            .andExpect(jsonPath("$[4].validatedCombinations.length()").value(1))
+            .andExpect(jsonPath("$[4].validatedCombinations[0].databaseVersion").value("12.1"))
+            .andExpect(jsonPath("$[4].validatedCombinations[0].driverVersion")
                 .value("V008R006B0001"))
-            .andExpect(jsonPath("$[5].qualificationNoteKey").value("adapter.kingbaseQualification"))
-            .andExpect(jsonPath("$[6].id").value("dm"))
-            .andExpect(jsonPath("$[6].dialect").value("dm"))
-            .andExpect(jsonPath("$[6].requiresDatabase").value(false))
-            .andExpect(jsonPath("$[6].namespaceSelection").value("schema"));
+            .andExpect(jsonPath("$[4].qualificationNoteKey").value("adapter.kingbaseQualification"))
+            .andExpect(jsonPath("$[5].id").value("dm"))
+            .andExpect(jsonPath("$[5].dialect").value("dm"))
+            .andExpect(jsonPath("$[5].requiresDatabase").value(false))
+            .andExpect(jsonPath("$[5].namespaceSelection").value("schema"));
         verifyNoInteractions(worker);
     }
 }

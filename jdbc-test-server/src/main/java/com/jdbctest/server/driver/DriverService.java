@@ -54,6 +54,7 @@ final class DriverService {
         try {
             Set<String> detected = DriverPackageInspector.detectDriverClasses(staged);
             String driverClass = selectDriverClass(optional(request.driverClass()), detected);
+            requireActive(driverClass, request.urlPrefix(), request.defaultSqlDialect());
             String fingerprint = DriverPackageInspector.fingerprint(staged.artifacts());
             packages.findByPackageFingerprint(fingerprint).ifPresent(existing -> {
                 throw duplicate(existing.getId());
@@ -121,6 +122,7 @@ final class DriverService {
     DriverResponse update(UUID id, UpdateDriverRequest request) {
         JdbcDriverPackageEntity entity = requirePackage(id);
         return transactions.execute(status -> {
+            requireActive(request.driverClass(), request.urlPrefix(), request.defaultSqlDialect());
             entity.updateMetadata(required(request.name()), required(request.vendor()),
                 required(request.version()), optional(request.urlPrefix()),
                 required(request.driverClass()));
@@ -159,6 +161,7 @@ final class DriverService {
 
     DriverValidationResponse validate(UUID id) {
         JdbcDriverPackageEntity entity = requirePackage(id);
+        requireActive(entity.getDriverClass(), entity.getUrlPrefix(), entity.getDefaultSqlDialect());
         List<java.nio.file.Path> files = artifacts.findByDriver_Id(id).stream()
             .map(item -> storage.resolve(item.getStorageKey())).toList();
         try {
@@ -182,13 +185,23 @@ final class DriverService {
         }
     }
 
+    private static void requireActive(String... values) {
+        try {
+            com.jdbctest.catalog.ExecutionSupport.requireActive(values);
+        } catch (IllegalArgumentException exception) {
+            throw new DriverException(HttpStatus.UNPROCESSABLE_CONTENT, "DATABASE_SUPPORT_RETIRED",
+                "SQL Server execution is no longer supported");
+        }
+    }
+
     private static String defaultDialect(String value) {
         if (value == null || value.isBlank()) {
             return null;
         }
-        if (!Set.of("oracle", "mysql", "postgresql", "dm").contains(value)) {
+        if (com.jdbctest.catalog.AdapterRegistry.bundled().list().stream()
+            .noneMatch(adapter -> adapter.dialect().code().equals(value))) {
             throw new DriverException(HttpStatus.BAD_REQUEST, "ADAPTER_DIALECT_INVALID",
-                "Select Oracle, MySQL, PostgreSQL or Dameng");
+                "Select a dialect declared by an active adapter");
         }
         return com.jdbctest.catalog.SqlDialect.fromCode(value).code();
     }

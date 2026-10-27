@@ -92,8 +92,7 @@ class ProcedureBehaviorTest {
                 }
             }
         }
-        int outputMode = config.db.isDialect("sqlserver") ? DatabaseMetaData.procedureColumnInOut
-            : DatabaseMetaData.procedureColumnOut;
+        int outputMode = DatabaseMetaData.procedureColumnOut;
         assertEquals(java.util.Map.of(1, DatabaseMetaData.procedureColumnIn,
             2, DatabaseMetaData.procedureColumnInOut, 3, outputMode), modes);
     }

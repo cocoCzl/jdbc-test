@@ -21,7 +21,6 @@ class ExecutionControlTest {
             // MySQL documents that standalone interrupted SLEEP returns 1 without an error.
             // Use SLEEP inside a query so interruption produces the error this scenario tests.
             case "mysql" -> "SELECT 1 WHERE SLEEP(" + seconds + ") = 0";
-            case "sqlserver" -> "WAITFOR DELAY '00:00:0" + seconds + "'";
             case "postgresql", "gaussdb" -> "SELECT pg_sleep(" + seconds + ")";
             default -> throw new IllegalStateException("Adapter has no bounded sleep fixture");
         };

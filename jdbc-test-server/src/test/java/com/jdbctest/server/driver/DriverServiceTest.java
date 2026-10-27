@@ -62,6 +62,20 @@ class DriverServiceTest {
     }
 
     @Test
+    void legacySqlServerDriverCannotBeRevalidatedOrUploaded() throws Exception {
+        var entity = new JdbcDriverPackageEntity("legacy", "legacy", "1", "fixture.Driver", DriverSourceType.UPLOAD);
+        entity.setDefaultSqlDialect("sqlserver");
+        when(packages.findById(entity.getId())).thenReturn(java.util.Optional.of(entity));
+        assertEquals("DATABASE_SUPPORT_RETIRED",
+            assertThrows(DriverException.class, () -> service.validate(entity.getId())).code());
+        assertEquals("DATABASE_SUPPORT_RETIRED", assertThrows(DriverException.class,
+            () -> service.create(new CreateDriverRequest("legacy", "legacy", "1",
+                "com.microsoft.sqlserver.jdbc.SQLServerDriver", "jdbc:sqlserver:", null, null),
+                List.of(jar("com.microsoft.sqlserver.jdbc.SQLServerDriver\n")))).code());
+        verifyNoInteractions(validation);
+    }
+
+    @Test
     void dmUploadStoresTheIndependentDialectWithoutLoadingTheDriver() throws Exception {
         var response = service.create(new CreateDriverRequest("DM JDBC", "Dameng", "8.1.2.192",
             "dm.jdbc.driver.DmDriver", "jdbc:dm:", null, "dm"),

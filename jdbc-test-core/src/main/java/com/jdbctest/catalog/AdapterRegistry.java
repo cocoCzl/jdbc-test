@@ -70,6 +70,7 @@ public final class AdapterRegistry {
     }
 
     public AdapterDefinition required(String id) {
+        ExecutionSupport.requireActive(id);
         AdapterDefinition definition = definitions.get(id);
         if (definition == null) {
             throw new IllegalArgumentException("Unknown execution adapter");
