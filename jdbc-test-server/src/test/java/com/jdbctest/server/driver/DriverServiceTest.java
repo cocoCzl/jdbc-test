@@ -65,7 +65,7 @@ class DriverServiceTest {
     void legacySqlServerDriverCannotBeRevalidatedOrUploaded() throws Exception {
         var entity = new JdbcDriverPackageEntity("legacy", "legacy", "1", "fixture.Driver", DriverSourceType.UPLOAD);
         entity.setDefaultSqlDialect("sqlserver");
-        when(packages.findById(entity.getId())).thenReturn(java.util.Optional.of(entity));
+        when(packages.findForUpdate(entity.getId())).thenReturn(java.util.Optional.of(entity));
         assertEquals("DATABASE_SUPPORT_RETIRED",
             assertThrows(DriverException.class, () -> service.validate(entity.getId())).code());
         assertEquals("DATABASE_SUPPORT_RETIRED", assertThrows(DriverException.class,
@@ -91,7 +91,7 @@ class DriverServiceTest {
         var entity = new JdbcDriverPackageEntity("fixture", "fixture", "1", "fixture.Driver",
             DriverSourceType.UPLOAD);
         entity.setStatus(DriverPackageStatus.VALIDATED);
-        when(packages.findById(entity.getId())).thenReturn(java.util.Optional.of(entity));
+        when(packages.findForUpdate(entity.getId())).thenReturn(java.util.Optional.of(entity));
         var result = service.update(entity.getId(), new UpdateDriverRequest("fixture", "fixture",
             "1", "fixture.Driver", null, null, "postgresql"));
         assertEquals("postgresql", result.defaultSqlDialect());

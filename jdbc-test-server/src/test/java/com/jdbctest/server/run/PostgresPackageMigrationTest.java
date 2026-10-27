@@ -71,7 +71,7 @@ class PostgresPackageMigrationTest {
             String frozen;
             try (var context = new SpringApplicationBuilder(JdbcTestServerApplication.class)
                 .web(WebApplicationType.NONE).run(args)) {
-                assertEquals(12, sql.queryForObject("select max(version::integer) from flyway_schema_history where success", Integer.class));
+                assertEquals(13, sql.queryForObject("select max(version::integer) from flyway_schema_history where success", Integer.class));
                 fingerprint = "c".repeat(64);
                 sqlFingerprint = "d".repeat(64);
                 frozen = new ObjectMapper().writeValueAsString(Map.of("adapterPackage",

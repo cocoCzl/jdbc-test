@@ -120,8 +120,9 @@ final class DriverService {
     }
 
     DriverResponse update(UUID id, UpdateDriverRequest request) {
-        JdbcDriverPackageEntity entity = requirePackage(id);
         return transactions.execute(status -> {
+            JdbcDriverPackageEntity entity = packages.findForUpdate(id).orElseThrow(
+                () -> new DriverException(HttpStatus.NOT_FOUND, "DRIVER_NOT_FOUND", "Driver was not found"));
             requireActive(request.driverClass(), request.urlPrefix(), request.defaultSqlDialect());
             entity.updateMetadata(required(request.name()), required(request.vendor()),
                 required(request.version()), optional(request.urlPrefix()),
@@ -160,29 +161,39 @@ final class DriverService {
     }
 
     DriverValidationResponse validate(UUID id) {
-        JdbcDriverPackageEntity entity = requirePackage(id);
-        requireActive(entity.getDriverClass(), entity.getUrlPrefix(), entity.getDefaultSqlDialect());
-        List<java.nio.file.Path> files = artifacts.findByDriver_Id(id).stream()
-            .map(item -> storage.resolve(item.getStorageKey())).toList();
+        // Serialize only snapshot acquisition; no transaction or row lock spans Worker execution.
+        ValidationInput input = transactions.execute(tx -> {
+            var entity = packages.findForUpdate(id).orElseThrow(
+                () -> new DriverException(HttpStatus.NOT_FOUND, "DRIVER_NOT_FOUND", "Driver was not found"));
+            requireActive(entity.getDriverClass(), entity.getUrlPrefix(), entity.getDefaultSqlDialect());
+            long revision = entity.beginValidation();
+            packages.saveAndFlush(entity);
+            return new ValidationInput(revision, entity.getDriverClass(),
+                artifacts.findByDriver_Id(id).stream()
+                    .map(item -> storage.resolve(item.getStorageKey())).toList());
+        });
         try {
-            DriverValidationResponse result = validationProcess.validate(entity.getDriverClass(),
-                files);
-            transactions.executeWithoutResult(status -> {
-                JdbcDriverPackageEntity current = requirePackage(id);
-                current.setStatus(DriverPackageStatus.VALIDATED);
-                packages.save(current);
-            });
+            DriverValidationResponse result = validationProcess.validate(input.driverClass(), input.files());
+            applyValidation(id, input.revision(), DriverPackageStatus.VALIDATED);
             return result;
         } catch (DriverException exception) {
-            if (!"WORKER_UNAVAILABLE".equals(exception.code())) {
-                transactions.executeWithoutResult(status -> {
-                    JdbcDriverPackageEntity current = requirePackage(id);
-                    current.setStatus(DriverPackageStatus.INVALID);
-                    packages.save(current);
-                });
+            if (!Set.of("WORKER_UNAVAILABLE", "DRIVER_VALIDATION_STALE").contains(exception.code())) {
+                applyValidation(id, input.revision(), DriverPackageStatus.INVALID);
             }
             throw exception;
         }
+    }
+
+    private void applyValidation(UUID id, long revision, DriverPackageStatus status) {
+        Integer applied = transactions.execute(tx -> packages.applyValidation(id, revision, status, java.time.Instant.now()));
+        if (!Integer.valueOf(1).equals(applied)) {
+            throw new DriverException(HttpStatus.CONFLICT, "DRIVER_VALIDATION_STALE",
+                "Driver configuration changed, another validation started, or the driver was deleted; retry");
+        }
+    }
+
+    private record ValidationInput(long revision, String driverClass, List<java.nio.file.Path> files) {
+
     }
 
     private static void requireActive(String... values) {

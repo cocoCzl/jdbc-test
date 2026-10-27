@@ -19,6 +19,17 @@ public class JdbcDriverPackageEntity {
         defaultSqlDialect = value;
     }
 
+    @Column(name = "validation_revision", nullable = false)
+    private long validationRevision;
+
+    public long getValidationRevision() {
+        return validationRevision;
+    }
+
+    long beginValidation() {
+        return ++validationRevision;
+    }
+
     @Id
     private UUID id;
     @Column(nullable = false, length = 200)
@@ -121,6 +132,7 @@ public class JdbcDriverPackageEntity {
         this.version = version;
         this.urlPrefix = urlPrefix;
         if (!this.driverClass.equals(driverClass)) {
+            validationRevision++;
             this.driverClass = driverClass;
             this.status = DriverPackageStatus.PENDING_VALIDATION;
         }

@@ -69,7 +69,7 @@ React / Vite → REST + SSE → Spring Boot Server
 
 Server depends on Core, never Suite or uploaded driver classes. Worker bundles Core/Suite/JUnit/SQL;
 target drivers stay external. CLI uses Maven/JUnit and shares scenarios and safety contracts.
-Flyway owns platform migrations V1–V12; Hibernate validates, never generates the schema. Do not edit
+Flyway owns platform migrations V1–V13; Hibernate validates, never generates the schema. Do not edit
 historical migrations. Password envelopes use AES-256-GCM and the persistent 32-byte Master Key.
 Queued credentials are separately encrypted and removed on handoff/terminal/recovery paths.
 Driver files live in `<data-dir>/drivers/`; task workspaces in `<data-dir>/runs/`.
@@ -416,3 +416,9 @@ active support index. Product/dialect enum values remain for historical parsing;
 run statuses, evidence and raw reports are not rewritten. New runs and queued frozen inputs enforce
 retirement; old SQL Server inputs fail with `DATABASE_SUPPORT_RETIRED`. Contract checks tie packaged
 resources and bilingual support declarations to the registry; driver default dialects and UI options use it.
+
+Driver validation takes a configuration snapshot and monotonic revision in a short transaction.
+Driver-class edits and every validation advance the revision; results use a conditional update.
+Stale success/failure, competing validation and deletion return `DRIVER_VALIDATION_STALE` without
+overwriting current state. Worker execution/admission never spans a database transaction. Artifacts
+are immutable; names, default dialect and DataSource metadata do not change class-loading validation.

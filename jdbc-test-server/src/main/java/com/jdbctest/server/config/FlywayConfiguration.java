@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Configuration;
  * starter set used by this application.
  */
 @Configuration
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "spring.flyway.enabled", matchIfMissing = true)
 public class FlywayConfiguration {
 
     @Bean(initMethod = "migrate")

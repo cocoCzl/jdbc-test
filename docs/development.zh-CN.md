@@ -66,7 +66,7 @@ React / Vite → REST + SSE → Spring Boot Server
 | `scripts` | CLI、报告、回归和打包 |
 
 Server 依赖 Core，不加载 Suite 或上传驱动类。Worker 打包 Core/Suite/JUnit/SQL，目标驱动仍为外部输入。
-CLI 采用 Maven/JUnit，共享场景及安全契约。Flyway 管理平台 V1–V12 迁移，Hibernate 只校验不建表，
+CLI 采用 Maven/JUnit，共享场景及安全契约。Flyway 管理平台 V1–V13 迁移，Hibernate 只校验不建表，
 禁止修改历史迁移。密码信封使用 AES-256-GCM 和持久32字节 Master Key；队列凭据单独加密，
 在交接、终态和恢复路径删除。驱动位于 `<data-dir>/drivers/`，任务工作区位于 `<data-dir>/runs/`。
 
@@ -368,3 +368,7 @@ SQL Server 已停止新建连接、连接探测和执行支持；`adapters/catal
 数据库类型/方言枚举只保留历史解析值，历史连接、任务、原始报告和原始结论不改写。
 新任务及队列中的旧快照均校验退役策略，旧 SQL Server 输入以 `DATABASE_SUPPORT_RETIRED` 失败。
 文档契约检查活动目录、发布资源和中英文支持声明；驱动默认方言及界面选项复用活动目录。
+
+驱动验证在短事务中获取配置和单调修订号；改动驱动类和每次验证均递增修订号，
+回写使用条件更新。旧成功/失败结果、并发验证、删除均返回 `DRIVER_VALIDATION_STALE`，不覆盖新状态。
+Worker 运行和等待限额均在事务外；驱动文件不可变，普通名称、默认方言和 DataSource 元数据不影响类加载验证。
