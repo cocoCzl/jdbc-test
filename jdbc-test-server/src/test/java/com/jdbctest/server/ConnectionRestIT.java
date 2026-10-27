@@ -31,6 +31,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 
 @Tag("integration")
 @EnabledIf("dockerAvailable")
+@org.springframework.test.annotation.DirtiesContext
 @SpringBootTest
 class ConnectionRestIT {
 
@@ -152,7 +153,7 @@ class ConnectionRestIT {
         mvc.perform(post("/api/connections").contentType(MediaType.APPLICATION_JSON)
                 .content(base.formatted("typo", "jdbc:postgresql://host/db", unknown)))
             .andExpect(status().isUnprocessableContent())
-            .andExpect(jsonPath("$.code").value("ADAPTER_NOT_FOUND"));
+            .andExpect(jsonPath("$.code").value("BUILTIN_ADAPTER_REQUIRED"));
     }
 
     @Test

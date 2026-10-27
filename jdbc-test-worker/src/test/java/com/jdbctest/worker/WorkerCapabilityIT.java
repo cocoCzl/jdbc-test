@@ -130,12 +130,12 @@ class WorkerCapabilityIT {
                         .path("status")
                         .asText(), report.toPrettyString());
                 var array = report.path("scenario_results").path("advanced_type.get_array");
-                assertEquals(mode.equals("enabled") ? "PASSED" : "SKIPPED",
+                assertEquals("PASSED",
                     array.path("status").asText(),
                     report.toPrettyString());
                 if (mode.equals("disabled")) {
-                    assertTrue(array.path("message").asText().contains("array_type"));
-                    assertTrue(array.has("skipSource"));
+                    assertFalse(array.path("declaredCapabilities").path("array_type").asBoolean(true));
+                    assertTrue(array.path("contractInvoked").asBoolean());
                 }
                 assertEquals(2, report.path("summary").path("total").asInt());
                 assertEquals(0, report.path("notRun").size());

@@ -19,7 +19,7 @@ test("TEST FIXTURE ONLY: CPA foundation representative pages and expanded menu",
   await page.keyboard.press("Escape"); await expect(sort).toBeFocused();
   await page.goto("/"); await expect(page.locator("h1")).toBeVisible();
   await page.screenshot({path:"test-results/fixture-cpa-dashboard.png",fullPage:true});
-  await page.goto("/runs/run-1"); await expect(page.locator("h1")).toHaveText("Core tests · Oracle Core fixture");
+  await page.goto("/runs/run-1"); await expect(page.locator("h1")).toHaveText(`Oracle Core fixture · Core tests · ${await fixtureDate(page, "en")}`);
   await expect(page.getByRole("region",{name:"Test selection"})).toBeVisible();
   await page.screenshot({path:"test-results/fixture-cpa-core.png",fullPage:true});
   await page.goto("/connections"); await page.getByRole("button",{name:"View URL"}).click();
@@ -52,13 +52,13 @@ test("TEST FIXTURE ONLY: menus, long text, URL copy and bilingual form/wizard st
     const box = await page.getByRole("listbox").boundingBox(); expect(box!.x).toBeGreaterThanOrEqual(0); expect(box!.x+box!.width).toBeLessThanOrEqual(width);
     await page.keyboard.press("End"); await expect(page.getByRole("option").last()).toBeFocused(); await page.keyboard.press("Enter"); await expect(trigger).toHaveAttribute("data-value","status,asc");
     await switchLanguage("zh-CN"); await expect(trigger).toHaveAttribute("data-value","status,asc"); await noOverflow();
-    await page.goto("/runs/run-1"); await expect(page.locator("h1")).toHaveText(`自定义测试 · ${longName}`); await expect(page.getByRole("region",{name:"测试选择"})).toContainText("语句"); await noOverflow();
+    await page.goto("/runs/run-1"); await expect(page.locator("h1")).toHaveText(`${longName} · 自定义测试 · ${await fixtureDate(page, "zh-CN")}`); await expect(page.getByRole("region",{name:"测试选择"})).toContainText("语句"); await noOverflow();
     await page.screenshot({path:`test-results/fixture-custom-long-zh-${width}.png`,fullPage:true});
-    await switchLanguage("en"); await expect(page.locator("h1")).toHaveText(`Custom tests · ${longName}`);
+    await switchLanguage("en"); await expect(page.locator("h1")).toHaveText(`${longName} · Custom tests · ${await fixtureDate(page, "en")}`);
     await page.goto("/runs/new");
     const radio = page.getByRole("radio",{name:longName}); const next=page.getByRole("button",{name:"Next: Choose driver"});
     await radio.focus(); await expect(radio).not.toBeChecked(); await expect(next).toBeDisabled();
-    await page.getByRole("button",{name:"Copy",exact:true}).click();
+    await page.getByRole("button",{name:"Copy sanitized URL",exact:true}).click();
     const copied=await page.evaluate(()=>navigator.clipboard.readText());
     expect(copied).toBe(oracle.replace("fixture-secret","[REDACTED]")); await expect(radio).not.toBeChecked(); await expect(next).toBeDisabled();
     const view=page.getByRole("button",{name:"View URL"}); await view.click(); await expect(page.getByRole("dialog")).toContainText(copied); await page.keyboard.press("Escape"); await expect(view).toBeFocused();
@@ -73,3 +73,10 @@ test("TEST FIXTURE ONLY: menus, long text, URL copy and bilingual form/wizard st
   }
   expect(requests.every(request=>request.method === "GET")).toBe(true);
 });
+
+// Compute the fixture timestamp in the browser's timezone; still assert the complete title.
+async function fixtureDate(page: import("@playwright/test").Page, language: string) {
+  return page.evaluate(({ value, locale }) => new Intl.DateTimeFormat(locale, {
+    year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).format(new Date(value)), { value: finishedRun.createdAt, locale: language });
+}

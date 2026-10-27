@@ -17,6 +17,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -42,6 +43,7 @@ jobs:
 
   production-packaging:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -54,10 +56,47 @@ jobs:
           node-version: "24"
           cache: npm
           cache-dependency-path: jdbc-test-web/package-lock.json
-      - run: ./mvnw -B clean verify
+      - name: Require Docker for PostgreSQL integration tests
+        run: docker info > /dev/null
+      - name: JVM unit and disposable database integration tests
+        run: ./mvnw -B -Pworker-e2e,server-integration clean verify
+      - name: Require representative integration tests to execute
+        run: |
+          python3 - <<'PYTHON'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          required = {"WorkerPostgresIT", "WorkerConnectionProbeIT", "RunPostgresIT",
+                      "PlatformPersistenceIT", "PlatformUpgradeIT", "QuerySummaryMigrationIT", "RunEventCommitIT"}
+          for report in Path(".").glob("jdbc-test-*/target/failsafe-reports/TEST-*.xml"):
+              suite = ET.parse(report).getroot()
+              name = suite.attrib["name"].rsplit(".", 1)[-1]
+              if name in required:
+                  assert int(suite.attrib["tests"]) > 0, name
+                  assert all(int(suite.attrib.get(key, 0)) == 0 for key in ("skipped", "errors", "failures")), name
+                  required.remove(name)
+          assert not required, f"Missing integration reports: {sorted(required)}"
+          PYTHON
       - name: Frontend regression
         working-directory: jdbc-test-web
         run: npm ci && npm run lint && npm run test && npm run build
+      - name: Install Chromium for mocked browser regression
+        working-directory: jdbc-test-web
+        run: npx playwright install --with-deps chromium
+      - name: Mocked browser regression against built assets
+        working-directory: jdbc-test-web
+        env:
+          JDBC_TEST_E2E_PREVIEW: "true"
+        run: npm run test:e2e
+      - name: Retain test failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-failure-diagnostics
+          retention-days: 7
+          path: |
+            jdbc-test-*/target/surefire-reports/
+            jdbc-test-*/target/failsafe-reports/
+            jdbc-test-web/test-results/
       - name: Validate Compose contract
         env:
           POSTGRES_PASSWORD: ci-validation-only

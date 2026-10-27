@@ -24,7 +24,7 @@ test("TEST FIXTURE ONLY: source-maintained JDBC scope and explicit compatibility
   await expect(page.getByLabel("Built-in compatibility dialect")).toHaveCount(0);
   await chooseOption(page, page.getByLabel("Database type", {exact: true}), "compatible");
   await chooseOption(page, page.getByLabel("Built-in compatibility dialect"), "postgresql");
-  await expect(page.getByText(/Product identity is observed independently/)).toBeVisible();
+  await expect(page.getByText(/This does not confirm product compatibility/)).toBeVisible();
   await page.screenshot({path: test.info().outputPath("fixture-source-maintained-connection.png"), fullPage: true});
   expect(requests.some(item => item.includes("sql-packages") || !item.startsWith("GET "))).toBe(false);
 });

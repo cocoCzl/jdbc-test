@@ -55,6 +55,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @Tag("integration")
 @Testcontainers(disabledWithoutDocker = true)
+@org.springframework.test.annotation.DirtiesContext
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class RunPostgresIT {
 

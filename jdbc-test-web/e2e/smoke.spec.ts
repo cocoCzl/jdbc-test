@@ -48,8 +48,10 @@ test("TEST FIXTURE ONLY: long text, pagination, masked Oracle URL and execution 
     await expect(page.getByText("21 records · Page 2 of 2")).toBeVisible();
     expect(requests.filter(p => /^\/api\/runs\//.test(p))).toHaveLength(0);
     await noOverflow();
-    await page.getByRole("table").getByRole("link").click();
-    await expect(page.getByRole("alert")).toHaveText(error);
+    await page.getByRole("table").getByRole("link", { name: "View details", exact: true }).click();
+    await expect(page.getByText("Ended abnormally", { exact: true })).toBeVisible();
+    await page.getByText("Technical details", { exact: true }).click();
+    await expect(page.getByText(error, { exact: true })).toBeVisible();
     await expect(page.locator('[data-stat="Not run"]')).toContainText("16");
     await expect(page.locator('[data-stat="Incomplete"]')).toContainText("1");
     await noOverflow();
@@ -168,7 +170,8 @@ test("API-mocked browser flow: upload → connection → Custom Statement → re
   ).toBeDisabled();
   await page.getByRole("checkbox", { name: /I understand/ }).check();
   await page.getByRole("button", { name: "Start test run" }).click();
-  await expect(page.getByText("23 / 23", { exact: true })).toBeVisible();
+  await expect(page.getByRole("progressbar")).toHaveAttribute("value", "23");
+  await expect(page.getByRole("progressbar")).toHaveAttribute("max", "23");
   await page.getByRole("tab", { name: "Report", exact: true }).click();
   await expect(page.getByText("Captured environment")).toBeVisible();
   await page.getByRole("button", { name: "View report JSON" }).click();
@@ -215,7 +218,7 @@ test("API-mocked empty Dashboard and responsive navigation at 1280 / 1024 / tabl
 });
 
 test("TEST FIXTURE ONLY: adapter declarations, filtered deep link and empty saved probe", async ({ page }) => {
-  const declarations = ["gaussdb", "mysql", "oracle", "postgresql", "sqlserver", "private-db"].map(id => ({
+  const declarations = ["gaussdb", "mysql", "oracle", "postgresql", "private-db"].map(id => ({
     id, name: `Fixture ${id}`, status: "CANDIDATE", dialect: "postgresql",
     namespaceSelection: "schema", requiresDatabase: true, driverClass: "fixture.Driver",
     recommendedMavenCoordinate: null, validatedCombinations: [],

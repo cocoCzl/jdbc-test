@@ -31,6 +31,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @Tag("integration")
 @EnabledIf("dockerAvailable")
+@org.springframework.test.annotation.DirtiesContext
 @SpringBootTest
 class DriverRestIT {
 

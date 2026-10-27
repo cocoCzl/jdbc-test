@@ -155,8 +155,9 @@ class SqlPreparationTest {
                 () -> new JdbcTestExtension().beforeEach(context));
             assertEquals("FIXTURE_SHAPE_UNAVAILABLE", error.getMessage());
             assertEquals("42S02", ((SQLException) error.getCause()).getSQLState());
+            // This method explicitly overrides the class fixture annotation with empty scripts.
             when(context.getRequiredTestMethod()).thenReturn(
-                test.getDeclaredMethod("testSetString", Connection.class));
+                test.getDeclaredMethod("testSetResult", Connection.class));
             new JdbcTestExtension().beforeEach(context);
             verify(statement, times(1))
                 .execute("SELECT id, name, xml_data FROM {{sqlxml_test}} WHERE 1 = 0");

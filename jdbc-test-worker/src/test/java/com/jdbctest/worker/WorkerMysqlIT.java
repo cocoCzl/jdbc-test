@@ -70,8 +70,11 @@ class WorkerMysqlIT {
             Files.createDirectories(evidenceDirectory);
             Files.writeString(evidenceDirectory.resolve("mysql-modules.json"),
                 report.toPrettyString());
-            assertEquals(40, report.path("summary").path("total").asInt());
-            assertEquals(40, report.path("summary").path("completed").asInt(),
+            int expected = com.jdbctest.catalog.TestCatalog.loadDefault().testCases().stream()
+                .filter(item -> java.util.Set.of("connection", "statement").contains(item.module().id()))
+                .mapToInt(item -> 1).sum();
+            assertEquals(expected, report.path("summary").path("total").asInt());
+            assertEquals(expected, report.path("summary").path("completed").asInt(),
                 report.toPrettyString());
             assertEquals(0, report.path("notRun").size());
             assertEquals(0, report.path("incomplete").size());

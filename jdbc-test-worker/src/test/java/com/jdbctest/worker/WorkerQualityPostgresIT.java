@@ -90,10 +90,6 @@ class WorkerQualityPostgresIT {
                 String events = Files.readString(out);
                 assertFalse(events.contains(password));
                 assertFalse(Files.readString(err).contains(password));
-                var report = mapper.readTree(
-                    Files.readString(workspace.resolve("report/report.json")));
-                assertEquals("PostgreSQL",
-                    report.path("metadataEvidence").path("databaseProductName").asText());
                 int objects;
                 try (var connection = DriverManager.getConnection(database.getJdbcUrl(),
                     "quality_worker", password);
@@ -106,31 +102,35 @@ class WorkerQualityPostgresIT {
                     }
                 }
                 if (mode.equals("mismatch")) {
-                    assertEquals(4, process.exitValue());
-                    assertEquals("PREFLIGHT_FAILURE", report.path("terminationReason").asText());
-                    assertEquals(0, report.path("summary").path("started").asInt());
+                    assertEquals(WorkerMain.INVALID_REQUEST, process.exitValue());
+                    assertTrue(events.contains("INVALID_REQUEST"));
+                    assertFalse(Files.exists(workspace.resolve("report/report.json")));
+                    assertFalse(Files.exists(workspace.resolve("object-ledger.yaml")));
+                    assertEquals(0, objects, "invalid input must not create database objects");
+                    continue;
+                }
+                var report = mapper.readTree(
+                    Files.readString(workspace.resolve("report/report.json")));
+                assertEquals("PostgreSQL",
+                    report.path("metadataEvidence").path("databaseProductName").asText());
+                assertEquals(2, report.path("summary").path("passed").asInt(),
+                    report.toString());
+                assertEquals(0, report.path("summary").path("failed").asInt());
+                if (mode.equals("normal")) {
+                    assertEquals(0, process.exitValue());
+                    assertEquals("SUCCESS",
+                        report.path("cleanupEvidence").path("status").asText());
+                    assertTrue(
+                        report.path("cleanupEvidence").path("confirmedDeleted").asInt() > 0);
                     assertEquals(0, objects);
-                    assertEquals(0, report.path("objectLedger").path("objects").size());
                 } else {
-                    assertEquals(2, report.path("summary").path("passed").asInt(),
-                        report.toString());
-                    assertEquals(0, report.path("summary").path("failed").asInt());
-                    if (mode.equals("normal")) {
-                        assertEquals(0, process.exitValue());
-                        assertEquals("SUCCESS",
-                            report.path("cleanupEvidence").path("status").asText());
-                        assertTrue(
-                            report.path("cleanupEvidence").path("confirmedDeleted").asInt() > 0);
-                        assertEquals(0, objects);
-                    } else {
-                        assertEquals(4, process.exitValue());
-                        assertEquals("FAILED",
-                            report.path("cleanupEvidence").path("status").asText());
-                        assertEquals("CLEANUP_FAILURE", report.path("terminationReason").asText());
-                        assertTrue(
-                            report.path("cleanupEvidence").path("retainedObjects").size() > 0);
-                        assertTrue(objects > 0);
-                    }
+                    assertEquals(4, process.exitValue());
+                    assertEquals("FAILED",
+                        report.path("cleanupEvidence").path("status").asText());
+                    assertEquals("CLEANUP_FAILURE", report.path("terminationReason").asText());
+                    assertTrue(
+                        report.path("cleanupEvidence").path("retainedObjects").size() > 0);
+                    assertTrue(objects > 0);
                 }
                 Path evidence = Path.of("target/quality-evidence");
                 Files.createDirectories(evidence);

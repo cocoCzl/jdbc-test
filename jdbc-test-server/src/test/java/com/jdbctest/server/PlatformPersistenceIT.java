@@ -19,6 +19,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 
 @Tag("integration")
 @EnabledIf("dockerAvailable")
+@org.springframework.test.annotation.DirtiesContext
 @SpringBootTest
 class PlatformPersistenceIT {
 
