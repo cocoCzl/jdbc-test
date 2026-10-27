@@ -3,7 +3,7 @@ package com.jdbctest.server.driver;
 import java.util.Map;
 import org.springframework.http.HttpStatus;
 
-final class DriverException extends RuntimeException {
+public final class DriverException extends RuntimeException {
 
     private final HttpStatus status;
     private final String code;
@@ -25,7 +25,7 @@ final class DriverException extends RuntimeException {
         return status;
     }
 
-    String code() {
+    public String code() {
         return code;
     }
 

@@ -177,7 +177,7 @@ final class DriverService {
             applyValidation(id, input.revision(), DriverPackageStatus.VALIDATED);
             return result;
         } catch (DriverException exception) {
-            if (!Set.of("WORKER_UNAVAILABLE", "DRIVER_VALIDATION_STALE").contains(exception.code())) {
+            if (!Set.of("WORKER_UNAVAILABLE", "WORKER_BUSY", "DRIVER_VALIDATION_STALE").contains(exception.code())) {
                 applyValidation(id, input.revision(), DriverPackageStatus.INVALID);
             }
             throw exception;

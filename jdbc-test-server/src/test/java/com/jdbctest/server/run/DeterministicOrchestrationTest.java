@@ -1024,6 +1024,7 @@ class DeterministicOrchestrationTest {
 
     private UUID run(String mode, int count) {
         var connection = resource(mode);
+        var scenarioCatalog = catalog.catalog();
         UUID id = transactions.execute(tx -> {
             var persistent = connections.findById(connection.getId()).orElseThrow();
             var driver = persistent.getDefaultDriver();
@@ -1040,7 +1041,7 @@ class DeterministicOrchestrationTest {
                     com.jdbctest.catalog.AdapterExecutionConfig.load("postgresql")
                         .capabilities())));
             runs.save(run);
-            catalog.catalog().scenarios().stream()
+            scenarioCatalog.scenarios().stream()
                 .filter(item -> item.moduleId().equals("connection"))
                 .sorted(java.util.Comparator.comparing(RunCatalogService.Scenario::id)).limit(count)
                 .forEach(item -> selections.save(

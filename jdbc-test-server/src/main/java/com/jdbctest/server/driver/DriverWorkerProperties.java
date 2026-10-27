@@ -7,6 +7,34 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties("jdbc-test.worker")
 public class DriverWorkerProperties {
 
+    private int maxConcurrentShortWorkers = 4;
+    private int maxPendingShortWorkers = 8;
+    private Duration shortWorkerWaitTimeout = Duration.ofSeconds(1);
+
+    public int getMaxConcurrentShortWorkers() {
+        return maxConcurrentShortWorkers;
+    }
+
+    public void setMaxConcurrentShortWorkers(int value) {
+        maxConcurrentShortWorkers = value;
+    }
+
+    public int getMaxPendingShortWorkers() {
+        return maxPendingShortWorkers;
+    }
+
+    public void setMaxPendingShortWorkers(int value) {
+        maxPendingShortWorkers = value;
+    }
+
+    public Duration getShortWorkerWaitTimeout() {
+        return shortWorkerWaitTimeout;
+    }
+
+    public void setShortWorkerWaitTimeout(Duration value) {
+        shortWorkerWaitTimeout = value;
+    }
+
     private Path executable;
     private Duration driverValidationTimeout = Duration.ofSeconds(30);
     private Duration connectionProbeTimeout = Duration.ofSeconds(30);

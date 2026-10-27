@@ -23,6 +23,9 @@ jdbc-test:
     max-package-size: 262144000
   worker:
     executable: ${JDBC_TEST_WORKER_EXECUTABLE:}
+    max-concurrent-short-workers: ${JDBC_TEST_MAX_SHORT_WORKERS:4}
+    max-pending-short-workers: ${JDBC_TEST_MAX_PENDING_SHORT_WORKERS:8}
+    short-worker-wait-timeout: ${JDBC_TEST_SHORT_WORKER_WAIT:1s}
     driver-validation-timeout: 30s
     connection-probe-timeout: 30s
     termination-grace-period: 2s

@@ -74,6 +74,12 @@ final class TestRunService {
             throw problem(HttpStatus.UNPROCESSABLE_CONTENT, "DESTRUCTIVE_CONSENT_REQUIRED",
                 "Destructive test consent is required");
         }
+        transactions.executeWithoutResult(tx -> {
+            var connection = connections.findById(request.connectionId()).orElseThrow(
+                () -> problem(HttpStatus.NOT_FOUND, "CONNECTION_NOT_FOUND", "Connection was not found"));
+            requireActiveConnection(connection);
+        });
+        var source = catalog.catalog();
         TestRunResponse response = transactions.execute(status -> {
             DatabaseConnectionProfileEntity connection = connections.findById(
                     request.connectionId())
@@ -129,7 +135,6 @@ final class TestRunService {
                 throw problem(HttpStatus.UNPROCESSABLE_CONTENT, "EXECUTION_SCOPE_REQUIRED",
                     exception.getMessage());
             }
-            var source = catalog.catalog();
             ResolvedSelection selection = resolve(request, source, connection.getAdapterId());
             String password =
                 request.password() == null ? encryption.decrypt(connection.getEncryptedPassword())

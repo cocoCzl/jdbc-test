@@ -1,4 +1,5 @@
 {
+  "errors.WORKER_BUSY": "短期 Worker 容量已满，请稍后重试。",
   "errors.DRIVER_VALIDATION_STALE": "驱动配置已修改或有更新的验证，请重新验证当前配置。",
   "record.reason.DATABASE_SUPPORT_RETIRED": "SQL Server 已停止执行支持，此排队任务未执行；历史结果仍可读取。",
   "run.reason.DATABASE_SUPPORT_RETIRED": "SQL Server 已停止执行支持。",

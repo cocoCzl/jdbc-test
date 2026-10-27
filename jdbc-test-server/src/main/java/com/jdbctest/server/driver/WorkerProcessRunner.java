@@ -20,47 +20,86 @@ public final class WorkerProcessRunner {
     private static final int CATALOG_LIMIT = 1024 * 1024;
     private final DriverWorkerProperties properties;
     private final ObjectMapper mapper;
+    private final ShortWorkerLimiter limiter;
+    private final java.util.Set<Process> processes = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private boolean closed;
 
     public WorkerProcessRunner(DriverWorkerProperties properties, ObjectMapper mapper) {
         this.properties = properties;
         this.mapper = mapper;
+        this.limiter = new ShortWorkerLimiter(properties);
     }
 
     public Result run(String mode, Object request, java.time.Duration timeout)
+        throws IOException, InterruptedException {
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException("Short Workers must run outside database transactions");
+        }
+        try (var lease = limiter.acquire()) {
+            return execute(mode, request, timeout);
+        }
+    }
+
+    private Result execute(String mode, Object request, java.time.Duration timeout)
         throws IOException, InterruptedException {
         Path worker = properties.getExecutable();
         if (worker == null || !Files.isRegularFile(worker)) {
             throw new IOException("Worker executable is unavailable");
         }
         String java = Path.of(System.getProperty("java.home"), "bin", "java").toString();
-        Process process = new ProcessBuilder(java, "-jar", worker.toAbsolutePath().toString(),
-            mode).start();
+        Process process;
+        synchronized (this) {
+            if (closed) {
+                throw new DriverException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,
+                    "WORKER_BUSY", "Worker runner is shutting down");
+            }
+            process = new ProcessBuilder(java, "-jar", worker.toAbsolutePath().toString(), mode).start();
+            processes.add(process);
+        }
         ByteArrayOutputStream stdout = "--describe-catalog".equals(mode)
             ? new CatalogCapture() : new ByteArrayOutputStream();
         ByteArrayOutputStream stderr = new ByteArrayOutputStream();
-        Thread stdoutReader = Thread.ofVirtual()
-            .start(() -> drain(process.getInputStream(), stdout));
-        Thread stderrReader = Thread.ofVirtual()
-            .start(() -> drain(process.getErrorStream(), stderr));
-        try {
-            if ("--describe-catalog".equals(mode)) {
-                process.getOutputStream().close();
-            } else {
-                mapper.writeValue(process.getOutputStream(), request);
-                process.getOutputStream().close();
+        Thread stdoutReader = Thread.ofVirtual().start(() -> drain(process.getInputStream(), stdout));
+        Thread stderrReader = Thread.ofVirtual().start(() -> drain(process.getErrorStream(), stderr));
+        var writeFailure = new java.util.concurrent.atomic.AtomicReference<IOException>();
+        Thread writer = Thread.ofVirtual().start(() -> {
+            try (var output = process.getOutputStream()) {
+                if (!"--describe-catalog".equals(mode)) {
+                    mapper.writeValue(output, request);
+                }
+            } catch (IOException exception) {
+                writeFailure.set(exception);
+                process.destroy();
             }
+        });
+        try {
             if (!process.waitFor(timeout.toMillis(), TimeUnit.MILLISECONDS)) {
-                terminate(process);
                 return new Result(-1, true, "", "");
             }
+            writer.join(1_000);
             stdoutReader.join(1_000);
             stderrReader.join(1_000);
+            if (writeFailure.get() != null) {
+                throw writeFailure.get();
+            }
             return new Result(process.exitValue(), false, stdout.toString(StandardCharsets.UTF_8),
                 stderr.toString(StandardCharsets.UTF_8));
-        } catch (IOException | InterruptedException exception) {
+        } finally {
             terminate(process);
-            throw exception;
+            processes.remove(process);
+            writer.interrupt();
+            stdoutReader.interrupt();
+            stderrReader.interrupt();
         }
+    }
+
+    @jakarta.annotation.PreDestroy
+    void shutdown() {
+        synchronized (this) {
+            closed = true;
+            limiter.close();
+        }
+        processes.forEach(this::terminate);
     }
 
     /**
@@ -100,11 +139,37 @@ public final class WorkerProcessRunner {
         }
     }
 
-    private void terminate(Process process) throws InterruptedException {
+    private void terminate(Process process) {
+        // Snapshot descendants before destroying the parent, otherwise they can be reparented.
+        var descendants = process.descendants().toList();
+        descendants.forEach(ProcessHandle::destroy);
         process.destroy();
-        if (!process.waitFor(properties.getTerminationGracePeriod().toMillis(),
-            TimeUnit.MILLISECONDS)) {
+        boolean interrupted = Thread.interrupted();
+        try {
+            if (!process.waitFor(properties.getTerminationGracePeriod().toMillis(), TimeUnit.MILLISECONDS)) {
+                process.destroyForcibly();
+            }
+            for (var child : descendants) {
+                if (child.isAlive()) {
+                    child.destroyForcibly();
+                }
+            }
+            process.waitFor();
+        } catch (InterruptedException exception) {
+            interrupted = true;
             process.destroyForcibly();
+            descendants.forEach(ProcessHandle::destroyForcibly);
+            while (process.isAlive()) {
+                try {
+                    process.waitFor();
+                } catch (InterruptedException again) {
+                    interrupted = true;
+                }
+            }
+        } finally {
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 

@@ -22,6 +22,7 @@ final class RunCatalogService {
     private final DriverWorkerProperties properties;
     private final ObjectMapper mapper;
     private volatile Catalog catalog;
+    private final java.util.concurrent.locks.ReentrantLock loading = new java.util.concurrent.locks.ReentrantLock();
 
     RunCatalogService(WorkerProcessRunner worker, DriverWorkerProperties properties,
         ObjectMapper mapper) {
@@ -35,11 +36,18 @@ final class RunCatalogService {
         if (value != null) {
             return value;
         }
-        synchronized (this) {
+        // Do not accumulate unbounded HTTP waiters outside the shared Worker admission queue.
+        if (!loading.tryLock()) {
+            throw new RunException(HttpStatus.SERVICE_UNAVAILABLE, "WORKER_BUSY",
+                "Test catalog is loading; retry later");
+        }
+        try {
             if (catalog == null) {
                 catalog = load();
             }
             return catalog;
+        } finally {
+            loading.unlock();
         }
     }
 

@@ -177,3 +177,8 @@ Standard Docker source build has no successful retained validation after a regis
 request timed out. Alternate local-runtime-image checks do not establish standard source-build success.
 Target database verification is separate; see [database configuration](usage.md#database-configuration)
 and [known limitations](development.md#known-limitations).
+
+Short Workers (probes, driver validation, catalog and pre-run handshake) share independent admission:
+`JDBC_TEST_MAX_SHORT_WORKERS` defaults to 4, `JDBC_TEST_MAX_PENDING_SHORT_WORKERS` to 8, and
+`JDBC_TEST_SHORT_WORKER_WAIT` to `1s`. Saturation returns retryable HTTP 503 / `WORKER_BUSY`.
+Long-running test processes use the existing run dispatcher; handshakes do not nest short Worker leases.

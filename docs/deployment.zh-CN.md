@@ -174,3 +174,8 @@ Windows 主机 ACL/PowerShell 进程行为及 IDEA UI Run/Debug 尚未实测。
 替代本地运行镜像检查不能证明标准源码构建成功。
 目标数据库验证另行界定，见[数据库配置](usage.zh-CN.md#database-configuration)
 及[已知限制](development.zh-CN.md#known-limitations)。
+
+短期 Worker（连接探测、驱动验证、目录及正式任务启动前握手）共享独立限额：
+`JDBC_TEST_MAX_SHORT_WORKERS` 默认 4，`JDBC_TEST_MAX_PENDING_SHORT_WORKERS` 默认 8，
+`JDBC_TEST_SHORT_WORKER_WAIT` 默认 `1s`。满载返回 HTTP 503 / `WORKER_BUSY`，可重试。
+限额不包含正式执行进程；正式任务仍由执行队列约束。目录握手不嵌套占用短期名额。

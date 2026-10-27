@@ -40,6 +40,7 @@ final class TestRunExecutor {
     private final DriverWorkerProperties workerProperties;
     private final ExecutionProperties execution;
     private final ObjectMapper mapper;
+    private final com.jdbctest.server.driver.WorkerProcessRunner shortWorkers;
     private final TransactionTemplate transactions;
     private final RunEventPublisher events;
     private final java.util.Set<UUID> protocolStarted = ConcurrentHashMap.newKeySet();
@@ -50,7 +51,8 @@ final class TestRunExecutor {
         JdbcDriverArtifactRepository artifacts, DriverStorage storage,
         CredentialEncryptionService encryption, DriverStorageProperties storageProperties,
         DriverWorkerProperties workerProperties, ExecutionProperties execution, ObjectMapper mapper,
-        TransactionTemplate transactions, RunEventPublisher events) {
+        TransactionTemplate transactions, RunEventPublisher events,
+        com.jdbctest.server.driver.WorkerProcessRunner shortWorkers) {
         this.runs = runs;
         this.selected = selected;
         this.credentials = credentials;
@@ -64,6 +66,7 @@ final class TestRunExecutor {
         this.mapper = mapper;
         this.transactions = transactions;
         this.events = events;
+        this.shortWorkers = shortWorkers;
     }
 
     void execute(UUID runId) {
@@ -174,6 +177,8 @@ final class TestRunExecutor {
         } catch (
             com.jdbctest.server.driver.WorkerProcessRunner.ProtocolMismatchException exception) {
             fail(runId, "WORKER_PROTOCOL_MISMATCH");
+        } catch (com.jdbctest.server.driver.DriverException exception) {
+            fail(runId, exception.code());
         } catch (IOException exception) {
             fail(runId, "WORKER_UNAVAILABLE");
         } catch (InterruptedException exception) {
@@ -289,8 +294,7 @@ final class TestRunExecutor {
     }
 
     private Process start(RunInput input, Path workspace) throws IOException, InterruptedException {
-        new com.jdbctest.server.driver.WorkerProcessRunner(workerProperties,
-            mapper).requireRunProtocol(input.frozen().has("adapterSnapshot"));
+        shortWorkers.requireRunProtocol(input.frozen().has("adapterSnapshot"));
         Path executable = workerProperties.getExecutable();
         if (executable == null || !Files.isRegularFile(executable)) {
             throw new IOException("Worker executable unavailable");
