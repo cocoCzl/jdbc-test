@@ -69,7 +69,7 @@ React / Vite → REST + SSE → Spring Boot Server
 
 Server depends on Core, never Suite or uploaded driver classes. Worker bundles Core/Suite/JUnit/SQL;
 target drivers stay external. CLI uses Maven/JUnit and shares scenarios and safety contracts.
-Flyway owns platform migrations V1–V13; Hibernate validates, never generates the schema. Do not edit
+Flyway owns platform migrations V1–V15; Hibernate validates, never generates the schema. Do not edit
 historical migrations. Password envelopes use AES-256-GCM and the persistent 32-byte Master Key.
 Queued credentials are separately encrypted and removed on handoff/terminal/recovery paths.
 Driver files live in `<data-dir>/drivers/`; task workspaces in `<data-dir>/runs/`.
@@ -422,3 +422,45 @@ Driver-class edits and every validation advance the revision; results use a cond
 Stale success/failure, competing validation and deletion return `DRIVER_VALIDATION_STALE` without
 overwriting current state. Worker execution/admission never spans a database transaction. Artifacts
 are immutable; names, default dialect and DataSource metadata do not change class-loading validation.
+
+SSE queues only after commit, with 64 pending events per subscriber, independent virtual senders and
+256 subscribers globally. The run row lock protects persistent event sequences and snapshot registration.
+Snapshot sequences discard duplicates and reorder interleaving commit callbacks. Terminal sends precede
+completion. Overflow disconnects that client; a new snapshot recovers persisted state. Streams expire
+after 30 seconds and browsers reconnect; REST refreshes active runs every 10 seconds. This single-server
+design has no durable event replay/outbox. A noninterruptible send can retain one bounded subscriber
+slot until the transport write ends, without blocking Workers or database transactions. Embedded
+Tomcat NIO uses the explicit `server.tomcat.connection-timeout=30s` for socket writes; the 30-second
+SSE async lifetime alone is not a write cancellation guarantee. Interrupts are best effort; replacing
+Tomcat or setting an infinite transport timeout requires equivalent bounded write handling. Quota is
+released when the sender exits, so stuck sends cannot create unbounded replacement senders.
+V14 sequences order committed changes and reject stale/duplicate updates, including delayed SSE after
+newer REST refreshes; they do not replay events. A cold catalog load rejects concurrent requests with
+`WORKER_BUSY` rather than accumulating HTTP waiters outside short Worker admission.
+
+Run lists use a closed scalar page projection and two grouped projections, without full run/case entities
+or repeated evidence parsing. List SQL excludes `execution_input`; V15 backfills `execution_summary`
+without per-scenario selection metadata, maintained when execution inputs are frozen.
+List `accounting.scenarios` is empty; list selectionSnapshot retains only catalog version/count and budgets.
+Scenario detail remains available from run details/reports. Status-group predicates and indexed correlated
+counts execute before paging, preserving original status versus interpreted execution outcome.
+V15 backfills only derived fields, treating malformed historical JSON as unknown. Fetches and JDBC
+write batches use 500 rows **inside one Flyway transaction**, not independently committed chunks.
+On PostgreSQL, V15 includes ALTER TABLE, the entire backfill and ordinary CREATE INDEX (not CONCURRENTLY).
+DDL locks last until commit and can block readers/writers; allow downtime and enough transaction/WAL
+space. V13 and V14 commit separately before V15. A V15 failure rolls back its columns, data, indexes and
+history entry together; after correcting the cause, restart retries V15 without `flyway repair`.
+The PostgreSQL integration test deliberately fails the final index creation after more than 1000 rows,
+then retries without editing history. H2/nontransactional DDL does not establish this recovery guarantee.
+Subsequent evidence/input writes maintain projections through entity setters; do not bypass these setters.
+The upgrade scans historical evidence once and creates indexes; allow a maintenance window for large stores.
+`RunListQueryTest` measures SQL, entity loads and bytes on H2 with 12 runs, page size 10 and 20/1000 cases
+per run. These are fixture measurements, not production latency or driver compatibility claims.
+
+Historical case evidence that is absent, non-object or malformed no longer breaks database-backed
+details/report reconstruction. Invalid content is marked `LEGACY_EVIDENCE_UNREADABLE` without fabricating
+a JDBC conclusion; the persisted raw evidence and original case/run statuses remain unchanged.
+
+The SSE sender also waits for MVC afterConcurrentHandlingStarted before draining any event, so
+SseEmitter cannot bypass admission via its pre-initialization early-send buffer. The snapshot and
+realtime events remain in the same bounded subscriber queue until the transport handler is ready.

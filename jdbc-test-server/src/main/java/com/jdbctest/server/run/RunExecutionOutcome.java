@@ -5,10 +5,12 @@ import tools.jackson.databind.ObjectMapper;
 /** Read-only interpretation; original status and report evidence are never rewritten. */
 final class RunExecutionOutcome {
 
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
     private RunExecutionOutcome() {
     }
 
-    static boolean historicalCaseFailure(TestRunEntity run, ExecutionAccounting accounting) {
+    static boolean historicalCaseFailure(TestRunView run, ExecutionAccounting accounting) {
         if (run.getStatus() != TestRunStatus.FAILED || !run.isWorkerReportValidated()
             || !"TEST_FAILURE".equals(run.getWorkerTerminationReason())
             || !("TEST_FAILURE".equals(run.getFailureReason())
@@ -22,7 +24,7 @@ final class RunExecutionOutcome {
             return false;
         }
         // Protocol 2 TEST_FAILURE alone did not prove cleanup succeeded. Check independent evidence.
-        var mapper = new ObjectMapper();
+        var mapper = MAPPER;
         try {
             var issues = run.getExecutionIssues() == null ? mapper.createArrayNode()
                 : mapper.readTree(run.getExecutionIssues());
@@ -36,7 +38,15 @@ final class RunExecutionOutcome {
         }
     }
 
-    static String of(TestRunEntity run, ExecutionAccounting accounting) {
+    static tools.jackson.databind.JsonNode evidence(String value) {
+        try {
+            return value == null ? MAPPER.nullNode() : MAPPER.readTree(value);
+        } catch (tools.jackson.core.JacksonException exception) {
+            return MAPPER.nullNode();
+        }
+    }
+
+    static String of(TestRunView run, ExecutionAccounting accounting) {
         if (run.getStatus() == TestRunStatus.SUCCEEDED || historicalCaseFailure(run, accounting)) {
             return "COMPLETED";
         }

@@ -4,7 +4,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-public record TestRunResponse(UUID id, TestRunStatus status, String profile,
+public record TestRunResponse(UUID id, long eventSequence, TestRunStatus status, String profile,
     ConnectionSnapshot connection,
     DriverSnapshot driver, List<String> selectedModules, int totalCases,
     int completedCases,

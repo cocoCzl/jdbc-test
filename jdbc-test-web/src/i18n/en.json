@@ -1,6 +1,7 @@
 {
   "errors.WORKER_BUSY": "Short Worker capacity is full. Please retry shortly.",
   "errors.DRIVER_VALIDATION_STALE": "The driver changed or another validation started. Validate the current configuration again.",
+  "errors.SSE_BUSY": "Live updates are busy. The run will refresh automatically.",
   "record.reason.DATABASE_SUPPORT_RETIRED": "SQL Server execution has been retired. This queued task was not executed; historical results remain readable.",
   "run.reason.DATABASE_SUPPORT_RETIRED": "SQL Server execution is no longer supported.",
   "wizard.noConnectionSelected": "None",

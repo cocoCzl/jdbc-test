@@ -119,6 +119,25 @@ class LegacyEvidenceReportTest {
         assertFalse(text.contains("ReviewOnlyLegacyTail"), text);
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.NullAndEmptySource
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"invalid JSON", "[]", "null", "{\"message\":\"legacy\"}"})
+    void missingOrUnreadableCaseEvidenceDoesNotBreakHistoricalDetailsOrReport(String raw) throws Exception {
+        var run = legacyRun(TestRunStatus.FAILED);
+        var row = result(run, TestCaseResultStatus.FAILED, raw);
+        var page = service.results(run.getId(), 0, 10, null, null, null);
+        assertEquals(TestCaseResultStatus.FAILED, page.items().getFirst().status());
+        var downloaded = report(run.getId()).path("scenario_results").path("connection.fixture");
+        if (raw != null && !raw.equals("{\"message\":\"legacy\"}")) {
+            assertEquals("LEGACY_EVIDENCE_UNREADABLE", downloaded.path("evidenceReadError").asString());
+        }
+        if (raw != null && raw.contains("legacy")) {
+            assertEquals("legacy", downloaded.path("message").asString());
+        }
+        assertEquals(raw, results.findById(row.getId()).orElseThrow().getExecutionEvidence());
+        assertEquals(TestRunStatus.FAILED, runs.findById(run.getId()).orElseThrow().getStatus());
+    }
+
     @Test
     void retiredSqlServerHistoryStillListsAndDownloadsOriginalConclusions() throws Exception {
         var run = legacyRun(TestRunStatus.FAILED);

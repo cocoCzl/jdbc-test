@@ -9,6 +9,13 @@ import java.util.UUID;
     "run_id", "scenario_id"}))
 public class TestCaseResultEntity {
 
+    @Column(name = "contract_conclusion", columnDefinition = "text")
+    private String contractConclusion;
+    @Column(name = "requirement_scope", columnDefinition = "text")
+    private String requirementScope;
+    @Column(name = "contract_invoked", nullable = false)
+    private boolean contractInvoked;
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -47,6 +54,10 @@ public class TestCaseResultEntity {
 
     void setExecutionEvidence(String value) {
         executionEvidence = value;
+        var evidence = RunExecutionOutcome.evidence(value);
+        contractConclusion = evidence.has("conclusion") ? evidence.path("conclusion").asString() : null;
+        requirementScope = evidence.path("requirementScope").asString(null);
+        contractInvoked = evidence.path("contractInvoked").asBoolean(false);
     }
 
     void setExecutionStartedAt(Instant value) {

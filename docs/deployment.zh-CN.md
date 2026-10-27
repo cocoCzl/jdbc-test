@@ -179,3 +179,13 @@ Windows 主机 ACL/PowerShell 进程行为及 IDEA UI Run/Debug 尚未实测。
 `JDBC_TEST_MAX_SHORT_WORKERS` 默认 4，`JDBC_TEST_MAX_PENDING_SHORT_WORKERS` 默认 8，
 `JDBC_TEST_SHORT_WORKER_WAIT` 默认 `1s`。满载返回 HTTP 503 / `WORKER_BUSY`，可重试。
 限额不包含正式执行进程；正式任务仍由执行队列约束。目录握手不嵌套占用短期名额。
+升级包含 V13 驱动验证修订号、V14 SSE 事件序号和 V15 查询派生列/索引及历史回填。
+先备份平台库、数据目录和原 Master Key，再整体替换匹配的 Server/Worker/Web。
+
+V15 的 500 行 JDBC 批次与普通索引创建仍处于一个 PostgreSQL 事务中，并非在线或逐批提交迁移。
+历史库需预留停机窗口、事务和 WAL 容量。失败会完整回滚 V15，排除原因后重启即可，无需 Flyway repair；
+V13/V14 已分别提交。维护窗口内须停止所有应用写入，包括 Server/Worker 和外部写入者，
+不得让新旧版本并行运行。迁移后仅换回旧程序不是已验证的回退方式；应恢复匹配的升级前
+平台库、驱动/任务文件、配置和原 Master Key，并使用对应旧部署包。
+内嵌 Tomcat 显式使用 30 秒 socket 写超时（`server.tomcat.connection-timeout`），自定义传输层时应保持有限写超时。
+目录首次加载期间其他请求可能收到可重试的 `WORKER_BUSY`。

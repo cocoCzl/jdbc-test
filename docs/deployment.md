@@ -182,3 +182,17 @@ Short Workers (probes, driver validation, catalog and pre-run handshake) share i
 `JDBC_TEST_MAX_SHORT_WORKERS` defaults to 4, `JDBC_TEST_MAX_PENDING_SHORT_WORKERS` to 8, and
 `JDBC_TEST_SHORT_WORKER_WAIT` to `1s`. Saturation returns retryable HTTP 503 / `WORKER_BUSY`.
 Long-running test processes use the existing run dispatcher; handshakes do not nest short Worker leases.
+Upgrades add V13 driver validation revisions, V14 SSE sequences and V15 query projections/indexes with
+historical backfill. Back up the platform database, data directory and original Master Key before
+replacing matching Server/Worker/Web bundles.
+
+V15 uses one PostgreSQL transaction, including 500-row JDBC batches and ordinary index creation;
+it is not an online/chunk-committed migration. Plan downtime and transaction/WAL capacity for historical
+stores. Failure rolls V15 back completely; correct the cause and restart, without Flyway repair.
+V13/V14 remain committed. Stop all application writes, including Server/Workers and external writers,
+for the maintenance window; do not run old and new versions concurrently. After migration, switching
+back to old binaries alone is not a verified rollback: restore the matching pre-upgrade platform
+database, driver/run files, configuration and original Master Key with the old bundle.
+The embedded Tomcat socket write timeout is explicitly 30 seconds (`server.tomcat.connection-timeout`);
+keep a finite write timeout if customizing the transport. Cold catalog requests may return retryable
+`WORKER_BUSY` while the initial load is in progress.

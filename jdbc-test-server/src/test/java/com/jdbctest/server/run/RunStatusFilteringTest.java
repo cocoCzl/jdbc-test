@@ -153,6 +153,31 @@ class RunStatusFilteringTest {
     }
 
     @Test
+    void missingHistoricalReasonsRemainInAbnormalPagination() throws Exception {
+        var run = runs.findAll().stream().filter(item -> item.getStatus() == TestRunStatus.FAILED)
+            .findFirst().orElseThrow();
+        run.markWorkerReportValidated();
+        run.setCleanupEvidence("{\"status\":\"SUCCESS\"}");
+        run.setTotalCases(1);
+        run.recordCase(TestCaseResultStatus.FAILED);
+        var scenario = new TestRunSelectedScenarioEntity(run, "fixture.failed", "connection");
+        scenario.started();
+        scenario.finished("FAILED");
+        selections.saveAndFlush(scenario);
+        for (String missing : List.of("failureReason", "workerTerminationReason", "evidenceVersion")) {
+            run.setFailureReason("TEST_FAILURE");
+            run.setWorkerTerminationReason("TEST_FAILURE");
+            ReflectionTestUtils.setField(run, "evidenceVersion", 2);
+            ReflectionTestUtils.setField(run, missing, null);
+            runs.saveAndFlush(run);
+            mvc.perform(get("/api/runs").param("statusGroup", "ABNORMAL").param("size", "1"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(2));
+            mvc.perform(get("/api/runs").param("statusGroup", "COMPLETED"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1));
+        }
+    }
+
+    @Test
     void groupPredicatePrecedesPaginationAndCountAndPreservesSorting() throws Exception {
         mvc.perform(get("/api/runs").param("statusGroup", "IN_PROGRESS").param("size", "2")
                 .param("sort", "createdAt,desc"))

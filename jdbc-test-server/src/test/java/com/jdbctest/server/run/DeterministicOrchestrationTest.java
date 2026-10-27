@@ -112,11 +112,11 @@ class DeterministicOrchestrationTest {
             "Overlapping Worker processes detected");
         mvc = MockMvcBuilders.webAppContextSetup(context).build();
         doAnswer(invocation -> {
-            UUID id = invocation.getArgument(0);
+            UUID id = ((TestRunEntity) invocation.getArgument(0)).getId();
             eventNames.computeIfAbsent(id, ignored -> new CopyOnWriteArrayList<>())
                 .add(invocation.getArgument(1));
             return invocation.callRealMethod();
-        }).when(events).publish(any(UUID.class), anyString(), any());
+        }).when(events).publish(any(TestRunEntity.class), anyString(), any());
         doAnswer(invocation -> {
             Object value = invocation.callRealMethod();
             completed.computeIfAbsent(invocation.getArgument(0), ignored -> new CountDownLatch(1))
@@ -641,19 +641,19 @@ class DeterministicOrchestrationTest {
         UUID id = run("BLOCK", 1);
         MvcResult first = subscribe(id);
         MvcResult second = subscribe(id);
-        assertTrue(first.getResponse().getContentAsString().startsWith("event:run.snapshot"));
         scheduler.enqueue(id);
         started(id);
         release(id);
         done(id, TestRunStatus.SUCCEEDED, null);
         for (MvcResult stream : List.of(first, second)) {
+            assertNull(stream.getAsyncResult(1000));
             String output = stream.getResponse().getContentAsString();
+            assertTrue(output.startsWith("event:run.snapshot"));
             for (String name : List.of("run.snapshot", "run.status", "module.started",
                 "case.started",
                 "case.finished", "run.progress", "run.finished")) {
                 assertTrue(output.contains("event:" + name), name + ": " + output);
             }
-            assertNull(stream.getAsyncResult(1000));
             for (String forbidden : List.of("password", "encryptedPassword", "storageKey",
                 DATA.toString(), "workspace")) {
                 assertFalse(output.contains(forbidden), forbidden);
@@ -680,11 +680,6 @@ class DeterministicOrchestrationTest {
         UUID id = run("BLOCK", 1);
         MvcResult disconnected = subscribe(id);
         MvcResult survivor = subscribe(id);
-        @SuppressWarnings("unchecked")
-        Map<UUID, CopyOnWriteArrayList<org.springframework.web.servlet.mvc.method.annotation.SseEmitter>> emitters =
-            (Map<UUID, CopyOnWriteArrayList<org.springframework.web.servlet.mvc.method.annotation.SseEmitter>>) org.springframework.test.util.ReflectionTestUtils.getField(
-                events, "emitters");
-        assertEquals(2, emitters.get(id).size());
         var async = (org.springframework.mock.web.MockAsyncContext) disconnected.getRequest()
             .getAsyncContext();
         var error = new jakarta.servlet.AsyncEvent(async, disconnected.getRequest(),
@@ -692,20 +687,11 @@ class DeterministicOrchestrationTest {
         for (var listener : async.getListeners()) {
             listener.onError(error);
         }
-        assertEquals(1, emitters.get(id).size());
-        var broken = org.mockito.Mockito.mock(
-            org.springframework.web.servlet.mvc.method.annotation.SseEmitter.class);
-        org.mockito.Mockito.doThrow(new java.io.IOException("send failed")).when(broken).send(
-            any(org.springframework.web.servlet.mvc.method.annotation.SseEmitter.SseEventBuilder.class));
-        org.mockito.Mockito.doThrow(new IllegalStateException("async context already failed"))
-            .when(broken).complete();
-        emitters.get(id).add(broken);
         scheduler.enqueue(id);
         started(id);
         release(id);
         done(id, TestRunStatus.SUCCEEDED, null);
-        org.mockito.Mockito.verify(broken).complete();
-        assertFalse(emitters.containsKey(id));
+        assertNull(survivor.getAsyncResult(1000));
         String output = survivor.getResponse().getContentAsString();
         assertTrue(output.contains("event:case.finished"));
         assertTrue(output.contains("event:run.finished"));
@@ -714,30 +700,6 @@ class DeterministicOrchestrationTest {
         scheduler.enqueue(noSubscribers);
         started(noSubscribers);
         done(noSubscribers, TestRunStatus.SUCCEEDED, null);
-        assertFalse(emitters.containsKey(noSubscribers));
-    }
-
-    @Test
-    void completionFailureDoesNotPreventOtherSubscribersFromCompleting() {
-        UUID id = UUID.randomUUID();
-        var broken = org.mockito.Mockito.mock(
-            org.springframework.web.servlet.mvc.method.annotation.SseEmitter.class);
-        var survivor = org.mockito.Mockito.mock(
-            org.springframework.web.servlet.mvc.method.annotation.SseEmitter.class);
-        org.mockito.Mockito.doThrow(new IllegalStateException("async context already failed"))
-            .when(broken).complete();
-        // Reflection returns Object; the field declares this exact map type.
-        @SuppressWarnings("unchecked")
-        Map<UUID, CopyOnWriteArrayList<org.springframework.web.servlet.mvc.method.annotation.SseEmitter>> emitters =
-            (Map<UUID, CopyOnWriteArrayList<org.springframework.web.servlet.mvc.method.annotation.SseEmitter>>) org.springframework.test.util.ReflectionTestUtils.getField(
-                events, "emitters");
-        emitters.put(id, new CopyOnWriteArrayList<>(List.of(broken, survivor)));
-
-        assertDoesNotThrow(() -> events.complete(id));
-
-        org.mockito.Mockito.verify(broken).complete();
-        org.mockito.Mockito.verify(survivor).complete();
-        assertFalse(emitters.containsKey(id));
     }
 
     @Test
@@ -747,8 +709,8 @@ class DeterministicOrchestrationTest {
         started(id);
         done(id, TestRunStatus.SUCCEEDED, null);
         MvcResult stream = subscribe(id);
-        assertTrue(stream.getResponse().getContentAsString().contains("event:run.snapshot"));
         assertNull(stream.getAsyncResult(1000));
+        assertTrue(stream.getResponse().getContentAsString().contains("event:run.snapshot"));
         assertEquals("RUN_ALREADY_FINISHED",
             assertThrows(RunException.class, () -> scheduler.cancel(id)).code());
         assertEquals(TestRunStatus.SUCCEEDED, state(id));

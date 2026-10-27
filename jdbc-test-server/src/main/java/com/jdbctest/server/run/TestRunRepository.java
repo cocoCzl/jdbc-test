@@ -19,12 +19,6 @@ public interface TestRunRepository extends JpaRepository<TestRunEntity, UUID>,
     java.util.Optional<TestRunEntity> findForUpdate(
         @org.springframework.data.repository.query.Param("id") UUID id);
 
-    @org.springframework.data.jpa.repository.Query("select run from TestRunEntity run where "
-        + "run.status = com.jdbctest.server.run.TestRunStatus.FAILED "
-        + "and run.workerReportValidated = true and run.workerTerminationReason = 'TEST_FAILURE' "
-        + "and run.failureReason in ('TEST_FAILURE', 'WORKER_EXECUTION_FAILED')")
-    List<TestRunEntity> findCaseFailureCandidates();
-
     long countByDriver_Id(UUID driverId);
 
     long countByConnection_Id(UUID connectionId);

@@ -42,6 +42,7 @@ final class TestRunService {
     private final TestRunScheduler scheduler;
     private final ExecutionProperties executionProperties;
     private final AdapterService adapters;
+    private final tools.jackson.databind.ObjectMapper mapper;
 
     TestRunService(TestRunRepository runs, TestRunSelectedScenarioRepository selected,
         TestRunModuleRepository modules, TestRunCredentialRepository credentials,
@@ -49,8 +50,10 @@ final class TestRunService {
         JdbcDriverPackageRepository drivers,
         CredentialEncryptionService encryption, RunCatalogService catalog,
         TransactionTemplate transactions, TestRunScheduler scheduler,
-        ExecutionProperties executionProperties, AdapterService adapters) {
+        ExecutionProperties executionProperties, AdapterService adapters,
+        tools.jackson.databind.ObjectMapper mapper) {
         this.adapters = adapters;
+        this.mapper = mapper;
         this.runs = runs;
         this.selected = selected;
         this.modules = modules;
@@ -194,7 +197,7 @@ final class TestRunService {
             execution.put("capabilities",
                 driver.getDataSources().capabilities(adapterExecution.capabilities()));
             run.freezeExecutionInput(
-                new tools.jackson.databind.ObjectMapper().writeValueAsString(execution));
+                mapper.writeValueAsString(execution));
             runs.save(run);
             selected.saveAll(selection.scenarios().stream()
                 .map(item -> new TestRunSelectedScenarioEntity(run, item.id(), item.moduleId()))
@@ -231,11 +234,11 @@ final class TestRunService {
     }
 
     org.springframework.web.servlet.mvc.method.annotation.SseEmitter subscribe(UUID id,
-        RunEventPublisher events) {
+        RunEventPublisher events, java.util.function.Consumer<Runnable> whenTransportReady) {
         return transactions.execute(tx -> {
             TestRunEntity run = runs.findForUpdate(id).orElseThrow(
                 () -> problem(HttpStatus.NOT_FOUND, "RUN_NOT_FOUND", "Test run was not found"));
-            var emitter = events.subscribe(id, response(run, moduleIds(id)));
+            var emitter = events.subscribe(id, response(run, moduleIds(id)), whenTransportReady);
             if (TestRunStateTransitions.terminal(run.getStatus())) {
                 events.complete(id);
             }
@@ -253,14 +256,24 @@ final class TestRunService {
             throw problem(HttpStatus.BAD_REQUEST, "CONFLICTING_STATUS_FILTERS",
                 "Use either status or statusGroup, not both");
         }
-        var pageable = page(page, size, sort, RUN_SORTS, "createdAt,desc");
+        var primary = page(page, size, sort, RUN_SORTS, "createdAt,desc");
+        var pageable = primary.withSort(primary.getSort().and(Sort.by("id")));
         return transactions.execute(tx -> {
-            var value = statusGroup != null ? runs.findAll(groupFilter(statusGroup), pageable)
-                : status == null ? runs.findAll(pageable) : runs.findByStatus(status, pageable);
-            return new PageResponse<>(
-                value.getContent().stream().map(item -> response(item, moduleIds(item.getId())))
-                    .toList(),
-                value.getNumber(), value.getSize(), value.getTotalElements(),
+            org.springframework.data.jpa.domain.Specification<TestRunEntity> filter = statusGroup != null
+                ? groupFilter(statusGroup) : (root, query, builder) -> status == null
+                    ? builder.conjunction() : builder.equal(root.get("status"), status);
+            var value = runs.findBy(filter, query -> query.as(RunListView.class).page(pageable));
+            var ids = value.getContent().stream().map(RunListView::getId).toList();
+            var selections = ids.isEmpty() ? java.util.Map.<UUID, List<TestRunSelectedScenarioRepository.SelectionCounts>>of()
+                : selected.summarize(ids).stream().collect(java.util.stream.Collectors.groupingBy(
+                    TestRunSelectedScenarioRepository.SelectionCounts::getRunId));
+            var contracts = contractSummaries(ids);
+            var items = value.getContent().stream().map(run -> {
+                var counts = selections.getOrDefault(run.getId(), List.of());
+                return response(run, counts.stream().map(TestRunSelectedScenarioRepository.SelectionCounts::getModuleId)
+                    .sorted().toList(), ExecutionAccounting.summary(run, counts), contracts.get(run.getId()), true, run.getExecutionSummary());
+            }).toList();
+            return new PageResponse<>(items, value.getNumber(), value.getSize(), value.getTotalElements(),
                 value.getTotalPages());
         });
     }
@@ -339,7 +352,7 @@ final class TestRunService {
         if (run.getExecutionInput() == null) {
             return null;
         }
-        return new tools.jackson.databind.ObjectMapper().readTree(
+        return mapper.readTree(
             JdbcUrlSanitizer.sanitizeJson(run.getExecutionInput())).get("sqlPackage");
     }
 
@@ -406,8 +419,8 @@ final class TestRunService {
     }
 
     private List<String> moduleIds(UUID runId) {
-        return selected.findByRun_IdOrderByScenarioId(runId).stream()
-            .map(TestRunSelectedScenarioEntity::getModuleId).distinct().toList();
+        return selected.summarize(List.of(runId)).stream()
+            .map(TestRunSelectedScenarioRepository.SelectionCounts::getModuleId).sorted().toList();
     }
 
     private org.springframework.data.jpa.domain.Specification<TestRunEntity> groupFilter(
@@ -415,33 +428,58 @@ final class TestRunService {
         if (group != TestRunStatusGroup.COMPLETED && group != TestRunStatusGroup.ABNORMAL) {
             return (root, query, builder) -> root.get("status").in(group.statuses());
         }
-        // Only legacy failure candidates need evidence interpretation. Count and page use the same
-        // database predicate; do not filter an already paginated response or mutate old records.
-        var completedIds = runs.findCaseFailureCandidates().stream()
-            .filter(run -> RunExecutionOutcome.historicalCaseFailure(run,
-                ExecutionAccounting.of(run, selected.findByRun_IdOrderByScenarioId(run.getId()))))
-            .map(TestRunEntity::getId).toList();
+        // Match historical evidence using indexed correlated counts, before pagination/count.
+        // JSON-derived flags are backfilled once by V15 and maintained by entity setters.
         return (root, query, builder) -> {
+            var total = query.subquery(Long.class);
+            var all = total.from(TestRunSelectedScenarioEntity.class);
+            total.select(builder.count(all)).where(builder.equal(all.get("run").get("id"), root.get("id")));
+            var started = query.subquery(Long.class);
+            var begun = started.from(TestRunSelectedScenarioEntity.class);
+            started.select(builder.count(begun)).where(builder.equal(begun.get("run").get("id"), root.get("id")),
+                builder.isNotNull(begun.get("executionStartedAt")));
+            var missing = query.subquery(Long.class);
+            var unfinished = missing.from(TestRunSelectedScenarioEntity.class);
+            missing.select(builder.count(unfinished)).where(builder.equal(unfinished.get("run").get("id"), root.get("id")),
+                builder.isNull(unfinished.get("resultStatus")));
+            var historical = builder.and(
+                builder.equal(root.get("status"), TestRunStatus.FAILED),
+                builder.isTrue(root.get("workerReportValidated")),
+                builder.equal(root.get("workerTerminationReason"), "TEST_FAILURE"),
+                root.get("failureReason").in("TEST_FAILURE", "WORKER_EXECUTION_FAILED"),
+                builder.equal(root.get("evidenceVersion"), 2),
+                builder.gt(root.get("totalCases"), 0),
+                builder.equal(root.get("completedCases"), root.get("totalCases")),
+                builder.equal(total, root.get("totalCases")), builder.gt(started, 0L), builder.equal(missing, 0L),
+                builder.gt(builder.diff(builder.diff(root.<Integer>get("completedCases"), root.<Integer>get("passed")),
+                    root.<Integer>get("skipped")), 0),
+                builder.isTrue(root.get("cleanupSucceeded")), builder.isTrue(root.get("executionIssuesEmpty")),
+                builder.or(builder.isNull(root.get("workerExitCode")), builder.equal(root.get("workerExitCode"), 4)));
+            // SQL NULL means insufficient historical evidence, never a completed failure.
+            var confirmed = builder.isTrue(builder.coalesce(historical, false));
             var states = root.get("status").in(group.statuses());
-            if (completedIds.isEmpty()) {
-                return states;
-            }
-            var completed = root.get("id").in(completedIds);
-            return group == TestRunStatusGroup.COMPLETED ? builder.or(states, completed)
-                : builder.and(states, builder.not(completed));
+            return group == TestRunStatusGroup.COMPLETED ? builder.or(states, confirmed)
+                : builder.and(states, builder.not(confirmed));
         };
     }
 
     private TestRunResponse response(TestRunEntity run, List<String> moduleIds) {
+        var rows = selected.findByRun_IdOrderByScenarioId(run.getId());
+        return response(run, moduleIds, ExecutionAccounting.of(run, rows),
+            contractSummaries(List.of(run.getId())).get(run.getId()), false, run.getExecutionInput());
+    }
+
+    private TestRunResponse response(TestRunView run, List<String> moduleIds, ExecutionAccounting accounting,
+        java.util.Map<String, Long> contracts, boolean summary, String executionInput) {
+        var input = executionInput == null ? mapper.createObjectNode()
+            : mapper.readTree(JdbcUrlSanitizer.sanitizeJson(executionInput));
         Long duration = run.getStartedAt() == null ? null : Duration.between(run.getStartedAt(),
             run.getFinishedAt() == null ? Instant.now() : run.getFinishedAt()).toMillis();
-        var accounting = ExecutionAccounting.of(run,
-            selected.findByRun_IdOrderByScenarioId(run.getId()));
-        return new TestRunResponse(run.getId(), run.getStatus(), run.getProfile(),
+        return new TestRunResponse(run.getId(), run.getEventSequence(), run.getStatus(), run.getProfile(),
             new TestRunResponse.ConnectionSnapshot(run.getConnectionNameSnapshot(),
                 run.getDatabaseTypeSnapshot(), run.getAdapterIdSnapshot(),
                 JdbcUrlSanitizer.sanitize(run.getJdbcUrlSanitizedSnapshot())),
-            new TestRunResponse.DriverSnapshot(run.getDriver().getId(), run.getDriverNameSnapshot(),
+            new TestRunResponse.DriverSnapshot(run.getDriverId(), run.getDriverNameSnapshot(),
                 run.getDriverVendorSnapshot(), run.getDriverVersionSnapshot(),
                 run.getDriverClassSnapshot(), run.getDriverFingerprintSnapshot()), moduleIds,
             run.getTotalCases(), run.getCompletedCases(), run.getPassed(), run.getFailed(),
@@ -449,85 +487,71 @@ final class TestRunService {
             run.getStartedAt(), run.getFinishedAt(), duration,
             JdbcUrlSanitizer.sanitize(run.getFailureReason()),
             accounting,
-            scopeSnapshot(run), issueSnapshot(run), cleanupSnapshot(run), selectionSnapshot(run),
-            contractSummary(run), adapterSnapshot(run),
-            frozenSqlPackage(run), run.getWorkerTerminationReason(), run.isWorkerReportValidated(),
-            run.getExecutionInput() == null ? null
-                : new tools.jackson.databind.ObjectMapper().readTree(run.getExecutionInput())
-                    .path("adapterExecution").path("dialect").asString(null), run.getName(),
+            scopeSnapshot(input), issueSnapshot(run), cleanupSnapshot(run), selectionSnapshot(input, summary),
+            input.has("sqlPackage") ? null : contracts, adapterSnapshot(input),
+            input.get("sqlPackage"), run.getWorkerTerminationReason(), run.isWorkerReportValidated(),
+            input.path("adapterExecution").path("dialect").asString(null), run.getName(),
             RunExecutionOutcome.of(run, accounting),
             RunExecutionOutcome.historicalCaseFailure(run, accounting), run.getWorkerArtifactSha256(),
             run.getWorkerExitCode(),
             run.getWorkerFinalEvent() == null ? null
-                : new tools.jackson.databind.ObjectMapper().readTree(run.getWorkerFinalEvent()));
+                : mapper.readTree(run.getWorkerFinalEvent()));
     }
 
     @SuppressWarnings("unchecked")
-    private java.util.Map<String, Object> selectionSnapshot(TestRunEntity run) {
-        if (run.getExecutionInput() == null) {
-            return java.util.Map.of();
-        }
-        var mapper = new tools.jackson.databind.ObjectMapper();
-        var frozen = mapper.readTree(run.getExecutionInput());
+    private java.util.Map<String, Object> selectionSnapshot(tools.jackson.databind.JsonNode frozen, boolean summary) {
         if (!frozen.has("selection")) {
             return java.util.Map.of();
         }
         java.util.Map<String, Object> value = new java.util.LinkedHashMap<>(mapper.convertValue(
             frozen.path("selection"), java.util.Map.class));
+        if (summary) {
+            value.keySet().retainAll(Set.of("catalogVersion", "catalogCount"));
+        }
         value.put("budgetMs", frozen.path("budgetMs").asLong());
         value.put("caseTimeoutMs", frozen.path("caseTimeoutMs").asLong());
         return value;
     }
 
-    private AdapterResponse adapterSnapshot(TestRunEntity run) {
-        if (run.getExecutionInput() == null) {
-            return null;
-        }
-        var mapper = new tools.jackson.databind.ObjectMapper();
-        var node = mapper.readTree(run.getExecutionInput()).path("adapterSnapshot");
+    private AdapterResponse adapterSnapshot(tools.jackson.databind.JsonNode input) {
+        var node = input.path("adapterSnapshot");
         return node.isMissingNode() ? null : mapper.treeToValue(node, AdapterResponse.class);
     }
 
-    private java.util.Map<String, Long> contractSummary(TestRunEntity run) {
-        if (frozenSqlPackage(run) != null) {
-            return null;
+    private java.util.Map<UUID, java.util.Map<String, Long>> contractSummaries(List<UUID> ids) {
+        java.util.Map<UUID, java.util.Map<String, Long>> summaries = new java.util.HashMap<>();
+        if (ids.isEmpty()) {
+            return summaries;
         }
-        java.util.Map<String, Long> counts = new java.util.LinkedHashMap<>();
-        var mapper = new tools.jackson.databind.ObjectMapper();
-        for (var row : results.findByRun_Id(run.getId())) {
-            if (row.getExecutionEvidence() == null) {
-                continue;
+        for (var row : results.summarize(ids)) {
+            var counts = summaries.computeIfAbsent(row.getRunId(), key -> new java.util.LinkedHashMap<>());
+            if (row.getConclusion() != null) {
+                counts.merge(row.getConclusion(), row.getTotal(), Long::sum);
             }
-            var evidence = mapper.readTree(row.getExecutionEvidence());
-            if (evidence.has("conclusion")) {
-                counts.merge(evidence.path("conclusion").asString(), 1L, Long::sum);
+            if ("NOT_EVALUATED".equals(row.getConclusion()) && "SUITE".equals(row.getRequirementScope())) {
+                counts.merge("SUITE_REQUIREMENT_UNMET", row.getTotal(), Long::sum);
             }
-            if ("NOT_EVALUATED".equals(evidence.path("conclusion").asString())
-                && "SUITE".equals(evidence.path("requirementScope").asString())) {
-                counts.merge("SUITE_REQUIREMENT_UNMET", 1L, Long::sum);
-            }
-            if (evidence.path("contractInvoked").asBoolean(false)) {
-                counts.merge("EXECUTED", 1L, Long::sum);
+            if (row.getInvoked()) {
+                counts.merge("EXECUTED", row.getTotal(), Long::sum);
             }
         }
-        return counts.isEmpty() ? null : counts;
+        summaries.values().removeIf(java.util.Map::isEmpty);
+        return summaries;
     }
 
     @SuppressWarnings("unchecked")
-    private java.util.Map<String, Object> cleanupSnapshot(TestRunEntity run) {
+    private java.util.Map<String, Object> cleanupSnapshot(TestRunView run) {
         return run.getCleanupEvidence() == null
             ? java.util.Map.of("status", "UNKNOWN", "phase", "NOT_RECORDED")
-            : new tools.jackson.databind.ObjectMapper().readValue(run.getCleanupEvidence(),
+            : mapper.readValue(run.getCleanupEvidence(),
                 java.util.Map.class);
     }
 
     @SuppressWarnings("unchecked")
-    private java.util.Map<String, Object> scopeSnapshot(TestRunEntity run) {
-        if (run.getExecutionInput() == null) {
+    private java.util.Map<String, Object> scopeSnapshot(tools.jackson.databind.JsonNode input) {
+        if (!input.has("scope")) {
             return java.util.Map.of();
         }
-        var mapper = new tools.jackson.databind.ObjectMapper();
-        var input = mapper.readTree(run.getExecutionInput());
         java.util.Map<String, Object> scope = new java.util.LinkedHashMap<>(
             mapper.convertValue(input.path("scope"), java.util.Map.class));
         scope.put("objectPrefix", input.path("objectPrefix").asString());
@@ -535,9 +559,9 @@ final class TestRunService {
     }
 
     @SuppressWarnings("unchecked")
-    private List<java.util.Map<String, Object>> issueSnapshot(TestRunEntity run) {
+    private List<java.util.Map<String, Object>> issueSnapshot(TestRunView run) {
         return run.getExecutionIssues() == null ? List.of()
-            : new tools.jackson.databind.ObjectMapper().readValue(
+            : mapper.readValue(
                 JdbcUrlSanitizer.sanitizeJson(run.getExecutionIssues()), List.class);
     }
 
@@ -574,15 +598,15 @@ final class TestRunService {
             report.put("runStatus", run.getStatus());
             report.put("terminationReason", reason);
             report.put("scope",
-                new tools.jackson.databind.ObjectMapper().readTree(run.getExecutionInput())
+                mapper.readTree(run.getExecutionInput())
                     .path("scope"));
             report.put("objectPrefix", value.executionScope().get("objectPrefix"));
             report.put("dataSources",
-                new tools.jackson.databind.ObjectMapper().readTree(run.getExecutionInput())
+                mapper.readTree(run.getExecutionInput())
                     .path("dataSources"));
             report.put("metadataEvidence", run.getMetadataEvidence() == null
                 ? java.util.Map.of("status", "UNKNOWN")
-                : new tools.jackson.databind.ObjectMapper().readTree(run.getMetadataEvidence()));
+                : mapper.readTree(run.getMetadataEvidence()));
             report.put("adapterSnapshot", value.adapterSnapshot());
             report.put("testDomain", value.sqlPackage() == null ? "JDBC_CONTRACT" : "SQL_FEATURE");
             if (value.sqlPackage() != null) {
@@ -591,10 +615,10 @@ final class TestRunService {
                 report.put("sqlComparisonSupported", false);
             }
             report.put("adapterExecution",
-                new tools.jackson.databind.ObjectMapper().readTree(run.getExecutionInput())
+                mapper.readTree(run.getExecutionInput())
                     .path("adapterExecution"));
             report.put("capabilities",
-                new tools.jackson.databind.ObjectMapper().readTree(run.getExecutionInput())
+                mapper.readTree(run.getExecutionInput())
                     .path("capabilities"));
             report.put("accounting", accounting);
             report.put("selectionSnapshot", value.selectionSnapshot());
@@ -620,9 +644,7 @@ final class TestRunService {
             report.put("scenario_results", results.findByRun_Id(id).stream()
                 .collect(
                     java.util.stream.Collectors.toMap(TestCaseResultEntity::getScenarioId, row -> {
-                        var event = new tools.jackson.databind.ObjectMapper().readValue(
-                            JdbcUrlSanitizer.sanitizeJson(row.getExecutionEvidence()),
-                            java.util.Map.class);
+                        var event = readCaseEvidence(row.getExecutionEvidence());
                         event.remove("type");
                         event.remove("timestamp");
                         event.remove("runId");
@@ -640,9 +662,26 @@ final class TestRunService {
             JdbcUrlSanitizer.sanitize(value.getStackTrace()), value.getStartedAt(),
             value.getFinishedAt(),
             value.getExecutionEvidence() == null ? null
-                : new tools.jackson.databind.ObjectMapper().readValue(
-                    JdbcUrlSanitizer.sanitizeJson(value.getExecutionEvidence()),
-                    java.util.Map.class));
+                : readCaseEvidence(value.getExecutionEvidence()));
+    }
+
+    private java.util.Map<String, Object> readCaseEvidence(String raw) {
+        if (raw == null) {
+            return new java.util.LinkedHashMap<>();
+        }
+        try {
+            var node = mapper.readTree(JdbcUrlSanitizer.sanitizeJson(raw));
+            if (node != null && node.isObject()) {
+                return mapper.convertValue(node,
+                    new tools.jackson.core.type.TypeReference<java.util.Map<String, Object>>() { });
+            }
+        } catch (tools.jackson.core.JacksonException exception) {
+            org.slf4j.LoggerFactory.getLogger(TestRunService.class)
+                .debug("Historical case evidence is unreadable; returning an explicit marker");
+        }
+        var unreadable = new java.util.LinkedHashMap<String, Object>();
+        unreadable.put("evidenceReadError", "LEGACY_EVIDENCE_UNREADABLE");
+        return unreadable;
     }
 
     private static RunException problem(HttpStatus status, String code, String detail) {

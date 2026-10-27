@@ -194,6 +194,7 @@ export interface CleanupEvidence {
   retainedObjects?: Record<string, unknown>[];
 }
 export interface Run {
+  eventSequence?: number;
   name?: string | null;
   executionOutcome?: "WAITING" | "IN_PROGRESS" | "COMPLETED" | "ABNORMAL" | "CANCELLED";
   historicalOutcome?: boolean;

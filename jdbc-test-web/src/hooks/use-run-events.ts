@@ -35,6 +35,7 @@ export function useRunEvents(id: string, run: Run | undefined) {
     );
     source.onopen = () => setConnection("live");
     source.onerror = () => setConnection("reconnecting");
+    let lastSequence = -1;
     const receive = (event: MessageEvent<string>) => {
       let data: unknown;
       try {
@@ -50,6 +51,12 @@ export function useRunEvents(id: string, run: Run | undefined) {
       )
         return;
       const body = data;
+      if (typeof body.eventSequence === "number") {
+        const latestSequence = Math.max(lastSequence,
+          client.getQueryData<Run>(runsKeys.detail(id))?.eventSequence ?? -1);
+        if (body.eventSequence < latestSequence || (body.eventSequence === latestSequence && event.type !== "run.snapshot")) return;
+        lastSequence = body.eventSequence;
+      }
       const runStatus = event.type === "run.status" && status(body.status)
         ? body.status : undefined;
       const terminalStatus =
@@ -67,13 +74,14 @@ export function useRunEvents(id: string, run: Run | undefined) {
           return {
             ...previous,
             ...Object.fromEntries(
-              [...Object.keys(previous), "accounting", "executionScope", "executionIssues", "cleanupEvidence", "workerTerminationReason", "workerReportValidated", "sqlDialect", "name", "executionOutcome", "historicalOutcome", "workerArtifactSha256", "workerExitCode", "workerFinalEvent"]
+              [...Object.keys(previous), "eventSequence", "accounting", "executionScope", "executionIssues", "cleanupEvidence", "workerTerminationReason", "workerReportValidated", "sqlDialect", "name", "executionOutcome", "historicalOutcome", "workerArtifactSha256", "workerExitCode", "workerFinalEvent"]
                 .filter((key) => key in body)
                 .map((key) => [key, body[key]]),
             ),
           } as Run;
         }
         const next = { ...previous };
+        if (typeof body.eventSequence === "number") next.eventSequence = body.eventSequence;
         if (body.accounting && typeof body.accounting === "object")
           next.accounting = body.accounting as Run["accounting"];
         if (event.type === "run.cleanup" && record(body.cleanupEvidence))
@@ -109,7 +117,8 @@ export function useRunEvents(id: string, run: Run | undefined) {
       });
       if (event.type === "case.finished")
         void client.invalidateQueries({ queryKey: runsKeys.results(id) });
-      if (terminalStatus || (runStatus && isTerminal(runStatus))) {
+      if (terminalStatus || (runStatus && isTerminal(runStatus)) ||
+        (event.type === "run.snapshot" && status(body.status) && isTerminal(body.status))) {
         source.close();
         void client.invalidateQueries({ queryKey: runsKeys.all });
       }

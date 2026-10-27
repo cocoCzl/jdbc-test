@@ -69,21 +69,18 @@ final class TestRunScheduler {
 
     // Creation commits before enqueue. Rejection must not strand that row or its credentials.
     private void rejectQueuedRun(UUID runId, String reason) {
-        Map<String, Object> payload = transactions.execute(tx -> {
+        transactions.executeWithoutResult(tx -> {
             TestRunEntity run = runs.findForUpdate(runId).orElseThrow();
             if (run.getStatus() != TestRunStatus.QUEUED) {
-                return null;
+                return;
             }
             run.setStatus(TestRunStatus.INTERRUPTED);
             run.markFinished();
             run.setFailureReason(reason);
             credentials.deleteById(runId);
-            return terminalPayload(run);
-        });
-        if (payload != null) {
-            events.publish(runId, "run.status", payload);
+            events.publish(run, "run.status", terminalPayload(run));
             events.complete(runId);
-        }
+        });
     }
 
     private final class QueuedRun extends FutureTask<Void> {
@@ -109,7 +106,7 @@ final class TestRunScheduler {
             run.markFinished();
             runs.save(run);
             credentials.deleteById(runId);
-            events.publish(runId, "run.cancelled", terminalPayload(run));
+            events.publish(run, "run.cancelled", terminalPayload(run));
             events.complete(runId);
         });
         queue.getQueue().removeIf(task -> task instanceof QueuedRun queued
@@ -152,16 +149,10 @@ final class TestRunScheduler {
                         run.markFinished();
                         run.setFailureReason("SERVER_SHUTDOWN");
                         credentials.deleteById(run.getId());
+                        events.publish(run, "run.status", terminalPayload(run));
+                        events.complete(id);
                         return run.getId();
                     }).filter(java.util.Objects::nonNull).toList());
-            if (interrupted != null) {
-                for (UUID id : interrupted) {
-                    events.publish(id, "run.status",
-                        transactions.execute(
-                            tx -> terminalPayload(runs.findById(id).orElseThrow())));
-                    events.complete(id);
-                }
-            }
         } finally {
             executor.interruptAll();
             queue.shutdownNow();

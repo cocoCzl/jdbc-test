@@ -66,7 +66,7 @@ React / Vite → REST + SSE → Spring Boot Server
 | `scripts` | CLI、报告、回归和打包 |
 
 Server 依赖 Core，不加载 Suite 或上传驱动类。Worker 打包 Core/Suite/JUnit/SQL，目标驱动仍为外部输入。
-CLI 采用 Maven/JUnit，共享场景及安全契约。Flyway 管理平台 V1–V13 迁移，Hibernate 只校验不建表，
+CLI 采用 Maven/JUnit，共享场景及安全契约。Flyway 管理平台 V1–V15 迁移，Hibernate 只校验不建表，
 禁止修改历史迁移。密码信封使用 AES-256-GCM 和持久32字节 Master Key；队列凭据单独加密，
 在交接、终态和恢复路径删除。驱动位于 `<data-dir>/drivers/`，任务工作区位于 `<data-dir>/runs/`。
 
@@ -372,3 +372,34 @@ SQL Server 已停止新建连接、连接探测和执行支持；`adapters/catal
 驱动验证在短事务中获取配置和单调修订号；改动驱动类和每次验证均递增修订号，
 回写使用条件更新。旧成功/失败结果、并发验证、删除均返回 `DRIVER_VALIDATION_STALE`，不覆盖新状态。
 Worker 运行和等待限额均在事务外；驱动文件不可变，普通名称、默认方言和 DataSource 元数据不影响类加载验证。
+
+SSE 在事务提交后进入每订阅者的 64 项有界队列，由独立虚拟线程发送，全局最多 256 个订阅者。
+任务行锁保护持久化事件序号；订阅时在同一锁下注册并获取快照，提交后才发送。
+按序号消除快照重复及重排提交回调，终态发送后再关闭；积压超限断开该客户端，以重连快照恢复。
+连接最长 30 秒，浏览器重连；REST 的 10 秒刷新保底。没有持久化事件重放/outbox，进程崩溃时以数据库为准。
+不可中断的网络写占住该名额直到发送线程退出，避免无限补充卡住的线程，不阻塞任务或数据库事务。
+内嵌 Tomcat NIO 使用显式 `server.tomcat.connection-timeout=30s` 限制 socket 写等待；SSE 的 30 秒异步生命周期
+本身不能保证中断正在发送的网络写。线程中断只是尽力而为，替换容器或配置无限传输超时需要提供等效写超时。
+V14 序号仅用于提交状态的排序、去重及拒绝落后于 REST 刷新的 SSE，不提供历史事件重放。
+目录冷加载期间并发请求直接返回 `WORKER_BUSY`，不在短期 Worker 限额外积累无界 HTTP 等待者。
+
+运行列表通过闭合标量投影读取任务页和两组聚合，不加载完整任务/用例实体或逐项解释证据。
+列表 SQL 不选择 `execution_input`；V15 回填去掉逐场景元数据的 `execution_summary`，冻结配置时同步维护。
+`accounting.scenarios` 为空，
+列表 selectionSnapshot 仅含版本、目录数量和时间预算，逐场景信息保留在详情/报告。
+状态组在分页前用数据库条件和索引关联计数筛选，原始任务状态与执行判定保持分离。
+V15 仅更新派生字段，容忍无效历史 JSON（判定未知）。读取 fetch size 和 JDBC 写批次均为 500 行，
+但**全部批次仍在一个 Flyway 长事务内**，并非每批提交。PostgreSQL 中 ALTER TABLE、全量回填和普通
+CREATE INDEX（不是 CONCURRENTLY）一起提交；DDL 锁持有到提交，可能阻塞读写，需预留停机、事务和 WAL 空间。
+V13、V14 各自先提交。V15 失败会同时回滚字段、回填、索引和该版本历史记录，排除原因后重启即可重试，
+无需 `flyway repair`。隔离 PostgreSQL 测试在超过 1000 行回填后故意使最后一个索引失败，再无修复历史表地重试。
+H2 或非事务 DDL 环境不能据此推断同样的恢复保证。
+后续证据/配置写入通过实体 setter 同步派生值；不要绕过 setter 修改原始证据。
+升级会扫描一次历史证据并建立索引，历史库较大时应预留迁移窗口。
+`RunListQueryTest` 使用 H2、12 个任务、每页 10 条、每任务 20/1000 用例，记录 SQL、实体加载和响应大小；这不代表生产延迟或全驱动兼容性。
+
+历史用例证据缺失、不是对象或无法解析时，详情和数据库报告重建不再失败；无法解析的内容标记为
+`LEGACY_EVIDENCE_UNREADABLE`，不生成 JDBC 判定，不修改持久化原始证据或任务/用例状态。
+
+SSE 发送线程还必须等待 MVC afterConcurrentHandlingStarted，才可发送快照或消费事件，避免
+SseEmitter 初始化前的内部暂存绕过有界队列；传输 handler 就绪前仍只使用同一订阅者限额。

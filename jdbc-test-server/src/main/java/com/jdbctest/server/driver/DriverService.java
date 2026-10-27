@@ -113,8 +113,11 @@ final class DriverService {
                 "Invalid sort direction");
         }
         var result = packages.findAll(PageRequest.of(page, size, Sort.by(direction, parts[0])));
+        var byDriver = artifacts.findByDriver_IdIn(result.getContent().stream()
+            .map(JdbcDriverPackageEntity::getId).toList()).stream()
+            .collect(java.util.stream.Collectors.groupingBy(item -> item.getDriver().getId()));
         List<DriverResponse> items = result.getContent().stream()
-            .map(entity -> response(entity, artifacts.findByDriver_Id(entity.getId()))).toList();
+            .map(entity -> response(entity, byDriver.getOrDefault(entity.getId(), List.of()))).toList();
         return new DriverPageResponse(items, result.getNumber(), result.getSize(),
             result.getTotalElements(), result.getTotalPages());
     }

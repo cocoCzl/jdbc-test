@@ -9,5 +9,7 @@ public interface JdbcDriverArtifactRepository extends
 
     List<JdbcDriverArtifactEntity> findByDriver_Id(UUID driverId);
 
+    List<JdbcDriverArtifactEntity> findByDriver_IdIn(List<UUID> driverIds);
+
     void deleteByDriver_Id(UUID driverId);
 }

@@ -8,7 +8,23 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "test_run")
-public class TestRunEntity {
+public class TestRunEntity implements TestRunView {
+
+    @Column(name = "event_sequence", nullable = false)
+    private long eventSequence;
+
+    public long getEventSequence() {
+        return eventSequence;
+    }
+
+    long nextEventSequence() {
+        return ++eventSequence;
+    }
+
+    @Column(name = "cleanup_succeeded", nullable = false)
+    private boolean cleanupSucceeded;
+    @Column(name = "execution_issues_empty", nullable = false)
+    private boolean executionIssuesEmpty = true;
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -129,6 +145,7 @@ public class TestRunEntity {
 
     void setCleanupEvidence(String value) {
         cleanupEvidence = value;
+        cleanupSucceeded = "SUCCESS".equals(RunExecutionOutcome.evidence(value).path("status").asString());
     }
 
     public String getWorkerTerminationReason() {
@@ -148,10 +165,26 @@ public class TestRunEntity {
 
     void setExecutionIssues(String value) {
         executionIssues = value;
+        var node = RunExecutionOutcome.evidence(value);
+        executionIssuesEmpty = value == null || (node.isArray() && node.isEmpty());
     }
 
     @Column(name = "execution_input", columnDefinition = "text")
     private String executionInput;
+    @Column(name = "execution_summary", columnDefinition = "text")
+    private String executionSummary;
+
+    public String getExecutionSummary() {
+        return executionSummary;
+    }
+
+    @Column(name = "driver_id", insertable = false, updatable = false)
+    private UUID driverId;
+
+    public UUID getDriverId() {
+        return driver == null ? driverId : driver.getId();
+    }
+
     @Column(name = "evidence_version")
     private Integer evidenceVersion;
 
@@ -176,6 +209,7 @@ public class TestRunEntity {
 
     void freezeExecutionInput(String value) {
         executionInput = value;
+        executionSummary = value == null ? null : RunInputSummary.compact(RunExecutionOutcome.evidence(value)).toString();
         evidenceVersion = 2;
     }
 

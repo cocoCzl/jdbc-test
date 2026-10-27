@@ -400,7 +400,7 @@ final class TestRunExecutor {
                         JdbcUrlSanitizer.sanitizeJson(mapper.writeValueAsString(event))));
                 run.setExecutionIssues(mapper.writeValueAsString(issues));
                 runs.save(run);
-                events.publish(runId, "run.issue",
+                events.publish(run, "run.issue",
                     mapper.convertValue(issues.get(issues.size() - 1), Map.class));
             });
             case "METADATA_VALIDATED" -> transactions.executeWithoutResult(tx -> {
@@ -431,7 +431,7 @@ final class TestRunExecutor {
                 }
                 run.setCleanupEvidence(safe);
                 runs.save(run);
-                events.publish(runId, "run.cleanup", Map.of("runId", runId, "cleanupEvidence",
+                events.publish(run, "run.cleanup", Map.of("runId", runId, "cleanupEvidence",
                     mapper.readValue(safe, Map.class)));
             });
             case "CASE_FINISHED" -> persistCase(runId, event);
@@ -482,12 +482,8 @@ final class TestRunExecutor {
             String scenario = required(event, "scenarioId");
             String module = required(event, "moduleId");
             String status = required(event, "status");
-            if (selected.findByRun_IdOrderByScenarioId(runId).stream().noneMatch(
-                item -> scenario.equals(item.getScenarioId()) && module.equals(item.getModuleId()))
-                || results.findByRun_Id(runId).stream()
-                .anyMatch(item -> scenario.equals(item.getScenarioId()))) {
-                throw new RunException(org.springframework.http.HttpStatus.UNPROCESSABLE_CONTENT,
-                    "WORKER_PROTOCOL_ERROR", "Unselected or duplicate scenario");
+            if (results.existsByRun_IdAndScenarioId(runId, scenario)) {
+                throw protocol("Duplicate scenario result");
             }
             TestCaseResultStatus parsed;
             try {
@@ -524,17 +520,17 @@ final class TestRunExecutor {
             results.save(value);
             run.recordCase(parsed);
             runs.save(run);
-            events.publish(runId, "case.finished",
+            events.publish(run, "case.finished",
                 Map.of("runId", runId, "scenarioId", scenario, "moduleId", module, "displayName",
                     value.getDisplayName(), "status", parsed.name(), "durationMs",
                     value.getDurationMs(),
                     "completedCases", run.getCompletedCases(), "totalCases", run.getTotalCases()));
-            events.publish(runId, "run.progress",
+            events.publish(run, "run.progress",
                 Map.of("runId", runId, "completedCases", run.getCompletedCases(), "totalCases",
                     run.getTotalCases(), "passed", run.getPassed(), "failed", run.getFailed(),
                     "skipped",
                     run.getSkipped(), "accounting",
-                    ExecutionAccounting.of(run, selected.findByRun_IdOrderByScenarioId(runId))));
+                    ExecutionAccounting.summary(run, selected.summarize(List.of(runId)))));
         });
     }
 
@@ -547,9 +543,9 @@ final class TestRunExecutor {
                     run.setCurrentTestCase(test);
                 }
                 runs.save(run);
-                events.publish(id, name, test == null ? Map.of("runId", id, "moduleId", module)
+                events.publish(run, name, test == null ? Map.of("runId", id, "moduleId", module)
                     : Map.of("runId", id, "moduleId", module, "scenarioId", test, "accounting",
-                        ExecutionAccounting.of(run, selected.findByRun_IdOrderByScenarioId(id))));
+                        ExecutionAccounting.summary(run, selected.summarize(List.of(id)))));
             }
         });
     }
@@ -582,12 +578,11 @@ final class TestRunExecutor {
         if (reason != null) {
             payload.put("reason", sanitize(reason));
         }
-        var accounting = ExecutionAccounting.of(run,
-            selected.findByRun_IdOrderByScenarioId(run.getId()));
+        var accounting = ExecutionAccounting.summary(run, selected.summarize(List.of(run.getId())));
         if (accounting != null) {
             payload.put("accounting", accounting);
         }
-        events.publish(run.getId(), name, payload);
+        events.publish(run, name, payload);
         return true;
     }
 
@@ -751,10 +746,8 @@ final class TestRunExecutor {
 
     private TestRunSelectedScenarioEntity selectedScenario(UUID runId, JsonNode event) {
         String scenario = required(event, "scenarioId"), module = required(event, "moduleId");
-        return selected.findByRun_IdOrderByScenarioId(runId).stream()
-            .filter(
-                item -> item.getScenarioId().equals(scenario) && item.getModuleId().equals(module))
-            .findFirst().orElseThrow(() -> protocol("Unselected scenario/module"));
+        return selected.findByRun_IdAndScenarioIdAndModuleId(runId, scenario, module)
+            .orElseThrow(() -> protocol("Unselected scenario/module"));
     }
 
     private static RunException protocol(String message) {

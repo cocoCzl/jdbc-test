@@ -59,8 +59,9 @@ final class TestRunController {
     }
 
     @GetMapping(value = "/{id}/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    SseEmitter events(@PathVariable("id") UUID id) {
-        return service.subscribe(id, events);
+    SseEmitter events(@PathVariable("id") UUID id, jakarta.servlet.http.HttpServletRequest request) {
+        return service.subscribe(id, events,
+            ready -> request.setAttribute(RunEventMvcConfiguration.READY_ATTRIBUTE, ready));
     }
 
     @GetMapping("/{id}/results")

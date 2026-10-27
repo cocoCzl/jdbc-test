@@ -8,6 +8,23 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface TestCaseResultRepository extends JpaRepository<TestCaseResultEntity, UUID> {
 
+    boolean existsByRun_IdAndScenarioId(UUID runId, String scenarioId);
+
+    @org.springframework.data.jpa.repository.Query("select r.run.id as runId, r.contractConclusion as conclusion, "
+        + "r.requirementScope as requirementScope, r.contractInvoked as invoked, count(r) as total "
+        + "from TestCaseResultEntity r where r.run.id in :ids "
+        + "group by r.run.id, r.contractConclusion, r.requirementScope, r.contractInvoked")
+    List<ContractCounts> summarize(@org.springframework.data.repository.query.Param("ids") List<UUID> ids);
+
+    interface ContractCounts {
+
+        UUID getRunId();
+        String getConclusion();
+        String getRequirementScope();
+        boolean getInvoked();
+        long getTotal();
+    }
+
     Page<TestCaseResultEntity> findByRun_Id(UUID runId, Pageable pageable);
 
     Page<TestCaseResultEntity> findByRun_IdAndStatus(UUID runId, TestCaseResultStatus status,

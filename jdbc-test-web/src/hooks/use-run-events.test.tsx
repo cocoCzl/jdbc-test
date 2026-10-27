@@ -19,6 +19,19 @@ function setup() {
   return { ...hook, client, source: TestEventSource.instances[0] };
 }
 describe("EventSource lifecycle", () => {
+  it("ignores duplicate and reordered events after a reconnect snapshot", () => {
+    const { source, client } = setup();
+    act(() => {
+      source.emit("run.snapshot", { ...run, eventSequence: 4, completedCases: 4 });
+      source.emit("run.progress", { runId: run.id, eventSequence: 3, completedCases: 2 });
+      source.emit("run.progress", { runId: run.id, eventSequence: 5, completedCases: 5 });
+      source.emit("run.progress", { runId: run.id, eventSequence: 5, completedCases: 1 });
+    });
+    expect(client.getQueryData(runsKeys.detail(run.id))).toMatchObject({ completedCases: 5, eventSequence: 5 });
+    act(() => source.emit("run.snapshot", { ...finishedRun, eventSequence: 5 }));
+    expect(source.closed).toBe(true);
+    expect(client.getQueryData(runsKeys.detail(run.id))).toMatchObject({ status: finishedRun.status });
+  });
   it("preserves passed cases and cleanup failure through terminal and late events", () => {
     const { source, client } = setup();
     const cleanupEvidence = {
@@ -58,6 +71,18 @@ describe("EventSource lifecycle", () => {
     expect(client.getQueryData(runsKeys.detail(run.id))).toMatchObject({
       completedCases: 2,
     });
+  });
+  it("does not overwrite a newer REST refresh with delayed events or reconnect snapshots", () => {
+    const { source, client } = setup();
+    act(() => {
+      source.emit("run.progress", { runId: run.id, completedCases: 3, eventSequence: 3 });
+      client.setQueryData(runsKeys.detail(run.id), { ...run, completedCases: 7, eventSequence: 7 });
+      source.emit("run.progress", { runId: run.id, completedCases: 4, eventSequence: 4 });
+      source.emit("run.snapshot", { ...run, completedCases: 5, eventSequence: 5 });
+    });
+    expect(client.getQueryData(runsKeys.detail(run.id))).toMatchObject({ completedCases: 7, eventSequence: 7 });
+    act(() => source.emit("run.progress", { runId: run.id, completedCases: 8, eventSequence: 8 }));
+    expect(client.getQueryData(runsKeys.detail(run.id))).toMatchObject({ completedCases: 8, eventSequence: 8 });
   });
   it("handles status, module, case and progress events in the single Query cache", () => {
     const { source, client } = setup();

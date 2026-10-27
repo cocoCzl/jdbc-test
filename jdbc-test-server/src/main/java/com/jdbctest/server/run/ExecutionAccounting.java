@@ -13,7 +13,7 @@ public record ExecutionAccounting(int selected, int started, int completed, int 
 
     }
 
-    static ExecutionAccounting of(TestRunEntity run,
+    static ExecutionAccounting of(TestRunView run,
         List<TestRunSelectedScenarioEntity> selection) {
         if (!Integer.valueOf(2).equals(run.getEvidenceVersion())) {
             return null;
@@ -36,6 +36,23 @@ public record ExecutionAccounting(int selected, int started, int completed, int 
             run.getCompletedCases() - run.getPassed() - run.getFailed() - run.getSkipped(),
             count(rows, "PENDING"), count(rows, "RUNNING"), count(rows, "NOT_RUN"),
             count(rows, "INCOMPLETE"), rows);
+    }
+
+    static ExecutionAccounting summary(TestRunView run,
+        List<TestRunSelectedScenarioRepository.SelectionCounts> rows) {
+        if (!Integer.valueOf(2).equals(run.getEvidenceVersion())) {
+            return null;
+        }
+        int total = (int) rows.stream().mapToLong(TestRunSelectedScenarioRepository.SelectionCounts::getTotal).sum();
+        int started = (int) rows.stream().mapToLong(TestRunSelectedScenarioRepository.SelectionCounts::getStarted).sum();
+        int pending = (int) rows.stream().mapToLong(TestRunSelectedScenarioRepository.SelectionCounts::getPending).sum();
+        int running = (int) rows.stream().mapToLong(TestRunSelectedScenarioRepository.SelectionCounts::getRunning).sum();
+        boolean terminal = TestRunStateTransitions.terminal(run.getStatus());
+        return new ExecutionAccounting(total, started, run.getCompletedCases(), run.getPassed(),
+            run.getFailed(), run.getSkipped(),
+            run.getCompletedCases() - run.getPassed() - run.getFailed() - run.getSkipped(),
+            terminal ? 0 : pending, terminal ? 0 : running, terminal ? pending : 0,
+            terminal ? running : 0, List.of());
     }
 
     private static int count(List<Scenario> rows, String state) {
