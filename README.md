@@ -11,6 +11,9 @@ Start here: [Usage](docs/usage.md) · [Deployment](docs/deployment.md).
 Built-in adapters include PostgreSQL, MySQL, Oracle, GaussDB, KingbaseES and Dameng.
 An adapter provides preparation and execution rules; it does not promise that all JDBC tests pass.
 See [database configuration and verification limits](docs/usage.md#database-configuration).
+Dameng remains **candidate**. Upload your licensed JDBC JAR, use `dm.jdbc.driver.DmDriver` and
+`jdbc:dm://host:5236?schema=TEST_SCHEMA`, and authorize the exact existing schema; no dummy
+database/catalog is needed. Recorded results apply only to the tested DBMS/driver combinations.
 
 ## Start the website
 

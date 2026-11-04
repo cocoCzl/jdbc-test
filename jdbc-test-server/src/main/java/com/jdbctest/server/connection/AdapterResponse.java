@@ -11,7 +11,8 @@ public record AdapterResponse(String id, String name, String status, String dial
     String namespaceSelection, boolean requiresDatabase, String driverClass,
     String recommendedMavenCoordinate, List<ValidatedCombination> validatedCombinations,
     String qualificationNoteKey, String version, String revision, String origin,
-    String fingerprint, Map<String, String> matchConditions, String fingerprintScope) {
+    String fingerprint, Map<String, String> matchConditions, String fingerprintScope,
+    Map<String, Boolean> capabilities) {
 
     public static AdapterResponse from(AdapterDefinition definition) {
         try (var input = AdapterResponse.class.getResourceAsStream(
@@ -41,7 +42,7 @@ public record AdapterResponse(String id, String name, String status, String dial
                     (String) combination.get("driver_version"));
             }).toList(), definition.declaration().get("qualification_note_key") instanceof String key
                 ? key : null, definition.version(), definition.revision(), "BUILTIN", fingerprint,
-            definition.metadataConstraints(), "MANIFEST");
+            definition.metadataConstraints(), "MANIFEST", definition.capabilities());
     }
 
     record ValidatedCombination(String databaseVersion, String driverVersion) {

@@ -162,7 +162,6 @@ Optimize Imports 和 IDE inspection 仍需独立审查。
 配置、Key、数据和附件；验证失败时也清理本轮创建的资源，不删除未知归属资源。
 未经授权不重写历史、不 push/PR/tag/release。
 
-
 ## 增加数据库支持
 
 `adapters/catalog.json` 是唯一内置索引；`adapters/<id>/adapter.json` 分别维护名称、信任状态、
@@ -178,12 +177,35 @@ Optimize Imports 和 IDE inspection 仍需独立审查。
 新方言需实现 `SqlDialect` 的范围、引号、URL 解析、资源定位及归属清理，并覆盖失败路径。
 当前有限行为为 `postgresql`、`mysql`、`oracle`、`dm`，产品身份独立。
 DM 保留 schema 精确大小写且不要求 catalog，与 Oracle 折叠和 MySQL catalog 选择不同。
+
+DM 审计沿用注册表 → Server 冻结快照 → 隔离 Worker → Suite 资源的链路，
+11 个声明区域和 `pool/dm.yaml` 均存在，没有 Oracle 回退或第二套执行器。
+作用域保持共享的 `[A-Za-z][A-Za-z0-9_]{0,62}` 策略：拒绝纯数字、下划线开头、引号分隔符和非 ASCII 名称。
+每次 checkout 设置并核对精确名称；关闭失败作为原始作用域错误的 suppressed 异常保留。
+只有 journal 确认成功创建的对象可以按精确名称清理，不确定的 CREATE 保留为可见证据，不执行删 Schema 或扫描清理。
+适配器 API 返回不可变的历史 capability 声明和 candidate 说明，不保证驱动行为通过。
+Provider 必须提供公共类、匹配的接口及公共无参构造器；实际构造、属性设置及 JDBC 调用仍需观察。
+探测保留有界的 next-exception、cause 和 suppressed 分支及 SQLState/厂商码，诊断脱敏，连接关闭后才发布成功。
+
 修改共享逻辑需回归已有产品。仅增加枚举不能实现支持，不得修改公共断言或减少 FULL 选择制造兼容。
 扩大支持声明前需要真实授权验证。
 
 适配资源在源码中维护，自定义适配包、SQL 包上传和 JSON 导入已撤回。
 多 JAR 驱动使用 Web 上传或 CLI 本地目录；CLI Maven 解析器仅加载主 JAR，不构成完整传递依赖包。
 没有 Web 在线 Maven 导入器。[示例](../examples/README.zh-CN.md)说明显式兼容方言选择。
+
+只读外部 DM 集成检查先构建 Worker，再通过私密环境提供 `DM_JDBC_JAR`、`DM_JDBC_URL`、
+`DM_USERNAME`、`DM_PASSWORD`、`DM_SCHEMA`，执行：
+
+```sh
+./mvnw -pl jdbc-test-worker -am -Dtest=WorkerDmIT -Dsurefire.excluded.groups=none test
+```
+
+该显式启用的 integration 测试只验证加载和连接元数据，不证明可写套件兼容。
+浏览器测试 `e2e/dm.real.spec.ts` 需要 `JDBC_TEST_DM_REAL=true`、显式的
+`JDBC_TEST_DM_CONNECTION_ID` / `JDBC_TEST_DM_RUN_ID`、`DM_SCHEMA` 和临时平台地址；
+它测试并保存该连接，检查中英文历史及报告读取，不另建任务。
+CORE/FULL 继续使用正常任务流程和授权，分别保留原始统计、observation 和 cleanupEvidence，严禁提交私有 JAR 或环境文件。
 
 ## 增加用例与准备资源
 
@@ -356,7 +378,7 @@ V9/V10 及其他历史迁移保留，撤回包的表和历史仍可读且不重�
 | Oracle 资源 | 原生数组、多结果准备及嵌套依赖清理已有自动化检查，尚未真实 Oracle 复验。按列名批量键 NPE 归因、终态页面/筛选/下载按钮复核仍待办；需可达授权 PDB、额度与权限。 |
 | Oracle LOB 清单 | 历史运行后两个既有字典条目缺失，原因与历史父映射未知；既未证实业务数据丢失，也未证实无影响。合成归属测试不解释或修复差异。该写入范围保持关闭，新写入需独立专用账号/schema。归因需已有运行前映射/备份/审计/redo/采集身份，不能盲目重跑 FULL。 |
 | 历史证据 | 部分早期 MySQL/Kingbase 原 FULL 报告已不可得；脱敏摘录不等于原报告，不重建或认证缺失历史。adapters 内维护的证据保留。 |
-| 达梦 | 候选接入仅验证 DM DBMS 8.1.3.162＋驱动 8.1.2.192，包括真实 Web 保存/编辑/执行及 FULL（249 通过、21 失败）。后续修复原失败五项，仍有十一项兼容疑点及五项额外套件要求；独立复现不等于已确认厂商缺陷。精确配置和模式范围见使用指南。 |
+| 达梦 | candidate：历史 DM DBMS 8.1.3.162＋驱动 8.1.2.192 的 FULL 保留 249/21 及独立复测。2026-11-04 驱动 8.1.3.62 的独立 CORE 为 151/2、FULL 为 254/16：八项契约失败、三项其他 JDBC 结果未评估、五项额外套件失败。任务对象清理为 18/18、41/41；912 个已有对象元数据前后一致。驱动区间内其他版本和其他模式/补丁未验证；逐项能力审计见使用指南，独立观察不等于已确认厂商缺陷。 |
 | 平台启动验证 | Windows ACL/PowerShell 进程行为和 IDEA UI 未验证；标准 Docker 源码构建在镜像仓库认证超时后没有成功验证记录，替代本地镜像运行不证明源码构建通过。 |
 
 准备不足不等于驱动缺陷，允许不支持不算功能通过。REF/ROWID 类型存在、LOB 自动持久化、

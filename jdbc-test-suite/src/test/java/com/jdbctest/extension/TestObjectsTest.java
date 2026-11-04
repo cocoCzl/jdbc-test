@@ -15,6 +15,22 @@ class TestObjectsTest {
     @TempDir
     Path directory;
 
+    @Test
+    void dmPreservesSchemaCaseAndCleansOnlyJournaledObjects() throws Exception {
+        Config value = config("j01234567890123456789");
+        value.db.dialect = "dm";
+        value.namespace.name = "Mixed_Schema";
+        TestObjects objects = new TestObjects(value);
+        var commands = new ArrayList<String>();
+        objects.create(statement(commands, null), "CREATE TABLE {{owned}} (id INTEGER)");
+        objects.cleanup(connection(statement(commands, null)));
+        assertEquals(List.of("CREATE TABLE " + objects.qualified("owned") + " (id INTEGER)",
+            "DROP TABLE " + objects.qualified("owned")), commands);
+        assertTrue(objects.qualified("owned").startsWith("\"Mixed_Schema\".\"j"));
+        assertEquals("SUCCESS", objects.cleanupEvidence().get("status"));
+        assertEquals(1L, objects.cleanupEvidence().get("confirmedDeleted"));
+    }
+
     Config config(String prefix) {
         Config value = new Config();
         value.db = new Config.DbConfig();

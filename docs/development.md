@@ -203,8 +203,34 @@ A distinct dialect requires implemented `SqlDialect` scope, quoting, URL parsing
 ownership cleanup with failure tests. Current finite behaviors are `postgresql`, `mysql`, `oracle`,
 `dm`; product identity remains independent. DM preserves exact schema case and requires
 no catalog, unlike Oracle folding or MySQL catalog selection. Audit shared logic for existing products.
+The DM audit follows the same registry → Server snapshot → isolated Worker → Suite assets flow.
+All eleven declared fixture areas and `pool/dm.yaml` exist; no Oracle fallback or second executor is used.
+Schema identifiers retain the shared `[A-Za-z][A-Za-z0-9_]{0,62}` policy (numeric-only, leading underscore,
+quoted delimiters and non-ASCII names are rejected). Each checkout sets and checks the exact name;
+close errors are suppressed on the original scope failure. Only successful journaled CREATEs are
+eligible for exact-object cleanup; uncertain CREATEs stay visible, without schema drops or scans.
+The adapter API exposes immutable historical capability declarations and a candidate qualification
+note; it does not certify driver behavior. Public provider interface/constructor availability is a
+prerequisite; actual constructor, setter and JDBC-call behavior still needs observation.
+Connection-probe diagnostics retain bounded next-exception, cause and suppressed branches with
+SQLState/vendor codes, redact credentials, and publish success only after the connection closes.
+
 A product enum alone does not implement support. Never change public assertions or deselect FULL
 cases to manufacture compatibility. Real authorized verification is required before widening claims.
+
+For the read-only external DM smoke, first build the packaged Worker, then supply private environment
+variables `DM_JDBC_JAR`, `DM_JDBC_URL`, `DM_USERNAME`, `DM_PASSWORD`, `DM_SCHEMA` and run:
+
+```sh
+./mvnw -pl jdbc-test-worker -am -Dtest=WorkerDmIT -Dsurefire.excluded.groups=none test
+```
+
+This opt-in integration test validates loading and the actual connected metadata; it does not prove
+writable suite compatibility. The browser integration `e2e/dm.real.spec.ts` requires
+`JDBC_TEST_DM_REAL=true`, explicit `JDBC_TEST_DM_CONNECTION_ID`/`JDBC_TEST_DM_RUN_ID`, `DM_SCHEMA`,
+and a disposable platform URL. It probes/saves that connection and checks bilingual report/history
+readback without creating another task. Use the normal task flow for authorized CORE/FULL and retain
+each task's original result counts, observations and cleanupEvidence. Never commit private JARs or env files.
 
 Maintain assets in source; custom adapter/SQL package upload and JSON imports are retired.
 Multi-JAR drivers use Web upload or a CLI local directory. The CLI Maven resolver loads the primary
@@ -402,7 +428,7 @@ and historical reports; a targeted follow-up never changes an earlier FULL pass 
 | Oracle resources | Native array/multiple-result preparation and nested dependency cleanup have automated checks but no real Oracle revalidation. Batch-key-by-name NPE attribution and terminal-page/filter/download review remain open. A reachable authorized PDB with quota/permissions is required. |
 | Oracle LOB inventory | Two pre-existing dictionary entries were absent after a historical run. Cause and historical parent mapping remain unknown; neither business-data loss nor absence of impact is established. Synthetic ownership tests do not explain/fix it. Keep that write scope closed; new writes need an independent dedicated account/schema. Attribution needs existing pre-run mapping/backups/audit/redo/capture identity, not another blind FULL. |
 | Historical evidence | Some earlier MySQL/Kingbase original FULL reports are unavailable. Sanitized excerpts are not original reports; do not reconstruct or certify missing history. Maintained adapter evidence stays in adapters. |
-| Dameng | Candidate integration verified only for DM DBMS 8.1.3.162 + driver 8.1.2.192, including real Web save/edit/execution and FULL (249 passed, 21 failed). Followups fixed five original failures; eleven compatibility doubts and five extra suite requirements remain. Standalone reproductions are not confirmed vendor defects. See Usage for exact configuration/mode limits. |
+| Dameng | Candidate: historical DM DBMS 8.1.3.162 + driver 8.1.2.192 FULL remains 249/21 with separate followups. The independent 2026-11-04 driver 8.1.3.62 CORE is 151/2 and FULL 254/16: eight contract violations, three other JDBC outcomes not evaluated, five extra suite failures. Owned-object cleanup is 18/18 and 41/41; 912 existing object metadata records match before/after. Intermediate driver releases and other modes/patches are unvalidated. Usage contains the per-capability audit; standalone observations do not confirm vendor defects. |
 | Platform launch validation | Windows host ACL/PowerShell process behavior and IDEA UI remain unverified. Standard Docker source build has no successful retained verification after a registry authentication timeout; alternate local-image execution is not source-build proof. |
 
 Missing fixtures are not driver defects; legal unsupported is not a feature pass. REF/ROWID type

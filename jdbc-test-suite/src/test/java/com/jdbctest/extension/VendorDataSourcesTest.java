@@ -52,10 +52,49 @@ class VendorDataSourcesTest {
         assertThrows(ExecutionPrerequisiteException.class, () -> VendorDataSources.dataSource(config));
         var wrong = new DataSourceProviders.Provider(String.class.getName(), null, null, null);
         config.dataSources = new DataSourceProviders(wrong, null, null);
-        assertThrows(IllegalStateException.class, () -> VendorDataSources.dataSource(config));
+        assertThrows(ExecutionPrerequisiteException.class,
+            () -> VendorDataSources.dataSource(config));
         Config.DbConfig collision = config();
         collision.properties = Map.of("secret", "override");
         assertThrows(IllegalStateException.class, () -> VendorDataSources.dataSource(collision));
+    }
+
+    @Test
+    void dmProvidersMissingFromTheUploadedArtifactsAreExplicitPrerequisites() {
+        Config.DbConfig config = config();
+        config.dataSources = new DataSourceProviders(
+            new DataSourceProviders.Provider("dm.jdbc.driver.DmdbDataSource", null, null, null),
+            new DataSourceProviders.Provider("dm.jdbc.driver.DmdbConnectionPoolDataSource", null,
+                null, null),
+            new DataSourceProviders.Provider("dm.jdbc.driver.DmdbXADataSource", null, null, null));
+        for (org.junit.jupiter.api.function.Executable action : java.util.List
+            .<org.junit.jupiter.api.function.Executable>of(() -> VendorDataSources.dataSource(config),
+                () -> VendorDataSources.pooled(config), () -> VendorDataSources.xa(config))) {
+            var error = assertThrows(ExecutionPrerequisiteException.class, action);
+            assertInstanceOf(ClassNotFoundException.class, error.getCause());
+            assertTrue(error.prerequisite().startsWith("dm.jdbc.driver.Dmdb"));
+        }
+    }
+
+    @Test
+    void providerMustExposeAPublicClassAndPublicNoArgConstructor() {
+        Config.DbConfig config = config();
+        for (Class<?> type : java.util.List.of(PrivateProvider.class, PrivateConstructor.class)) {
+            config.dataSources = new DataSourceProviders(
+                new DataSourceProviders.Provider(type.getName(), null, null, null), null, null);
+            var error = assertThrows(ExecutionPrerequisiteException.class,
+                () -> VendorDataSources.dataSource(config));
+            assertEquals(type.getName(), error.prerequisite());
+        }
+    }
+
+    private static class PrivateProvider extends Fixture {
+    }
+
+    public static class PrivateConstructor extends Fixture {
+
+        private PrivateConstructor() {
+        }
     }
 
     @Test

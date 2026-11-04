@@ -24,6 +24,21 @@ class ConnectionProbeProtocolTest {
 
     @Test
     void loadingConnectingAndMetadataFailuresRemainDistinctOnTheWire() throws Exception {
+        Path jar = driverJar();
+        assertFailure(jar, "missing.Driver", "unknown", "CONNECTION_DRIVER_LOAD_FAILED",
+            "LOADING_DRIVER", null);
+        assertFailure(jar, "fixture.Driver", "unknown", "CONNECTION_UNKNOWN",
+            "ESTABLISHING_CONNECTION", "ZZ999");
+        assertFailure(jar, "fixture.Driver", "auth", "CONNECTION_AUTHENTICATION_FAILED",
+            "ESTABLISHING_CONNECTION", "28000");
+        assertFailure(jar, "fixture.Driver", "metadata", "CONNECTION_METADATA_FAILED",
+            "READING_METADATA", "XX001");
+        assertFailure(jar, "fixture.Driver", "rejected", "DRIVER_DOES_NOT_ACCEPT_URL",
+            "ESTABLISHING_CONNECTION", null);
+    }
+
+
+    private Path driverJar() throws Exception {
         Path source = directory.resolve("fixture/Driver.java");
         Files.createDirectories(source.getParent());
         Files.writeString(source, """
@@ -38,10 +53,24 @@ class ConnectionProbeProtocolTest {
                         throw new java.sql.SQLException("authentication rejected", "28000", 72);
                     }
                     if (url.endsWith("rejected")) return null;
+                    if (url.endsWith("success") || url.endsWith("close_failure")) {
+                        try {
+                            java.nio.file.Files.writeString(java.nio.file.Path.of(System.getProperty("fixture.marker")), "connected");
+                        } catch (java.io.IOException error) { throw new java.sql.SQLException(error); }
+                    }
                     return (java.sql.Connection) java.lang.reflect.Proxy.newProxyInstance(
                         getClass().getClassLoader(), new Class<?>[]{java.sql.Connection.class},
                         (proxy, method, args) -> {
+                            if (method.getName().equals("close")) {
+                                java.nio.file.Files.writeString(java.nio.file.Path.of(System.getProperty("fixture.marker")), "closed");
+                                if (url.endsWith("close_failure")) throw new java.sql.SQLException("close failed", "08006", 74);
+                            }
                             if (method.getName().equals("getMetaData")) {
+                                if (url.endsWith("success") || url.endsWith("close_failure")) {
+                                    return java.lang.reflect.Proxy.newProxyInstance(getClass().getClassLoader(),
+                                        new Class<?>[]{java.sql.DatabaseMetaData.class}, (p, m, a) ->
+                                            m.getReturnType() == int.class ? 4 : "fixture");
+                                }
                                 throw new java.sql.SQLException("metadata failed", "XX001", 73);
                             }
                             return null;
@@ -65,23 +94,57 @@ class ConnectionProbeProtocolTest {
             output.write(Files.readAllBytes(directory.resolve("fixture/Driver.class")));
             output.closeEntry();
         }
-        assertFailure(jar, "missing.Driver", "unknown", "CONNECTION_DRIVER_LOAD_FAILED",
-            "LOADING_DRIVER", null);
-        assertFailure(jar, "fixture.Driver", "unknown", "CONNECTION_UNKNOWN",
-            "ESTABLISHING_CONNECTION", "ZZ999");
-        assertFailure(jar, "fixture.Driver", "auth", "CONNECTION_AUTHENTICATION_FAILED",
-            "ESTABLISHING_CONNECTION", "28000");
-        assertFailure(jar, "fixture.Driver", "metadata", "CONNECTION_METADATA_FAILED",
-            "READING_METADATA", "XX001");
-        assertFailure(jar, "fixture.Driver", "rejected", "DRIVER_DOES_NOT_ACCEPT_URL",
-            "ESTABLISHING_CONNECTION", null);
+        return jar;
+    }
+
+    @Test
+    void validationNeverConnectsAndProbeClosesBeforePublishingSuccess() throws Exception {
+        Path jar = driverJar();
+        Path marker = directory.resolve("connection-marker");
+        var mapper = new ObjectMapper();
+        Process validation = worker("--validate-driver").start();
+        try {
+            validation.getOutputStream().write(mapper.writeValueAsBytes(Map.of(
+                "driverClass", "fixture.Driver", "artifacts", java.util.List.of(jar.toString()))));
+            validation.getOutputStream().close();
+            assertTrue(validation.waitFor(15, TimeUnit.SECONDS));
+            assertEquals(0, validation.exitValue());
+            assertTrue(new String(validation.getInputStream().readAllBytes(), StandardCharsets.UTF_8)
+                .contains("DRIVER_VALIDATED"));
+            assertFalse(Files.exists(marker));
+        } finally {
+            validation.destroyForcibly();
+            assertTrue(validation.waitFor(5, TimeUnit.SECONDS));
+        }
+        Process probe = worker("--probe-connection").start();
+        try {
+            probe.getOutputStream().write(mapper.writeValueAsBytes(Map.of(
+                "driver", Map.of("driverClass", "fixture.Driver", "artifacts", java.util.List.of(jar.toString())),
+                "connection", Map.of("jdbcUrl", "jdbc:fixture:success", "username", "fixture", "password", "probe-only-secret"))));
+            probe.getOutputStream().close();
+            assertTrue(probe.waitFor(15, TimeUnit.SECONDS));
+            assertEquals(0, probe.exitValue());
+            assertEquals("closed", Files.readString(marker));
+            String output = new String(probe.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            assertEquals("CONNECTION_PROBED", mapper.readTree(output).path("type").asText());
+            assertFalse(output.contains("probe-only-secret"));
+        } finally {
+            probe.destroyForcibly();
+            assertTrue(probe.waitFor(5, TimeUnit.SECONDS));
+        }
+        assertFailure(jar, "fixture.Driver", "close_failure", "CONNECTION_UNKNOWN",
+            "CLOSING_CONNECTION", "08006");
+    }
+
+    private ProcessBuilder worker(String command) {
+        return new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
+            "-Dfixture.marker=" + directory.resolve("connection-marker"),
+            "-cp", System.getProperty("java.class.path"), WorkerMain.class.getName(), command);
     }
 
     private void assertFailure(Path jar, String driver, String suffix, String code, String stage,
         String state) throws Exception {
-        Process process = new ProcessBuilder(Path.of(System.getProperty("java.home"), "bin", "java")
-            .toString(), "-cp", System.getProperty("java.class.path"), WorkerMain.class.getName(),
-            "--probe-connection").start();
+        Process process = worker("--probe-connection").start();
         try {
             var mapper = new ObjectMapper();
             var request = Map.of("driver", Map.of("driverClass", driver, "artifacts",

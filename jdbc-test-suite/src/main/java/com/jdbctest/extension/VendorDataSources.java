@@ -37,17 +37,19 @@ public final class VendorDataSources {
         }
         java.lang.reflect.Constructor<?> constructor;
         try {
-            constructor = Class.forName(provider.className(), false, JdbcContext.driverClassLoader())
-                .getDeclaredConstructor();
-        } catch (ClassNotFoundException | NoClassDefFoundError error) {
+            Class<?> implementation = Class.forName(provider.className(), false,
+                JdbcContext.driverClassLoader());
+            if (!java.lang.reflect.Modifier.isPublic(implementation.getModifiers())
+                || !contract.isAssignableFrom(implementation)) {
+                throw new ExecutionPrerequisiteException("PROVIDER_INTERFACE_UNAVAILABLE", null,
+                    provider.className(), null);
+            }
+            constructor = implementation.getConstructor();
+        } catch (ClassNotFoundException | NoClassDefFoundError | NoSuchMethodException error) {
             throw new ExecutionPrerequisiteException("PROVIDER_CLASS_UNAVAILABLE", error,
                 provider.className(), null);
         }
         Object source = constructor.newInstance();
-        if (!contract.isInstance(source)) {
-            throw new IllegalStateException(
-                "Configured provider must implement " + contract.getName());
-        }
         // No vendor-specific APIs: configure public JavaBean properties on the supplied provider.
         for (var entry : config.properties.entrySet()) {
             if (entry.getKey().equalsIgnoreCase(provider.urlProperty())

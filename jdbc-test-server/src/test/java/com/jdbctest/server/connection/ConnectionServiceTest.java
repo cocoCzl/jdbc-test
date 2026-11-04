@@ -33,6 +33,8 @@ class ConnectionServiceTest {
     private final WorkerProcessRunner worker = mock(WorkerProcessRunner.class);
     private final DriverWorkerProperties properties = new DriverWorkerProperties();
     private ConnectionService service;
+    private final DatabaseConnectionProfileRepository connections = mock(DatabaseConnectionProfileRepository.class);
+    private final CredentialEncryptionService encryption = mock(CredentialEncryptionService.class);
 
     @BeforeEach
     void setUp() {
@@ -49,10 +51,40 @@ class ConnectionServiceTest {
             TransactionCallback<?> callback = invocation.getArgument(0);
             return callback.doInTransaction(mock(TransactionStatus.class));
         });
-        service = new ConnectionService(mock(DatabaseConnectionProfileRepository.class), drivers,
+        service = new ConnectionService(connections, drivers,
             artifacts, mock(TestRunRepository.class), mock(DriverStorage.class),
-            mock(CredentialEncryptionService.class), worker, properties, new ObjectMapper(),
+            encryption, worker, properties, new ObjectMapper(),
             transactions, new AdapterService());
+    }
+
+    @Test
+    void dmCreateEditReadAndRetestPreserveExactSchemaWithoutACatalog() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(connections.save(any())).thenAnswer(call -> call.getArgument(0));
+        when(encryption.encrypt("dm-synthetic-secret")).thenReturn("encrypted-fixture");
+        var created = service.create(new CreateConnectionRequest("DM fixture", "dm", "dm",
+            "jdbc:dm://fixture.invalid:5236?schema=Mixed_Schema", "fixture", "dm-synthetic-secret",
+            true, driverId, null, null, "Mixed_Schema", "dm"));
+        assertEquals("dm", created.databaseType());
+        assertEquals("dm", created.adapterId());
+        assertEquals("dm", created.sqlDialect());
+        assertEquals("Mixed_Schema", created.executionSchema());
+        org.junit.jupiter.api.Assertions.assertNull(created.executionDatabase());
+        var saved = org.mockito.ArgumentCaptor.forClass(DatabaseConnectionProfileEntity.class);
+        org.mockito.Mockito.verify(connections).save(saved.capture());
+        when(connections.findById(id)).thenReturn(Optional.of(saved.getValue()));
+        assertEquals(created, service.get(id));
+        var updated = service.update(id, new UpdateConnectionRequest("DM edited", "dm", "dm",
+            created.jdbcUrl(), "fixture", null, true, false, driverId, "edited", null,
+            "Edited_Schema", "dm"));
+        assertEquals("Edited_Schema", updated.executionSchema());
+        org.junit.jupiter.api.Assertions.assertNull(updated.executionDatabase());
+        assertEquals("encrypted-fixture", saved.getValue().getEncryptedPassword());
+        when(encryption.decrypt("encrypted-fixture")).thenReturn("dm-synthetic-secret");
+        respond(0, false, "{\"type\":\"CONNECTION_PROBED\",\"databaseProductName\":\"DM DBMS\","
+            + "\"driverName\":\"dm.jdbc.driver.DmDriver\",\"currentSchema\":\"Mixed_Schema\"}\n");
+        assertEquals("DM DBMS", service.testSaved(id, new ConnectionTestRequest(null)).databaseProductName());
+        assertEquals(updated.executionSchema(), service.get(id).executionSchema());
     }
 
     @Test

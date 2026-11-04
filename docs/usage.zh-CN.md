@@ -87,7 +87,7 @@ XML 依赖缺失只阻塞相关用例，不阻塞独立测试。
 和 `dm.jdbc.driver.DmdbXADataSource`，默认 Bean 属性为 `URL`、`user`、`password`。
 类存在不代表相应测试通过。
 
-实测元数据为 **DM DBMS 8.1.3.162**、连接驱动 **8.1.2.192**、Driver API **8.1**、
+历史基线（驱动 8.1.2.192）的元数据为 **DM DBMS 8.1.3.162**、连接驱动 **8.1.2.192**、Driver API **8.1**、
 JDBC **4.0**，catalog 为 null；实例 `COMPATIBLE_MODE=0`、`CASE_SENSITIVE=1`。
 驱动 `compatibleMode` 未显式设置，其有效默认值未核实，与实例兼容模式是不同概念。
 已在专用 schema 验证真实 Web 上传/加载、连接探测/保存/编辑、执行、结果筛选、报告下载及后端重启后的持久化读取。
@@ -101,9 +101,66 @@ JDBC **4.0**，catalog 为 null；实例 `COMPATIBLE_MODE=0`、`CASE_SENSITIVE=1
 `DBMS_LOCK.SLEEP` 中断。数组类型命名/支持和该过程的取消支持仍待厂商确认，不能据此宣称普遍 JDBC
 违约。四项类型元数据要求及过程内部更新计数暴露要求仍未满足；页面、报告和内部回归比较将其与
 JDBC 违约分开跟踪。
-DM 为候选适配，仅验证 DM DBMS 8.1.3.162＋驱动 8.1.2.192；独立复现不等于已确认厂商缺陷。
+上述历史证据仅适用于 DM DBMS 8.1.3.162＋驱动 8.1.2.192；独立复现不等于已确认厂商缺陷。
 参见厂商 [DM8 JDBC 指南](https://eco.dameng.com/document/dm/zh-cn/pm/jdbc-rogramming-guide.html)，
 在线手册不是已留存的对应补丁版本手册。
+
+独立的 **2026-11-04** 验收使用 **DM DBMS 8.1.3.162＋驱动 8.1.3.62**，
+JAR SHA-256 为 `327bade775f4f15b97618bc9736a4625def52701cf53f5ef5ad72580797e6e45`，
+Java 21、Driver API 8.1 / JDBC 4.0、`COMPATIBLE_MODE=0`、`CASE_SENSITIVE=1`、catalog 为 null。
+本次不需要额外连接 Properties；驱动实际 `compatibleMode` 默认值仍未独立确认。
+大小写错误的 schema URL 在 `ESTABLISHING_CONNECTION` 阶段返回 `3F000/-2103`；
+只读元数据确认真实名称后使用精确拼写，应用不会自动折叠大小写或新建替代模式。
+
+本次验证真实上传、隔离加载、草稿/已保存/编辑后的探测、密码加密保存、重启读取、
+SSE 进度、结果分页和筛选、JSON 报告及 Chrome 中英文连接/报告页面。
+CORE 选择 153：**151 通过、2 失败**；新的 FULL 选择 270：
+**254 通过、16 失败、0 跳过、0 中止**。互斥分类为 254 项符合契约、8 项契约失败、
+3 项其他 JDBC 结果未评估、5 项额外 suite requirement 未满足；原始 `NOT_EVALUATED=8` 包含这五项。
+明确允许 unsupported、准备/环境问题及 Provider 缺失均为 0。
+三项未评估异常为 setArray（`22000/-3301`）、absolute(0)（`HY107/6020`）和按列索引批处理生成键（`HY096/6007`），
+尚未确认厂商归因。五项套件要求为 ARRAY/REF/STRUCT/ROWID 类型元数据存在性及内部过程更新计数暴露。
+任务结束和 254 项通过不代表完整 JDBC 兼容，旧 FULL 及独立复测仍保留原统计。
+
+cleanupEvidence 记录 **CORE 18/18、FULL 41/41** 次已登记创建均确认删除，没有遗留任务对象，保留已有模式。
+912 个已有对象的名称、类型、对象 ID 和最后 DDL 时间与初始清单完全一致。
+清理只操作 journal 精确登记对象，不执行 DROP SCHEMA、CASCADE、前缀扫描或业务对象 DDL/DML。
+再次重启 Server 后仍可读取连接、历史任务和报告。验收临时平台与服务在验证结束后清理，保留用户提供的驱动和已有资源。
+
+达梦仍为 **candidate**。运行前数据库版本边界仍精确为 8.1.3.162；驱动数值范围
+8.1.2.192–8.1.3.62 保留旧端点并准入本次已观察的新版本，区间内其他驱动、其他 DM8 补丁、
+兼容模式及驱动/JDK 组合均**未验证**。manifest 的 qualification 记录该边界，不提升状态或重写历史报告。
+Provider 必须是公共类、匹配接口并提供公共无参构造器；缺少类、接口或构造器明确属于 prerequisite，
+实际 Provider 的 JDBC 调用失败继续保留。
+
+下面逐项核对本次组合的 capability。数值仍是历史声明，不是通过保证，也不会自动跳过标准调用。
+关联用例数量有重叠，不能相加。三个 Provider 的默认声明为 false，本次通过显式配置使运行时标志为 true；
+未通过修改 capability 隐藏失败。
+
+| Capability | 历史声明 | 本次观察边界 |
+|---|---|---|
+| `array_type` | `true` | 6 通过；setArray、空集合失败；类型元数据为套件额外要求 |
+| `ref_type` | `true` | 仅检查类型元数据（套件要求失败）；REF 对象行为未验证 |
+| `struct_type` | `true` | 仅检查类型元数据（套件要求失败）；Struct 对象行为未验证 |
+| `rowid_type` | `false` | 类型元数据套件要求失败；独立 ROWID 往返、绑定和更新用例通过 |
+| `sqlxml` | `true` | 10 个关联用例通过，不推广到所有版本 |
+| `rowset` | `true` | 9 个关联用例通过 |
+| `lob_objects` | `true` | 10 个关联用例通过；Blob readAllBytes 往返失败 |
+| `lob_locator_updates` | `true` | 1 个关联定位器更新用例通过 |
+| `callable_inout` | `true` | 3 个关联用例通过；过程参数序号断言失败 |
+| `ref_cursor` | `true` | 1 个原生 OUT 游标用例通过 |
+| `batch_generated_keys` | `false` | 2 个关联用例通过；按列索引请求生成键失败 |
+| `generated_keys_by_index` | `true` | 按列索引批处理路径失败（HY096/6007），不推广到其他路径 |
+| `multiple_result_sequences` | `true` | 内部过程更新计数暴露属于未满足的额外套件要求 |
+| `data_source` | `false` | 显式配置公共 Provider：8 个关联用例通过，getParentLogger 返回 null 断言失败 |
+| `connection_pool` | `false` | 显式配置公共 Provider：1 通过，替换句柄后旧句柄失效断言失败 |
+| `xa_data_source` | `false` | 显式配置公共 Provider：4 个关联用例通过 |
+| `statement_cancel` | `true` | DBMS_LOCK.SLEEP 中断断言失败，其他 SQL 形态未验证 |
+| `query_timeout` | `true` | 2 个关联用例通过；实际 DBMS_LOCK.SLEEP 超时断言失败 |
+| `network_timeout` | `true` | getter/setter 往返通过；真实网络阻塞截止时间未验证 |
+| `parameter_metadata` | `true` | 9 个关联用例通过；Callable 参数序号另有失败 |
+| `updatable_result_set` | `true` | 当前目录没有直接的可更新 ResultSet 契约覆盖，未验证 |
+| `scrollable_result_set` | `true` | 2 个关联滚动窗口用例通过；absolute(0) 另有失败 |
 
 ## 创建与执行任务
 

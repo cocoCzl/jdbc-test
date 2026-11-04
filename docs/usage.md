@@ -95,7 +95,7 @@ Optional provider classes are `dm.jdbc.driver.DmdbDataSource`, `dm.jdbc.driver.D
 and `dm.jdbc.driver.DmdbXADataSource`, with default bean properties `URL`, `user`, `password`.
 Their presence does not establish that those tests pass.
 
-Observed metadata: **DM DBMS 8.1.3.162**, connected driver **8.1.2.192**, Driver API **8.1**,
+Historical baseline metadata (driver 8.1.2.192): **DM DBMS 8.1.3.162**, connected driver **8.1.2.192**, Driver API **8.1**,
 JDBC **4.0**, null catalog; instance `COMPATIBLE_MODE=0`, `CASE_SENSITIVE=1`.
 The driver's `compatibleMode` was not set; its effective default was not verified and is distinct
 from the instance setting. Real Web upload/loading, connection probe/save/edit, execution, result
@@ -114,9 +114,73 @@ interruption of `DBMS_LOCK.SLEEP`. Array type naming/support and cancellation su
 procedure still need vendor confirmation; these observations do not establish universal JDBC
 violations. Four type-metadata requirements and internal procedure update-count exposure remain
 unmet; they are tracked separately from JDBC violations, including in regression comparison.
-DM is a candidate adapter; only DM DBMS 8.1.3.162 + driver 8.1.2.192 was verified. Standalone
+That historical evidence is limited to DM DBMS 8.1.3.162 + driver 8.1.2.192. Standalone
 reproduction does not mean a vendor defect is confirmed. See the vendor's [DM8 JDBC guide](https://eco.dameng.com/document/dm/zh-cn/pm/jdbc-rogramming-guide.html);
 the live manual is not a retained manual for the exact patch release.
+
+The separate **2026-11-04** acceptance used **DM DBMS 8.1.3.162 + driver 8.1.3.62**
+(JAR SHA-256 `327bade775f4f15b97618bc9736a4625def52701cf53f5ef5ad72580797e6e45`),
+Java 21, Driver API 8.1/JDBC 4.0, `COMPATIBLE_MODE=0`, `CASE_SENSITIVE=1`, null catalog.
+No additional connection Properties were needed; the driver's effective `compatibleMode` default
+remains unconfirmed. An incorrectly cased schema URL was rejected with SQLState `3F000` / vendor
+code `-2103` during `ESTABLISHING_CONNECTION`; read-only metadata established the exact stored name.
+The application does not repair case or create a replacement schema.
+
+Real upload, isolated validation, draft/saved/edit probes, encrypted save, restart/readback,
+SSE progress, result pagination/filtering, JSON report and bilingual Chrome connection/report pages
+were checked. CORE selected 153: **151 passed, 2 failed**. The new FULL selected 270:
+**254 passed, 16 failed, 0 skipped, 0 aborted**. Its disjoint result review is 254 conforming,
+8 contract violations, 3 other JDBC outcomes not evaluated, and 5 unmet extra suite requirements
+(the raw `NOT_EVALUATED=8` includes those five). Allowed unsupported, preparation/environment,
+and missing-provider counts are all zero. The three unassessed failures are setArray (`22000/-3301`),
+absolute(0) (`HY107/6020`) and indexed batch keys (`HY096/6007`); their vendor attribution remains
+unconfirmed. The five suite failures are ARRAY/REF/STRUCT/ROWID metadata presence and internal
+procedure update-count exposure. Neither task completion nor the 254 passes establishes complete
+JDBC compatibility; the earlier FULL and followups keep their original statistics.
+
+CleanupEvidence reports **CORE 18/18** and **FULL 41/41** journaled creation attempts deleted,
+no retained task objects and the existing schema retained. Metadata for all 912 pre-existing objects
+(name/type/object ID/last DDL time) matched the initial inventory. Cleanup used exact owned objects,
+without DROP SCHEMA, CASCADE, prefix scans or business-object DDL/DML. Connection/history/report
+readback remained available after another Server restart. The temporary platform and test services
+were session-owned and removed after verification; the supplied driver and existing resources were preserved.
+
+DM stays **candidate**. Runtime DBMS admission remains exactly 8.1.3.162; the numeric driver range
+8.1.2.192–8.1.3.62 preserves the old endpoint and admits the newly observed release. Intermediate
+releases, other DM8 patches, modes and driver/JDK combinations are **unverified**. The manifest's
+qualification records the boundary without promoting the adapter or changing historical reports.
+Driver-owned providers require public matching classes and public no-argument constructors; absent
+classes/interfaces/constructors are explicit prerequisites. Their real JDBC calls retain failures.
+
+The capability audit below concerns this new combination. Values remain historical declarations,
+not guarantees or automatic standard-test skips. Tagged counts overlap and must not be summed.
+Provider declarations default false; explicit provider configuration made the three effective flags
+true for this run. No failed behavior was hidden by changing capability flags.
+
+| Capability | Declared | Observed boundary |
+|---|---|---|
+| `array_type` | `true` | 6 passed; setArray and empty collections fail; metadata is a suite requirement |
+| `ref_type` | `true` | Only type metadata checked (suite failure); REF object behavior unverified |
+| `struct_type` | `true` | Only type metadata checked (suite failure); Struct object behavior unverified |
+| `rowid_type` | `false` | Type metadata suite requirement fails; independent ROWID round-trip/binding/update cases pass |
+| `sqlxml` | `true` | 10 tagged cases pass; no all-version claim |
+| `rowset` | `true` | 9 tagged cases pass |
+| `lob_objects` | `true` | 10 tagged cases pass; Blob readAllBytes round-trip fails |
+| `lob_locator_updates` | `true` | 1 tagged locator-update case passes |
+| `callable_inout` | `true` | 3 tagged cases pass; procedure parameter ordinal assertion fails |
+| `ref_cursor` | `true` | 1 native OUT cursor case passes |
+| `batch_generated_keys` | `false` | 2 tagged cases pass; keys requested by column index fail |
+| `generated_keys_by_index` | `true` | Column-index batch path fails (HY096/6007); other paths not generalized |
+| `multiple_result_sequences` | `true` | Internal procedure update-count exposure is an unmet suite requirement |
+| `data_source` | `false` | Configured public provider: 8 tagged passes, getParentLogger null assertion fails |
+| `connection_pool` | `false` | Configured public provider: 1 pass, replacement-handle invalidation assertion fails |
+| `xa_data_source` | `false` | Configured public provider: 4 tagged cases pass |
+| `statement_cancel` | `true` | DBMS_LOCK.SLEEP interruption assertion fails; other SQL shapes unverified |
+| `query_timeout` | `true` | 2 tagged cases pass; actual DBMS_LOCK.SLEEP timeout assertion fails |
+| `network_timeout` | `true` | Getter/setter round-trip passes; actual stalled-network deadline unverified |
+| `parameter_metadata` | `true` | 9 tagged cases pass; callable ordinals remain a separate failure |
+| `updatable_result_set` | `true` | No direct updatable ResultSet contract coverage in this catalog; unverified |
+| `scrollable_result_set` | `true` | 2 tagged fetch-window cases pass; absolute(0) fails independently |
 
 ## Create and execute a task
 

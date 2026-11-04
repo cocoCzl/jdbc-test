@@ -270,6 +270,9 @@ function Editor({ connection }: { connection?: Connection }) {
                 </Field>
               </div>
             ) : null}
+            {selectedAdapter?.id === "dm" && selectedAdapter.qualificationNoteKey ? (
+              <p className="text-sm text-muted-foreground sm:col-span-2">{t(selectedAdapter.qualificationNoteKey)}</p>
+            ) : null}
             {connection && !selectedAdapter ? <p role="alert" className="text-sm text-destructive sm:col-span-2">{t(retiredSqlServer ? "errors.DATABASE_SUPPORT_RETIRED" : "adapter.legacyConnection")}</p> : null}
             <DriverSelect value={driver?.id ?? ""} selected={driver} onChange={value => {
               setDriver(value);

@@ -148,6 +148,7 @@ export interface Adapter {
   fingerprintScope?: "PACKAGE" | "MANIFEST";
   id: string;
   qualificationNoteKey?: string | null;
+  capabilities?: Record<string, boolean>;
   name: string;
   status: string;
   dialect?: string;

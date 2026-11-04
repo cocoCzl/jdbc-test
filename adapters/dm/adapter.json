@@ -1,8 +1,8 @@
 {
   "id": "dm",
-  "name": "\u8fbe\u68a6 / Dameng",
+  "name": "达梦 / Dameng",
   "version": "1.0.0",
-  "revision": "1.0.0",
+  "revision": "1.1.0",
   "trust": "candidate",
   "dialect": "dm",
   "identifier_quote": "\"",
@@ -24,7 +24,7 @@
     },
     "driver": {
       "min": "8.1.2.192",
-      "max": "8.1.2.192"
+      "max": "8.1.3.62"
     }
   },
   "validated_combinations": [],
@@ -109,5 +109,15 @@
       "cleanup_sql": "DROP TYPE {probe}_a"
     }
   ],
-  "known_differences": []
+  "known_differences": [],
+  "qualification_note_key": "adapter.dmQualification",
+  "qualification": {
+    "scope": "Candidate integration for DM DBMS 8.1.3.162 only. Historical driver 8.1.2.192 FULL remains 249 passed/21 failed; its separate followups do not rewrite that run. The 2026-11-04 driver 8.1.3.62 CORE observed 151 passed/2 failed of 153, and FULL observed 254 passed/16 failed of 270, with no skips or aborts. Task completion is not complete JDBC compatibility.",
+    "driver_artifact_sha256": "327bade775f4f15b97618bc9736a4625def52701cf53f5ef5ad72580797e6e45",
+    "version_policy": "Numeric driver admission bounds 8.1.2.192 through 8.1.3.62 preserve the old endpoint and admit the new observed endpoint. Intermediate releases, other DBMS patches, compatibility modes and JDK combinations remain unvalidated.",
+    "capability_policy": "Historical declarations and test scope only. Standard JDBC calls still execute when false. Provider declarations default false and are derived from explicitly configured public driver-owned classes at runtime; presence never guarantees success. No failed case was disabled or reclassified as unsupported to obtain this result.",
+    "result_review": "The new FULL records eight contract violations, three other JDBC outcomes not evaluated, and five extra suite requirements unmet. No preparation/environment or provider-missing results were observed. These are observations requiring per-method review, not universal vendor-defect findings. See docs/usage.md and docs/usage.zh-CN.md for the capability audit.",
+    "cleanup": "CORE 18/18 and FULL 41/41 journaled object-creation attempts confirmed deleted. The existing authorized schema was retained. Before/after metadata for 912 pre-existing objects (name, type, object ID, last DDL time) matched exactly.",
+    "configuration": "Driver API 8.1, JDBC 4.0, null catalog, COMPATIBLE_MODE=0, CASE_SENSITIVE=1. No additional connection Properties were required; effective driver compatibleMode default was not independently verified. Exact stored schema spelling is required."
+  }
 }

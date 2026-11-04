@@ -1,3 +1,4 @@
+import i18n from "@/i18n";
 import { chooseOption } from "@/test/select";
 import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -22,6 +23,55 @@ async function fillDraft(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText("Authorized test schema"), "owned_scope");
 }
 describe("Connection UI", () => {
+  it.each([
+    ["en", false], ["zh-CN", false], ["en", true], ["zh-CN", true],
+  ] as const)("preserves exact DM scope during %s create/edit=%s, probe and save", async (language, editing) => {
+    await i18n.changeLanguage(language);
+    const user = userEvent.setup();
+    const dmDriver = { ...driver, vendor: "Dameng", driverClass: "dm.jdbc.driver.DmDriver", defaultSqlDialect: "dm" };
+    const dmConnection = { ...connection, databaseType: "dm", adapterId: "dm", sqlDialect: "dm",
+      jdbcUrl: "jdbc:dm://fixture.invalid:5236?schema=Mixed_Schema", executionDatabase: null,
+      executionSchema: "Mixed_Schema", defaultDriver: dmDriver };
+    const api = mockApi((url, options) => {
+      if (url.pathname === "/api/drivers") return json(page([dmDriver]));
+      if (url.pathname === "/api/connections/connection-1") return json(dmConnection);
+      if (url.pathname === "/api/connections" && options.method === "POST") return json(dmConnection, 201);
+      if (url.pathname.endsWith("/test")) return json({ ...probe, databaseProductName: "DM DBMS", driverName: dmDriver.driverClass });
+      return undefined;
+    });
+    const { client } = renderPage(editing ? "/connections/connection-1" : "/connections/new?adapterId=dm");
+    const schema = await screen.findByLabelText(i18n.t("ui.authorizedTestSchema"));
+    expect(screen.queryByLabelText(i18n.t("ui.authorizedTestDatabase"))).not.toBeInTheDocument();
+    expect(screen.getByText(i18n.t("connection.dmUrlHint"))).toBeVisible();
+    expect(screen.getByText(i18n.t("adapter.dmQualification"))).toBeVisible();
+    if (!editing) {
+      await user.type(screen.getByLabelText(i18n.t("ui.name")), "DM fixture");
+      await chooseOption(user, screen.getByLabelText(i18n.t("ui.driverPackage")), driver.id);
+      await user.type(screen.getByLabelText(i18n.t("ui.jdbcURL")), dmConnection.jdbcUrl);
+      await user.type(schema, dmConnection.executionSchema);
+      await user.type(screen.getByLabelText(i18n.t("ui.password"), { exact: true }), "dm-fixture-secret");
+    } else {
+      expect(schema).toHaveValue("Mixed_Schema");
+      await user.clear(schema);
+      await user.type(schema, "Edited_Schema");
+    }
+    await user.click(screen.getByRole("button", { name: i18n.t("ui.testConnection") }));
+    expect(await screen.findByText(/^DM DBMS/)).toBeVisible();
+    await user.click(screen.getByRole("button", { name: i18n.t("ui.saveConnection") }));
+    const method = editing ? "PATCH" : "POST";
+    await waitFor(() => expect(api.mock.calls.some(([url, options]) =>
+      String(url).endsWith(editing ? "/connections/connection-1" : "/connections") && options?.method === method)).toBe(true));
+    const saved = api.mock.calls.find(([url, options]) =>
+      String(url).endsWith(editing ? "/connections/connection-1" : "/connections") && options?.method === method)!;
+    const body = JSON.parse(saved[1]!.body as string);
+    expect(body).toMatchObject({ adapterId: "dm", databaseType: "dm", sqlDialect: "dm",
+      executionSchema: editing ? "Edited_Schema" : "Mixed_Schema", executionDatabase: "" });
+    if (editing) expect(body).not.toHaveProperty("password");
+    expect(body.jdbcUrl).not.toContain("secret");
+    expect(JSON.stringify(client.getMutationCache().getAll().map(item => item.state.variables))).not.toContain("dm-fixture-secret");
+    expect(JSON.stringify(localStorage)).not.toContain("dm-fixture-secret");
+    expect(JSON.stringify(sessionStorage)).not.toContain("dm-fixture-secret");
+  });
   it("identifies a retired SQL Server connection without offering it for new execution", async () => {
     const user = userEvent.setup();
     const api = mockApi(url => url.pathname === "/api/connections/connection-1"

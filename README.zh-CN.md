@@ -10,6 +10,9 @@
 项目内置 PostgreSQL、MySQL、Oracle、GaussDB、KingbaseES 和达梦适配。
 内置适配提供准备与执行规则，不代表全部 JDBC 测试通过。
 各数据库的配置与验证边界见[使用指南](docs/usage.zh-CN.md#database-configuration)。
+达梦仍为 **candidate**。上传有权使用的 JDBC JAR，驱动类为 `dm.jdbc.driver.DmDriver`，
+URL 示例为 `jdbc:dm://host:5236?schema=TEST_SCHEMA`。填写精确的已有 Schema，
+不需要虚构 database/catalog；实测结论仅适用于已记录的数据库与驱动组合。
 
 ## 启动网站
 

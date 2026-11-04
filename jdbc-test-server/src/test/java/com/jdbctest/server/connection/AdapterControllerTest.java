@@ -20,6 +20,25 @@ import tools.jackson.databind.ObjectMapper;
 class AdapterControllerTest {
 
     @Test
+    void dmPublishesItsOwnIdentityScopeAndHistoricalDeclarations() {
+        var response = new AdapterService().list().stream()
+            .filter(adapter -> "dm".equals(adapter.id())).findFirst().orElseThrow();
+        assertEquals("CANDIDATE", response.status());
+        assertEquals("dm", response.dialect());
+        assertEquals("schema", response.namespaceSelection());
+        assertFalse(response.requiresDatabase());
+        assertTrue(response.name().contains("达梦"));
+        assertTrue(response.name().contains("Dameng"));
+        assertEquals("dm.jdbc.driver.DmDriver", response.driverClass());
+        assertEquals(com.jdbctest.catalog.AdapterRegistry.bundled().required("dm").capabilities(),
+            response.capabilities());
+        assertFalse(response.capabilities().get("data_source"));
+        assertEquals("adapter.dmQualification", response.qualificationNoteKey());
+        assertThrows(UnsupportedOperationException.class,
+            () -> response.capabilities().put("array_type", false));
+    }
+
+    @Test
     void kingbasePublishesOfficialStatusAndOnlyItsObservedCombination() {
         var response = new AdapterService().list().stream()
             .filter(adapter -> "kingbase".equals(adapter.id())).findFirst().orElseThrow();

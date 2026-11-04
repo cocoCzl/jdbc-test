@@ -23,14 +23,14 @@ class WorkerAdapterSnapshotTest {
     @Test
     void builtinFrozenDialectDrivesScopeAndKeepsProtocolShape() throws Exception {
         ObjectMapper mapper = new ObjectMapper();
-        for (String dialect : List.of("mysql", "oracle", "postgresql")) {
+        for (String dialect : List.of("mysql", "oracle", "postgresql", "dm")) {
             var original = AdapterExecutionConfig.load(dialect);
             var snapshot = new AdapterExecutionConfig(dialect, original.assetId(),
                 original.dialect(),
                 original.identifierQuote(), original.capabilities(),
                 original.metadataConstraints());
             ExecutionScope scope =
-                "oracle".equals(dialect) ? new ExecutionScope(null, "owned_scope")
+                List.of("oracle", "dm").contains(dialect) ? new ExecutionScope(null, "Mixed_Scope")
                     : "mysql".equals(dialect) ? new ExecutionScope("owned_db", null)
                         : new ExecutionScope("owned_db", "owned_scope");
             WorkerRunRequest request = request(snapshot, scope);
@@ -50,7 +50,10 @@ class WorkerAdapterSnapshotTest {
                 json.at("/namespace/selection").asText());
             assertEquals(scope.namespace(snapshot.sqlDialect()),
                 json.at("/namespace/name").asText());
-            assertEquals(!"oracle".equals(dialect), json.path("namespace").has("database"));
+            assertEquals(snapshot.sqlDialect().requiresDatabase(),
+                json.path("namespace").has("database"));
+            assertEquals(mapper.valueToTree(original.capabilities()),
+                json.at("/adapter/capabilities"));
             assertEquals("", json.at("/db/password").asText());
             assertFalse(json.at("/preflight/require_sqlxml").asBoolean());
             var wire = mapper.readTree(mapper.writeValueAsString(snapshot));

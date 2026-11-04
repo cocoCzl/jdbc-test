@@ -11,6 +11,22 @@ import org.junit.jupiter.api.Test;
 class ConnectionProbeFailureTest {
 
     @Test
+    void preservesNextCauseAndSuppressedBranchesWithoutRepeatingCycles() throws Exception {
+        var failure = new SQLException("schema", "3F000", -2103);
+        var cause = new SQLException("underlying", "08001", 11);
+        failure.initCause(cause);
+        failure.setNextException(new SQLException("next", "HY000", 12));
+        failure.addSuppressed(new SQLException("close", "08006", 13));
+        cause.initCause(failure);
+        String json = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(
+            ConnectionProbeFailure.describe("ESTABLISHING_CONNECTION", failure));
+        for (String state : java.util.List.of("3F000", "08001", "HY000", "08006")) {
+            assertTrue(json.contains(state), state);
+            assertEquals(json.indexOf(state), json.lastIndexOf(state));
+        }
+    }
+
+    @Test
     void unknownMessagesNeverGuessUrlOrPasswordFailuresAndRedactSecrets() throws Exception {
         CredentialSanitizer.password("unlabelled-secret");
         var failure = new SQLException(

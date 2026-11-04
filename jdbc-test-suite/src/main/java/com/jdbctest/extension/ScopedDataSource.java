@@ -44,7 +44,11 @@ final class ScopedDataSource implements DataSource, AutoCloseable {
             }
             return connection;
         } catch (SQLException | RuntimeException exception) {
-            connection.close();
+            try {
+                connection.close();
+            } catch (SQLException | RuntimeException closeFailure) {
+                exception.addSuppressed(closeFailure);
+            }
             throw exception;
         }
     }

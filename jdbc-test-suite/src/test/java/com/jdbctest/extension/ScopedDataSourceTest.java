@@ -68,6 +68,38 @@ class ScopedDataSourceTest {
         }
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"TEST_SCHEMA", "test_schema", "MixedCase", "A123"})
+    void dmCheckoutUsesExactSchemaAndDoesNotRequireACatalog(String name) throws Exception {
+        var namespace = new Config.NamespaceConfig();
+        namespace.name = name;
+        namespace.selection = "schema";
+        var connection = org.mockito.Mockito.mock(Connection.class);
+        org.mockito.Mockito.when(connection.getSchema()).thenReturn(name);
+        for (int checkout = 0; checkout < 2; checkout++) {
+            assertSame(connection, ScopedDataSource.scope(connection, namespace));
+        }
+        org.mockito.Mockito.verify(connection, org.mockito.Mockito.times(2)).setSchema(name);
+        org.mockito.Mockito.verify(connection, org.mockito.Mockito.times(2)).getSchema();
+        org.mockito.Mockito.verify(connection, org.mockito.Mockito.never()).getCatalog();
+        org.mockito.Mockito.verify(connection, org.mockito.Mockito.never()).close();
+    }
+
+    @Test
+    void scopeMismatchRemainsPrimaryWhenClosingAlsoFails() throws Exception {
+        var namespace = new Config.NamespaceConfig();
+        namespace.name = "MixedCase";
+        namespace.selection = "schema";
+        var connection = org.mockito.Mockito.mock(Connection.class);
+        org.mockito.Mockito.when(connection.getSchema()).thenReturn("MIXEDCASE");
+        var closing = new SQLException("close failed", "08006", 9);
+        org.mockito.Mockito.doThrow(closing).when(connection).close();
+        var failure = assertThrows(SQLException.class,
+            () -> ScopedDataSource.scope(connection, namespace));
+        assertEquals("EXECUTION_SCOPE_MISMATCH: schema", failure.getMessage());
+        assertArrayEquals(new Throwable[] {closing}, failure.getSuppressed());
+    }
+
     @Test
     void closesConnectionWhenScopeCannotBeApplied() {
         boolean[] closed = {false};

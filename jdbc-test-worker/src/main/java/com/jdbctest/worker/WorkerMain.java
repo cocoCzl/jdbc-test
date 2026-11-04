@@ -282,6 +282,7 @@ public final class WorkerMain {
                     credentials.setProperty("password", request.connection().password());
                 }
                 stage = "ESTABLISHING_CONNECTION";
+                Map<String, Object> metadata;
                 try (Connection connection = driver.connect(request.connection().jdbcUrl(),
                     credentials)) {
                     if (connection == null) {
@@ -291,11 +292,11 @@ public final class WorkerMain {
                         return DRIVER_FAILURE;
                     }
                     stage = "READING_METADATA";
-                    Map<String, Object> metadata = probeMetadata(connection, driver);
-                    events.write("CONNECTION_PROBED", "", metadata);
+                    metadata = probeMetadata(connection, driver);
                     stage = "CLOSING_CONNECTION";
-                    return SUCCESS;
                 }
+                events.write("CONNECTION_PROBED", "", metadata);
+                return SUCCESS;
             }
         } catch (Exception | LinkageError exception) {
             events.write("CONNECTION_PROBE_FAILED", "",

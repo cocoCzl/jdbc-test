@@ -1,6 +1,7 @@
 package com.jdbctest.worker;
 
 import java.sql.SQLException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -19,8 +20,13 @@ final class ConnectionProbeFailure {
             : "CONNECTION_UNKNOWN";
         var details = new ArrayList<Map<String, Object>>();
         var seen = new IdentityHashMap<Throwable, Boolean>();
-        Throwable current = failure;
-        while (current != null && details.size() < 8 && seen.put(current, true) == null) {
+        var pending = new ArrayDeque<Throwable>();
+        pending.add(failure);
+        while (!pending.isEmpty() && details.size() < 8) {
+            Throwable current = pending.removeFirst();
+            if (seen.put(current, true) != null) {
+                continue;
+            }
             Map<String, Object> detail = new LinkedHashMap<>();
             detail.put("exceptionType", current.getClass().getName());
             String message = CredentialSanitizer.sanitize(current.getMessage());
@@ -41,9 +47,18 @@ final class ConnectionProbeFailure {
                         code = "CONNECTION_REJECTED";
                     }
                 }
-                current = sql.getNextException() == null ? sql.getCause() : sql.getNextException();
-            } else {
-                current = current.getCause();
+                if (sql.getNextException() != null) {
+                    pending.addLast(sql.getNextException());
+                }
+            }
+            if (current.getCause() != null) {
+                pending.addLast(current.getCause());
+            }
+            for (Throwable suppressed : current.getSuppressed()) {
+                if (pending.size() >= 16) {
+                    break;
+                }
+                pending.addLast(suppressed);
             }
             details.add(detail);
         }
