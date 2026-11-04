@@ -27,6 +27,15 @@ class TestCatalogTest {
     }
 
     @Test
+    void parentLoggerRecordsItsJdbc41ContractWithoutDeselectingOlderDrivers() {
+        var selected = CATALOG.select(TestSelection.custom(TestProfile.FULL, Set.of(),
+            Set.of("datasource.get_parent_logger"), Set.of()));
+        assertEquals(1, selected.size());
+        assertEquals("4.1", selected.getFirst().jdbcVersion());
+        assertEquals("OPTIONAL", selected.getFirst().unsupportedPolicy());
+    }
+
+    @Test
     void arrayValuedMethodRequirementsRemainExtended() {
         var scenario = CATALOG.testCases().stream()
             .filter(

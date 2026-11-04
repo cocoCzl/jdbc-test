@@ -75,10 +75,44 @@ class ArrayContractTest {
         when(connection.createArrayOf(eq("INTEGER"), any(Object[].class)))
             .thenThrow(new SQLFeatureNotSupportedException("array factory", "0A000"));
         var failure = assertThrows(JdbcContracts.UnsupportedAllowedException.class,
-            () -> new AdvancedTypeTest().testSetArray(connection, fixtures));
+            () -> AdvancedTypeTest.bindingArray(connection, fixtures, new Integer[] {10, 20, 30},
+                false, "INTEGER"));
         assertTrue(failure.getMessage().contains("Connection.createArrayOf"));
         verifyNoInteractions(fixtures);
         verify(connection, never()).prepareStatement(anyString());
+    }
+
+    @Test
+    void namedCollectionPreparesFixtureAndPreservesExactQualifiedCase() throws Exception {
+        for (String schema : new String[] {"UPPER", "TEST_SCHEMA", "Mixed_Case"}) {
+            Connection connection = mock(Connection.class);
+            JdbcTestExtension.Fixtures fixtures = mock(JdbcTestExtension.Fixtures.class);
+            Array array = mock(Array.class);
+            Integer[] elements = {10, 20, 30};
+            String typeName = "\"" + schema + "\".\"j0123456789abcdef0123_type\"";
+            when(connection.createArrayOf(typeName, elements)).thenReturn(array);
+            org.junit.jupiter.api.Assertions.assertSame(array,
+                AdvancedTypeTest.bindingArray(connection, fixtures, elements, true, typeName));
+            var order = org.mockito.Mockito.inOrder(fixtures, connection);
+            order.verify(fixtures).prepare();
+            order.verify(connection).createArrayOf(typeName, elements);
+        }
+    }
+
+    @Test
+    void namedCollectionStillPropagatesFactoryAndFixtureFailures() throws Exception {
+        Connection connection = mock(Connection.class);
+        JdbcTestExtension.Fixtures fixtures = mock(JdbcTestExtension.Fixtures.class);
+        Integer[] elements = {10, 20, 30};
+        var original = new SQLException("native type rejected", "22000", -3301);
+        when(connection.createArrayOf("quoted type", elements)).thenThrow(original);
+        org.junit.jupiter.api.Assertions.assertSame(original, assertThrows(SQLException.class,
+            () -> AdvancedTypeTest.bindingArray(connection, fixtures, elements, true, "quoted type")));
+        var missing = new com.jdbctest.extension.ExecutionPrerequisiteException("missing type", null);
+        doThrow(missing).when(fixtures).prepare();
+        org.junit.jupiter.api.Assertions.assertSame(missing,
+            assertThrows(com.jdbctest.extension.ExecutionPrerequisiteException.class,
+                () -> AdvancedTypeTest.bindingArray(connection, fixtures, elements, true, "quoted type")));
     }
 
     @Test
@@ -86,7 +120,7 @@ class ArrayContractTest {
         Connection connection = mock(Connection.class);
         when(connection.createArrayOf(eq("INTEGER"), any(Object[].class)))
             .thenThrow(new SQLException("invalid element type", "42704"));
-        assertThrows(SQLException.class, () -> new AdvancedTypeTest().testSetArray(connection,
-            mock(JdbcTestExtension.Fixtures.class)));
+        assertThrows(SQLException.class, () -> AdvancedTypeTest.bindingArray(connection,
+            mock(JdbcTestExtension.Fixtures.class), new Integer[] {10, 20, 30}, false, "INTEGER"));
     }
 }

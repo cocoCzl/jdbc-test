@@ -277,27 +277,56 @@ final class WorkerExecutionEvidence implements TestExecutionListener {
     static Map<String, Object> failure(Throwable error) {
         Map<String, Object> value = new LinkedHashMap<>();
         value.put("errorType", error.getClass().getName());
-        value.put("message",
-            CredentialSanitizer.sanitize(Objects.toString(error.getMessage(), "")));
-        Throwable cause = error;
+        value.put("message", diagnosticText(error.getMessage()));
+        Throwable primary = error;
+        var primarySeen = new IdentityHashMap<Throwable, Boolean>();
+        for (int depth = 0; primary != null && depth < 10
+            && primarySeen.put(primary, true) == null; depth++, primary = primary.getCause()) {
+            if (primary instanceof SQLException sql) {
+                value.put("sqlState", diagnosticText(sql.getSQLState()));
+                value.put("vendorCode", sql.getErrorCode());
+                break;
+            }
+        }
+        var pending = new ArrayDeque<Map.Entry<String, Throwable>>();
+        var seen = new IdentityHashMap<Throwable, Boolean>();
+        pending.add(Map.entry("ROOT", error));
         List<Map<String, Object>> causes = new ArrayList<>();
-        for (int depth = 0; cause != null && depth < 10; depth++, cause = cause.getCause()) {
+        while (!pending.isEmpty() && causes.size() < 10) {
+            var branch = pending.removeFirst();
+            Throwable cause = branch.getValue();
+            if (seen.put(cause, true) != null) {
+                continue;
+            }
             Map<String, Object> detail = new LinkedHashMap<>();
+            detail.put("relation", branch.getKey());
             detail.put("errorType", cause.getClass().getName());
-            detail.put("message",
-                CredentialSanitizer.sanitize(Objects.toString(cause.getMessage(), "")));
+            detail.put("message", diagnosticText(cause.getMessage()));
             if (cause instanceof SQLException sql) {
-                detail.put("sqlState", Objects.toString(sql.getSQLState(), ""));
+                detail.put("sqlState", diagnosticText(sql.getSQLState()));
                 detail.put("vendorCode", sql.getErrorCode());
-                if (!value.containsKey("sqlState")) {
-                    value.put("sqlState", detail.get("sqlState"));
-                    value.put("vendorCode", sql.getErrorCode());
+                if (sql.getNextException() != null && pending.size() < 16) {
+                    pending.addLast(Map.entry("NEXT_EXCEPTION", sql.getNextException()));
                 }
+            }
+            if (cause.getCause() != null && pending.size() < 16) {
+                pending.addLast(Map.entry("CAUSE", cause.getCause()));
+            }
+            for (Throwable suppressed : cause.getSuppressed()) {
+                if (pending.size() >= 16) {
+                    break;
+                }
+                pending.addLast(Map.entry("SUPPRESSED", suppressed));
             }
             causes.add(detail);
         }
         value.put("causes", causes);
         return value;
+    }
+
+    private static String diagnosticText(String value) {
+        String safe = CredentialSanitizer.sanitize(value);
+        return safe.substring(0, Math.min(safe.length(), 2000));
     }
 
     static Map<String, Object> fields(TestCaseDescriptor item) {

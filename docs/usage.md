@@ -182,6 +182,99 @@ true for this run. No failed behavior was hidden by changing capability flags.
 | `updatable_result_set` | `true` | No direct updatable ResultSet contract coverage in this catalog; unverified |
 | `scrollable_result_set` | `true` | 2 tagged fetch-window cases pass; absolute(0) fails independently |
 
+### Attribution of the recorded FULL failures
+
+The following independent reproductions and manual review supplement the 254/270 FULL above;
+**they do not replace its failures, classifications or counts, and are not a new FULL**.
+Both CORE failures (`connection.enable_auto_commit_commits_pending_work`, `result_set.absolute`)
+are included. The boundary remains DM DBMS 8.1.3.162, driver 8.1.3.62, Java 21.
+A separate connection observed both public driver configuration and effective connection
+`compatibleMode=0`, evidence not captured in the original FULL. The live DM guide describes
+`autoCommitSpecCompliant`, but this JAR's public Configuration collection has no such entry;
+its documented default cannot be assumed for this patch or repaired by adding an unknown property.
+
+“Violation” and “not evaluated” below are the **original automated classifications**. Manual API
+attribution does not rewrite them.
+
+| Case ID | Test method | Expected behavior and independent observation | Attribution / missing evidence |
+|---|---|---|---|
+| `connection.enable_auto_commit_commits_pending_work` | `TransactionBehaviorTest.testEnableAutoCommitCommitsPendingWork` | Switching to true should commit immediately; flag becomes true but observer sees the row only after another writer SELECT | Violation; delayed-commit driver concern, patch-matched transaction documentation needed |
+| `statement.actual_query_timeout` | `ExecutionControlTest.testActualQueryTimeout` | One-second timeout should bound execute; five-second SLEEP completes normally in 5007 ms | Violation; execution-control concern for this SQL shape; patch/package interruptibility details needed |
+| `statement.cancel_running_statement` | `ExecutionControlTest.testCancelRunningStatement` | Suite expects interruption; cancel invoked at 508 ms returns normally but execute completes at 5013 ms | Violation; JDBC cancel is conditional on DBMS/driver abort support; that support for this package is unconfirmed |
+| `datasource.get_parent_logger` | `DataSourceTest.testGetParentLogger` | JDBC 4.1 returns a Logger or explicit optional unsupported exception; driver returns null | Historical violation; current attribution not evaluated: API introduced in Java 7/JDBC 4.1, while this driver advertises 4.0. Null is not a conforming 4.1 return, but patch-specific 4.1 applicability/support remains unconfirmed |
+| `datasource.pooled_replacement_invalidates_previous_handle` | `PooledConnectionBehaviorTest.testPooledReplacementInvalidatesPreviousHandle` | New logical handle closes the old one; driver returns the same proxy and old handle still queries | Violation; driver handle-lifetime concern, JDBC specification §11.4 supports the assertion |
+| `blob_clob.blob_stream_round_trip` | `BlobObjectTest.testBlobStreamRoundTrip` | Read 307200 bytes; readAllBytes returns only 16384 with more data still readable | Violation; DmdbInputStream returns -1 for zero-length read (required 0); getBytes/chunked reads are complete, not assertion replacements |
+| `callable_statement.procedure_parameter_metadata` | `ProcedureBehaviorTest.testProcedureParameterMetadata` | Parameter ordinals should be 1/2/3; actual 0/1/2 with correct IN/INOUT/OUT modes | Violation; actual outputs 17/14 are correct; metadata ordinal concern, never normalize by adding one |
+| `advanced_type.empty_array` | `AdvancedTypeTest.testEmptyArray` | Non-NULL empty collection should materialize an empty Java array; non-null wrapper/wasNull=false but getArray returns null | Violation; driver materialization concern; zero rows from array ResultSet do not replace the Java-array contract |
+| `advanced_type.set_array` | `AdvancedTypeTest.testSetArray` | Original createArrayOf(INTEGER) fails with 22000/-3301 before setArray | Historically not evaluated; setter fixture corrected and formal CUSTOM passes binding, one-row insert and exact [10,20,30] readback. Built-in factory/metadata naming discrepancy remains unresolved |
+| `prepared_statement.batch_keys_by_column_index` | `BatchBehaviorTest.testBatchKeysByColumnIndex` | Requested ID keys; batch succeeds but returns NAME/VARCHAR, then getLong raises HY096/6007 | Not evaluated; returned-column concern located; ID-by-name control succeeds; internal index basis remains unconfirmed, no replacement with names or index 0 |
+| `result_set.absolute` | `ResultSetTest.testAbsolute` | Actual type 1004 and scroll support true; only absolute(0) raises HY107/6020 | Not evaluated; literal-row query also reproduces, excluding fixture/forward-only; standard requires false and beforeFirst |
+| `jdbc_type.array_type_metadata` | `JdbcTypeCoverageTest.testArrayTypeMetadata` | Suite requires type 2003 in getTypeInfo; absent | Not evaluated/SUITE; type presence is extra, not a requirement that all databases support ARRAY |
+| `jdbc_type.ref_type_metadata` | `JdbcTypeCoverageTest.testRefTypeMetadata` | Suite requires type 2006; absent | Not evaluated/SUITE; does not disprove all REF operations |
+| `jdbc_type.struct_type_metadata` | `JdbcTypeCoverageTest.testStructTypeMetadata` | Suite requires type 2002; absent | Not evaluated/SUITE; does not disprove all Struct operations |
+| `jdbc_type.row_id_type_metadata` | `JdbcTypeCoverageTest.testRowIdTypeMetadata` | Suite requires type -8; absent | Not evaluated/SUITE; independent ROWID operation passes do not satisfy type metadata presence |
+| `statement.result_sequence` | `MultipleResultsTest.testResultSequence` | Results 11/22, stored value 1 and traversal termination pass, but updateCounts=[] | Not evaluated/SUITE; exposing the internal one-row update is extra; JDBC does not require every internal statement's count |
+
+The three ordinary SQL exceptions remain automatically not evaluated because SQLState alone
+cannot establish a vendor violation. Failed API, cursor type, type names and key-column metadata
+are now recorded independently; patch-matched vendor documentation/confirmation is still missing.
+The eight assertion failures also do not automatically establish confirmed vendor defects.
+The writable reproductions created only five journaled objects, all deleted; metadata for 912
+pre-existing objects matched exactly. Read-only probes created no test objects. No FULL was rerun,
+capability changed, assertion relaxed or case skipped.
+
+Project fixes: prepare DM's native collection before the standard factory and pass its exact
+quoted, qualified fixture name for the setter scenario; observe the cancel thread regardless of
+execute outcome; preserve the original primary error and phase with cancel/shutdown failures as
+supplemental evidence. Both thread waits are limited to five seconds. Worker diagnostics traverse
+cause/nextException/suppressed with identity deduplication, at most 10 records, a queue of at most
+16 entries and at most 2000 characters per message/SQLState after redaction. Supplemental branches
+do not supply primary SQLState. Correct only getParentLogger's API introduction metadata to 4.1;
+retain the driver's observed JDBC 4.0 and optional-unsupported policy, without version-based skipping.
+Clarify the Chinese suite-requirement terminology. UI, JSON reports and
+regression comparisons retain FAILED, NOT_EVALUATED and SUITE: five is a subset of eight, not
+an additional count, JDBC violation or pass. Existing generic regression tests and added bilingual
+five-case presentation tests verify the boundary.
+
+The formal setter retest is separate run `f816ac85-c189-47c9-90df-4a799fc01d89`:
+CUSTOM 1 selected/1 passed, no failures/skips/aborts, cleanup SUCCESS 3/3 (two types and one table),
+912 existing objects unchanged. The original path used literal `INTEGER` before deferred preparation;
+no generated identifier lost its schema, quotes or case. The earlier independent program instead
+created one VARRAY and a simple id/array table, used an exact quoted collection name, and did not
+read back the inserted value. The formal path uses both existing collection types and the original
+identity/name table, data and assertions; neither path changes autocommit or transaction mode.
+Both still use createArrayOf and setArray. PostgreSQL/other adapters retain the factory-before-fixture
+path. This is a setter-fixture repair, not a finding that the collection name is a conforming SQL
+element type: Connection's Java 21 typeName contract describes the element SQL type and refers to
+Array.getBaseTypeName. INTEGER failure and the driver's unquoted collection base name remain
+separate evidence requiring patch-matched documentation; the successful setter does not resolve them.
+
+Current attribution therefore differs from the historical labels: set_array has a repaired and
+formally retested fixture; get_parent_logger remains unassessed for 4.1 applicability; cancel still
+needs package/driver abort-support evidence. Other driver behavior concerns, including literal-query
+absolute(0) and wrong generated-key columns, remain concerns rather than confirmed vendor defects.
+The five suite requirements are unchanged. No other case was formally rerun in this finish check;
+manual observations are not substituted for formal outcomes or a new aggregate pass rate.
+
+Reviewed local evidence is retained under ignored `.local/qa/dm-attribution/`: `INDEX.json` records
+SHA-256 hashes; `attribution.json` separates each original exception/classification, current attribution,
+project repair, formal retest and remaining uncertainty; `formal-report.json` and
+`formal-object-ledger.yaml` retain the new result/ownership evidence. `previous/` preserves earlier
+reproductions byte-for-byte; `acceptance/` preserves historical reports; `REPRODUCTION.md` describes
+the environment-only, dedicated-scope invocation. These local materials are not distributed with Git.
+Only these reviewed conclusions and official source references belong in formal documentation.
+
+Contract sources: Java 21 [Connection](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/Connection.html),
+[Statement](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/Statement.html),
+[ResultSet](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/ResultSet.html),
+[DatabaseMetaData](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/DatabaseMetaData.html),
+[Array](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/Array.html),
+[CommonDataSource](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/javax/sql/CommonDataSource.html),
+[InputStream](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/io/InputStream.html), and
+[JDBC 4.3 specification §11.4](https://download.oracle.com/otn-pub/jcp/jdbc-4_3-mrel3-spec/jdbc4.3-fr-spec.pdf).
+The live DM guide is not a patch-matched DBMS/driver manual; full release notes and vendor attribution
+for this combination remain unavailable. DM stays candidate; other versions and modes are not covered.
+
 ## Create and execute a task
 
 In **New Run**, choose a saved connection, set an optional editable task name, review the current

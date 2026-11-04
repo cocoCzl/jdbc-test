@@ -67,9 +67,9 @@ class AdvancedTypeTest {
         checks = "SELECT int_array, text_array FROM {{array_test}} WHERE 1 = 0", deferred = true)
     void testSetArray(Connection conn, JdbcTestExtension.Fixtures fixtures) throws SQLException {
         Integer[] testArray = {10, 20, 30};
-        Array sqlArray = JdbcContracts.optional("Connection.createArrayOf",
-            () -> conn.createArrayOf("INTEGER", testArray));
-        fixtures.prepare();
+        boolean namedCollection = com.jdbctest.config.ConfigLoader.load().db.isDialect("dm");
+        Array sqlArray = bindingArray(conn, fixtures, testArray, namedCollection,
+            namedCollection ? JdbcContext.sql("{{integer_array_type}}") : "INTEGER");
 
         try (PreparedStatement ps = conn.prepareStatement(
             JdbcContext.sql("INSERT INTO {{array_test}} (name, int_array) VALUES (?, ?)"))) {
@@ -189,6 +189,22 @@ class AdvancedTypeTest {
             assertNotNull(values);
             assertEquals(0, values.length, "空数组长度应为 0");
         }
+    }
+
+    static Array bindingArray(Connection connection, JdbcTestExtension.Fixtures fixtures,
+        Integer[] elements, boolean namedCollection, String typeName) throws SQLException {
+        // DM's native VARRAY must exist before the standard factory can describe it. Use the
+        // exact quoted fixture name, not an unquoted name parsed from driver metadata. This
+        // setter fixture does not establish conformance of createArrayOf("INTEGER", ...).
+        if (namedCollection) {
+            fixtures.prepare();
+        }
+        Array array = JdbcContracts.optional("Connection.createArrayOf",
+            () -> connection.createArrayOf(typeName, elements));
+        if (!namedCollection) {
+            fixtures.prepare();
+        }
+        return array;
     }
 
     static void observeGetterThenPrepare(Connection connection, JdbcTestExtension.Fixtures fixtures,

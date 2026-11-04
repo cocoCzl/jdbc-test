@@ -162,6 +162,83 @@ Provider 必须是公共类、匹配接口并提供公共无参构造器；缺�
 | `updatable_result_set` | `true` | 当前目录没有直接的可更新 ResultSet 契约覆盖，未验证 |
 | `scrollable_result_set` | `true` | 2 个关联滚动窗口用例通过；absolute(0) 另有失败 |
 
+### 已记录 FULL 的逐项归因
+
+以下是对上述 254/270 FULL 的**独立复现与人工审阅**，不替换原始失败、分类或统计，
+也不是新一轮 FULL。CORE 的两项失败 `connection.enable_auto_commit_commits_pending_work` 和
+`result_set.absolute` 都包含在下面。范围仍为 DM DBMS 8.1.3.162、驱动 8.1.3.62、Java 21。
+独立连接的公开驱动配置及连接字段均观察到 `compatibleMode=0`；这补充了原 FULL 未采集的证据。
+当前在线达梦指南描述 `autoCommitSpecCompliant`，但该 JAR 的公开 Configuration 集合未提供该参数；
+不能把在线手册的默认值直接套用到本补丁，也不能假设传入未知属性就修复了事务行为。
+
+表中的“契约失败”“未评估”均指**历史自动分类**；人工定位到具体 API 不会回写它。
+
+| Case ID | 测试方法 | 预期与独立观察 | 归因及仍缺证据 |
+|---|---|---|---|
+| `connection.enable_auto_commit_commits_pending_work` | `TransactionBehaviorTest.testEnableAutoCommitCommitsPendingWork` | 切换 true 应立即提交；实际标志 true、独立连接不可见，写连接再执行 SELECT 后才可见 | 契约失败；延迟提交的驱动疑点，需对应补丁事务说明 |
+| `statement.actual_query_timeout` | `ExecutionControlTest.testActualQueryTimeout` | 1 秒超时应约束 execute；5 秒 SLEEP 正常完成（5007 ms） | 契约失败；该 SQL 形态的执行控制疑点，需系统包可中断性及补丁说明 |
+| `statement.cancel_running_statement` | `ExecutionControlTest.testCancelRunningStatement` | 原测试要求中断；508 ms 时调用 cancel 并正常返回、执行仍至 5013 ms | 契约失败；cancel 契约以 DBMS/驱动支持中断为条件，尚缺 SLEEP 的对应版本支持证据，不宣称通用违规 |
+| `datasource.get_parent_logger` | `DataSourceTest.testGetParentLogger` | JDBC 4.1 应返回 Logger 或明确可选不支持；实际返回 null | 历史契约失败；当前归因未评估：该 API 始于 Java 7/JDBC 4.1，驱动仍宣称 4.0。null 不符合 4.1 返回要求，但本补丁的 4.1 适用性/支持承诺未确认 |
+| `datasource.pooled_replacement_invalidates_previous_handle` | `PooledConnectionBehaviorTest.testPooledReplacementInvalidatesPreviousHandle` | 新逻辑句柄应关闭旧句柄；实际两次返回同一代理、旧句柄未关闭且仍能查询 | 契约失败；连接池句柄驱动疑点，规范依据为 JDBC §11.4 |
+| `blob_clob.blob_stream_round_trip` | `BlobObjectTest.testBlobStreamRoundTrip` | 完整读取 307200 字节；readAllBytes 仅 16384，随后仍可读取 | 契约失败；已定位 DmdbInputStream 的零长度 read 错返 -1（应为 0）；getBytes/小块读取完整，不能替换原断言绕过 |
+| `callable_statement.procedure_parameter_metadata` | `ProcedureBehaviorTest.testProcedureParameterMetadata` | 参数序号应为 1/2/3；实际为 0/1/2，方向仍为 IN/INOUT/OUT | 契约失败；实际过程输出 17/14 正确，疑点是元数据序号，不能自动 +1 |
+| `advanced_type.empty_array` | `AdvancedTypeTest.testEmptyArray` | 非 NULL 空集合应物化为空 Java 数组；包装 Array 非空、wasNull=false，但 getArray 返回 null | 契约失败；驱动物化疑点；数组 ResultSet 为零行并不能代替 Java 数组契约 |
+| `advanced_type.set_array` | `AdvancedTypeTest.testSetArray` | 原调用在 createArrayOf(INTEGER) 即报 22000/-3301，未到 setArray | 历史未评估；setter fixture 已修复，正式 CUSTOM 通过绑定、写入 1 行及精确读回 [10,20,30]；内置类型工厂/元数据命名疑点仍保留 |
+| `prepared_statement.batch_keys_by_column_index` | `BatchBehaviorTest.testBatchKeysByColumnIndex` | 指定 ID 应返回其键；批处理成功却返回 NAME/VARCHAR，getLong 才报 HY096/6007 | 未评估；已定位返回列疑点，按名称 ID 对照正确；索引基准的内部原因仍需确认，不改成列名或索引 0 绕过 |
+| `result_set.absolute` | `ResultSetTest.testAbsolute` | actual type=1004 且声明支持滚动；仅 absolute(0) 报 HY107/6020 | 未评估；无表的字面量查询也重现，排除 fixture 与 forward-only；标准要求返回 false 并移至 beforeFirst |
+| `jdbc_type.array_type_metadata` | `JdbcTypeCoverageTest.testArrayTypeMetadata` | 套件要求 getTypeInfo 包含 2003；实际缺失 | 未评估/SUITE；类型存在性是额外要求，不是所有数据库必须支持 ARRAY |
+| `jdbc_type.ref_type_metadata` | `JdbcTypeCoverageTest.testRefTypeMetadata` | 套件要求包含 2006；实际缺失 | 未评估/SUITE；不能据此否定全部 REF 行为 |
+| `jdbc_type.struct_type_metadata` | `JdbcTypeCoverageTest.testStructTypeMetadata` | 套件要求包含 2002；实际缺失 | 未评估/SUITE；不能据此否定全部 Struct 行为 |
+| `jdbc_type.row_id_type_metadata` | `JdbcTypeCoverageTest.testRowIdTypeMetadata` | 套件要求包含 -8；实际缺失 | 未评估/SUITE；独立 ROWID 行为用例通过不改变类型元数据要求 |
+| `statement.result_sequence` | `MultipleResultsTest.testResultSequence` | 两个结果 11/22、存储值 1、遍历终止均通过，但 updateCounts=[] | 未评估/SUITE；额外要求过程内部更新计数 1 可见，JDBC 不保证每条内部语句暴露计数 |
+
+上述三项普通 SQL 异常的自动未评估原因是：分类器不能仅凭 SQLState 断言厂商违约。
+现已补齐失败 API、游标类型、类型名及返回键列元数据；仍缺对应补丁的厂商说明/确认，
+不通过全局 SQLState 规则强行改变归因。其他八项断言也不自动等于已确认厂商缺陷。
+本次独立可写复现仅创建五个 journal 对象，全部确认删除；912 个既有对象元数据前后一致。
+只读复现没有创建测试对象；未重跑 FULL，也未修改 capability、放宽断言或跳过用例。
+
+项目修复：达梦 setter 用例先准备原生集合，再向标准工厂传入精确引用、限定的 fixture 类型名；
+无论 execute 是否抛错都读取取消线程结果，保留原始主异常与 phase，取消/线程退出失败作为附加证据。
+两处线程等待上限分别为 5 秒。Worker 遍历 cause、nextException、suppressed，以对象身份去重，
+最多输出 10 条、队列最多 16 项，消息/SQLState 先脱敏再限制为 2000 字符；附加分支不提供主 SQLState。
+getParentLogger 只修正 API 引入版本为 4.1，保留驱动实际 JDBC 4.0 和可选不支持策略，不按版本跳过。
+中文把 suite requirement 明确称为“套件要求”。UI、JSON 报告和回归比较继续保留 FAILED、
+NOT_EVALUATED 与 SUITE 标记；5 是 8 个未评估中的子集，不能重复相加，也不算 JDBC 违规或通过。
+已有通用回归及新增五项双语呈现测试核对这一边界。
+
+正式 setter 定向复测单独记录为 `f816ac85-c189-47c9-90df-4a799fc01d89`：CUSTOM 选中 1、通过 1，
+无失败/跳过/中止；cleanup SUCCESS 3/3（两个类型、一个表），912 个既有对象元数据一致。
+原正式路径在 deferred fixture 之前传入字面量 `INTEGER`，不是名称生成器丢失 Schema、引号或大小写。
+此前独立程序使用一个 VARRAY、简单 id/array 表和精确引用集合名，未读回新写入值；正式路径仍使用
+既有两个集合类型、identity/name 表、数据和全部断言，两条路径都未改变自动提交或事务模式。
+仍调用 createArrayOf 与 setArray，其他适配器保留工厂先于 fixture 的路径。
+这是 setter fixture 修复，不能证明集合名符合 SQL 元素类型语义：Java 21 Connection 的 typeName
+契约描述元素 SQL 类型并引用 Array.getBaseTypeName；INTEGER 失败及驱动返回未引用集合名仍是
+独立疑点，需要匹配补丁的资料，不能用 setter 通过消除这些证据。
+
+当前归因与历史标签分开：set_array 的 fixture 已修复并正式复测；get_parent_logger 的 4.1 适用性
+仍未评估；cancel 仍缺包/驱动中断支持证据。其余驱动行为疑点，包括纯查询 absolute(0) 和错误键列，
+仍不是已确认的厂商缺陷；五项套件要求不变。本次收尾没有正式复跑其他用例，人工观察不替代正式结果，
+也不形成新的汇总通过率。
+
+精简证据与完整本地材料保存在被忽略的 `.local/qa/dm-attribution/`：`INDEX.json` 记录 SHA-256；
+`attribution.json` 逐项分开原始异常/分类、当前归因、项目修复、正式复测与剩余不确定性；
+`formal-report.json`、`formal-object-ledger.yaml` 保留新结果与对象登记；`previous/` 原样保留此前复现；
+`acceptance/` 保留历史报告；`REPRODUCTION.md` 描述只从私密环境读取配置、限制专用作用域的复现方法。
+这些本地材料不随 Git 分发，正式文档只保留已审阅结论及官方规范引用。
+
+契约依据为 Java 21 的 [Connection](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/Connection.html)、
+[Statement](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/Statement.html)、
+[ResultSet](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/ResultSet.html)、
+[DatabaseMetaData](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/DatabaseMetaData.html)、
+[Array](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/Array.html)、
+[CommonDataSource](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/javax/sql/CommonDataSource.html)、
+[InputStream](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/io/InputStream.html) 和
+[JDBC 4.3 规范 §11.4](https://download.oracle.com/otn-pub/jcp/jdbc-4_3-mrel3-spec/jdbc4.3-fr-spec.pdf)。
+当前在线 DM 指南不是本次 DBMS/驱动补丁的固定版本手册；尚未取得该组合的完整发行说明及厂商归因。
+达梦继续保持 candidate，以上结果不推广到其他版本或兼容模式。
+
 ## 创建与执行任务
 
 在**新建任务**选择已保存连接，设置可编辑任务名称，查看当前目录并选择用例。

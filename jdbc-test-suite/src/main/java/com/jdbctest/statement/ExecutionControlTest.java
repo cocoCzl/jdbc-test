@@ -67,9 +67,10 @@ class ExecutionControlTest {
     @RequiresFeature("statement_cancel")
     @Timeout(15)
     @DisplayName("另一个线程取消慢语句并释放取消线程")
-    void testCancelRunningStatement(Connection connection) throws Exception {
+    void testCancelRunningStatement(Connection connection, TestReporter reporter) throws Exception {
         ScheduledExecutorService canceller = Executors.newSingleThreadScheduledExecutor(
             Thread.ofPlatform().daemon(true).name("jdbc-scenario-cancel").factory());
+        Throwable primary = null;
         try (Statement sql = connection.createStatement()) {
             sql.execute(sleepSql(0));
             ScheduledFuture<Void> cancellation = canceller.schedule(() -> {
@@ -78,9 +79,8 @@ class ExecutionControlTest {
             }, 500, TimeUnit.MILLISECONDS);
             try {
                 long started = System.nanoTime();
-                SQLException error = assertThrows(SQLException.class,
-                    () -> sql.execute(sleepSql(5)));
-                cancellation.get(5, TimeUnit.SECONDS);
+                SQLException error = executeAndObserveCancellation(sql, sleepSql(5), cancellation,
+                    reporter);
                 long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
                 assertTrue(elapsed >= 300 && elapsed < 5000,
                     "Cancellation must interrupt ongoing work");
@@ -91,10 +91,74 @@ class ExecutionControlTest {
             } finally {
                 cancellation.cancel(false);
             }
+        } catch (Exception | Error failure) {
+            primary = failure;
+            throw failure;
         } finally {
-            canceller.shutdownNow();
-            assertTrue(canceller.awaitTermination(5, TimeUnit.SECONDS), "Cancel thread must exit");
+            stopCanceller(canceller, primary);
         }
         assertConnectionUsable(connection);
+    }
+
+    static void stopCanceller(ExecutorService canceller, Throwable primary) throws Exception {
+        try {
+            canceller.shutdownNow();
+            assertTrue(canceller.awaitTermination(5, TimeUnit.SECONDS), "Cancel thread must exit");
+        } catch (Exception | AssertionError failure) {
+            if (failure instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            if (primary == null) {
+                throw failure;
+            }
+            primary.addSuppressed(failure);
+        }
+    }
+
+    static SQLException executeAndObserveCancellation(Statement sql, String command,
+        Future<?> cancellation, TestReporter reporter) throws Exception {
+        Throwable executionFailure = null;
+        long started = System.nanoTime();
+        try {
+            sql.execute(command);
+        } catch (SQLException | RuntimeException | Error failure) {
+            executionFailure = failure;
+        } finally {
+            reporter.publishEntry("jdbc.cancel.executionElapsedMs", Long.toString(
+                TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)));
+        }
+        try {
+            cancellation.get(5, TimeUnit.SECONDS);
+            reporter.publishEntry("jdbc.cancel.callOutcome", "RETURNED");
+        } catch (Exception failure) {
+            reporter.publishEntry("jdbc.cancel.callOutcome", "FAILED");
+            if (failure instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            // Keep both outcomes; a failed cancel call must never become a successful test.
+            if (executionFailure != null) {
+                executionFailure.addSuppressed(failure);
+                if (executionFailure instanceof SQLException original) {
+                    throw original;
+                }
+                if (executionFailure instanceof RuntimeException original) {
+                    throw original;
+                }
+                throw (Error)executionFailure;
+            }
+            throw failure;
+        }
+        if (executionFailure instanceof RuntimeException failure) {
+            throw failure;
+        }
+        if (executionFailure instanceof Error failure) {
+            throw failure;
+        }
+        Throwable observed = executionFailure;
+        return assertThrows(SQLException.class, () -> {
+            if (observed != null) {
+                throw observed;
+            }
+        });
     }
 }

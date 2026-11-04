@@ -1070,7 +1070,7 @@ scenarios:
   - data_source
   test_category: STANDARD_JDBC
   applicable_adapters: []
-  jdbc_version: '4.0'
+  jdbc_version: '4.1'
   execution_prerequisites:
   - provider:data_source
   unsupported_policy: OPTIONAL

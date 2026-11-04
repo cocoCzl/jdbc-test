@@ -15,6 +15,85 @@ import org.junit.platform.launcher.core.*;
 
 class WorkerExecutionEvidenceTest {
 
+    @Test
+    void failureRetainsSqlNextAndSuppressedBranchesWithCyclesAndRedaction() throws Exception {
+        var cancel = new java.sql.SQLException("cancel secret-fixture", "HY000", 77);
+        var failure = new java.util.concurrent.ExecutionException(cancel);
+        var execution = new java.sql.SQLException("execution", "HY008", 78);
+        failure.addSuppressed(execution);
+        execution.setNextException(new java.sql.SQLException("next", "08006", 79));
+        cancel.initCause(failure);
+        CredentialSanitizer.password("secret-fixture");
+        try {
+            String json = new ObjectMapper().writeValueAsString(
+                WorkerExecutionEvidence.failure(failure));
+            assertFalse(json.contains("secret-fixture"));
+            assertTrue(json.contains("SUPPRESSED"));
+            assertTrue(json.contains("NEXT_EXCEPTION"));
+            for (String state : List.of("HY000", "HY008", "08006")) {
+                assertTrue(json.contains(state));
+            }
+            var branches = (List<?>) WorkerExecutionEvidence.failure(failure).get("causes");
+            assertEquals(4, branches.size());
+        } finally {
+            CredentialSanitizer.password(null);
+        }
+    }
+
+    @Test
+    void diagnosticGraphBoundsCountsAndLengthsWithoutReplacingPrimaryOrLeakingSecrets() {
+        var primary = new java.sql.SQLException("x".repeat(1995) + "secret-fixture".repeat(1000),
+            "HY008", 78);
+        var secondary = new java.sql.SQLException("secondary", "HY000", 79);
+        primary.setNextException(secondary);
+        secondary.setNextException(primary);
+        secondary.initCause(primary);
+        primary.addSuppressed(secondary);
+        for (int index = 0; index < 100; index++) {
+            primary.addSuppressed(new IllegalStateException("y".repeat(5000)));
+        }
+        CredentialSanitizer.password("secret-fixture");
+        try {
+            var evidence = WorkerExecutionEvidence.failure(primary);
+            assertEquals("HY008", evidence.get("sqlState"));
+            assertEquals(78, evidence.get("vendorCode"));
+            assertEquals(primary.getClass().getName(), evidence.get("errorType"));
+            assertTrue(((String)evidence.get("message")).length() <= 2000);
+            assertFalse(evidence.toString().contains("secret-fixture"));
+            var branches = (List<?>)evidence.get("causes");
+            assertEquals(10, branches.size());
+            assertEquals(1, branches.stream().filter(row ->
+                "secondary".equals(((Map<?, ?>)row).get("message"))).count());
+            for (Object row : branches) {
+                assertTrue(((String)((Map<?, ?>)row).get("message")).length() <= 2000);
+            }
+            var assertion = new AssertionError("primary assertion");
+            assertion.addSuppressed(secondary);
+            var assertionEvidence = WorkerExecutionEvidence.failure(assertion);
+            assertFalse(assertionEvidence.containsKey("sqlState"));
+            assertEquals("NOT_EVALUATED", WorkerExecutionEvidence.conclusion(
+                TestExecutionResult.Status.FAILED, assertion, "PREPARATION").get("conclusion"));
+            assertEquals("CONTRACT_VIOLATION", WorkerExecutionEvidence.conclusion(
+                TestExecutionResult.Status.FAILED, assertion, "EXECUTION").get("conclusion"));
+        } finally {
+            CredentialSanitizer.password(null);
+        }
+    }
+
+    @Test
+    void supplementalExceptionsCannotSupplyPrimarySqlStateOrChangePhaseClassification() {
+        var original = new java.sql.SQLException("primary", "HY008", 78);
+        original.addSuppressed(new ExecutionPrerequisiteException("secondary prerequisite", null));
+        original.addSuppressed(new java.util.concurrent.TimeoutException("secondary timeout"));
+        var evidence = WorkerExecutionEvidence.failure(original);
+        assertEquals("HY008", evidence.get("sqlState"));
+        assertEquals(78, evidence.get("vendorCode"));
+        assertEquals("NOT_EVALUATED", WorkerExecutionEvidence.conclusion(
+            TestExecutionResult.Status.FAILED, original, "EXECUTION").get("conclusion"));
+        var longState = new java.sql.SQLException("primary", "z".repeat(5000));
+        assertEquals(2000, ((String)WorkerExecutionEvidence.failure(longState).get("sqlState")).length());
+    }
+
     static class BrokenSetup {
 
         @BeforeAll
