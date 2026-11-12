@@ -23,7 +23,9 @@ class AdapterControllerTest {
     void dmPublishesItsOwnIdentityScopeAndHistoricalDeclarations() {
         var response = new AdapterService().list().stream()
             .filter(adapter -> "dm".equals(adapter.id())).findFirst().orElseThrow();
-        assertEquals("CANDIDATE", response.status());
+        assertEquals("OFFICIAL", response.status());
+        assertEquals(List.of(new AdapterResponse.ValidatedCombination("8.1.3.162", "8.1.3.62")),
+            response.validatedCombinations());
         assertEquals("dm", response.dialect());
         assertEquals("schema", response.namespaceSelection());
         assertFalse(response.requiresDatabase());
