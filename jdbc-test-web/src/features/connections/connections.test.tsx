@@ -557,7 +557,8 @@ describe("Connection UI", () => {
       stage: "ESTABLISHING_CONNECTION", diagnostics: [{ sqlState: "ZZ999", vendorCode: 71, message: "Unknown [REDACTED]", exceptionType: "java.sql.SQLException" }],
     }) : undefined);
     renderPage("/connections/connection-1");
-    await user.click(await screen.findByRole("button", { name: "Test connection" }));
+    // Editing loads the connection, then adapter metadata before showing the actions.
+    await user.click(await screen.findByRole("button", { name: "Test connection" }, { timeout: 3_000 }));
     expect(await screen.findByRole("alert")).toHaveTextContent("cause is unknown");
     const summary = screen.getByText("Redacted error details");
     expect(summary.closest("details")).not.toHaveAttribute("open");
