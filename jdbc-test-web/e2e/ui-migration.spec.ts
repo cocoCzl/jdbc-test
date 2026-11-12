@@ -42,6 +42,8 @@ test("TEST FIXTURE ONLY: menus, long text, URL copy and bilingual form/wizard st
   const switchLanguage = async (locale:"en"|"zh-CN") => {
     await page.getByRole("button",{name:/^(Language|界面语言)$/}).click();
     await page.getByRole("menuitemradio",{name:locale === "en" ? "English" : "简体中文"}).click();
+    await expect(page.locator("html")).toHaveAttribute("lang", locale);
+    await expect(page.getByRole("menuitemradio")).toHaveCount(0);
   };
   const noOverflow = async () => expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   for(const width of [1440,390]) {
@@ -62,7 +64,9 @@ test("TEST FIXTURE ONLY: menus, long text, URL copy and bilingual form/wizard st
     const copied=await page.evaluate(()=>navigator.clipboard.readText());
     expect(copied).toBe(oracle.replace("fixture-secret","[REDACTED]")); await expect(radio).not.toBeChecked(); await expect(next).toBeDisabled();
     const view=page.getByRole("button",{name:"View URL"}); await view.click(); await expect(page.getByRole("dialog")).toContainText(copied); await page.keyboard.press("Escape"); await expect(view).toBeFocused();
-    await radio.check(); await next.click(); await switchLanguage("zh-CN"); await expect(page.getByRole("heading",{name:"选择已验证的驱动"})).toBeVisible();
+    await radio.check(); await next.click();
+    await expect(page.getByRole("heading",{name:"Choose a validated driver"})).toBeVisible();
+    await switchLanguage("zh-CN"); await expect(page.getByRole("heading",{name:"选择已验证的驱动"})).toBeVisible();
     await switchLanguage("en"); await page.goto("/connections/new");
     await page.getByLabel("Name",{exact:true}).fill("Unsubmitted fixture input");
     const adapter=page.getByRole("combobox",{name:"Database type",exact:true}); await adapter.click();
