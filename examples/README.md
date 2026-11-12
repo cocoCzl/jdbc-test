@@ -2,6 +2,8 @@
 
 English | [简体中文](README.zh-CN.md)
 
+[English home](../README.en.md) · [Documentation](../docs/README.en.md)
+
 Web users upload drivers, configure connections and choose built-in tests; no adapter or SQL packages.
 Run CLI examples from the source root against dedicated test databases only. Keep generated config,
 credentials and drivers outside Git.

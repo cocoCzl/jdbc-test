@@ -4,7 +4,6 @@ import hashlib
 import http.server
 import json
 import os
-import re
 import shlex
 import shutil
 import subprocess
@@ -19,6 +18,7 @@ from unittest.mock import patch
 
 import build_distribution
 import test_deployment_runtime
+from test_documentation import assert_document_links
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -45,6 +45,10 @@ class DistributionTest(unittest.TestCase):
         (web / "assets/app.js").write_text("fixture", encoding="utf-8")
         shutil.copytree(ROOT / "deploy", self.source / "deploy")
         shutil.copytree(ROOT / "docs", self.source / "docs")
+        # A nested local QA attachment must not become part of the document allowlist.
+        private_docs = self.source / "docs" / ".local" / "qa"
+        private_docs.mkdir(parents=True)
+        (private_docs / "acceptance-private.md").write_text("fixture-private-qa", encoding="utf-8")
         shutil.copy2(ROOT / "LICENSE", self.source / "LICENSE")
         for entry in ("jdbc-test", "jdbc-test.ps1", ".env.example"):
             shutil.copy2(ROOT / entry, self.source / entry)
@@ -61,6 +65,8 @@ class DistributionTest(unittest.TestCase):
         directory, archive, windows_archive = self.bundle()
         required = {"jdbc-test", "jdbc-test.ps1", ".env.example", "server/jdbc-test-server.jar", "worker/jdbc-test-worker.jar", "web/index.html", "web/assets/app.js", "start.sh", "start.ps1", "config/application.properties.example", "docs/deployment.md", "docs/deployment.zh-CN.md"}
         required.update({
+            "README.md", "README.en.md", "docs/README.md", "docs/README.en.md",
+            "docs/database-validation.md", "docs/database-validation.zh-CN.md",
             "docs/usage.md", "docs/usage.zh-CN.md",
             "docs/jdbc-capability-contracts.md", "docs/jdbc-capability-contracts.zh-CN.md",
         })
@@ -70,7 +76,9 @@ class DistributionTest(unittest.TestCase):
             self.assertNotIn(".env", contents)
             self.assertTrue({"init.sh", "init.ps1", "check.sh", "check.ps1"}.isdisjoint(contents))
             self.assertNotIn("config/application.properties", contents)
-            self.assertFalse(any(name.startswith("data/") for name in contents))
+            self.assertFalse(any(part in {"data", ".local", "qa", "configs", "local-drivers", "__pycache__"}
+                                 for name in contents for part in Path(name).parts))
+            self.assertFalse(any(name.endswith((".local.json", ".log", ".input")) for name in contents))
             self.assertFalse(any("acceptance-" in name or "execution-safety" in name or "dameng.md" in name for name in contents))
         with tarfile.open(archive) as bundle:
             self.assertTrue(bundle.getmember(f"{directory.name}/start.sh").mode & 0o111)
@@ -82,15 +90,10 @@ class DistributionTest(unittest.TestCase):
 
     def test_packaged_document_links_resolve_without_source_checkout(self):
         directory, _, _ = self.bundle()
-        documents = [directory / "README.md", *(directory / "docs").glob("*.md")]
-        for document in documents:
-            content = re.sub(r"```.*?```", "", document.read_text(encoding="utf-8"), flags=re.S)
-            for target in re.findall(r"\]\(([^\s)]+)", content):
-                if "://" in target or target.startswith("#"):
-                    continue
-                path = (document.parent / target.split("#", 1)[0]).resolve()
-                self.assertTrue(path.is_relative_to(directory), f"Outside bundle: {document}: {target}")
-                self.assertTrue(path.is_file(), f"Missing bundle link: {document}: {target}")
+        documents = [*directory.glob("README*.md"), *(directory / "docs").rglob("*.md")]
+        assert_document_links(self, directory, documents)
+        self.assertIn("简体中文 / [English](README.en.md)", (directory / "README.md").read_text())
+        self.assertIn("[简体中文](README.md) / English", (directory / "README.en.md").read_text())
 
     def test_tar_launcher_is_executable_without_host_execute_bits(self):
         gettarinfo = tarfile.TarFile.gettarinfo

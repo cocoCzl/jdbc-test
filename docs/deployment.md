@@ -2,8 +2,26 @@
 
 English | [简体中文](deployment.zh-CN.md)
 
+[Documentation](README.en.md) · [English home](../README.en.md)
+
+Contents: [Choose a deployment mode](#choose-mode) · [Where does configuration go?](#configuration-location) · [1. Docker + bundled PG](#docker-bundled) · [2. Docker + existing PG](#docker-external) · [3. Non-Docker deployment bundle + existing PG](#native) · [Build machine vs runtime machine](#build-bundle) · [Advanced: configuration rules and old entry compatibility](#configuration-rules) · [Stop, back up and restore](#operations) · [Troubleshooting](#troubleshooting) · [Validation limits](#validation-limits)
+
 Editing/debugging source? Use [Development → local source startup](development.md#local-source-startup), with `./jdbc-test dev`. To run the website, choose **one** of the three modes below. Native means **non-Docker deployment bundle**, not IDEA source startup. Every mode uses the unified entry; Windows uses `./jdbc-test.ps1` instead of `./jdbc-test`.
 
+<a id="choose-mode"></a>
+## Choose a deployment mode
+
+| Goal | Working directory | Prerequisites | Path |
+|---|---|---|---|
+| New Docker site and platform PG | Source root | Docker/Compose v2, download network | [Bundled PG](#docker-bundled) |
+| Docker with dedicated existing PG | Source root | Docker/Compose v2, PG reachable from containers | [External PG](#docker-external) |
+| Run a built website | Extracted bundle root | Java 21, dedicated existing PG | [Bundle](#native) |
+| Edit source | Source root | JDK 21, Node >=22.12/npm, dedicated PG | [Development](development.md#local-source-startup) |
+
+For each mode follow prepare → configure → start → stop. Backup, upgrades and troubleshooting follow below.
+Existing installations must recover original configuration, Master Key and storage before startup, rather than initialize anew.
+
+<a id="configuration-location"></a>
 ## Where does configuration go?
 
 | Mode | Actual configuration | Platform PG URL |
@@ -86,6 +104,7 @@ cp -n .env.example .env
 
 Use `jdbc:postgresql://localhost:5432/jdbc_test` if PG is on the runtime host; replace actual host/port/database/user. This is **the extracted bundle's `.env`**, not the source file. The entry protects the local config, authenticates PG read-only, checks new-install state, and automatically saves an independent Key in the same file only for a new empty platform. It then checks artifacts/port, starts Server, waits for health/Catalog, and serves the production page. Formal startup migrates the platform DB. Default application files: bundle **`data/`**. Existing data requires its original Key; stop never deletes config/PG/data.
 
+<a id="windows"></a>
 ### Windows commands, grouped alternatives
 
 Run these in the corresponding source/bundle-root **PowerShell** terminal; choose only your mode, not every line:
@@ -135,6 +154,18 @@ The new `.env` format is **literal UTF-8 assignments**:
 
 Never `source`/`eval` `.env` or Java `.properties`; they are not Shell scripts and have different rules. Examples contain empty secrets and are not a ready installation. Configuration and data are owner-protected, Git/context/archive exclusions keep secrets out of releases. The Key is generated only at runtime after empty-state checks pass, never baked into an image. Keep `.env` and data/PG backups private. Do not share actual `.env`, environment dumps, `docker inspect` or expanded Compose config.
 
+<a id="worker-limits"></a>
+### Worker limits and transport timeout
+
+Short Workers (probes, driver validation, catalog and pre-run handshake) share independent admission:
+`JDBC_TEST_MAX_SHORT_WORKERS` defaults to 4, `JDBC_TEST_MAX_PENDING_SHORT_WORKERS` to 8, and
+`JDBC_TEST_SHORT_WORKER_WAIT` to `1s`. Saturation returns retryable HTTP 503 / `WORKER_BUSY`.
+Long-running test processes use the existing run dispatcher; handshakes do not nest short Worker leases.
+
+The embedded Tomcat socket write timeout is explicitly 30 seconds (`server.tomcat.connection-timeout`);
+keep a finite write timeout if customizing the transport. Cold catalog requests may return retryable
+`WORKER_BUSY` while the initial load is in progress.
+
 ### Existing properties/environment compatibility
 
 For existing installations only: retain bundle `config/application.properties` with `spring.datasource.url/username/password` and `jdbc-test.security.master-key`, or inject all four `SPRING_DATASOURCE_URL/USERNAME/PASSWORD`, `JDBC_TEST_MASTER_KEY` from the original protected service environment. **Run the same `./jdbc-test start`**; do not execute separate init/check/start workflows. Spring preflight validates settings and the port before startup. Properties is Java syntax, not dotenv, and is not sourced by Shell.
@@ -147,8 +178,9 @@ The unified entry supports `--project`, `--port`, `--host-pg`, `--new-install` (
 
 It always selects the requested PG mode, rejects mode/project mismatches and never rewrites the URL. Saved custom networks/Compose storage definitions must be restored/reviewed with their original project/config; the default wrapper cannot infer a moved/renamed historical deployment. `JDBC_TEST_SETUP_NETWORK` selects an existing setup network; ensure actual Server uses the same network via a reviewed Compose override. `JDBC_TEST_SETUP_IMAGE` is an advanced locally built **current-revision** image override; it is not a promised public image or a standard-build verification.
 
+<a id="backup-recovery-and-upgrades"></a>
 <a id="operations"></a>
-## Backup, recovery and upgrades
+## Stop, back up and restore
 
 Read-only preflight authenticates PG and checks new-install emptiness; it does not migrate. Formal dev/start/Compose up performs migrations. Startup checks never run target tests. Missing `.env` is not proof of new installation: selected actual Compose project/path/volumes, effective data directory and supplied PG schema are checked. Existing state with missing Key means restore **original config/Key**, not generate a replacement. Secure-random failures stop immediately. Locked, private staged atomic writes prevent partial/concurrent replacements; on a stale lock first establish no initializer/launcher is running before manual recovery. No DROP, volume deletion, password reset or privilege elevation.
 
@@ -169,19 +201,9 @@ Start once to apply Flyway migrations and verify saved connection decryption and
 Do not edit old migrations or assume an older binary can read a migrated database. Rollback requires
 the corresponding pre-upgrade database/files/config snapshot and matching old binaries.
 
-<a id="validation-limits"></a>
-## Validation limits
+<a id="upgrades"></a>
+### Upgrades and the V13–V15 maintenance window
 
-Windows host ACL/PowerShell process behavior and IDEA UI Run/Debug remain unverified.
-Standard Docker source build has no successful retained validation after a registry authentication
-request timed out. Alternate local-runtime-image checks do not establish standard source-build success.
-Target database verification is separate; see [database configuration](usage.md#database-configuration)
-and [known limitations](development.md#known-limitations).
-
-Short Workers (probes, driver validation, catalog and pre-run handshake) share independent admission:
-`JDBC_TEST_MAX_SHORT_WORKERS` defaults to 4, `JDBC_TEST_MAX_PENDING_SHORT_WORKERS` to 8, and
-`JDBC_TEST_SHORT_WORKER_WAIT` to `1s`. Saturation returns retryable HTTP 503 / `WORKER_BUSY`.
-Long-running test processes use the existing run dispatcher; handshakes do not nest short Worker leases.
 Upgrades add V13 driver validation revisions, V14 SSE sequences and V15 query projections/indexes with
 historical backfill. Back up the platform database, data directory and original Master Key before
 replacing matching Server/Worker/Web bundles.
@@ -193,6 +215,25 @@ V13/V14 remain committed. Stop all application writes, including Server/Workers 
 for the maintenance window; do not run old and new versions concurrently. After migration, switching
 back to old binaries alone is not a verified rollback: restore the matching pre-upgrade platform
 database, driver/run files, configuration and original Master Key with the old bundle.
-The embedded Tomcat socket write timeout is explicitly 30 seconds (`server.tomcat.connection-timeout`);
-keep a finite write timeout if customizing the transport. Cold catalog requests may return retryable
-`WORKER_BUSY` while the initial load is in progress.
+
+<a id="troubleshooting"></a>
+## Troubleshooting
+
+| Symptom | Check | Action |
+|---|---|---|
+| Platform PG connection fails | Actual mode's URL, database, account and network | Correct the actual `.env`; container localhost is itself, see external PG for host access |
+| Port occupied | Error address and ownership of existing services | Choose a free port or stop a service you own; never kill unrelated processes |
+| `WORKER_BUSY` / HTTP 503 | Short Worker admission and cold catalog loading | Retry later and review budgets/load; see [limits](#worker-limits) |
+| Missing driver dependencies | Loading diagnostics and required JARs | Upload a complete multi-JAR package; see [upload](usage.md#upload-driver) |
+| Scope, case or permission error | Target schema/catalog, stored name and selected privileges | Correct the dedicated scope and necessary privileges; avoid broad business-database grants |
+| Original Master Key missing or decryption fails | Original config and matching platform backup | Stop and restore the original Key; a replacement cannot decrypt existing credentials |
+| Cleanup UNKNOWN / FAILED | `cleanupEvidence` and exact ownership journal | Establish ownership before removal; do not drop whole schemas/volumes; see [cleanup](usage.md#cleanup) |
+
+<a id="validation-limits"></a>
+## Validation limits
+
+Windows host ACL/PowerShell process behavior and IDEA UI Run/Debug remain unverified.
+Standard Docker source build has no successful retained validation after a registry authentication
+request timed out. Alternate local-runtime-image checks do not establish standard source-build success.
+Target database verification is separate; see [database configuration](usage.md#database-configuration)
+and [known limitations](development.md#known-limitations).

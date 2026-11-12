@@ -2,12 +2,27 @@
 
 [English](jdbc-capability-contracts.md) | 简体中文
 
+[文档导航](README.md) · [中文首页](../README.md)
+
+目录：[执行、契约与证据分别记录](#dimensions) · [已复核元数据与可选操作](#methods) · [套件额外要求](#suite-requirements) · [准备必须保留被测语义](#preparation) · [证据、计划要求与比较](#comparison)
+
 规范依据为 **Java SE 21 / JDBC 4.3** API Javadoc 及对应 JDK `java.sql` 源码。
 本文记录已复核的判定，不代表已逐项审计目录全部断言，也不构成产品认证。
 仍需遵守用例 JDBC 基线，例如 SQLType 重载要求 JDBC4.2。
 结果阅读见[使用指南](usage.zh-CN.md#results)，未解决准备、环境和驱动问题见[已知限制](development.zh-CN.md#known-limitations)。
 
+<a id="dimensions"></a>
 ## 执行、契约与证据分别记录
+
+先按五个维度阅读，不将执行状态直接转换为 JDBC 结论：
+
+| 维度 | 阅读规则 |
+|---|---|
+| 任务执行状态 | `SUCCEEDED` 表示执行/报告处理完成，不代表全部用例通过；用例状态另行记录 |
+| JDBC 契约结论 | 按具体方法、JDBC 版本前提、实际调用和规范断言判断 |
+| 套件额外要求 | `requirementScope=SUITE` 独立于 JDBC 违规；不满足仍保留失败 |
+| 准备/环境问题 | 缺 SQL、权限、依赖或 Provider 不构成合法 unsupported |
+| 清理证据 | 独立检查 `cleanupEvidence`；UNKNOWN/缺失不能当作成功 |
 
 PASSED/FAILED/SKIPPED/ABORTED 是执行状态，JDBC 结论、调用证据和 SUITE 额外要求是独立维度。
 准备失败不是驱动缺陷，终态不证明契约已调用。元数据布尔值、适配声明和实际操作分别保留；
@@ -21,12 +36,13 @@ false 不取消标准操作，也不产生异常豁免。
 | 已复核必需方法拒绝该异常 | UNSUPPORTED_REQUIRED，例如 Connection.getAutoCommit |
 | SQL、依赖、Provider 或权限前提缺失 | 准备/环境证据，不构成合法不支持 |
 | 普通 SQLException、未限定不支持、未知执行/准备错误 | 保留错误、SQLState/厂商码/原因及 NOT_EVALUATED，除非有具体证据归因 |
-| 额外方案特性断言未满足 | FAILED / NOT_EVALUATED，requirementScope=SUITE，不等于通用 JDBC 违规 |
+| 套件额外要求断言未满足 | FAILED / NOT_EVALUATED，requirementScope=SUITE，不等于通用 JDBC 违规 |
 
 不能按 SQLState0A000、厂商异常名称/消息、能力标志或前置失败推导合法不支持。
 `contractInvoked` 是用例级证据，不统计全部下游方法。容器/准备失败保留影响范围，不伪造子用例调用。
 历史报告不追溯重新分类。
 
+<a id="methods"></a>
 ## 已复核元数据与可选操作
 
 | API | 前提及断言 | 官方方法来源 |
@@ -37,18 +53,20 @@ false 不取消标准操作，也不产生异常豁免。
 | Connection.createBlob/createClob/createSQLXML | 仅具体工厂调用允许可选异常，后续对象操作保留原断言。 | [Connection](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/Connection.html) |
 | SQLXML.setString | 写入可使原对象变为不可读。使用 setSQLXML 绑定，再从数据库取得新 SQLXML 并精确断言内容；不要求读取已写对象，也不省略内容验证。 | [SQLXML 生命周期](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/SQLXML.html) |
 | JdbcRowSet.updateRow | 通过独立连接按主键精确核对存储值，失败时也恢复同一记录。ownUpdatesAreVisible 为 false 时，不要求不敏感游标反映自身更新。 | [ResultSet.updateRow](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/ResultSet.html#updateRow()), [ownUpdatesAreVisible](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/DatabaseMetaData.html#ownUpdatesAreVisible(int)) |
-| CommonDataSource.getParentLogger | 已复核的 logger 可选调用，不扩大至 log-writer 方法。 | [getParentLogger](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/javax/sql/CommonDataSource.html#getParentLogger()) |
+| CommonDataSource.getParentLogger | 自 Java 7 / JDBC 4.1 引入；已复核 logger 可选调用，不扩大至 log-writer。驱动仅宣称 4.0 时需另核适用性，不按版本跳过。 | [getParentLogger](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/javax/sql/CommonDataSource.html#getParentLogger()) |
 | Clob.setCharacterStream(long) | 有效 Clob 和一基位置，返回覆盖字符的 Writer 或该调用抛可选异常；流写入/关闭、提交、访问和清理错误不豁免。 | [setCharacterStream](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/Clob.html#setCharacterStream(long)) |
 | Blob.position(byte[],long) | 有效 Blob、模式及起点，返回准确位置/-1 或该调用抛可选异常；之前局部写入/长度/字节断言仍执行。 | [position](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/Blob.html#position(byte%5B%5D,long)) |
 
 仅已复核调用点使用可选包装器。其他批处理/事务/保存点操作保留各自契约，
 单方法异常不证明整个接口不支持。声明 false 但实际成功记录为 `declaration_mismatch`，不隐藏后续失败。
 
-## 额外方案要求
+<a id="额外方案要求"></a>
+<a id="suite-requirements"></a>
+## 套件额外要求
 
 [DatabaseMetaData.getTypeInfo](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/DatabaseMetaData.html#getTypeInfo())
 描述数据库支持的类型，不要求所有数据库都有 ARRAY/REF/ROWID/STRUCT。
-类型存在性测试仍真实调用，缺少方案要求类型仍失败，另记所需类型码、存在值和 SUITE 范围；读取错误仍是错误。
+类型存在性测试仍真实调用，缺少套件要求类型仍失败，另记所需类型码、存在值和 SUITE 范围；读取错误仍是错误。
 
 以下要求继续保留，但不声称是通用 JDBC 义务：
 
@@ -64,6 +82,7 @@ false 不取消标准操作，也不产生异常豁免。
 （CLI 为 `requirement_scope`）。`SUITE_REQUIREMENT_UNMET` 是明确标记的 NOT_EVALUATED 子集，不能重复相加。
 Worker、Web、持久化、下载及 CLI 报告均保留；未知错误不添加该标记，旧无标记报告不推断。
 
+<a id="preparation"></a>
 ## 准备必须保留被测语义
 
 | 范围 | 必要准备 / 边界 |
@@ -84,6 +103,7 @@ MySQL 取消使用 `SELECT 1 WHERE SLEEP(n) = 0`：独立 SLEEP 中断可能返�
 MySQL [CALL](https://dev.mysql.com/doc/refman/8.0/en/call.html) 不必逐条暴露内部 UPDATE 计数。
 这些语义不豁免任意取消成功或任意 SQL 异常。
 
+<a id="comparison"></a>
 ## 证据、计划要求与比较
 
 Suite 用 `jdbc.capability.metadata.*`、`jdbc.capability.behavior.*` 独立 JUnit 条目记录，

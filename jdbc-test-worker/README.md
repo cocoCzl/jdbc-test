@@ -2,6 +2,8 @@
 
 English | [简体中文](README.zh-CN.md)
 
+[English home](../README.en.md) · [Documentation](../docs/README.en.md)
+
 Single-run JVM executable for external JDBC drivers, the compatibility suite, NDJSON events and JSON reports. It also supports catalog description, driver validation and connection probes.
 
 See the [Worker protocol](../docs/development.md#worker-protocol) and [Usage](../docs/usage.md). Deploy Server and Worker artifacts together.

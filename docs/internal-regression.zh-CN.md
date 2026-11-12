@@ -2,16 +2,32 @@
 
 [English](internal-regression.md) | 简体中文
 
+[文档导航](README.md) · [中文首页](../README.md)
+
+目录：[驱动 A → 选择基线 → 驱动 B → 比较](#ab-workflow) · [可比性策略](#comparability) · [输出与退出码](#comparison-exits) · [范围与密钥管理](#keys)
+
 内部基线是用户明确选定的 CLI 报告快照。私有驱动可使用内置适配或显式兼容方言；历史 local/candidate 来源保留读取，不恢复上传包入口。
 它不改变 `adapter.trust`、`formal_eligible`、已知差异或原报告，不构成 JDBC 认证或项目维护者背书。
 默认 `compare --scope formal` 继续要求正式报告资格；两种范围现在都要求完整、版本化的比较证据。
 历史 JSON 保留原样，缺少证据时明确拒绝比较，需要用当前 CLI 重跑。
 
+<a id="ab-workflow"></a>
 ## 驱动 A → 选择基线 → 驱动 B → 比较
 
 使用 JDK 21、Maven Wrapper 与已授权的专用测试数据库／schema。用 `init --adapter postgresql`
 等内置 ID 生成连接配置；私有驱动使用 `--driver-dir`／`--driver-class`，复用方言时显式加 `--compatible-dialect`。
 不再制作或上传适配包，见[示例](../examples/README.zh-CN.md)。
+先在源码根目录准备 **Python >=3.9** 和驱动 A 的本地目录，通过私密环境提供 `DB_PASSWORD`。
+只在明确授权的专用范围执行；替换地址、账号和范围：
+
+```sh
+python3 -B scripts/runner.py init --adapter postgresql \
+  --url jdbc:postgresql://localhost:5432/test_db --username jdbc_tester \
+  --namespace owned_schema --password-env DB_PASSWORD --consent \
+  --driver-dir local-drivers/A --connection-mode driver_manager \
+  --output configs/config.local.json
+```
+
 在配置中加入以下字段，替换示例身份、构建和模式：
 
 ```json
@@ -28,6 +44,8 @@
 }
 ```
 
+将这些字段合并到生成配置，保留连接、password_env、适配、范围授权和选择字段。
+
 `database_identity`、`server_build`、`database_mode` 是操作者明确确认的信息，应填写实际实例标识、
 精确服务端构建和兼容模式；无兼容模式也显式填写 `native`。CLI 不会声称已独立核实物理实例身份或服务端设置，
 因此结论仅在这些确认成立的前提下有效。同时会检查真实 JDBC 产品/版本和连接配置指纹。
@@ -35,17 +53,31 @@
 只生成一次随机比较密钥，A/B 使用同一密钥，CI 通过既有密钥机制保存并注入：
 
 ```sh
+set -eu
 export JDBC_TEST_REGRESSION_KEY="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
 # 按现有秘密管理方式提供配置中 password_env 指向的密码环境变量。
-python3 -B scripts/runner.py run configs/config.local.json
+if python3 -B scripts/runner.py run configs/config.local.json; then
+  run_a_exit=0
+else
+  run_a_exit=$?
+fi
+[ "$run_a_exit" -le 1 ] || exit "$run_a_exit"
 python3 -B scripts/runner.py baseline create \
   --report report/private-db_A/report.json --output report/internal-baseline.json
 # 仅修改 db.driver 指向 B，或替换该目录中的驱动/依赖 JAR。
-python3 -B scripts/runner.py run configs/config.local.json
+if python3 -B scripts/runner.py run configs/config.local.json; then
+  run_b_exit=0
+else
+  run_b_exit=$?
+fi
+[ "$run_b_exit" -le 1 ] || exit "$run_b_exit"
 python3 -B scripts/runner.py compare --scope internal \
   --baseline report/internal-baseline.json --current report/private-db_B/report.json \
   --output report/driver-upgrade.json
 ```
+
+脚本显式保留两次 `run` 退出码：0/1 后检查真实报告并继续，其他值停止；不要用 `run && compare`。
+即使 `run` 返回 1，也先确认报告存在且完整，再选择基线或比较。B 只更换驱动及依赖制品；配置与用例选择保持相同。
 
 将示例报告路径替换为 `run` 打印的真实路径。`baseline create` 使用独占创建，不覆盖已有文件；
 可通过不同文件名保存和选择多个基线。快照包含完整原报告及 SHA-256，后续篡改会阻断比较；这不是数字签名。
@@ -59,6 +91,7 @@ python3 -B scripts/runner.py compare --scope internal \
 CI 应保留报告，并在运行返回 1 后继续执行比较，以比较退出码作为回归门禁；
 如果还要求所有用例通过，应额外检查运行退出码。
 
+<a id="comparability"></a>
 ## 可比性策略
 
 | 维度 | 驱动升级比较规则 |
@@ -79,6 +112,7 @@ Maven 坐标选择该制品 JAR，多 JAR 驱动请使用本地目录；框架�
 缺失/冲突的目标信息、未知状态、无法解释的 Maven 失败或指纹缺失均给出具体原因，不把“两边都缺失”当作相同。
 运行期间源码或驱动制品变化会被拒绝。SQL 指纹保守地覆盖已解析资源根目录，因此无关 SQL 修改也可能要求另建基线。
 
+<a id="comparison-exits"></a>
 ## 输出与退出码
 
 比较 JSON 包含比较目的、允许变化维度、逐项可比性检查、具体错误、新增失败、修复、既有未解决失败、覆盖变化、
@@ -86,7 +120,7 @@ Maven 坐标选择该制品 JAR，多 JAR 驱动请使用本地目录；框架�
 `known_difference` 仍作为既有失败展示。先前可用的功能变为合法不支持，也属于支持能力退化，
 但不会被改称为 JDBC 契约违规。
 
-| 退出码 | 含义 |
+| CLI compare 退出码 | 含义 |
 |---|---|
 | 0 | 可比较、执行完整、无新增回归；仍可能有既有失败或合法不支持 |
 | 1 | 新增失败、先前支持能力丢失，或新增未满足方案要求 |
@@ -97,6 +131,7 @@ Maven 坐标选择该制品 JAR，多 JAR 驱动请使用本地目录；框架�
 未选用例保留 `USER_EXCLUDED`/`NOT_APPLICABLE`，不会算作已执行，也不导致单次评估失败。
 比较过程不连接数据库、不重写原报告。
 
+<a id="keys"></a>
 ## 范围与密钥管理
 
 本流程仅用于 CLI，不提供 Web 基线管理、物理服务身份独立证明、远程基线存储/签名或 SQL/产品/厂商认证。
@@ -110,3 +145,13 @@ Maven 坐标选择该制品 JAR，多 JAR 驱动请使用本地目录；框架�
 
 CLI 会从 Maven/驱动子进程环境移除当前比较密钥及默认密钥变量；保存报告和诊断日志前也会
 脱敏意外回显的当前密钥，包括需要 JSON 转义的值。
+
+CI 中保留 A/B 报告、基线及比较 JSON 为受控制品；无论运行评估是否返回 1，都先收集报告，再执行可比性检查。
+CI 的失败策略应分别记录 `run` 与 `compare` 状态。Worker 的 0/2/3/4/5 是执行协议退出码，
+不适用上表，见[Worker 协议](development.zh-CN.md#worker-protocol)。
+
+| 秘密 | 用途 |
+|---|---|
+| 数据库密码 | 目标数据库认证，由 `db.password_env` 引用 |
+| 平台 Master Key | Web 平台保存凭据的加密；不是 CLI 比较密钥 |
+| 回归 HMAC Key | A/B 配置指纹比较；同一基线周期保留同一值 |

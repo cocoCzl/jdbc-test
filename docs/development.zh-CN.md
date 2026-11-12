@@ -2,6 +2,10 @@
 
 [English](development.md) | 简体中文
 
+[文档导航](README.md) · [中文首页](../README.md)
+
+目录：[本地源码启动](#local-source-startup) · [架构](#architecture) · [增加数据库支持](#adding-database-support) · [增加用例与准备资源](#adding-scenarios) · [API 与持久化契约](#api) · [Worker 协议](#worker-protocol) · [Java 格式](#java-style) · [前端维护](#frontend) · [开发检查](#testing) · [升级兼容](#upgrade-compatibility) · [已知限制](#known-limitations)
+
 用户操作见[使用指南](usage.zh-CN.md)，运行配置、备份和升级见[部署指南](deployment.zh-CN.md)。
 本文覆盖源码架构与维护规则。
 
@@ -46,6 +50,7 @@ IDEA 用 JDK 21 导入 `pom.xml`，配置 Remote JVM Debug / Attach 和 `jdbc-te
 手工前端在 `jdbc-test-web` 执行 `npm ci`、`npm run dev`，非默认后端可在 Vite 进程中设置
 非秘密 `JDBC_TEST_DEV_API_URL`。秘密不能进入共享 IDE 配置或参数，手工启动的进程分别停止。
 
+<a id="architecture"></a>
 ## 架构
 
 ```text
@@ -70,6 +75,200 @@ CLI 采用 Maven/JUnit，共享场景及安全契约。Flyway 管理平台 V1–
 禁止修改历史迁移。密码信封使用 AES-256-GCM 和持久32字节 Master Key；队列凭据单独加密，
 在交接、终态和恢复路径删除。驱动位于 `<data-dir>/drivers/`，任务工作区位于 `<data-dir>/runs/`。
 
+<a id="adding-database-support"></a>
+## 增加数据库支持
+
+`adapters/catalog.json` 是唯一内置索引；`adapters/<id>/adapter.json` 分别维护名称、信任状态、
+身份/版本规则、能力、命名空间和资源。Java/Python 严格校验 UTF-8 JSON、重复键、类型、路径、
+有限数值、大小和深度。Core 构建不可变注册表，不加载 Suite 或驱动。
+共享正反例在 `jdbc-test-core/src/test/resources/adapter-contract`。
+未知扩展保留但不会自动执行。身份正则需兼容 Java/Python，版本声明不是兼容性证据。
+
+复用已实现 SQL 行为时，添加唯一 manifest、真实身份/能力及 `candidate`/`local` 状态，登记 ID。
+可通过 `assets.directory` 复用资源，或新增 `ddl/<asset-id>`、`dml/<asset-id>`、`pool/<asset-id>.yaml`。
+普通注册项无需增加产品枚举或前端分支。驱动预设是独立可编辑提示，不决定适配身份或能力。
+
+新方言需实现 `SqlDialect` 的范围、引号、URL 解析、资源定位及归属清理，并覆盖失败路径。
+当前有限行为为 `postgresql`、`mysql`、`oracle`、`dm`，产品身份独立。
+DM 保留 schema 精确大小写且不要求 catalog，与 Oracle 折叠和 MySQL catalog 选择不同。
+
+DM 审计沿用注册表 → Server 冻结快照 → 隔离 Worker → Suite 资源的链路，
+11 个声明区域和 `pool/dm.yaml` 均存在，没有 Oracle 回退或第二套执行器。
+作用域保持共享的 `[A-Za-z][A-Za-z0-9_]{0,62}` 策略：拒绝纯数字、下划线开头、引号分隔符和非 ASCII 名称。
+每次 checkout 设置并核对精确名称；关闭失败作为原始作用域错误的 suppressed 异常保留。
+只有 journal 确认成功创建的对象可以按精确名称清理，不确定的 CREATE 保留为可见证据，不执行删 Schema 或扫描清理。
+适配器 API 返回不可变的历史 capability 声明和 candidate 说明，不保证驱动行为通过。
+Provider 必须提供公共类、匹配的接口及公共无参构造器；实际构造、属性设置及 JDBC 调用仍需观察。
+探测保留有界的 next-exception、cause 和 suppressed 分支及 SQLState/厂商码，诊断脱敏，连接关闭后才发布成功。
+
+修改共享逻辑需回归已有产品。仅增加枚举不能实现支持，不得修改公共断言或减少 FULL 选择制造兼容。
+扩大支持声明前需要真实授权验证。
+
+适配资源在源码中维护，自定义适配包、SQL 包上传和 JSON 导入已撤回。
+多 JAR 驱动使用 Web 上传或 CLI 本地目录；CLI Maven 解析器仅加载主 JAR，不构成完整传递依赖包。
+没有 Web 在线 Maven 导入器。[示例](../examples/README.zh-CN.md)说明显式兼容方言选择。
+
+只读外部 DM 集成检查先构建 Worker，再通过私密环境提供 `DM_JDBC_JAR`、`DM_JDBC_URL`、
+`DM_USERNAME`、`DM_PASSWORD`、`DM_SCHEMA`，执行：
+
+```sh
+./mvnw -pl jdbc-test-worker -am -Dtest=WorkerDmIT -Dsurefire.excluded.groups=none test
+```
+
+该显式启用的 integration 测试只验证加载和连接元数据，不证明可写套件兼容。
+浏览器测试 `e2e/dm.real.spec.ts` 需要 `JDBC_TEST_DM_REAL=true`、显式的
+`JDBC_TEST_DM_CONNECTION_ID` / `JDBC_TEST_DM_RUN_ID`、`DM_SCHEMA` 和临时平台地址；
+它测试并保存该连接，检查中英文历史及报告读取，不另建任务。
+CORE/FULL 继续使用正常任务流程和授权，分别保留原始统计、observation 和 cleanupEvidence，严禁提交私有 JAR 或环境文件。
+
+<a id="adding-scenarios"></a>
+## 增加用例与准备资源
+
+在 Suite 添加测试并登记稳定用例 ID，明确类别、JDBC 基线、适用性及执行前提。
+使用共享选择器和目录，不另写固定数量。FULL 为全部适用场景，CORE 由清单维护，
+CUSTOM 先交集模块/包含项再应用排除项。空、过期、未知选择均拒绝。
+能力 false 不跳过标准调用，厂商扩展适用性独立；当前没有实际调用厂商 API 的扩展用例。
+
+`UseSqlScripts` 按选中方法/类延迟准备，空方法注解可覆盖类资源，无表场景保持独立。
+通过显式占位符和归属 API 创建带引号、范围限定的对象并清理，不任意改写 SQL 单词或宽泛 DROP。
+断言前检查原生资源形状；SQL NULL 观察和工厂调用不能替代 ARRAY/ROWID/REF_CURSOR 往返。
+资源、依赖、权限缺失属于准备或环境问题，保留原始 SQLState、原因和阶段。
+
+使用精确到方法的 `JdbcContracts` 判定，额外要求使用 `SuiteRequirementAssertionError`，
+不能从能力标志、SQLState 或消息推导豁免，见 [JDBC 判定参考](jdbc-capability-contracts.zh-CN.md)。
+清理与用例完成独立记录，历史缺失证据保持未知；真实复验产生新报告，不改写旧 FULL。
+
+### 驱动自身 Provider
+
+配置真实公共类和 setter，缺失属于前提不足。CLI/运行时 YAML 示例：
+
+```yaml
+db:
+  data_sources:
+    dataSource:
+      className: org.postgresql.ds.PGSimpleDataSource
+      urlProperty: URL
+      userProperty: user
+      passwordProperty: password
+    connectionPoolDataSource:
+      className: org.postgresql.ds.PGConnectionPoolDataSource
+    xaDataSource:
+      className: org.postgresql.xa.PGXADataSource
+```
+
+API `dataSources` 使用相同定义，默认属性为 `URL/user/password`，其他属性映射公共标量 Bean setter。
+测试对象是上传驱动的实现，不是平台连接门面。XA 还需数据库前提。
+CLI `db.password_env` 逐字解析单个环境变量，未设置与空值不同，同时指定字面密码和环境密码会失败。
+
+<a id="api"></a>
+## API 与持久化契约
+
+资源 DTO 无统一成功信封。列表 `page/size` 默认20、最大100，返回
+`{items,page,size,totalElements,totalPages}`；错误为带稳定 code 的 RFC Problem Details。
+创建返回201/Location，删除204，历史引用保护返回409。
+
+| 路由 | 操作 |
+|---|---|
+| `/api/drivers`、`/api/drivers/presets`、`/api/drivers/{id}` | multipart 上传/列表、提示、读取/PATCH/删除 |
+| `/api/drivers/{id}/validate` | POST 隔离加载验证 |
+| `/api/adapters` | GET 内置连接选项 |
+| `/api/connections`、`/api/connections/{id}` | 创建/列表、读取/PATCH/删除 |
+| `/api/connections/test`、`/api/connections/{id}/test` | POST 草稿/已保存连接探测 |
+| `/api/test-catalog` | GET profile、模块、当前数量 |
+| `/api/runs`、`/api/runs/{id}` | 创建/列表、读取快照/进度 |
+| `/api/runs/{id}/cancel`、`/api/runs/{id}/events` | POST 取消、GET SSE |
+| 任务下的 `/api/runs/{id}/results`、`/report`、`/report.json` | 结果、摘要/失败和 JSON 证据 |
+
+驱动上传含 multipart `metadata` 与重复 `files`，默认20制品、单个100MiB、总计250MiB。
+大小/SHA-256 和排序摘要构成的包指纹标识不可变二进制。`loadedArtifact` 记录实际定义类的 JAR
+及独立 Manifest 字段。Driver API 整数版本/合规值是声明，不是连接后的发行版本。
+协议元数据无效时严格失败。
+
+连接密码只写，返回 `hasSavedPassword`。`savePassword` 保存/替换，`clearSavedPassword`
+与任何新密码（包括空值）冲突。省略字段保留旧值；显式空值按字段清除范围或选择空密码。
+探测通过 Worker `Driver.connect` 尽可能读取元数据及只读 Oracle/DM 配置后关闭，不执行测试 SQL。
+普通驱动验证仅加载类。被引用驱动/连接不能删除。
+
+任务入队冻结范围/授权、选择、适配执行声明和非秘密设置。可选 `name` 最多200字符，旧无名任务用显示回退。
+本地 FIFO 限制并发 Worker，锁保护终态/取消竞争。筛选组为 WAITING、IN_PROGRESS、COMPLETED、
+ABNORMAL、CANCELLED，不能同时指定精确 `status` 和 `statusGroup`；过滤及计数在分页前进行。
+结果的状态和模块筛选采用 AND，以稳定 ID 处理同序值。
+
+正常链路为 QUEUED → PREPARING → RUNNING → GENERATING_REPORT → SUCCEEDED，
+SUCCEEDED 表示处理完成而非全通过。只有经过验证的 exit4/TEST_FAILURE、无独立执行问题且清理成功时，
+才可显示正常完成但有未通过用例。其他执行、报告和清理失败仍异常。
+Server 交叉校验选择、事件、报告、计数和清理，持久化重建标注 `source`、`workerReportValidated`。
+历史结论仅在已有证据充分时只读解释，原始报告不变。
+
+<a id="execution-and-query-boundaries"></a>
+<a id="执行与查询边界"></a>
+### 执行与查询边界
+
+SQL Server 已停止新建连接、连接探测和执行支持；`adapters/catalog.json` 是活动支持的唯一索引。
+数据库类型/方言枚举只保留历史解析值，历史连接、任务、原始报告和原始结论不改写。
+新任务及队列中的旧快照均校验退役策略，旧 SQL Server 输入以 `DATABASE_SUPPORT_RETIRED` 失败。
+文档契约检查活动目录、发布资源和中英文支持声明；驱动默认方言及界面选项复用活动目录。
+
+驱动验证在短事务中获取配置和单调修订号；改动驱动类和每次验证均递增修订号，
+回写使用条件更新。旧成功/失败结果、并发验证、删除均返回 `DRIVER_VALIDATION_STALE`，不覆盖新状态。
+Worker 运行和等待限额均在事务外；驱动文件不可变，普通名称、默认方言和 DataSource 元数据不影响类加载验证。
+
+### SSE 事件交付
+
+SSE 在事务提交后进入每订阅者的 64 项有界队列，由独立虚拟线程发送，全局最多 256 个订阅者。
+任务行锁保护持久化事件序号；订阅时在同一锁下注册并获取快照，提交后才发送。
+按序号消除快照重复及重排提交回调，终态发送后再关闭；积压超限断开该客户端，以重连快照恢复。
+连接最长 30 秒，浏览器重连；REST 的 10 秒刷新保底。没有持久化事件重放/outbox，进程崩溃时以数据库为准。
+不可中断的网络写占住该名额直到发送线程退出，避免无限补充卡住的线程，不阻塞任务或数据库事务。
+内嵌 Tomcat NIO 使用显式 `server.tomcat.connection-timeout=30s` 限制 socket 写等待；SSE 的 30 秒异步生命周期
+本身不能保证中断正在发送的网络写。线程中断只是尽力而为，替换容器或配置无限传输超时需要提供等效写超时。
+V14 序号仅用于提交状态的排序、去重及拒绝落后于 REST 刷新的 SSE，不提供历史事件重放。
+目录冷加载期间并发请求直接返回 `WORKER_BUSY`，不在短期 Worker 限额外积累无界 HTTP 等待者。
+
+SSE 发送线程还必须等待 MVC afterConcurrentHandlingStarted，才可发送快照或消费事件，避免
+SseEmitter 初始化前的内部暂存绕过有界队列；传输 handler 就绪前仍只使用同一订阅者限额。
+
+### 列表与历史证据查询
+
+运行列表通过闭合标量投影读取任务页和两组聚合，不加载完整任务/用例实体或逐项解释证据。
+列表 SQL 不选择 `execution_input`；V15 回填去掉逐场景元数据的 `execution_summary`，冻结配置时同步维护。
+`accounting.scenarios` 为空，
+列表 selectionSnapshot 仅含版本、目录数量和时间预算，逐场景信息保留在详情/报告。
+状态组在分页前用数据库条件和索引关联计数筛选，原始任务状态与执行判定保持分离。
+`RunListQueryTest` 使用 H2、12 个任务、每页 10 条、每任务 20/1000 用例，记录 SQL、实体加载和响应大小；这不代表生产延迟或全驱动兼容性。
+
+历史用例证据缺失、不是对象或无法解析时，详情和数据库报告重建不再失败；无法解析的内容标记为
+`LEGACY_EVIDENCE_UNREADABLE`，不生成 JDBC 判定，不修改持久化原始证据或任务/用例状态。
+
+
+<a id="worker-protocol"></a>
+## Worker 协议
+
+配套部署 Server/Worker。协议2从 stdin 读取一个 JSON 请求，stdout 输出 NDJSON，凭据不进入 argv。
+每轮 `URLClassLoader` 以 platform 为父加载器，直接调用所选 `Driver.connect`，不全局注册。
+驱动输出不能进入公共协议通道；诊断有界并脱敏，识别边界见[使用指南](usage.zh-CN.md)。
+
+| 模式 | 用途 |
+|---|---|
+| 默认 | 单任务执行 |
+| `--describe-catalog`、`--catalog-smoke` | 无目标驱动的目录描述、打包资源检查 |
+| `--validate-driver` | 类加载及 Driver 元数据，不连接 |
+| `--probe-connection` | 只读连接/元数据探测，无测试 SQL |
+
+请求见 [WorkerRunRequest.java](../jdbc-test-worker/src/main/java/com/jdbctest/worker/WorkerRunRequest.java)。
+执行要求协议2、范围/授权、`j` 加20位小写十六进制前缀、完整布尔能力及冻结适配选择。
+事件包含任务/模块/用例生命周期、元数据和清理；错误 ID、意外/重复结果和协议不匹配明确失败。
+报告 schema 为2.0.0，路径 `<workspace>/report/report.json`。
+Worker 退出码：0完成（仍需校验报告）、2请求/选择、3驱动/连接准备、4执行/超时、5目录/工作区/报告/内部错误，
+不同于 CLI 比较退出码。
+
+任务预算60–7200秒，UI 默认1800，包含准备/执行/清理。JUnit 方法默认60000ms、SAME_THREAD，
+显式 `@Timeout` 优先；发现和回调受任务预算约束，不计入方法计时。
+中断不能强制 JDBC 返回，不能用另一线程并发清理或启动下一用例。
+Worker 到预算退出，Server 再给予5秒及配置的终止宽限（默认2秒）后强制结束。
+未运行、未完成及不确定清理需明确保留。
+
+<a id="java-style"></a>
 ## Java 格式
 
 原始来源为未改动的 [intellij-java-google-style.xml](../code-style/intellij-java-google-style.xml)，
@@ -162,155 +361,7 @@ Optimize Imports 和 IDE inspection 仍需独立审查。
 配置、Key、数据和附件；验证失败时也清理本轮创建的资源，不删除未知归属资源。
 未经授权不重写历史、不 push/PR/tag/release。
 
-## 增加数据库支持
-
-`adapters/catalog.json` 是唯一内置索引；`adapters/<id>/adapter.json` 分别维护名称、信任状态、
-身份/版本规则、能力、命名空间和资源。Java/Python 严格校验 UTF-8 JSON、重复键、类型、路径、
-有限数值、大小和深度。Core 构建不可变注册表，不加载 Suite 或驱动。
-共享正反例在 `jdbc-test-core/src/test/resources/adapter-contract`。
-未知扩展保留但不会自动执行。身份正则需兼容 Java/Python，版本声明不是兼容性证据。
-
-复用已实现 SQL 行为时，添加唯一 manifest、真实身份/能力及 `candidate`/`local` 状态，登记 ID。
-可通过 `assets.directory` 复用资源，或新增 `ddl/<asset-id>`、`dml/<asset-id>`、`pool/<asset-id>.yaml`。
-普通注册项无需增加产品枚举或前端分支。驱动预设是独立可编辑提示，不决定适配身份或能力。
-
-新方言需实现 `SqlDialect` 的范围、引号、URL 解析、资源定位及归属清理，并覆盖失败路径。
-当前有限行为为 `postgresql`、`mysql`、`oracle`、`dm`，产品身份独立。
-DM 保留 schema 精确大小写且不要求 catalog，与 Oracle 折叠和 MySQL catalog 选择不同。
-
-DM 审计沿用注册表 → Server 冻结快照 → 隔离 Worker → Suite 资源的链路，
-11 个声明区域和 `pool/dm.yaml` 均存在，没有 Oracle 回退或第二套执行器。
-作用域保持共享的 `[A-Za-z][A-Za-z0-9_]{0,62}` 策略：拒绝纯数字、下划线开头、引号分隔符和非 ASCII 名称。
-每次 checkout 设置并核对精确名称；关闭失败作为原始作用域错误的 suppressed 异常保留。
-只有 journal 确认成功创建的对象可以按精确名称清理，不确定的 CREATE 保留为可见证据，不执行删 Schema 或扫描清理。
-适配器 API 返回不可变的历史 capability 声明和 candidate 说明，不保证驱动行为通过。
-Provider 必须提供公共类、匹配的接口及公共无参构造器；实际构造、属性设置及 JDBC 调用仍需观察。
-探测保留有界的 next-exception、cause 和 suppressed 分支及 SQLState/厂商码，诊断脱敏，连接关闭后才发布成功。
-
-修改共享逻辑需回归已有产品。仅增加枚举不能实现支持，不得修改公共断言或减少 FULL 选择制造兼容。
-扩大支持声明前需要真实授权验证。
-
-适配资源在源码中维护，自定义适配包、SQL 包上传和 JSON 导入已撤回。
-多 JAR 驱动使用 Web 上传或 CLI 本地目录；CLI Maven 解析器仅加载主 JAR，不构成完整传递依赖包。
-没有 Web 在线 Maven 导入器。[示例](../examples/README.zh-CN.md)说明显式兼容方言选择。
-
-只读外部 DM 集成检查先构建 Worker，再通过私密环境提供 `DM_JDBC_JAR`、`DM_JDBC_URL`、
-`DM_USERNAME`、`DM_PASSWORD`、`DM_SCHEMA`，执行：
-
-```sh
-./mvnw -pl jdbc-test-worker -am -Dtest=WorkerDmIT -Dsurefire.excluded.groups=none test
-```
-
-该显式启用的 integration 测试只验证加载和连接元数据，不证明可写套件兼容。
-浏览器测试 `e2e/dm.real.spec.ts` 需要 `JDBC_TEST_DM_REAL=true`、显式的
-`JDBC_TEST_DM_CONNECTION_ID` / `JDBC_TEST_DM_RUN_ID`、`DM_SCHEMA` 和临时平台地址；
-它测试并保存该连接，检查中英文历史及报告读取，不另建任务。
-CORE/FULL 继续使用正常任务流程和授权，分别保留原始统计、observation 和 cleanupEvidence，严禁提交私有 JAR 或环境文件。
-
-## 增加用例与准备资源
-
-在 Suite 添加测试并登记稳定用例 ID，明确类别、JDBC 基线、适用性及执行前提。
-使用共享选择器和目录，不另写固定数量。FULL 为全部适用场景，CORE 由清单维护，
-CUSTOM 先交集模块/包含项再应用排除项。空、过期、未知选择均拒绝。
-能力 false 不跳过标准调用，厂商扩展适用性独立；当前没有实际调用厂商 API 的扩展用例。
-
-`UseSqlScripts` 按选中方法/类延迟准备，空方法注解可覆盖类资源，无表场景保持独立。
-通过显式占位符和归属 API 创建带引号、范围限定的对象并清理，不任意改写 SQL 单词或宽泛 DROP。
-断言前检查原生资源形状；SQL NULL 观察和工厂调用不能替代 ARRAY/ROWID/REF_CURSOR 往返。
-资源、依赖、权限缺失属于准备或环境问题，保留原始 SQLState、原因和阶段。
-
-使用精确到方法的 `JdbcContracts` 判定，额外要求使用 `SuiteRequirementAssertionError`，
-不能从能力标志、SQLState 或消息推导豁免，见 [JDBC 判定参考](jdbc-capability-contracts.zh-CN.md)。
-清理与用例完成独立记录，历史缺失证据保持未知；真实复验产生新报告，不改写旧 FULL。
-
-### 驱动自身 Provider
-
-配置真实公共类和 setter，缺失属于前提不足。CLI/运行时 YAML 示例：
-
-```yaml
-db:
-  data_sources:
-    dataSource:
-      className: org.postgresql.ds.PGSimpleDataSource
-      urlProperty: URL
-      userProperty: user
-      passwordProperty: password
-    connectionPoolDataSource:
-      className: org.postgresql.ds.PGConnectionPoolDataSource
-    xaDataSource:
-      className: org.postgresql.xa.PGXADataSource
-```
-
-API `dataSources` 使用相同定义，默认属性为 `URL/user/password`，其他属性映射公共标量 Bean setter。
-测试对象是上传驱动的实现，不是平台连接门面。XA 还需数据库前提。
-CLI `db.password_env` 逐字解析单个环境变量，未设置与空值不同，同时指定字面密码和环境密码会失败。
-
-## API 与持久化契约
-
-资源 DTO 无统一成功信封。列表 `page/size` 默认20、最大100，返回
-`{items,page,size,totalElements,totalPages}`；错误为带稳定 code 的 RFC Problem Details。
-创建返回201/Location，删除204，历史引用保护返回409。
-
-| 路由 | 操作 |
-|---|---|
-| `/api/drivers`、`/api/drivers/presets`、`/api/drivers/{id}` | multipart 上传/列表、提示、读取/PATCH/删除 |
-| `/api/drivers/{id}/validate` | POST 隔离加载验证 |
-| `/api/adapters` | GET 内置连接选项 |
-| `/api/connections`、`/api/connections/{id}` | 创建/列表、读取/PATCH/删除 |
-| `/api/connections/test`、`/api/connections/{id}/test` | POST 草稿/已保存连接探测 |
-| `/api/test-catalog` | GET profile、模块、当前数量 |
-| `/api/runs`、`/api/runs/{id}` | 创建/列表、读取快照/进度 |
-| `/api/runs/{id}/cancel`、`/api/runs/{id}/events` | POST 取消、GET SSE |
-| 任务下的 `/api/runs/{id}/results`、`/report`、`/report.json` | 结果、摘要/失败和 JSON 证据 |
-
-驱动上传含 multipart `metadata` 与重复 `files`，默认20制品、单个100MiB、总计250MiB。
-大小/SHA-256 和排序摘要构成的包指纹标识不可变二进制。`loadedArtifact` 记录实际定义类的 JAR
-及独立 Manifest 字段。Driver API 整数版本/合规值是声明，不是连接后的发行版本。
-协议元数据无效时严格失败。
-
-连接密码只写，返回 `hasSavedPassword`。`savePassword` 保存/替换，`clearSavedPassword`
-与任何新密码（包括空值）冲突。省略字段保留旧值；显式空值按字段清除范围或选择空密码。
-探测通过 Worker `Driver.connect` 尽可能读取元数据及只读 Oracle/DM 配置后关闭，不执行测试 SQL。
-普通驱动验证仅加载类。被引用驱动/连接不能删除。
-
-任务入队冻结范围/授权、选择、适配执行声明和非秘密设置。可选 `name` 最多200字符，旧无名任务用显示回退。
-本地 FIFO 限制并发 Worker，锁保护终态/取消竞争。筛选组为 WAITING、IN_PROGRESS、COMPLETED、
-ABNORMAL、CANCELLED，不能同时指定精确 `status` 和 `statusGroup`；过滤及计数在分页前进行。
-结果的状态和模块筛选采用 AND，以稳定 ID 处理同序值。
-
-正常链路为 QUEUED → PREPARING → RUNNING → GENERATING_REPORT → SUCCEEDED，
-SUCCEEDED 表示处理完成而非全通过。只有经过验证的 exit4/TEST_FAILURE、无独立执行问题且清理成功时，
-才可显示正常完成但有未通过用例。其他执行、报告和清理失败仍异常。
-Server 交叉校验选择、事件、报告、计数和清理，持久化重建标注 `source`、`workerReportValidated`。
-历史结论仅在已有证据充分时只读解释，原始报告不变。
-
-<a id="worker-protocol"></a>
-## Worker 协议
-
-配套部署 Server/Worker。协议2从 stdin 读取一个 JSON 请求，stdout 输出 NDJSON，凭据不进入 argv。
-每轮 `URLClassLoader` 以 platform 为父加载器，直接调用所选 `Driver.connect`，不全局注册。
-驱动输出不能进入公共协议通道；诊断有界并脱敏，识别边界见[使用指南](usage.zh-CN.md)。
-
-| 模式 | 用途 |
-|---|---|
-| 默认 | 单任务执行 |
-| `--describe-catalog`、`--catalog-smoke` | 无目标驱动的目录描述、打包资源检查 |
-| `--validate-driver` | 类加载及 Driver 元数据，不连接 |
-| `--probe-connection` | 只读连接/元数据探测，无测试 SQL |
-
-请求见 [WorkerRunRequest.java](../jdbc-test-worker/src/main/java/com/jdbctest/worker/WorkerRunRequest.java)。
-执行要求协议2、范围/授权、`j` 加20位小写十六进制前缀、完整布尔能力及冻结适配选择。
-事件包含任务/模块/用例生命周期、元数据和清理；错误 ID、意外/重复结果和协议不匹配明确失败。
-报告 schema 为2.0.0，路径 `<workspace>/report/report.json`。
-Worker 退出码：0完成（仍需校验报告）、2请求/选择、3驱动/连接准备、4执行/超时、5目录/工作区/报告/内部错误，
-不同于 CLI 比较退出码。
-
-任务预算60–7200秒，UI 默认1800，包含准备/执行/清理。JUnit 方法默认60000ms、SAME_THREAD，
-显式 `@Timeout` 优先；发现和回调受任务预算约束，不计入方法计时。
-中断不能强制 JDBC 返回，不能用另一线程并发清理或启动下一用例。
-Worker 到预算退出，Server 再给予5秒及配置的终止宽限（默认2秒）后强制结束。
-未运行、未完成及不确定清理需明确保留。
-
+<a id="frontend"></a>
 ## 前端维护
 
 保留既有布局与交互，复用 `components/ui`、`components/common`、`components/data-table`，
@@ -351,6 +402,7 @@ npm --prefix jdbc-test-web run test:e2e
 一般验证在回复简述；仅影响用户操作或维护时直接更新对应的既有指南。保持当前文档结构，
 不为每轮开发、验收或每种数据库新增独立文档。
 
+<a id="upgrade-compatibility"></a>
 ## 升级兼容
 
 V9/V10 及其他历史迁移保留，撤回包的表和历史仍可读且不重写。历史 SQL 报告保留 SQL_FEATURE，
@@ -359,57 +411,8 @@ V9/V10 及其他历史迁移保留，撤回包的表和历史仍可读且不重�
 重启以 SERVER_RESTART 中断旧非终态任务。Server/Worker 快照须匹配，未知撤回包执行字段严格失败，
 不静默回退。见[部署升级/备份规则](deployment.zh-CN.md#operations)及[驱动 A/B 回归](internal-regression.zh-CN.md)。
 
-<a id="known-limitations"></a>
-## 已知限制
+### V13–V15 派生字段迁移
 
-以下是仍有效的边界，不是完整认证矩阵。保留原断言和历史报告，定向复验不改变原 FULL 通过率。
-
-| 范围 | 当前边界 / 后续条件 |
-|---|---|
-| PostgreSQL 结果序列 | 平台准备缺口，尚无满足原生过程隐式结果序列契约的等价资源，不能用游标名列表或客户端多语句替代。 |
-| PostgreSQL / Kingbase 两阶段 XA | 实测 max_prepared_transactions=0 阻塞 prepare 相关分支；需 DBA 提供已启用的专用环境，其他独立分支继续。 |
-| Kingbase 元数据耗时 | 早期 getTypeInfo 调用耗尽任务预算，后续更广任务完成，原因仍未知；归因驱动挂起前，仅在有界隔离进程复现该调用。 |
-| Kingbase ROWID | 疑似驱动 NULL 映射问题：SQL NULL 返回非空 KbRowId，wasNull=true，getBytes 抛 NPE。未到达的绑定/更新/删除/批量仍未验证。 |
-| PostgreSQL DataSource log writer | 疑似驱动行为，保留断言和最小证据，等待具体方法契约及厂商复核。 |
-| PostgreSQL holdability、按索引生成键 | 证据不足，NOT_EVALUATED；PSQLException/SQLState0A000 本身不构成允许不支持。 |
-| Kingbase / MySQL 过程更新计数 | 内部语句计数可见性是额外方案要求而非通用 JDBC 保证，未满足仍保留 SUITE 范围失败。 |
-| MySQL 可选路径 | 已观察到的 ARRAY/ROWID/SQLType 注册调用允许不支持，不验证下游 Array 方法、绑定和原生游标输出；保留具体方法证据，不宣称整个接口支持情况。 |
-| Oracle 已记录执行失败 | 参数序号、取消/查询超时、批量生成键及 SQLXML 流文本仍需逐方法归因/复验，新增准备资源不解决这些既有观察。 |
-| Oracle 资源 | 原生数组、多结果准备及嵌套依赖清理已有自动化检查，尚未真实 Oracle 复验。按列名批量键 NPE 归因、终态页面/筛选/下载按钮复核仍待办；需可达授权 PDB、额度与权限。 |
-| Oracle LOB 清单 | 历史运行后两个既有字典条目缺失，原因与历史父映射未知；既未证实业务数据丢失，也未证实无影响。合成归属测试不解释或修复差异。该写入范围保持关闭，新写入需独立专用账号/schema。归因需已有运行前映射/备份/审计/redo/采集身份，不能盲目重跑 FULL。 |
-| 历史证据 | 部分早期 MySQL/Kingbase 原 FULL 报告已不可得；脱敏摘录不等于原报告，不重建或认证缺失历史。adapters 内维护的证据保留。 |
-| 达梦 | candidate：历史 DM DBMS 8.1.3.162＋驱动 8.1.2.192 的 FULL 保留 249/21 及独立复测。2026-11-04 驱动 8.1.3.62 的独立 CORE 为 151/2、FULL 为 254/16：八项契约失败、三项其他 JDBC 结果未评估、五项额外套件失败。任务对象清理为 18/18、41/41；912 个已有对象元数据前后一致。驱动区间内其他版本和其他模式/补丁未验证；逐项能力审计见使用指南，独立观察不等于已确认厂商缺陷。 |
-| 平台启动验证 | Windows ACL/PowerShell 进程行为和 IDEA UI 未验证；标准 Docker 源码构建在镜像仓库认证超时后没有成功验证记录，替代本地镜像运行不证明源码构建通过。 |
-
-准备不足不等于驱动缺陷，允许不支持不算功能通过。REF/ROWID 类型存在、LOB 自动持久化、
-非法操作后恢复和内部更新计数要求分别定界，见 [JDBC 判定参考](jdbc-capability-contracts.zh-CN.md)。
-
-### 执行与查询边界
-
-SQL Server 已停止新建连接、连接探测和执行支持；`adapters/catalog.json` 是活动支持的唯一索引。
-数据库类型/方言枚举只保留历史解析值，历史连接、任务、原始报告和原始结论不改写。
-新任务及队列中的旧快照均校验退役策略，旧 SQL Server 输入以 `DATABASE_SUPPORT_RETIRED` 失败。
-文档契约检查活动目录、发布资源和中英文支持声明；驱动默认方言及界面选项复用活动目录。
-
-驱动验证在短事务中获取配置和单调修订号；改动驱动类和每次验证均递增修订号，
-回写使用条件更新。旧成功/失败结果、并发验证、删除均返回 `DRIVER_VALIDATION_STALE`，不覆盖新状态。
-Worker 运行和等待限额均在事务外；驱动文件不可变，普通名称、默认方言和 DataSource 元数据不影响类加载验证。
-
-SSE 在事务提交后进入每订阅者的 64 项有界队列，由独立虚拟线程发送，全局最多 256 个订阅者。
-任务行锁保护持久化事件序号；订阅时在同一锁下注册并获取快照，提交后才发送。
-按序号消除快照重复及重排提交回调，终态发送后再关闭；积压超限断开该客户端，以重连快照恢复。
-连接最长 30 秒，浏览器重连；REST 的 10 秒刷新保底。没有持久化事件重放/outbox，进程崩溃时以数据库为准。
-不可中断的网络写占住该名额直到发送线程退出，避免无限补充卡住的线程，不阻塞任务或数据库事务。
-内嵌 Tomcat NIO 使用显式 `server.tomcat.connection-timeout=30s` 限制 socket 写等待；SSE 的 30 秒异步生命周期
-本身不能保证中断正在发送的网络写。线程中断只是尽力而为，替换容器或配置无限传输超时需要提供等效写超时。
-V14 序号仅用于提交状态的排序、去重及拒绝落后于 REST 刷新的 SSE，不提供历史事件重放。
-目录冷加载期间并发请求直接返回 `WORKER_BUSY`，不在短期 Worker 限额外积累无界 HTTP 等待者。
-
-运行列表通过闭合标量投影读取任务页和两组聚合，不加载完整任务/用例实体或逐项解释证据。
-列表 SQL 不选择 `execution_input`；V15 回填去掉逐场景元数据的 `execution_summary`，冻结配置时同步维护。
-`accounting.scenarios` 为空，
-列表 selectionSnapshot 仅含版本、目录数量和时间预算，逐场景信息保留在详情/报告。
-状态组在分页前用数据库条件和索引关联计数筛选，原始任务状态与执行判定保持分离。
 V15 仅更新派生字段，容忍无效历史 JSON（判定未知）。读取 fetch size 和 JDBC 写批次均为 500 行，
 但**全部批次仍在一个 Flyway 长事务内**，并非每批提交。PostgreSQL 中 ALTER TABLE、全量回填和普通
 CREATE INDEX（不是 CONCURRENTLY）一起提交；DDL 锁持有到提交，可能阻塞读写，需预留停机、事务和 WAL 空间。
@@ -418,10 +421,10 @@ V13、V14 各自先提交。V15 失败会同时回滚字段、回填、索引和
 H2 或非事务 DDL 环境不能据此推断同样的恢复保证。
 后续证据/配置写入通过实体 setter 同步派生值；不要绕过 setter 修改原始证据。
 升级会扫描一次历史证据并建立索引，历史库较大时应预留迁移窗口。
-`RunListQueryTest` 使用 H2、12 个任务、每页 10 条、每任务 20/1000 用例，记录 SQL、实体加载和响应大小；这不代表生产延迟或全驱动兼容性。
 
-历史用例证据缺失、不是对象或无法解析时，详情和数据库报告重建不再失败；无法解析的内容标记为
-`LEGACY_EVIDENCE_UNREADABLE`，不生成 JDBC 判定，不修改持久化原始证据或任务/用例状态。
+<a id="known-limitations"></a>
+## 已知限制
 
-SSE 发送线程还必须等待 MVC afterConcurrentHandlingStarted，才可发送快照或消费事件，避免
-SseEmitter 初始化前的内部暂存绕过有界队列；传输 handler 就绪前仍只使用同一订阅者限额。
+数据库组合、Oracle LOB 未归因差异、关闭的历史写入范围及达梦逐项记录，统一见
+[数据库验证记录与限制](database-validation.zh-CN.md#known-limitations)。历史报告和当前实现分别保留。
+平台启动验证边界见[部署指南](deployment.zh-CN.md#validation-limits)。

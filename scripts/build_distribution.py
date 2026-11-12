@@ -12,6 +12,8 @@ import xml.etree.ElementTree as ET
 import zipfile
 from pathlib import Path
 
+from documentation import repository_links
+
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -64,35 +66,23 @@ def build(output: Path) -> tuple[Path, Path, Path]:
         shutil.copy2(PROJECT_ROOT / ".env.example", staging / ".env.example")
         shutil.copy2(PROJECT_ROOT / "LICENSE", staging / "LICENSE")
         (staging / "docs").mkdir()
-        for document in (
+        # Runtime reading path only. Development/CLI sources and adapter evidence stay online.
+        documents = (
+            "README.md", "README.en.md",
             "deployment.md", "deployment.zh-CN.md", "usage.md", "usage.zh-CN.md",
             "jdbc-capability-contracts.md", "jdbc-capability-contracts.zh-CN.md",
-        ):
-            content = (PROJECT_ROOT / "docs" / document).read_text(encoding="utf-8")
-            # Development sources are available online, outside the runtime bundle.
-            for guide in (
-                "development.md", "development.zh-CN.md",
-                "internal-regression.md", "internal-regression.zh-CN.md",
-            ):
-                content = content.replace(f"({guide}", f"(https://github.com/cocoCzl/jdbc-test/blob/master/docs/{guide}")
-            content = content.replace("(../adapters/", "(https://github.com/cocoCzl/jdbc-test/blob/master/adapters/")
-            (staging / "docs" / document).write_text(content, encoding="utf-8")
-        (staging / "README.md").write_text(
-            "# JDBC Test Server\n\n"
-            "Runtime: Java 21 + shell/PowerShell + a prepared dedicated platform PostgreSQL. No Node/npm/Maven/Python.\n\n"
-            "1. Copy `.env.example` to `.env` in this extracted bundle directory only when .env is absent (Linux/macOS: `umask 077; cp -n .env.example .env`).\n"
-            "2. Edit that actual `.env` locally: fill SPRING_DATASOURCE_URL, SPRING_DATASOURCE_USERNAME and SPRING_DATASOURCE_PASSWORD.\n"
-            "URL example: jdbc:postgresql://localhost:5432/jdbc_test (replace host/port/database; no credentials in URL).\n"
-            "3. Run `./jdbc-test start` (PowerShell: `./jdbc-test.ps1 start`); the entry protects the local file and checks configuration.\n"
-            "After authenticating and verifying an empty platform, the tool automatically saves a persistent independent Master Key in .env; existing data requires the original Key.\n"
-            "Startup checks configuration and ports, runs migrations and prints the ready website URL. Ctrl+C stops this launch; data/configuration are retained.\n"
-            "Next time run `./jdbc-test start` again, reusing the original .env and Key. Do not repeat --new-install.\n\n"
-            "在本部署包目录复制 .env.example 为 .env（不覆盖），编辑实际 .env 三项，再执行 ./jdbc-test start。验证全新空平台后自动保存 Key；恢复必须使用原 Key。\n\n"
-            "Existing properties/environment configurations are read by the same unified start; historical start scripts only forward to it. Full guide: [English](docs/deployment.md#native) | [简体中文](docs/deployment.zh-CN.md#native).\n"
-            "First test: [Usage](docs/usage.md) | [使用指南](docs/usage.zh-CN.md).\n"
-            "Never source/eval .env; quoted strings use JSON escapes, single quotes are literal, unquoted values retain spaces/#/$ without expansion. Keep .env private and backed up with PG/data.\n",
-            encoding="utf-8",
+            "database-validation.md", "database-validation.zh-CN.md",
         )
+        included = {path.relative_to(staging).as_posix()
+                    for path in staging.rglob("*") if path.is_file()}
+        included.update(f"docs/{document}" for document in documents)
+        included.update({"README.md", "README.en.md"})
+        for document in documents:
+            content = (PROJECT_ROOT / "docs" / document).read_text(encoding="utf-8")
+            content = repository_links(content, f"docs/{document}", included)
+            (staging / "docs" / document).write_text(content, encoding="utf-8")
+        for language, filename in (("zh", "README.md"), ("en", "README.en.md")):
+            (staging / filename).write_text(bundle_readme(language), encoding="utf-8")
         shutil.move(str(staging), str(directory))
 
     archive = output / f"{name}.tar.gz"
@@ -116,6 +106,65 @@ def build(output: Path) -> tuple[Path, Path, Path]:
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
         path.with_name(path.name + ".sha256").write_text(f"{digest}  {path.name}\n", encoding="utf-8")
     return directory, archive, windows_archive
+
+
+def bundle_readme(language: str) -> str:
+    if language == "zh":
+        return """# JDBC Test 部署包
+
+简体中文 / [English](README.en.md)
+
+在真实数据库上验证 JDBC 驱动接口行为的平台。本包用于运行已构建的网站。
+需要 Java 21、Shell/PowerShell、空闲 8080 端口和具备迁移权限的专用平台 PostgreSQL；无需 Node/npm/Maven/Python。
+
+在**解压后的本部署包根目录**操作：
+
+1. 仅不存在时复制 `.env.example` 为 `.env`；Linux/macOS 用 `umask 077` 后执行 `cp -n .env.example .env`。
+   PowerShell 用 `if (-not (Test-Path '.env')) { Copy-Item .env.example .env }`。
+2. 编辑实际 `.env` 中的 `SPRING_DATASOURCE_URL`、`SPRING_DATASOURCE_USERNAME`、`SPRING_DATASOURCE_PASSWORD`。
+   URL 示例 `jdbc:postgresql://localhost:5432/jdbc_test`，替换实际主机/端口/库名，URL 不含凭据。
+3. 执行 `./jdbc-test start`；Windows 为 `./jdbc-test.ps1 start`。
+   全新空平台检查通过后自动保存独立 Master Key；已有状态必须保留原 Key。
+4. 启动会执行平台迁移，打开打印的就绪地址，默认 `http://127.0.0.1:8080`。
+   Ctrl+C 停止本次进程并保留配置/数据；下次复用原 `.env`、Key 和存储执行同一命令。
+
+`.env` 不可 source/eval：双引号采用 JSON 转义，单引号是字面值，未加引号值保留空格/#/$ 且不展开。
+备份必须包括平台 PG、应用文件与原配置/Key。旧 properties/环境配置仍由同一 start 读取。
+升级不覆盖已有安装，不让新旧 Server 并行写入；V15 需要停机窗口，见[升级](docs/deployment.zh-CN.md#upgrades)。
+
+下一步：[使用指南](docs/usage.zh-CN.md) · [部署与恢复](docs/deployment.zh-CN.md#native) · [文档导航](docs/README.md)。
+目标库另行配置，测试执行 DDL/DML，需要专用授权范围；第三方目标驱动不随包分发。
+网站无内置认证，必须控制访问；隔离 Worker 不能保证恶意驱动安全。结果与清理需分别检查。
+[Apache License 2.0](LICENSE)。
+"""
+    return """# JDBC Test deployment bundle
+
+[简体中文](README.md) / English
+
+A platform for validating JDBC driver interface behavior against real databases. This bundle runs the built website.
+Requires Java 21, shell/PowerShell, free port 8080 and dedicated platform PostgreSQL with migration permissions.
+No Node/npm/Maven/Python is required.
+
+Work in **this extracted bundle root**:
+
+1. Copy `.env.example` to `.env` only if absent; Linux/macOS: `umask 077` then `cp -n .env.example .env`.
+   PowerShell: `if (-not (Test-Path '.env')) { Copy-Item .env.example .env }`.
+2. Edit the actual `.env`: `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD`.
+   Example URL: `jdbc:postgresql://localhost:5432/jdbc_test`; replace host/port/database, no credentials in URL.
+3. Run `./jdbc-test start` (Windows: `./jdbc-test.ps1 start`). An independent Master Key is saved
+   only after new empty-platform checks; existing state requires the original Key.
+4. Startup applies platform migrations. Open the printed ready URL, normally `http://127.0.0.1:8080`.
+   Ctrl+C stops owned processes and retains config/data. Reuse the original `.env`, Key and storage next time.
+
+Never source/eval `.env`: double quotes use JSON escapes, single quotes are literal; unquoted values retain spaces/#/$ without expansion.
+Back up platform PG, application files and original configuration/Key together. Existing properties/environment configurations use the same start.
+Do not overwrite an installation or run old/new Servers concurrently. V15 requires downtime; see [upgrades](docs/deployment.md#upgrades).
+
+Next: [Usage](docs/usage.md) · [Deployment and recovery](docs/deployment.md#native) · [Documentation](docs/README.en.md).
+Configure target databases separately. Tests execute DDL/DML and need an authorized dedicated scope; third-party target drivers are not included.
+The site has no built-in authentication; restrict access. Worker isolation cannot guarantee safety from malicious drivers.
+Inspect results and cleanup separately. [Apache License 2.0](LICENSE).
+"""
 
 
 def main() -> int:

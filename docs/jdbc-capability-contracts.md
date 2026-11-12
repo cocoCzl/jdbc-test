@@ -2,13 +2,28 @@
 
 English | [简体中文](jdbc-capability-contracts.zh-CN.md)
 
+[Documentation](README.en.md) · [English home](../README.en.md)
+
+Contents: [Separate execution, contract and evidence](#dimensions) · [Reviewed metadata and optional operations](#methods) · [Extra suite requirements](#suite-requirements) · [Preparation must preserve the tested semantics](#preparation) · [Evidence, plan requirements and comparison](#comparison)
+
 The reference is **Java SE 21 / JDBC 4.3** API Javadoc and the corresponding JDK `java.sql` source.
 It records reviewed decisions, not a complete audit of every catalog assertion or a product certification.
 The catalog's JDBC baseline still matters: for example, the SQLType overload requires JDBC4.2.
 See [Usage](usage.md#results) for reading results and [known limitations](development.md#known-limitations)
 for unresolved preparation, environment and driver questions.
 
+<a id="dimensions"></a>
 ## Separate execution, contract and evidence
+
+Read five dimensions before turning execution states into JDBC conclusions:
+
+| Dimension | Interpretation |
+|---|---|
+| Task execution status | `SUCCEEDED` means execution/report processing completed, not every case passed; case states are separate |
+| JDBC contract conclusion | Review the exact method, JDBC version prerequisites, actual invocation and normative assertion |
+| Extra suite requirements | `requirementScope=SUITE` is separate from JDBC violations; unmet requirements remain failures |
+| Preparation/environment problems | Missing SQL, privileges, dependencies or Providers do not establish legal unsupported |
+| Cleanup evidence | Independently inspect `cleanupEvidence`; UNKNOWN/absent evidence is not success |
 
 PASSED/FAILED/SKIPPED/ABORTED are execution states. A JDBC conclusion, invocation evidence and a
 SUITE-only requirement are separate dimensions. Preparation failure is not a driver defect; a terminal
@@ -30,6 +45,7 @@ or failure of a prerequisite. `contractInvoked` is case-level evidence, not a co
 JDBC methods. Container/setup failures retain affected descendants without fabricating child invocations.
 Historical reports are not retroactively reclassified.
 
+<a id="methods"></a>
 ## Reviewed metadata and optional operations
 
 | API | Preconditions and assertions | Official method source |
@@ -40,7 +56,7 @@ Historical reports are not retroactively reclassified.
 | Connection.createBlob/createClob/createSQLXML | Only the specific factory invocation is optional; later object operations retain their assertions. | [Connection](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/Connection.html) |
 | SQLXML.setString | Writing may make the object unreadable. Bind it with setSQLXML, then obtain a fresh database SQLXML value and assert exact content; do not require getString on the written object or omit content verification. | [SQLXML lifecycle](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/SQLXML.html) |
 | JdbcRowSet.updateRow | Assert the exact stored value by primary key through a separate connection and restore the same row even on failure. Do not require an insensitive cursor to reflect its own updates when ownUpdatesAreVisible is false. | [ResultSet.updateRow](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/ResultSet.html#updateRow()), [ownUpdatesAreVisible](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/DatabaseMetaData.html#ownUpdatesAreVisible(int)) |
-| CommonDataSource.getParentLogger | Reviewed optional logger call; not a blanket exemption for log-writer methods. | [getParentLogger](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/javax/sql/CommonDataSource.html#getParentLogger()) |
+| CommonDataSource.getParentLogger | Introduced in Java 7 / JDBC 4.1. Reviewed optional logger call, not a log-writer exemption. A driver advertising only 4.0 needs applicability review; no version-based skip. | [getParentLogger](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/javax/sql/CommonDataSource.html#getParentLogger()) |
 | Clob.setCharacterStream(long) | Live Clob/valid one-based position; Writer overwrites or the specific call throws optional exception. Stream write/close, commit, access and cleanup errors are outside the wrapper. | [setCharacterStream](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/Clob.html#setCharacterStream(long)) |
 | Blob.position(byte[],long) | Live Blob, valid pattern/start; exact position/-1 or optional exception at that call. Earlier partial-write/length/byte assertions remain. | [position](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/Blob.html#position(byte%5B%5D,long)) |
 
@@ -48,6 +64,7 @@ Only reviewed call sites use optional wrappers. Other batch/transaction/savepoin
 independent contracts; an exception at one method never establishes support for an entire interface.
 A false declaration plus actual success is retained as `declaration_mismatch`, without hiding later failures.
 
+<a id="suite-requirements"></a>
 ## Extra suite requirements
 
 [DatabaseMetaData.getTypeInfo](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/DatabaseMetaData.html#getTypeInfo())
@@ -73,6 +90,7 @@ The suite also retains these requirements without claiming universal JDBC obliga
 additional conclusion to add again. Worker, Web, persistence, downloads and CLI reports preserve it.
 Unknown errors do not acquire this marker; old unmarked reports are not inferred.
 
+<a id="preparation"></a>
 ## Preparation must preserve the tested semantics
 
 | Area | Required preparation / boundary |
@@ -93,6 +111,7 @@ completion and connection-recovery assertions. See [SLEEP](https://dev.mysql.com
 MySQL [CALL](https://dev.mysql.com/doc/refman/8.0/en/call.html) need not expose each internal UPDATE
 as its own count. Neither rule authorizes arbitrary successful cancellation or arbitrary SQL exceptions.
 
+<a id="comparison"></a>
 ## Evidence, plan requirements and comparison
 
 Suite records `jdbc.capability.metadata.*` and `jdbc.capability.behavior.*` as independent JUnit entries;

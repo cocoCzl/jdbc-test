@@ -2,8 +2,26 @@
 
 [English](deployment.md) | 简体中文
 
+[文档导航](README.md) · [中文首页](../README.md)
+
+目录：[选择部署方式](#choose-mode) · [配置写在哪里？](#configuration-location) · [1. Docker + 自带 PG](#docker-bundled) · [2. Docker + 已有 PG](#docker-external) · [3. 非 Docker 部署包运行 + 已有 PG](#native) · [构建机器与运行机器](#build-bundle) · [进阶：配置规则与旧入口兼容](#configuration-rules) · [停止、备份与恢复](#operations) · [排错](#troubleshooting) · [验证边界](#validation-limits)
+
 修改/调试源码请看[开发指南 → 本地源码启动](development.zh-CN.md#local-source-startup)，使用 `./jdbc-test dev`。只运行网站请选择下面**一种**方式。Native 指**非 Docker 部署包运行**，不是 IDEA 源码启动。所有方式使用统一入口；Windows 将 `./jdbc-test` 换成 `./jdbc-test.ps1`。
 
+<a id="choose-mode"></a>
+## 选择部署方式
+
+| 目标 | 工作目录 | 前置条件 | 入口 |
+|---|---|---|---|
+| 新建 Docker 网站及平台 PG | 源码根目录 | Docker/Compose v2、下载网络 | [自带 PG](#docker-bundled) |
+| Docker 使用专用已有 PG | 源码根目录 | Docker/Compose v2、容器可达的 PG | [外部 PG](#docker-external) |
+| 运行已构建网站 | 解压后部署包根目录 | Java 21、专用已有 PG | [部署包](#native) |
+| 修改源码 | 源码根目录 | JDK 21、Node >=22.12/npm、专用 PG | [开发指南](development.zh-CN.md#local-source-startup) |
+
+每种模式下按“准备 → 配置 → 启动 → 停止”操作，备份、升级与排错在后文统一说明。
+现有安装先找回原配置、Master Key 与存储，不能按全新安装初始化。
+
+<a id="configuration-location"></a>
 ## 配置写在哪里？
 
 | 模式 | 实际配置位置 | 平台 PG URL |
@@ -86,6 +104,7 @@ cp -n .env.example .env
 
 PG 在运行机器本机时填 `jdbc:postgresql://localhost:5432/jdbc_test`，替换实际主机/端口/库名/用户。这里是**解压后的部署包 `.env`**，不是源码配置。入口保护本地文件，只读认证 PG，检查新装状态；全新空平台缺 Key 时自动生成并保存到同一文件，无需交互确认，随后检查产物/端口，启动 Server、等待 health/Catalog 并提供生产页面。正式启动运行平台库 migration，应用文件默认部署包 **`data/`**。已有数据必须原 Key；停止不删除配置/PG/数据。
 
+<a id="windows"></a>
 ### Windows 替代命令集中展示
 
 在对应源码/部署包根目录的 **PowerShell** 中执行，仅选择一种模式，不依次执行所有示例：
@@ -135,6 +154,17 @@ if (-not (Test-Path '.env')) { Copy-Item .env.example .env }
 
 不能 `source`/`eval` `.env` 或 Java `.properties`；它们不是 Shell 脚本，读取规则不同。模板含空秘密，不能直接运行。配置和数据保护权限，Git/构建上下文/归档排除私有内容。Key 仅运行时全新空平台检查通过后自动生成，绝不烘焙进镜像。配置、数据/PG 备份保持私有，不分享实际 `.env`、环境 dump、`docker inspect` 或展开后的 Compose 配置。
 
+<a id="worker-limits"></a>
+### Worker 限额与传输超时
+
+短期 Worker（连接探测、驱动验证、目录及正式任务启动前握手）共享独立限额：
+`JDBC_TEST_MAX_SHORT_WORKERS` 默认 4，`JDBC_TEST_MAX_PENDING_SHORT_WORKERS` 默认 8，
+`JDBC_TEST_SHORT_WORKER_WAIT` 默认 `1s`。满载返回 HTTP 503 / `WORKER_BUSY`，可重试。
+限额不包含正式执行进程；正式任务仍由执行队列约束。目录握手不嵌套占用短期名额。
+
+内嵌 Tomcat 显式使用 30 秒 socket 写超时（`server.tomcat.connection-timeout`），自定义传输层时应保持有限写超时。
+目录首次加载期间其他请求可能收到可重试的 `WORKER_BUSY`。
+
 ### 已有 properties / 环境配置兼容
 
 仅供已有安装：保留部署包 `config/application.properties` 的 `spring.datasource.url/username/password`、`jdbc-test.security.master-key`；或从原受保护的服务环境注入全部四项 `SPRING_DATASOURCE_URL/USERNAME/PASSWORD`、`JDBC_TEST_MASTER_KEY`。**仍执行同一个 `./jdbc-test start`**，不另跑 init/check/start 流程。Spring preflight 在正式启动前检查配置和端口。Properties 是 Java 语法，不是 dotenv，更不能 Shell source。
@@ -147,8 +177,9 @@ if (-not (Test-Path '.env')) { Copy-Item .env.example .env }
 
 始终选择明确 PG 模式，拒绝模式/project 冲突，不改 URL。自定义网络/Compose 存储必须按原 project/配置恢复和审查；默认入口无法推断已移动/更名的历史部署。`JDBC_TEST_SETUP_NETWORK` 选择已有 setup 网络，实际 Server 也需通过审查后的 Compose override 加入同一网络。`JDBC_TEST_SETUP_IMAGE` 仅为高级用户指定本地构建的**当前版本**镜像，不是公共镜像承诺，也不能作为标准构建通过证明。
 
+<a id="恢复检查和日常管理"></a>
 <a id="operations"></a>
-## 恢复、检查和日常管理
+## 停止、备份与恢复
 
 只读 preflight 验证 PG 认证、新装空状态，不执行 migration。正式 dev/start/Compose up 执行 migration；启动检查不跑目标库测试。缺 `.env` 不等于新装：检查所选实际 Compose project/路径/卷、有效数据路径以及提供的 PG schema。已有状态缺 Key 必须恢复**原配置/Key**，不能生成替代。安全随机源失败立即退出；私有 staging、锁和原子写保护半成品与并发覆盖。残留锁须先确认无初始化/启动进程再手工恢复。不执行 DROP、删除卷、重置密码或权限提升。
 
@@ -166,19 +197,9 @@ dev/部署包 Ctrl+C 停止，Docker 用对应命令追加 `--stop`，保留配�
 再整体替换匹配的 Server/Worker/Web 部署包。启动执行 Flyway 后检查保存连接解密及历史报告。
 不修改旧迁移，不假设旧二进制能读取已迁移数据库；回退需相应升级前数据库/文件/配置快照和匹配旧二进制。
 
-<a id="validation-limits"></a>
-## 验证边界
+<a id="upgrades"></a>
+### 升级与 V13–V15 停机窗口
 
-Windows 主机 ACL/PowerShell 进程行为及 IDEA UI Run/Debug 尚未实测。
-标准 Docker 源码构建在镜像仓库认证请求超时后没有成功验证记录，
-替代本地运行镜像检查不能证明标准源码构建成功。
-目标数据库验证另行界定，见[数据库配置](usage.zh-CN.md#database-configuration)
-及[已知限制](development.zh-CN.md#known-limitations)。
-
-短期 Worker（连接探测、驱动验证、目录及正式任务启动前握手）共享独立限额：
-`JDBC_TEST_MAX_SHORT_WORKERS` 默认 4，`JDBC_TEST_MAX_PENDING_SHORT_WORKERS` 默认 8，
-`JDBC_TEST_SHORT_WORKER_WAIT` 默认 `1s`。满载返回 HTTP 503 / `WORKER_BUSY`，可重试。
-限额不包含正式执行进程；正式任务仍由执行队列约束。目录握手不嵌套占用短期名额。
 升级包含 V13 驱动验证修订号、V14 SSE 事件序号和 V15 查询派生列/索引及历史回填。
 先备份平台库、数据目录和原 Master Key，再整体替换匹配的 Server/Worker/Web。
 
@@ -187,5 +208,25 @@ V15 的 500 行 JDBC 批次与普通索引创建仍处于一个 PostgreSQL 事�
 V13/V14 已分别提交。维护窗口内须停止所有应用写入，包括 Server/Worker 和外部写入者，
 不得让新旧版本并行运行。迁移后仅换回旧程序不是已验证的回退方式；应恢复匹配的升级前
 平台库、驱动/任务文件、配置和原 Master Key，并使用对应旧部署包。
-内嵌 Tomcat 显式使用 30 秒 socket 写超时（`server.tomcat.connection-timeout`），自定义传输层时应保持有限写超时。
-目录首次加载期间其他请求可能收到可重试的 `WORKER_BUSY`。
+
+<a id="troubleshooting"></a>
+## 排错
+
+| 现象 | 检查项 | 处理 |
+|---|---|---|
+| 平台 PG 连接失败 | 实际模式的 URL、库名、账号与网络 | 在实际 `.env` 修正；容器的 localhost 只指自身，宿主 PG 见外部 PG 章节 |
+| 端口占用 | 就绪错误中的地址、已有服务归属 | 选择空闲端口或自行停止确认归属的服务，不终止未知进程 |
+| `WORKER_BUSY` / HTTP 503 | 短期 Worker 限额、冷目录加载 | 等待后重试；检查预算与负载，见 [Worker 限额](#worker-limits) |
+| 驱动依赖缺失 | 加载诊断、驱动所需依赖 | 重新上传完整多 JAR 包，见[上传驱动](usage.zh-CN.md#upload-driver) |
+| 范围、大小写或权限错误 | 目标 schema/catalog、实际存储名称、所选用例权限 | 修正专用范围及必要权限，不授予宽泛业务库权限 |
+| 原 Master Key 缺失或解密失败 | 原配置及与平台库匹配的备份 | 停止启动并恢复原 Key；重新生成不能解密已有凭据 |
+| 清理 UNKNOWN / FAILED | `cleanupEvidence`、精确对象登记 | 先核实归属，再处理残留；不删整个 schema/卷，见[清理](usage.zh-CN.md#cleanup) |
+
+<a id="validation-limits"></a>
+## 验证边界
+
+Windows 主机 ACL/PowerShell 进程行为及 IDEA UI Run/Debug 尚未实测。
+标准 Docker 源码构建在镜像仓库认证请求超时后没有成功验证记录，
+替代本地运行镜像检查不能证明标准源码构建成功。
+目标数据库验证另行界定，见[数据库配置](usage.zh-CN.md#database-configuration)
+及[已知限制](development.zh-CN.md#known-limitations)。

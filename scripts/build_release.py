@@ -7,6 +7,8 @@ import re
 import zipfile
 from pathlib import Path
 
+from documentation import repository_links
+
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 EXCLUDED_PARTS = {".git", ".idea", ".vscode", "target", "report", "configs", "__pycache__", ".venv"}
@@ -14,6 +16,7 @@ INCLUDED_PATHS = (
     ".gitignore",
     "Dockerfile.cli",
     "LICENSE",
+    "README.en.md",
     "README.zh-CN.md",
     "README.md",
     "adapters",
@@ -48,9 +51,16 @@ def build(output: Path) -> tuple[Path, Path]:
     archive = output / f"jdbc-test-{version}.zip"
     prefix = f"jdbc-test-{version}"
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
-        for path in release_files():
+        files = release_files()
+        included = {path.relative_to(PROJECT_ROOT).as_posix() for path in files}
+        for path in files:
             relative = path.relative_to(PROJECT_ROOT)
-            bundle.write(path, f"{prefix}/{relative.as_posix()}")
+            destination = f"{prefix}/{relative.as_posix()}"
+            if path.suffix == ".md":
+                content = repository_links(path.read_text(encoding="utf-8"), relative.as_posix(), included)
+                bundle.writestr(destination, content)
+            else:
+                bundle.write(path, destination)
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     checksum = archive.with_suffix(archive.suffix + ".sha256")
     checksum.write_text(f"{digest}  {archive.name}\n", encoding="utf-8")

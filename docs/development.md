@@ -2,6 +2,10 @@
 
 English | [简体中文](development.zh-CN.md)
 
+[Documentation](README.en.md) · [English home](../README.en.md)
+
+Contents: [Local source startup](#local-source-startup) · [Architecture](#architecture) · [Adding database support](#adding-database-support) · [Adding scenarios and preparation](#adding-scenarios) · [API and persistence contracts](#api) · [Worker protocol](#worker-protocol) · [Java formatting](#java-style) · [Frontend maintenance](#frontend) · [Checks](#testing) · [Upgrade compatibility](#upgrade-compatibility) · [Known limitations](#known-limitations)
+
 User operations belong in [Usage](usage.md); runtime configuration, backup and upgrades in
 [Deployment](deployment.md). This guide covers source architecture and maintenance.
 
@@ -48,6 +52,7 @@ The manual frontend uses `npm ci` then `npm run dev` in `jdbc-test-web`; set non
 `JDBC_TEST_DEV_API_URL` in that Vite process for a nondefault backend. Keep secrets out of shared
 IDE settings/arguments and stop each manually owned process.
 
+<a id="architecture"></a>
 ## Architecture
 
 ```text
@@ -74,6 +79,230 @@ historical migrations. Password envelopes use AES-256-GCM and the persistent 32-
 Queued credentials are separately encrypted and removed on handoff/terminal/recovery paths.
 Driver files live in `<data-dir>/drivers/`; task workspaces in `<data-dir>/runs/`.
 
+<a id="adding-database-support"></a>
+## Adding database support
+
+`adapters/catalog.json` is the single built-in index. Each `adapters/<id>/adapter.json` owns its name,
+trust, identity/version rules, capabilities, namespace and assets. Java and Python strictly validate
+UTF-8 JSON, duplicate keys, types, paths, finite values and size/depth limits. Core builds one immutable
+registry without loading Suite or drivers. Shared fixtures live in
+`jdbc-test-core/src/test/resources/adapter-contract`. Unknown extensions are retained, not automatically executed.
+Identity regexes must work in both Java and Python; version declarations are not compatibility evidence.
+
+For a product reusing implemented SQL behavior, add a unique manifest, truthful identity/capabilities
+and `candidate`/`local` trust, then register its ID. Reuse `assets.directory` or add `ddl/<asset-id>`,
+`dml/<asset-id>` and `pool/<asset-id>.yaml`. No product enum/frontend branch is needed for a generic
+registry entry. Driver presets are independent editable form hints, not adapter identity or capability rules.
+
+A distinct dialect requires implemented `SqlDialect` scope, quoting, URL parsing, fixture lookup and
+ownership cleanup with failure tests. Current finite behaviors are `postgresql`, `mysql`, `oracle`,
+`dm`; product identity remains independent. DM preserves exact schema case and requires
+no catalog, unlike Oracle folding or MySQL catalog selection. Audit shared logic for existing products.
+The DM audit follows the same registry → Server snapshot → isolated Worker → Suite assets flow.
+All eleven declared fixture areas and `pool/dm.yaml` exist; no Oracle fallback or second executor is used.
+Schema identifiers retain the shared `[A-Za-z][A-Za-z0-9_]{0,62}` policy (numeric-only, leading underscore,
+quoted delimiters and non-ASCII names are rejected). Each checkout sets and checks the exact name;
+close errors are suppressed on the original scope failure. Only successful journaled CREATEs are
+eligible for exact-object cleanup; uncertain CREATEs stay visible, without schema drops or scans.
+The adapter API exposes immutable historical capability declarations and a candidate qualification
+note; it does not certify driver behavior. Public provider interface/constructor availability is a
+prerequisite; actual constructor, setter and JDBC-call behavior still needs observation.
+Connection-probe diagnostics retain bounded next-exception, cause and suppressed branches with
+SQLState/vendor codes, redact credentials, and publish success only after the connection closes.
+
+A product enum alone does not implement support. Never change public assertions or deselect FULL
+cases to manufacture compatibility. Real authorized verification is required before widening claims.
+
+For the read-only external DM smoke, first build the packaged Worker, then supply private environment
+variables `DM_JDBC_JAR`, `DM_JDBC_URL`, `DM_USERNAME`, `DM_PASSWORD`, `DM_SCHEMA` and run:
+
+```sh
+./mvnw -pl jdbc-test-worker -am -Dtest=WorkerDmIT -Dsurefire.excluded.groups=none test
+```
+
+This opt-in integration test validates loading and the actual connected metadata; it does not prove
+writable suite compatibility. The browser integration `e2e/dm.real.spec.ts` requires
+`JDBC_TEST_DM_REAL=true`, explicit `JDBC_TEST_DM_CONNECTION_ID`/`JDBC_TEST_DM_RUN_ID`, `DM_SCHEMA`,
+and a disposable platform URL. It probes/saves that connection and checks bilingual report/history
+readback without creating another task. Use the normal task flow for authorized CORE/FULL and retain
+each task's original result counts, observations and cleanupEvidence. Never commit private JARs or env files.
+
+Maintain assets in source; custom adapter/SQL package upload and JSON imports are retired.
+Multi-JAR drivers use Web upload or a CLI local directory. The CLI Maven resolver loads the primary
+JAR only, not a complete transitive bundle. No online Web Maven importer exists.
+[Examples](../examples/README.md) cover explicit compatible-dialect selection.
+
+<a id="adding-scenarios"></a>
+## Adding scenarios and preparation
+
+Add the test in Suite and its stable entry in the scenario inventory. Keep category, JDBC baseline,
+applicability and execution prerequisites explicit. Use the shared selector and catalog, never a
+second hard-coded count. FULL selects all applicable scenarios, CORE uses maintained inventory IDs,
+and CUSTOM intersects modules/includes before exclusions. Empty, stale or unknown selections fail.
+Capability false does not skip a standard call; vendor-extension applicability is independent.
+There are currently no implemented vendor API scenarios.
+
+`UseSqlScripts` prepares resources lazily per selected method/class; an empty method annotation can
+override class scripts. Keep no-table methods independent. Use explicit placeholders and ownership
+APIs for quoted, qualified objects and cleanup; never arbitrary word rewriting or broad DROP.
+Validate native fixture shape before asserting behavior. SQL NULL observations and factory calls do
+not replace ARRAY/ROWID/REF_CURSOR round trips. Missing fixtures/dependencies/permissions are
+preparation or environment problems. Preserve original SQLState, cause and phase.
+
+Use precise method-level `JdbcContracts` decisions and separate `SuiteRequirementAssertionError`
+for extra suite requirements. Do not infer permission from a flag, SQLState or exception message.
+See [JDBC reference](jdbc-capability-contracts.md). Track cleanup independently from case completion;
+missing historical evidence remains unknown. New real checks create new reports, never rewrite old FULL results.
+
+### Driver-owned providers
+
+Configure actual public classes/setters; provider absence is an unmet prerequisite. Example CLI/runtime YAML:
+
+```yaml
+db:
+  data_sources:
+    dataSource:
+      className: org.postgresql.ds.PGSimpleDataSource
+      urlProperty: URL
+      userProperty: user
+      passwordProperty: password
+    connectionPoolDataSource:
+      className: org.postgresql.ds.PGConnectionPoolDataSource
+    xaDataSource:
+      className: org.postgresql.xa.PGXADataSource
+```
+
+API `dataSources` uses the same definitions. Defaults are `URL/user/password`; additional properties
+map to public scalar bean setters. Provider tests use uploaded driver implementations, not the
+platform connection facade. XA needs database prerequisites. CLI `db.password_env` resolves a single
+variable literally; unset differs from empty, and simultaneous literal/environment passwords fail.
+
+<a id="api"></a>
+## API and persistence contracts
+
+Resource DTOs have no universal success envelope. Lists use bounded `page/size` (default 20, max 100)
+and `{items,page,size,totalElements,totalPages}`; errors are RFC Problem Details with a stable code.
+Creation returns 201/Location, deletion 204, protected historical references 409.
+
+| Routes | Operations |
+|---|---|
+| `/api/drivers`, `/api/drivers/presets`, `/api/drivers/{id}` | Multipart upload/list, suggestions, read/PATCH/delete |
+| `/api/drivers/{id}/validate` | POST isolated validation |
+| `/api/adapters` | GET built-in connection options |
+| `/api/connections`, `/api/connections/{id}` | Create/list, read/PATCH/delete |
+| `/api/connections/test`, `/api/connections/{id}/test` | POST draft/saved probes |
+| `/api/test-catalog` | GET profiles/modules/current counts |
+| `/api/runs`, `/api/runs/{id}` | Create/list, read snapshots/progress |
+| `/api/runs/{id}/cancel`, `/api/runs/{id}/events` | POST cancel, GET SSE |
+| `/api/runs/{id}/results`, `/report`, `/report.json` under the run | Results, summary/failures and JSON evidence |
+
+Driver upload uses multipart `metadata` and repeated `files`; defaults 20 artifacts, 100 MiB each,
+250 MiB total. Size/SHA-256 and sorted-digest package fingerprints identify immutable binaries.
+`loadedArtifact` records the actual defining JAR and independent manifest fields. Driver API integer
+versions/compliance are declarations, not connected release evidence. Invalid protocol metadata fails closed.
+
+Connection passwords are write-only (`hasSavedPassword`). `savePassword` saves/replaces;
+`clearSavedPassword` conflicts with any supplied password, including empty. Omitted fields preserve
+saved values, explicit empty clears scope or selects an empty password according to the field.
+Probes use Worker `Driver.connect`, read best-effort metadata and read-only Oracle/DM configuration,
+then close without test SQL. Ordinary validation only loads the driver. Used packages/profiles cannot be deleted.
+
+Runs freeze scope/consent, selection, adapter execution and nonsecret settings at enqueue. Optional
+`name` is limited to 200 characters; old unnamed runs use a display fallback. Scheduler is local FIFO
+with bounded Worker concurrency. Locks prevent terminal/cancel races. Filter groups are WAITING,
+IN_PROGRESS, COMPLETED, ABNORMAL and CANCELLED; exact `status` and `statusGroup` cannot be combined.
+Filters and counts apply before pagination. Results combine status and module with AND and a stable ID tie break.
+
+Normal execution progresses QUEUED → PREPARING → RUNNING → GENERATING_REPORT → SUCCEEDED.
+SUCCEEDED means processed, not all cases passed. Only validated exit 4/TEST_FAILURE with no independent
+execution issues and successful cleanup can be normally completed with unsuccessful cases.
+Other execution/report/cleanup failures remain abnormal. The Server cross-checks selection, events,
+report, counts and cleanup. Persisted reconstructions identify `source` and `workerReportValidated`.
+Legacy outcomes are interpreted read-only only when retained evidence is sufficient; raw reports remain unchanged.
+
+<a id="execution-and-query-boundaries"></a>
+<a id="执行与查询边界"></a>
+### Execution and query boundaries
+
+SQL Server no longer supports new connections, probes or executions. `adapters/catalog.json` is the
+active support index. Product/dialect enum values remain for historical parsing; existing connections,
+run statuses, evidence and raw reports are not rewritten. New runs and queued frozen inputs enforce
+retirement; old SQL Server inputs fail with `DATABASE_SUPPORT_RETIRED`. Contract checks tie packaged
+resources and bilingual support declarations to the registry; driver default dialects and UI options use it.
+
+Driver validation takes a configuration snapshot and monotonic revision in a short transaction.
+Driver-class edits and every validation advance the revision; results use a conditional update.
+Stale success/failure, competing validation and deletion return `DRIVER_VALIDATION_STALE` without
+overwriting current state. Worker execution/admission never spans a database transaction. Artifacts
+are immutable; names, default dialect and DataSource metadata do not change class-loading validation.
+
+### SSE delivery
+
+SSE queues only after commit, with 64 pending events per subscriber, independent virtual senders and
+256 subscribers globally. The run row lock protects persistent event sequences and snapshot registration.
+Snapshot sequences discard duplicates and reorder interleaving commit callbacks. Terminal sends precede
+completion. Overflow disconnects that client; a new snapshot recovers persisted state. Streams expire
+after 30 seconds and browsers reconnect; REST refreshes active runs every 10 seconds. This single-server
+design has no durable event replay/outbox. A noninterruptible send can retain one bounded subscriber
+slot until the transport write ends, without blocking Workers or database transactions. Embedded
+Tomcat NIO uses the explicit `server.tomcat.connection-timeout=30s` for socket writes; the 30-second
+SSE async lifetime alone is not a write cancellation guarantee. Interrupts are best effort; replacing
+Tomcat or setting an infinite transport timeout requires equivalent bounded write handling. Quota is
+released when the sender exits, so stuck sends cannot create unbounded replacement senders.
+V14 sequences order committed changes and reject stale/duplicate updates, including delayed SSE after
+newer REST refreshes; they do not replay events. A cold catalog load rejects concurrent requests with
+`WORKER_BUSY` rather than accumulating HTTP waiters outside short Worker admission.
+
+The SSE sender also waits for MVC afterConcurrentHandlingStarted before draining any event, so
+SseEmitter cannot bypass admission via its pre-initialization early-send buffer. The snapshot and
+realtime events remain in the same bounded subscriber queue until the transport handler is ready.
+
+### Lists and historical evidence
+
+Run lists use a closed scalar page projection and two grouped projections, without full run/case entities
+or repeated evidence parsing. List SQL excludes `execution_input`; V15 backfills `execution_summary`
+without per-scenario selection metadata, maintained when execution inputs are frozen.
+List `accounting.scenarios` is empty; list selectionSnapshot retains only catalog version/count and budgets.
+Scenario detail remains available from run details/reports. Status-group predicates and indexed correlated
+counts execute before paging, preserving original status versus interpreted execution outcome.
+`RunListQueryTest` measures SQL, entity loads and bytes on H2 with 12 runs, page size 10 and 20/1000 cases
+per run. These are fixture measurements, not production latency or driver compatibility claims.
+
+Historical case evidence that is absent, non-object or malformed no longer breaks database-backed
+details/report reconstruction. Invalid content is marked `LEGACY_EVIDENCE_UNREADABLE` without fabricating
+a JDBC conclusion; the persisted raw evidence and original case/run statuses remain unchanged.
+
+
+<a id="worker-protocol"></a>
+## Worker protocol
+
+Deploy matching Server and Worker. Protocol 2 reads one stdin JSON request and writes stdout NDJSON;
+credentials never go in argv. A per-run `URLClassLoader` with platform parent calls the selected
+`Driver.connect` without global registration. Driver output cannot share the public protocol channel;
+diagnostics are bounded/redacted, with the recognition limits documented in [Usage](usage.md).
+
+| Mode | Purpose |
+|---|---|
+| Default | One run |
+| `--describe-catalog`, `--catalog-smoke` | Catalog without target drivers; packaged-resource smoke |
+| `--validate-driver` | Class loading and Driver metadata, no connection |
+| `--probe-connection` | Read-only connection/metadata probe, no suite SQL |
+
+See [WorkerRunRequest.java](../jdbc-test-worker/src/main/java/com/jdbctest/worker/WorkerRunRequest.java).
+Execution requires protocol 2, scope/consent, prefix `j` plus 20 lowercase hex digits, complete boolean
+capability declarations and frozen adapter selection. Events cover run/module/case lifecycle, metadata
+and cleanup. Wrong IDs, unexpected/duplicate results or incompatible protocol fail explicitly.
+Report schema is 2.0.0 at `<workspace>/report/report.json`.
+Worker exits: 0 completed (still validate report), 2 request/selection, 3 driver/connection setup,
+4 execution/timeout, 5 catalog/workspace/report/internal error. These differ from CLI comparison exits.
+
+Task budget (60–7200 seconds; UI default 1800) covers preparation/execution/cleanup. The default JUnit
+method timeout is 60000 ms, SAME_THREAD; explicit `@Timeout` wins. Discovery and callbacks use the task
+budget, not the method timer. Interrupt cannot force JDBC return. Never race a hung call with cleanup
+or another case. The Worker exits at budget; Server allows 5 seconds plus configured termination grace
+(default 2) before forced termination. Not-run/incomplete and uncertain cleanup remain explicit.
+
+<a id="java-style"></a>
 ## Java formatting
 
 The unchanged source is [intellij-java-google-style.xml](../code-style/intellij-java-google-style.xml)
@@ -185,173 +414,7 @@ changes, configuration, Keys, data and attachments. Clean only resources created
 session, including on failure; do not rewrite history or push/PR/tag/release without authorization.
 
 
-## Adding database support
-
-`adapters/catalog.json` is the single built-in index. Each `adapters/<id>/adapter.json` owns its name,
-trust, identity/version rules, capabilities, namespace and assets. Java and Python strictly validate
-UTF-8 JSON, duplicate keys, types, paths, finite values and size/depth limits. Core builds one immutable
-registry without loading Suite or drivers. Shared fixtures live in
-`jdbc-test-core/src/test/resources/adapter-contract`. Unknown extensions are retained, not automatically executed.
-Identity regexes must work in both Java and Python; version declarations are not compatibility evidence.
-
-For a product reusing implemented SQL behavior, add a unique manifest, truthful identity/capabilities
-and `candidate`/`local` trust, then register its ID. Reuse `assets.directory` or add `ddl/<asset-id>`,
-`dml/<asset-id>` and `pool/<asset-id>.yaml`. No product enum/frontend branch is needed for a generic
-registry entry. Driver presets are independent editable form hints, not adapter identity or capability rules.
-
-A distinct dialect requires implemented `SqlDialect` scope, quoting, URL parsing, fixture lookup and
-ownership cleanup with failure tests. Current finite behaviors are `postgresql`, `mysql`, `oracle`,
-`dm`; product identity remains independent. DM preserves exact schema case and requires
-no catalog, unlike Oracle folding or MySQL catalog selection. Audit shared logic for existing products.
-The DM audit follows the same registry → Server snapshot → isolated Worker → Suite assets flow.
-All eleven declared fixture areas and `pool/dm.yaml` exist; no Oracle fallback or second executor is used.
-Schema identifiers retain the shared `[A-Za-z][A-Za-z0-9_]{0,62}` policy (numeric-only, leading underscore,
-quoted delimiters and non-ASCII names are rejected). Each checkout sets and checks the exact name;
-close errors are suppressed on the original scope failure. Only successful journaled CREATEs are
-eligible for exact-object cleanup; uncertain CREATEs stay visible, without schema drops or scans.
-The adapter API exposes immutable historical capability declarations and a candidate qualification
-note; it does not certify driver behavior. Public provider interface/constructor availability is a
-prerequisite; actual constructor, setter and JDBC-call behavior still needs observation.
-Connection-probe diagnostics retain bounded next-exception, cause and suppressed branches with
-SQLState/vendor codes, redact credentials, and publish success only after the connection closes.
-
-A product enum alone does not implement support. Never change public assertions or deselect FULL
-cases to manufacture compatibility. Real authorized verification is required before widening claims.
-
-For the read-only external DM smoke, first build the packaged Worker, then supply private environment
-variables `DM_JDBC_JAR`, `DM_JDBC_URL`, `DM_USERNAME`, `DM_PASSWORD`, `DM_SCHEMA` and run:
-
-```sh
-./mvnw -pl jdbc-test-worker -am -Dtest=WorkerDmIT -Dsurefire.excluded.groups=none test
-```
-
-This opt-in integration test validates loading and the actual connected metadata; it does not prove
-writable suite compatibility. The browser integration `e2e/dm.real.spec.ts` requires
-`JDBC_TEST_DM_REAL=true`, explicit `JDBC_TEST_DM_CONNECTION_ID`/`JDBC_TEST_DM_RUN_ID`, `DM_SCHEMA`,
-and a disposable platform URL. It probes/saves that connection and checks bilingual report/history
-readback without creating another task. Use the normal task flow for authorized CORE/FULL and retain
-each task's original result counts, observations and cleanupEvidence. Never commit private JARs or env files.
-
-Maintain assets in source; custom adapter/SQL package upload and JSON imports are retired.
-Multi-JAR drivers use Web upload or a CLI local directory. The CLI Maven resolver loads the primary
-JAR only, not a complete transitive bundle. No online Web Maven importer exists.
-[Examples](../examples/README.md) cover explicit compatible-dialect selection.
-
-## Adding scenarios and preparation
-
-Add the test in Suite and its stable entry in the scenario inventory. Keep category, JDBC baseline,
-applicability and execution prerequisites explicit. Use the shared selector and catalog, never a
-second hard-coded count. FULL selects all applicable scenarios, CORE uses maintained inventory IDs,
-and CUSTOM intersects modules/includes before exclusions. Empty, stale or unknown selections fail.
-Capability false does not skip a standard call; vendor-extension applicability is independent.
-There are currently no implemented vendor API scenarios.
-
-`UseSqlScripts` prepares resources lazily per selected method/class; an empty method annotation can
-override class scripts. Keep no-table methods independent. Use explicit placeholders and ownership
-APIs for quoted, qualified objects and cleanup; never arbitrary word rewriting or broad DROP.
-Validate native fixture shape before asserting behavior. SQL NULL observations and factory calls do
-not replace ARRAY/ROWID/REF_CURSOR round trips. Missing fixtures/dependencies/permissions are
-preparation or environment problems. Preserve original SQLState, cause and phase.
-
-Use precise method-level `JdbcContracts` decisions and separate `SuiteRequirementAssertionError`
-for extra suite requirements. Do not infer permission from a flag, SQLState or exception message.
-See [JDBC reference](jdbc-capability-contracts.md). Track cleanup independently from case completion;
-missing historical evidence remains unknown. New real checks create new reports, never rewrite old FULL results.
-
-### Driver-owned providers
-
-Configure actual public classes/setters; provider absence is an unmet prerequisite. Example CLI/runtime YAML:
-
-```yaml
-db:
-  data_sources:
-    dataSource:
-      className: org.postgresql.ds.PGSimpleDataSource
-      urlProperty: URL
-      userProperty: user
-      passwordProperty: password
-    connectionPoolDataSource:
-      className: org.postgresql.ds.PGConnectionPoolDataSource
-    xaDataSource:
-      className: org.postgresql.xa.PGXADataSource
-```
-
-API `dataSources` uses the same definitions. Defaults are `URL/user/password`; additional properties
-map to public scalar bean setters. Provider tests use uploaded driver implementations, not the
-platform connection facade. XA needs database prerequisites. CLI `db.password_env` resolves a single
-variable literally; unset differs from empty, and simultaneous literal/environment passwords fail.
-
-## API and persistence contracts
-
-Resource DTOs have no universal success envelope. Lists use bounded `page/size` (default 20, max 100)
-and `{items,page,size,totalElements,totalPages}`; errors are RFC Problem Details with a stable code.
-Creation returns 201/Location, deletion 204, protected historical references 409.
-
-| Routes | Operations |
-|---|---|
-| `/api/drivers`, `/api/drivers/presets`, `/api/drivers/{id}` | Multipart upload/list, suggestions, read/PATCH/delete |
-| `/api/drivers/{id}/validate` | POST isolated validation |
-| `/api/adapters` | GET built-in connection options |
-| `/api/connections`, `/api/connections/{id}` | Create/list, read/PATCH/delete |
-| `/api/connections/test`, `/api/connections/{id}/test` | POST draft/saved probes |
-| `/api/test-catalog` | GET profiles/modules/current counts |
-| `/api/runs`, `/api/runs/{id}` | Create/list, read snapshots/progress |
-| `/api/runs/{id}/cancel`, `/api/runs/{id}/events` | POST cancel, GET SSE |
-| `/api/runs/{id}/results`, `/report`, `/report.json` under the run | Results, summary/failures and JSON evidence |
-
-Driver upload uses multipart `metadata` and repeated `files`; defaults 20 artifacts, 100 MiB each,
-250 MiB total. Size/SHA-256 and sorted-digest package fingerprints identify immutable binaries.
-`loadedArtifact` records the actual defining JAR and independent manifest fields. Driver API integer
-versions/compliance are declarations, not connected release evidence. Invalid protocol metadata fails closed.
-
-Connection passwords are write-only (`hasSavedPassword`). `savePassword` saves/replaces;
-`clearSavedPassword` conflicts with any supplied password, including empty. Omitted fields preserve
-saved values, explicit empty clears scope or selects an empty password according to the field.
-Probes use Worker `Driver.connect`, read best-effort metadata and read-only Oracle/DM configuration,
-then close without test SQL. Ordinary validation only loads the driver. Used packages/profiles cannot be deleted.
-
-Runs freeze scope/consent, selection, adapter execution and nonsecret settings at enqueue. Optional
-`name` is limited to 200 characters; old unnamed runs use a display fallback. Scheduler is local FIFO
-with bounded Worker concurrency. Locks prevent terminal/cancel races. Filter groups are WAITING,
-IN_PROGRESS, COMPLETED, ABNORMAL and CANCELLED; exact `status` and `statusGroup` cannot be combined.
-Filters and counts apply before pagination. Results combine status and module with AND and a stable ID tie break.
-
-Normal execution progresses QUEUED → PREPARING → RUNNING → GENERATING_REPORT → SUCCEEDED.
-SUCCEEDED means processed, not all cases passed. Only validated exit 4/TEST_FAILURE with no independent
-execution issues and successful cleanup can be normally completed with unsuccessful cases.
-Other execution/report/cleanup failures remain abnormal. The Server cross-checks selection, events,
-report, counts and cleanup. Persisted reconstructions identify `source` and `workerReportValidated`.
-Legacy outcomes are interpreted read-only only when retained evidence is sufficient; raw reports remain unchanged.
-
-<a id="worker-protocol"></a>
-## Worker protocol
-
-Deploy matching Server and Worker. Protocol 2 reads one stdin JSON request and writes stdout NDJSON;
-credentials never go in argv. A per-run `URLClassLoader` with platform parent calls the selected
-`Driver.connect` without global registration. Driver output cannot share the public protocol channel;
-diagnostics are bounded/redacted, with the recognition limits documented in [Usage](usage.md).
-
-| Mode | Purpose |
-|---|---|
-| Default | One run |
-| `--describe-catalog`, `--catalog-smoke` | Catalog without target drivers; packaged-resource smoke |
-| `--validate-driver` | Class loading and Driver metadata, no connection |
-| `--probe-connection` | Read-only connection/metadata probe, no suite SQL |
-
-See [WorkerRunRequest.java](../jdbc-test-worker/src/main/java/com/jdbctest/worker/WorkerRunRequest.java).
-Execution requires protocol 2, scope/consent, prefix `j` plus 20 lowercase hex digits, complete boolean
-capability declarations and frozen adapter selection. Events cover run/module/case lifecycle, metadata
-and cleanup. Wrong IDs, unexpected/duplicate results or incompatible protocol fail explicitly.
-Report schema is 2.0.0 at `<workspace>/report/report.json`.
-Worker exits: 0 completed (still validate report), 2 request/selection, 3 driver/connection setup,
-4 execution/timeout, 5 catalog/workspace/report/internal error. These differ from CLI comparison exits.
-
-Task budget (60–7200 seconds; UI default 1800) covers preparation/execution/cleanup. The default JUnit
-method timeout is 60000 ms, SAME_THREAD; explicit `@Timeout` wins. Discovery and callbacks use the task
-budget, not the method timer. Interrupt cannot force JDBC return. Never race a hung call with cleanup
-or another case. The Worker exits at budget; Server allows 5 seconds plus configured termination grace
-(default 2) before forced termination. Not-run/incomplete and uncertain cleanup remain explicit.
-
+<a id="frontend"></a>
 ## Frontend maintenance
 
 Preserve existing layout/interactions. Use shared `components/ui`, `components/common` and
@@ -398,6 +461,7 @@ in ignored local paths; summarize routine verification in the response. Update f
 user operations or maintenance change, directly in the corresponding existing guide. Keep the current
 document structure; do not add separate documents for each development/acceptance round or database.
 
+<a id="upgrade-compatibility"></a>
 ## Upgrade compatibility
 
 V9/V10 and other historical migrations remain. Retired package tables/history are readable and not
@@ -408,68 +472,8 @@ Restart interrupts previous nonterminal runs with SERVER_RESTART. Server/Worker 
 unknown retired package execution fields fail instead of falling back silently.
 See [deployment upgrade/backup rules](deployment.md#operations) and [driver A/B regression](internal-regression.md).
 
-<a id="known-limitations"></a>
-## Known limitations
+### V13–V15 derived-field migrations
 
-These are active boundaries, not an exhaustive certification matrix. Preserve original assertions
-and historical reports; a targeted follow-up never changes an earlier FULL pass rate.
-
-| Area | Current boundary / next condition |
-|---|---|
-| PostgreSQL result sequence | Platform fixture gap: native implicit result sequence equivalent to the intended procedure contract is not prepared. Cursor-name lists or client multistatements are not substitutes. |
-| PostgreSQL / Kingbase two-phase XA | Observed max_prepared_transactions=0 blocks prepare-dependent branches. DBA must provide an enabled dedicated environment; independent XA branches continue. |
-| Kingbase metadata latency | An early getTypeInfo call exhausted a task budget; a later broader run completed. Cause remains undetermined. Reproduce only that call in a bounded isolated process before attributing a driver hang. |
-| Kingbase ROWID | Suspected driver NULL mapping defect: SQL NULL returned a non-null KbRowId with wasNull=true and getBytes NPE. Binding/update/delete/batch branches not reached remain unverified. |
-| PostgreSQL DataSource log writer | Suspected driver behavior; retain the assertion and minimal evidence pending method-contract/vendor review. |
-| PostgreSQL holdability and generated keys by index | Evidence insufficient; NOT_EVALUATED. PSQLException/SQLState0A000 does not by itself authorize unsupported. |
-| Kingbase / MySQL procedure update counts | Internal statement count visibility is an extra suite requirement, not a universal JDBC guarantee; unmet assertions remain failures with SUITE scope. |
-| MySQL optional paths | Observed allowed-unsupported ARRAY/ROWID/SQLType registration calls do not validate downstream Array methods, binding or native cursor output. Preserve method-scoped evidence; no whole-interface support claim. |
-| Oracle recorded execution failures | Parameter ordinals, cancellation/query timeout, batch generated keys and SQLXML stream text still require per-method attribution/revalidation; new preparation resources do not resolve these observations. |
-| Oracle resources | Native array/multiple-result preparation and nested dependency cleanup have automated checks but no real Oracle revalidation. Batch-key-by-name NPE attribution and terminal-page/filter/download review remain open. A reachable authorized PDB with quota/permissions is required. |
-| Oracle LOB inventory | Two pre-existing dictionary entries were absent after a historical run. Cause and historical parent mapping remain unknown; neither business-data loss nor absence of impact is established. Synthetic ownership tests do not explain/fix it. Keep that write scope closed; new writes need an independent dedicated account/schema. Attribution needs existing pre-run mapping/backups/audit/redo/capture identity, not another blind FULL. |
-| Historical evidence | Some earlier MySQL/Kingbase original FULL reports are unavailable. Sanitized excerpts are not original reports; do not reconstruct or certify missing history. Maintained adapter evidence stays in adapters. |
-| Dameng | Candidate: historical DM DBMS 8.1.3.162 + driver 8.1.2.192 FULL remains 249/21 with separate followups. The independent 2026-11-04 driver 8.1.3.62 CORE is 151/2 and FULL 254/16: eight contract violations, three other JDBC outcomes not evaluated, five extra suite failures. Owned-object cleanup is 18/18 and 41/41; 912 existing object metadata records match before/after. Intermediate driver releases and other modes/patches are unvalidated. Usage contains the per-capability audit; standalone observations do not confirm vendor defects. |
-| Platform launch validation | Windows host ACL/PowerShell process behavior and IDEA UI remain unverified. Standard Docker source build has no successful retained verification after a registry authentication timeout; alternate local-image execution is not source-build proof. |
-
-Missing fixtures are not driver defects; legal unsupported is not a feature pass. REF/ROWID type
-presence, automatic LOB persistence, invalid-call recovery and internal update-count requirements
-remain separately scoped, as specified in [JDBC reference](jdbc-capability-contracts.md).
-
-### Execution and query boundaries
-
-SQL Server no longer supports new connections, probes or executions. `adapters/catalog.json` is the
-active support index. Product/dialect enum values remain for historical parsing; existing connections,
-run statuses, evidence and raw reports are not rewritten. New runs and queued frozen inputs enforce
-retirement; old SQL Server inputs fail with `DATABASE_SUPPORT_RETIRED`. Contract checks tie packaged
-resources and bilingual support declarations to the registry; driver default dialects and UI options use it.
-
-Driver validation takes a configuration snapshot and monotonic revision in a short transaction.
-Driver-class edits and every validation advance the revision; results use a conditional update.
-Stale success/failure, competing validation and deletion return `DRIVER_VALIDATION_STALE` without
-overwriting current state. Worker execution/admission never spans a database transaction. Artifacts
-are immutable; names, default dialect and DataSource metadata do not change class-loading validation.
-
-SSE queues only after commit, with 64 pending events per subscriber, independent virtual senders and
-256 subscribers globally. The run row lock protects persistent event sequences and snapshot registration.
-Snapshot sequences discard duplicates and reorder interleaving commit callbacks. Terminal sends precede
-completion. Overflow disconnects that client; a new snapshot recovers persisted state. Streams expire
-after 30 seconds and browsers reconnect; REST refreshes active runs every 10 seconds. This single-server
-design has no durable event replay/outbox. A noninterruptible send can retain one bounded subscriber
-slot until the transport write ends, without blocking Workers or database transactions. Embedded
-Tomcat NIO uses the explicit `server.tomcat.connection-timeout=30s` for socket writes; the 30-second
-SSE async lifetime alone is not a write cancellation guarantee. Interrupts are best effort; replacing
-Tomcat or setting an infinite transport timeout requires equivalent bounded write handling. Quota is
-released when the sender exits, so stuck sends cannot create unbounded replacement senders.
-V14 sequences order committed changes and reject stale/duplicate updates, including delayed SSE after
-newer REST refreshes; they do not replay events. A cold catalog load rejects concurrent requests with
-`WORKER_BUSY` rather than accumulating HTTP waiters outside short Worker admission.
-
-Run lists use a closed scalar page projection and two grouped projections, without full run/case entities
-or repeated evidence parsing. List SQL excludes `execution_input`; V15 backfills `execution_summary`
-without per-scenario selection metadata, maintained when execution inputs are frozen.
-List `accounting.scenarios` is empty; list selectionSnapshot retains only catalog version/count and budgets.
-Scenario detail remains available from run details/reports. Status-group predicates and indexed correlated
-counts execute before paging, preserving original status versus interpreted execution outcome.
 V15 backfills only derived fields, treating malformed historical JSON as unknown. Fetches and JDBC
 write batches use 500 rows **inside one Flyway transaction**, not independently committed chunks.
 On PostgreSQL, V15 includes ALTER TABLE, the entire backfill and ordinary CREATE INDEX (not CONCURRENTLY).
@@ -480,13 +484,11 @@ The PostgreSQL integration test deliberately fails the final index creation afte
 then retries without editing history. H2/nontransactional DDL does not establish this recovery guarantee.
 Subsequent evidence/input writes maintain projections through entity setters; do not bypass these setters.
 The upgrade scans historical evidence once and creates indexes; allow a maintenance window for large stores.
-`RunListQueryTest` measures SQL, entity loads and bytes on H2 with 12 runs, page size 10 and 20/1000 cases
-per run. These are fixture measurements, not production latency or driver compatibility claims.
 
-Historical case evidence that is absent, non-object or malformed no longer breaks database-backed
-details/report reconstruction. Invalid content is marked `LEGACY_EVIDENCE_UNREADABLE` without fabricating
-a JDBC conclusion; the persisted raw evidence and original case/run statuses remain unchanged.
+<a id="known-limitations"></a>
+## Known limitations
 
-The SSE sender also waits for MVC afterConcurrentHandlingStarted before draining any event, so
-SseEmitter cannot bypass admission via its pre-initialization early-send buffer. The snapshot and
-realtime events remain in the same bounded subscriber queue until the transport handler is ready.
+Database combinations, the unresolved Oracle LOB inventory difference and closed historical write scope,
+and Dameng attribution are maintained in [database validation records](database-validation.md#known-limitations).
+Historical reports remain separate from current implementation. Platform startup validation limits are
+in [Deployment](deployment.md#validation-limits).

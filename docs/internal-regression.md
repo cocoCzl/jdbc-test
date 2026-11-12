@@ -2,18 +2,34 @@
 
 English | [简体中文](internal-regression.zh-CN.md)
 
+[Documentation](README.en.md) · [English home](../README.en.md)
+
+Contents: [Run A, select, run B, compare](#ab-workflow) · [Evidence and allowed differences](#comparability) · [Output and CI](#comparison-exits) · [Scope and key management](#keys)
+
 An internal baseline is an explicitly selected snapshot of a CLI report. It does not change
 `adapter.trust`, `formal_eligible`, known differences or the original report. Private drivers using bundled adapters or explicit compatible dialect selection can use this workflow.
 Historical local/candidate provenance remains readable without enabling retired package imports. Internal comparison is not JDBC certification or
 maintainer endorsement. The default `compare --scope formal` still requires formal eligibility;
 both scopes now require the same versioned comparison evidence. Historical JSON is not upgraded.
 
+<a id="ab-workflow"></a>
 ## Run A, select, run B, compare
 
 Use JDK 21, the Maven wrapper and an authorized dedicated test database/schema. Generate connection
 configuration with `init --adapter postgresql` or another built-in ID. Private drivers use `--driver-dir`
 and `--driver-class`; explicitly add `--compatible-dialect` for dialect reuse. No adapter package is
 created or uploaded. See [examples](../examples/README.md).
+Also prepare **Python >=3.9** and the local driver A directory in the source root. Supply `DB_PASSWORD`
+through private environment configuration. Execute only in an explicitly authorized dedicated scope; replace endpoint, account and scope:
+
+```sh
+python3 -B scripts/runner.py init --adapter postgresql \
+  --url jdbc:postgresql://localhost:5432/test_db --username jdbc_tester \
+  --namespace owned_schema --password-env DB_PASSWORD --consent \
+  --driver-dir local-drivers/A --connection-mode driver_manager \
+  --output configs/config.local.json
+```
+
 Add these fields to the configuration (replace the example identity/build/mode):
 
 ```json
@@ -39,17 +55,32 @@ The comparison also requires matching runtime JDBC product/version and connectio
 Generate a random comparison key once and keep the same key available for A and B, including in CI:
 
 ```sh
+set -eu
 export JDBC_TEST_REGRESSION_KEY="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
 # Supply the configured DB_PASSWORD through your existing secret mechanism.
-python3 -B scripts/runner.py run configs/config.local.json
+if python3 -B scripts/runner.py run configs/config.local.json; then
+  run_a_exit=0
+else
+  run_a_exit=$?
+fi
+[ "$run_a_exit" -le 1 ] || exit "$run_a_exit"
 python3 -B scripts/runner.py baseline create \
   --report report/private-db_A/report.json --output report/internal-baseline.json
 # Edit only db.driver to select B (or replace the contents of its local directory).
-python3 -B scripts/runner.py run configs/config.local.json
+if python3 -B scripts/runner.py run configs/config.local.json; then
+  run_b_exit=0
+else
+  run_b_exit=$?
+fi
+[ "$run_b_exit" -le 1 ] || exit "$run_b_exit"
 python3 -B scripts/runner.py compare --scope internal \
   --baseline report/internal-baseline.json --current report/private-db_B/report.json \
   --output report/driver-upgrade.json
 ```
+
+The shell flow preserves both `run` exit codes: inspect the real report after 0/1 and stop on other values.
+Do not use `run && compare`. Even after exit 1, verify report existence/completeness before baseline selection or comparison.
+For B change only driver/dependency artifacts; keep configuration and selection unchanged.
 
 Replace report paths with the paths printed by `run`. `baseline create` refuses to overwrite an
 existing file: select another name to retain multiple baselines. The snapshot includes the complete
@@ -66,6 +97,7 @@ cleanup, missing execution or unevaluated plan requirements is rejected. CI must
 and run comparison even when the assessment returned 1; use the comparison exit code for a regression
 gate, and the assessment exit code if the policy additionally requires a clean run.
 
+<a id="comparability"></a>
 ## Evidence and allowed differences
 
 | Dimension | Driver upgrade policy |
@@ -89,6 +121,7 @@ fingerprints produce concrete errors; equality is never inferred from two absent
 Source/driver changes during execution are rejected. Resource SQL digests cover the resolved asset
 roots conservatively, so unrelated asset edits may require re-establishing the baseline.
 
+<a id="comparison-exits"></a>
 ## Output and CI
 
 The JSON comparison contains `purpose`, `allowed_changes`, per-dimension `checks`, `errors`,
@@ -97,7 +130,7 @@ The JSON comparison contains `purpose`, `allowed_changes`, per-dimension `checks
 Reviewed `known_difference` results remain visible as unresolved failures. A transition from supported
 to legally unsupported is a support regression, without relabelling it a JDBC contract violation.
 
-| Exit | Meaning |
+| CLI compare exit | Meaning |
 |---|---|
 | 0 | Comparable, complete, no new regression; existing failures/unsupported results can remain |
 | 1 | New failure, loss of previously supported behavior, or newly unmet plan requirement |
@@ -109,6 +142,7 @@ prevents a successful comparison even if the same issue was present before. Unse
 `USER_EXCLUDED`/`NOT_APPLICABLE` and are not counted as executed or as assessment failures.
 No comparison writes to the database or rewrites source reports.
 
+<a id="keys"></a>
 ## Scope and key management
 
 This workflow is CLI-only; it does not provide Web baseline management, independent physical-server
@@ -127,3 +161,13 @@ new comparison evidence.
 The CLI removes the configured comparison key and the default key variable from the Maven/driver
 child environment. Retained report and diagnostic serialization also redacts unexpected echoes
 of the active comparison key, including values that need JSON escaping.
+
+In CI retain A/B reports, the baseline and comparison JSON as controlled artifacts. Collect reports even
+when assessment returns 1, then check comparability. Track `run` and `compare` exits independently.
+Worker 0/2/3/4/5 are execution-protocol exits, not the table above; see [Worker protocol](development.md#worker-protocol).
+
+| Secret | Purpose |
+|---|---|
+| Database password | Target authentication, referenced by `db.password_env` |
+| Platform Master Key | Web credential encryption; not the CLI comparison key |
+| Regression HMAC key | A/B configuration fingerprints; retain one value for the baseline lifetime |

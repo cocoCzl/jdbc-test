@@ -2,6 +2,7 @@ import json
 import hashlib
 import os
 import copy
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -33,7 +34,7 @@ class AdapterRuntimeTest(unittest.TestCase):
     def test_release_files_are_allowlisted_and_patch_versioned(self):
         self.assertEqual("1.2.1", project_version())
         included = {path.relative_to(PROJECT_ROOT).as_posix() for path in release_files()}
-        self.assertIn("README.md", included)
+        self.assertTrue({"README.md", "README.en.md", "README.zh-CN.md"} <= included)
         self.assertIn("scripts/runner.py", included)
         forbidden = {
             "CONTEXT.md",
@@ -68,11 +69,28 @@ class AdapterRuntimeTest(unittest.TestCase):
         names = {"postgresql": "PostgreSQL", "mysql": "MySQL", "oracle": "Oracle",
                  "gaussdb": "GaussDB", "kingbase": "KingbaseES", "dm": "Dameng"}
         self.assertEqual(set(names), set(active))
-        for document in ("README.md", "README.zh-CN.md", "docs/usage.md", "docs/usage.zh-CN.md"):
+        for document, chinese in (("README.md", True), ("README.en.md", False),
+                                  ("docs/usage.md", False), ("docs/usage.zh-CN.md", True)):
             text = (PROJECT_ROOT / document).read_text(encoding="utf-8")
-            for adapter, name in names.items():
-                self.assertIn("达梦" if adapter == "dm" and "zh-CN" in document else name, text)
+            expected = {"达梦 / DM" if key == "dm" and chinese else
+                        "Dameng / DM" if key == "dm" else name for key, name in names.items()}
+            # Assert exactly the catalog rows, not incidental names in surrounding prose.
+            header = "数据库" if chinese else "Database"
+            table = re.search(rf"^\| {header} \|[^\n]*\n(?:\|[^\n]*\n)+", text, re.M)
+            self.assertIsNotNone(table, document)
+            rows = re.findall(r"^\| ([^|]+) \|", table.group(), re.M)
+            self.assertEqual(expected, {row.strip() for row in rows} - {header}, document)
             self.assertNotIn("| SQL Server |", text)
+            if document.startswith("README"):
+                for adapter_id in active:
+                    manifest = load_adapter(PROJECT_ROOT, adapter_id).manifest
+                    display = "达梦 / DM" if adapter_id == "dm" and chinese else names[adapter_id]
+                    row = next(row for row in text.splitlines() if row.startswith(f"| {display}"))
+                    self.assertIn(f"| {manifest['trust']} |", row)
+                    for combination in manifest["validated_combinations"]:
+                        for field in ("database_version", "driver_version", "server_version", "database_mode"):
+                            if field in combination:
+                                self.assertIn(combination[field], row)
 
     def test_kingbase_official_records_real_scope_without_claiming_all_tests_passed(self):
         package = load_adapter(PROJECT_ROOT, "kingbase")
@@ -104,8 +122,9 @@ class AdapterRuntimeTest(unittest.TestCase):
             self.assertEqual(preparation[scenario_id]["recorded_conclusion"],
                              followup["recorded_conclusion"])
             self.assertTrue(preparation[scenario_id]["message"].endswith(followup["resource"]))
-        # Detailed historical cases stay in the maintained evidence resource, linked from usage.
-        for guide in ("usage.md", "usage.zh-CN.md"):
+        # The maintained evidence is reachable from both setup and the validation reference.
+        for guide in ("usage.md", "usage.zh-CN.md",
+                      "database-validation.md", "database-validation.zh-CN.md"):
             content = (PROJECT_ROOT / "docs" / guide).read_text()
             self.assertIn(f"../adapters/kingbase/{combination['evidence']}", content)
             self.assertIn(combination["server_version"], content)
