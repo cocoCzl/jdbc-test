@@ -36,6 +36,32 @@ from compatibility_v1 import (
 
 
 class CompatibilityV1Test(unittest.TestCase):
+    def test_runtime_identity_regex_is_required_for_formal_eligibility(self):
+        config = {"adapter": {"trust": "official"}, "db": {
+            "type": "dm", "expected_database_product_regex": "^DM DBMS$",
+            "expected_driver_name_regex": r"^dm\.jdbc\.driver\.DmDriver$"}}
+        observed = {"jdbc.test.databaseProductName": "DM DBMS",
+                    "jdbc.test.driverName": "dm.jdbc.driver.DmDriver"}
+        kind = compatibility_v1.RunKind.FORMAL_COMPATIBILITY_EVALUATION
+        for field, value in ((None, None), ("jdbc.test.databaseProductName", "Other DBMS"),
+                             ("jdbc.test.driverName", "other.Driver"),
+                             ("jdbc.test.databaseProductName", ""),
+                             ("jdbc.test.driverName", "")):
+            with self.subTest(field=field, value=value):
+                env = {**observed, **({field: value} if field else {})}
+                target = compatibility_v1.build_compatibility_target(config, env)
+                mismatch = compatibility_v1.detect_target_identity_mismatch(config, target)
+                self.assertEqual(field is not None, mismatch["mismatch"])
+                self.assertEqual(field is None, compatibility_v1._formal_eligible(config, kind, mismatch))
+        # Configured identity is not a substitute for metadata from the actual connection.
+        configured = {**config, "db": {**config["db"],
+            "expected_database_product": "DM DBMS"}}
+        target = compatibility_v1.build_compatibility_target(
+            configured, {"jdbc.test.driverName": "dm.jdbc.driver.DmDriver"})
+        mismatch = compatibility_v1.detect_target_identity_mismatch(configured, target)
+        self.assertTrue(mismatch["mismatch"])
+        self.assertFalse(compatibility_v1._formal_eligible(configured, kind, mismatch))
+
     def test_catalog_scenarios_depend_only_on_public_jdbc_and_test_apis(self):
         # Fixture SQL may vary by dialect; driver operations must use public standard APIs.
         allowed = (
@@ -206,6 +232,20 @@ class CompatibilityV1Test(unittest.TestCase):
         matrix = generate_matrix([report])["rows"][0]
         self.assertEqual(["NOT_EVALUATED"], list(matrix["conclusions"].values()))
         self.assertEqual(["SUITE"], list(matrix["requirement_scopes"].values()))
+
+    def test_unverified_applicability_preserves_failure_without_claiming_violation_or_support(self):
+        case = {"status": "failure", "category": "core", "error_type":
+                "com.jdbctest.extension.JdbcContracts$ContractApplicabilityAssertionError"}
+        self.assertEqual("compatibility_failure", normalize_status(case, {}))
+        result = execution_conclusion(case)
+        self.assertEqual("failure", result["execution_status"])
+        self.assertEqual("EXECUTION", result["phase"])
+        self.assertEqual("NOT_EVALUATED", result["conclusion"])
+        self.assertNotIn("contract_conforms", result)
+        self.assertNotIn("requirement_scope", result)
+        self.assertEqual("CONTRACT_VIOLATION", execution_conclusion({
+            "status": "failure", "error_type": "java.lang.AssertionError",
+            "error_message": "Contract applicability unverified"})["conclusion"])
 
     def test_error_text_and_sqlstate_cannot_claim_optional_support(self):
         misleading = {"status": "error", "error_type": "java.sql.SQLException",

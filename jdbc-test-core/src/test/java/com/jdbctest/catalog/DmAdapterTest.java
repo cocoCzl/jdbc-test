@@ -43,7 +43,15 @@ class DmAdapterTest {
         assertEquals(DbType.DM, adapter.dbType().orElseThrow());
         assertEquals(SqlDialect.DM, adapter.dialect());
         assertEquals("dm", adapter.assets().directory());
-        assertEquals("candidate", adapter.trust());
+        assertEquals("official", adapter.trust());
+        assertEquals("OFFICIAL", adapter.metadata().status());
+        var combinations = (java.util.List<?>)adapter.declaration().get("validated_combinations");
+        assertEquals(1, combinations.size());
+        var combination = (java.util.Map<?, ?>)combinations.getFirst();
+        assertEquals("8.1.3.162", combination.get("database_version"));
+        assertEquals("8.1.3.62", combination.get("driver_version"));
+        assertEquals("COMPATIBLE_MODE=0", combination.get("database_mode"));
+        assertEquals("21", combination.get("jdk"));
         assertTrue(adapter.name().contains("达梦"));
         assertTrue(adapter.name().contains("Dameng"));
         assertEquals("dm.jdbc.driver.DmDriver",

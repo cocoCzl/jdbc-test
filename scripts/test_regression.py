@@ -36,6 +36,84 @@ def fail(report, name="b"):
 
 
 class RegressionTest(unittest.TestCase):
+    def test_formal_version_matching_rejects_prefixes_extensions_and_missing_versions(self):
+        manifest = {"validated_combinations": [
+            {"database_version": "8.1.3.162", "driver_version": "8.1.3.62"}]}
+        for product, driver in (("8.1.3.162", "8.1.3.62"),
+                                ("DM DBMS 8.1.3.162", "DM JDBC 8.1.3.62 (JDBC 4.0)"),
+                                ("8.1.3.1620", "8.1.3.62"),
+                                ("18.1.3.162", "8.1.3.62"),
+                                ("8.1.3.162", "8.1.3.620"),
+                                ("8.1.3.162", "18.1.3.62"),
+                                ("8.1.3.162", "8.1.3.62.1"),
+                                ("8.1.3.162", "8.1.3.62-beta"),
+                                ("8.1.3.162", "8.1.3.62+build1"),
+                                ("8.1.3.162", "prefix8.1.3.62"),
+                                ("8.1.3.162", "")):
+            with self.subTest(product=product, driver=driver):
+                report = {"formal_eligible": True, "compatibility_target": {
+                    "database_version": {"value": product},
+                    "jdbc_driver_version": {"value": driver}}}
+                expected = (product, driver) in {
+                    ("8.1.3.162", "8.1.3.62"),
+                    ("DM DBMS 8.1.3.162", "DM JDBC 8.1.3.62 (JDBC 4.0)")}
+                self.assertEqual(expected, runner._validated_formal_eligibility(report, manifest))
+        # Descriptive Oracle metadata and alphanumeric Kingbase build versions still match.
+        self.assertTrue(runner._version_matches(
+            "Oracle Database 19c - Production\nVersion 19.3.0.0.0", "19.3.0.0.0"))
+        self.assertTrue(runner._version_matches("Kingbase8 JDBC V008R006B0001", "V008R006B0001"))
+        self.assertFalse(runner._version_matches("V008R006B00010", "V008R006B0001"))
+        from adapter_runtime import discover_adapters, load_adapter
+
+        root = Path(__file__).resolve().parent.parent
+        for adapter_id in discover_adapters(root):
+            for combination in load_adapter(root, adapter_id).manifest["validated_combinations"]:
+                for field in ("database_version", "driver_version"):
+                    version = combination[field]
+                    with self.subTest(adapter=adapter_id, field=field):
+                        self.assertTrue(runner._version_matches(version, version))
+                        self.assertTrue(runner._version_matches(f"Product {version} (JDBC)", version))
+                        self.assertFalse(runner._version_matches(version + "0", version))
+
+    def test_dm_official_only_qualifies_registered_new_runs_without_promoting_history(self):
+        from adapter_runtime import load_adapter
+        from compatibility_v1 import RunKind, _formal_eligible
+
+        manifest = load_adapter(Path(__file__).resolve().parent.parent, "dm").manifest
+        report = synthetic_report("official")
+        report["adapter"]["id"] = "dm"
+        report["compatibility_target"] = {
+            "database_version": {"value": "8.1.3.162"},
+            "jdbc_driver_version": {"value": "8.1.3.62"}}
+        config = {"adapter": manifest}
+        kind = RunKind.FORMAL_COMPATIBILITY_EVALUATION
+        self.assertTrue(_formal_eligible(config, kind, {"mismatch": False}))
+        self.assertFalse(_formal_eligible(config, kind, {"mismatch": True}))
+        self.assertFalse(_formal_eligible({"adapter": {**manifest, "experimental_override": True}},
+                                         kind, {}))
+        self.assertTrue(runner._validated_formal_eligibility(report, manifest))
+        self.assertEqual(0, runner.compare_reports(report, copy.deepcopy(report), "formal")["exit_code"])
+        old = copy.deepcopy(report)
+        old["formal_eligible"] = False
+        self.assertFalse(runner._validated_formal_eligibility(old, manifest))
+        self.assertEqual(2, runner.compare_reports(old, report, "formal")["exit_code"])
+        report["compatibility_target"]["jdbc_driver_version"]["value"] = "8.1.2.192"
+        self.assertFalse(runner._validated_formal_eligibility(report, manifest))
+        report["compatibility_target"]["jdbc_driver_version"]["value"] = "8.1.3.62"
+        report["compatibility_target"]["database_version"]["value"] = "8.1.3.163"
+        self.assertFalse(runner._validated_formal_eligibility(report, manifest))
+
+    def test_unknown_contract_precondition_is_not_a_pass_or_a_comparable_baseline(self):
+        report = synthetic_report()
+        case = {"status": "failure", "error_type":
+                "com.jdbctest.extension.JdbcContracts$ContractApplicabilityAssertionError"}
+        report["scenario_results"]["b"].update(execution_conclusion(case),
+                                                 compatibility_status="compatibility_failure")
+        report["scenario_results"]["b"].pop("contract_conforms")
+        report["diagnostics"]["maven_exit_code"] = 1
+        with self.assertRaisesRegex(ValueError, "Cannot select internal baseline"):
+            regression.select_baseline(report)
+
     def test_extra_suite_failure_is_separate_from_jdbc_failure_and_execution_issues(self):
         base = synthetic_report()
         current = copy.deepcopy(base)

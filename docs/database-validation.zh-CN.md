@@ -21,7 +21,7 @@
 | Oracle | [official](../adapters/oracle/adapter.json) | 19.3.0.0.0 / 21.13.0.0.0；[evidence](../adapters/oracle/evidence/oracle-19.3-driver-21.13.json) |
 | KingbaseES | [official](../adapters/kingbase/adapter.json) | V009R002C016 / oracle / JDBC 12.1 / V008R006B0001；[evidence](../adapters/kingbase/evidence/platform-v009r002c016-oracle-v008r006b0001.json) |
 | GaussDB | [candidate](../adapters/gaussdb/adapter.json) | 无 validated_combinations；PostgreSQL 基础设施复用，不推广至全部 GaussDB/openGauss 产品 |
-| 达梦 / DM | [candidate](../adapters/dm/adapter.json) | 无 validated_combinations；qualification 记录 8.1.3.162 + 8.1.2.192、8.1.3.62，见[下文](#dameng) |
+| 达梦 / DM | [official](../adapters/dm/adapter.json) | 8.1.3.162 / 8.1.3.62 / 模式 0 / Java 21；[脱敏证据](../adapters/dm/evidence/platform-8.1.3.162-driver-8.1.3.62.json)；[接纳范围](#dm-platform-acceptance) |
 
 `official` 仅为项目内适配状态，不是厂商认证；`supported_versions` 只约束准入，capability 是声明。
 Kingbase 的服务端构建号、模式与 JDBC 产品版本是不同字段；未设置数字版本界限不代表全版本支持，构建/模式也不是运行时强制检查。
@@ -48,13 +48,87 @@ Kingbase 的 manifest `qualification.asset_policy` 记载后续九例定向复�
 | Oracle 资源 | 原生数组、多结果准备及嵌套依赖清理已有自动化检查，尚未真实 Oracle 复验。按列名批量键 NPE 归因、终态页面/筛选/下载按钮复核仍待办；需可达授权 PDB、额度与权限。 |
 | Oracle LOB 清单 | 历史运行后两个既有字典条目缺失，原因与历史父映射未知；既未证实业务数据丢失，也未证实无影响。合成归属测试不解释或修复差异。该写入范围保持关闭，新写入需独立专用账号/schema。归因需已有运行前映射/备份/审计/redo/采集身份，不能盲目重跑 FULL。 |
 | 历史证据 | 部分早期 MySQL/Kingbase 原 FULL 报告已不可得；脱敏摘录不等于原报告，不重建或认证缺失历史。adapters 内维护的证据保留。 |
-| 达梦 | candidate：历史 DM DBMS 8.1.3.162＋驱动 8.1.2.192 的 FULL 保留 249/21 及独立复测。2026-11-04 驱动 8.1.3.62 的独立 CORE 为 151/2、FULL 为 254/16：八项契约失败、三项其他 JDBC 结果未评估、五项额外套件失败。任务对象清理为 18/18、41/41；912 个已有对象元数据前后一致。驱动区间内其他版本和其他模式/补丁未验证；逐项能力审计见[达梦记录](#dm-capabilities)，独立观察不等于已确认厂商缺陷。 |
+| 达梦 | official 的精确范围见[接纳记录](#dm-platform-acceptance)；历史 DM DBMS 8.1.3.162＋驱动 8.1.2.192 的 FULL 保留 249/21 及独立复测。2026-11-04 驱动 8.1.3.62 的独立 CORE 为 151/2、FULL 为 254/16：八项契约失败、三项其他 JDBC 结果未评估、五项额外套件失败。任务对象清理为 18/18、41/41；912 个已有对象元数据前后一致。驱动区间内其他版本和其他模式/补丁未验证；逐项能力审计见[达梦记录](#dm-capabilities)，独立观察不等于已确认厂商缺陷。 |
 | 平台启动验证 | Windows ACL/PowerShell 进程行为和 IDEA UI 未验证；标准 Docker 源码构建在镜像仓库认证超时后没有成功验证记录，替代本地镜像运行不证明源码构建通过。 |
 
 准备不足不等于驱动缺陷，允许不支持不算功能通过。REF/ROWID 类型存在、LOB 自动持久化、
 非法操作后恢复和内部更新计数要求分别定界，见 [JDBC 判定参考](jdbc-capability-contracts.zh-CN.md)。
 
 SQL Server 已停止新建连接、探测和执行；只保留历史连接、任务、原始报告与结论的读取。
+
+<a id="dm-platform-acceptance"></a>
+## 达梦平台适配接纳（2026-11-12）
+
+**结论：正式接纳为 official，仅登记 DM DBMS 8.1.3.162＋驱动 8.1.3.62。**
+边界为 `COMPATIBLE_MODE=0`、`CASE_SENSITIVE=1`、Java 21、JDBC 声明 4.0；驱动 SHA-256 为
+`327bade775f4f15b97618bc9736a4625def52701cf53f5ef5ad72580797e6e45`。
+`official` 表示项目正式维护的平台适配，不代表厂商认证、所有用例通过或其他版本/模式获准。
+[脱敏证据摘要](../adapters/dm/evidence/platform-8.1.3.162-driver-8.1.3.62.json)分别保留原报告统计、来源哈希、人工审阅和后续 CUSTOM。
+
+### 规则与证据质量
+
+此前 candidate 的实际状态是：已有实库记录，但未登记正式组合，也没有已公开、可核对的接纳摘要；
+数组 setter 准备已修复，契约前提仍需准确表达。不能把这些事实简化为“没有实测”或“必须修复全部失败”。
+[开发指南](development.zh-CN.md#adapter-acceptance)区分已有规则、代码最低校验和本次明确的维护标准。
+本轮未改变通用资格规则、capability、用例选择、SQL 或 JDBC 断言。
+
+本地 INDEX 的 79 项材料均按 SHA-256 核对，无缺失/不匹配。可取得 8.1.3.62 CORE/FULL 的持久化
+Worker 报告、set_array CUSTOM 原始报告及 journal；公开文件是经过审阅的脱敏摘要，**不是原始报告**。
+原材料含私密连接环境，不随 Git 分发；公开来源标识仅用于核对，不制造本地下载链接。
+8.1.2.192 的 249/21 FULL 原件在本轮审阅材料中不可得，保留历史文字记录，不重建，也不登记为正式组合。
+8.1.3.62 的 JAR 当前不在本地，指纹来自留存记录；本轮没有声称重新计算了该制品的哈希。
+
+### 平台链路验收
+
+| 链路 | 可核对依据与结果 | 边界 |
+|---|---|---|
+| 上传、依赖、隔离及身份 | 历史 Web 操作记录；CORE/FULL 元数据 MATCHED，真实产品/驱动独立；本轮所给旧 JAR 的隔离验证和只读探测成功 | 没有新做 Web 验收；隔离不是恶意代码沙箱 |
+| 探测、保存、编辑及重启读取 | 历史操作记录与持久化报告；ConnectionService 的 DM 生命周期测试覆盖精确 schema 与加密凭据 | 本轮未重启已有网站 |
+| database/schema 与授权 | ExecutionScope/ScopedDataSource 保留精确名称、不要求 catalog；已有模式不删除 | 本轮实测实际 schema 为 DEVELOP；不自动把输入折叠为大写 |
+| 选择、准备及标准调用 | FULL 270 项全部开始/完成；数组 fixture 回归与独立 CUSTOM 验证 setter 写入及精确读回 | setter 成功不证明 createArrayOf 的元素类型名契约成立 |
+| 超时、取消、异常和终态 | 有界 Worker、取消线程观测及原异常保留；清理失败/未知不能产生成功清理证据；本轮针对性修复契约适用性表达 | DM SLEEP 可中断性未确认，调用/断言仍执行，失败不变通过 |
+| 页面、报告及持久化 | 原 FULL source=PERSISTED_WORKER_EVENTS，workerReportValidated=true；逐项记录、汇总、分页/报告历史验收与呈现测试 | 本轮新增分类用 fixture 验证，不宣称新实库 FULL |
+| 归属与清理 | CORE 18/18、FULL 41/41、CUSTOM 3/3 分别成功；仅反序清理 journal 中确认创建的精确对象 | 不 DROP SCHEMA、不 CASCADE、不扫描前缀；未知 CREATE 保持可见 |
+| 版本与声明 | 仅登记有原始报告的 8.1.3.62 组合，revision 更新为 1.2.0 | 数字准入区间不等于全部已验证 |
+
+后续归因和 CUSTOM 各有一对 912 项既有对象元数据清单，本轮实际比对均相同；它们不是原 FULL
+运行前清单的替代品，也不证明表内所有数据相同。FULL 的 41/41 清理由其独立报告/journal 支撑。
+本轮还以用户提供的旧 JAR（SHA-256 `afc60f332c8b79d514c1c19d2b58164c3e42112fea455eae68c9d56716834a97`）
+只读核对 DM DBMS 8.1.3.162、驱动 8.1.2.192、JDBC 4.0、实际 schema `DEVELOP`；未执行新 DDL/DML。
+
+### 未解决事项与是否阻止接纳
+
+| 类别 / 事项 | 证据、影响范围与下一步 | 阻止本次接纳？ |
+|---|---|---|
+| 平台缺陷：前提不明仍直接判违规 | 原 FULL 的 logger/cancel 标签不变；当前新增显式适用性失败，保留原断言为 cause，FAILED / NOT_EVALUATED；针对性测试覆盖 Worker 和 CLI | 已修复，不阻止；不追溯重分类 |
+| 准备/契约：数组工厂 typeName | INTEGER 工厂失败与集合名工厂/基础类型名疑点独立保留；setter 已完成单独 CUSTOM 1/1 | 不阻止限定的 setter 验收；工厂语义仍待匹配补丁资料，不宣称该工厂符合契约 |
+| 契约适用性：getParentLogger | JDBC 4.1 引入；实际声明 4.0、返回 null；本补丁的高版本承诺未知 | 不阻止；继续调用且失败/未评估，不判合法 unsupported；4.1+ null 仍是规范断言失败 |
+| 契约/环境：cancel 与 timeout | SLEEP(0) 仅证明包/权限可用；cancel 需证明可中断性，timeout 正常完成仍保留执行控制疑点 | 不阻止；前提未知单列，不能宣称所有 SQL 均无法取消/超时 |
+| 被测驱动行为疑点 | 自动提交、连接池句柄、Blob、参数序号、空数组、生成键及 absolute(0) 保留原结果和独立观察，详见逐项归因 | 不阻止；不是已确认厂商缺陷，不补偿行为；未证明的归因不提升为确定结论 |
+| 套件额外要求 | 四项类型存在性及过程内部更新计数；原失败保留 SUITE，5 是 NOT_EVALUATED=8 子集 | 不阻止；额外要求未满足不等于通用 JDBC 违规或通过 |
+| 环境前提 | Provider 公共类/构造器、schema 权限、可用系统包；其他模式、驱动区间中间版本未验证 | 登记范围外不阻止；新环境须先满足授权和准备 |
+| 证据不足 | 旧 249/21 FULL 原件缺失；8.1.3.62 没有本轮再实测；部分补丁资料未知 | 不阻止已核对的历史组合；不登记旧版本，也不声称当前实库全链路复验 |
+
+### 资格与后续验证
+
+CLI 新运行在 official、正式类别、运行时身份符合 manifest 正则且完整版本标记匹配后才能 formal_eligible；本次仅 8.1.3.62
+组合满足登记条件，所给 8.1.2.192 仍可普通执行，不能因适配晋级而取得正式组合资格。
+版本可位于产品描述中，但不接受数字、字母、点、连字符或加号扩展出的其他版本标记。
+
+| 维度 | 正式维护的验证范围 | 程序强制检查 |
+|---|---|---|
+| 数据库版本 | 8.1.3.162 | Java 准入范围检查；CLI 与登记组合的完整版本标记匹配 |
+| 驱动版本 | 8.1.3.62 | Java 准入范围仍允许 8.1.2.192–8.1.3.62；CLI 正式资格仅匹配登记的 8.1.3.62 |
+| 驱动 SHA-256 | 本节所列指纹 | 采集实际制品指纹，但 formal_eligible 不与登记指纹比对 |
+| COMPATIBLE_MODE | 0 | formal_eligible 不校验实例模式；回归比较的模式证据来自操作者声明 |
+| CASE_SENSITIVE | 1 | formal_eligible 不核验实例标志；精确 schema 校验不等于实例标志校验 |
+| Java | 21 | Maven 要求 JDK 21；formal_eligible 不与组合的 Java/补丁版本比对 |
+
+因此 `formal_eligible=true` 不证明整个精确组合已由程序核验。报告保留组合声明、运行时身份/版本、
+Java 信息及制品证据；声明不冒充已强制核验的观测。操作者须核对未强制的边界，比较另需匹配的版本化环境证据。
+旧报告和旧 adapterSnapshot/资格原样保留，不能把状态变化当作追溯升级。
+剩余工作是定向确认上述 API 前提/行为、补丁资料，或在另行明确授权的专用环境扩充新组合；
+不是要求再跑一次 FULL 或等待全部失败消失。
 
 <a id="dameng"></a>
 ## 达梦历史观察、当前实现与复测
@@ -108,7 +182,7 @@ cleanupEvidence 记录 **CORE 18/18、FULL 41/41** 次已登记创建均确认�
 清理只操作 journal 精确登记对象，不执行 DROP SCHEMA、CASCADE、前缀扫描或业务对象 DDL/DML。
 再次重启 Server 后仍可读取连接、历史任务和报告。验收临时平台与服务在验证结束后清理，保留用户提供的驱动和已有资源。
 
-达梦仍为 **candidate**。运行前数据库版本边界仍精确为 8.1.3.162；驱动数值范围
+2026-11-04 验收时达梦仍为 **candidate**（当前状态见[接纳记录](#dm-platform-acceptance)）。当时运行前数据库版本边界仍精确为 8.1.3.162；驱动数值范围
 8.1.2.192–8.1.3.62 保留旧端点并准入本次已观察的新版本，区间内其他驱动、其他 DM8 补丁、
 兼容模式及驱动/JDK 组合均**未验证**。manifest 的 qualification 记录该边界，不提升状态或重写历史报告。
 Provider 必须是公共类、匹配接口并提供公共无参构造器；缺少类、接口或构造器明确属于 prerequisite，
@@ -190,7 +264,7 @@ Provider 必须是公共类、匹配接口并提供公共无参构造器；缺�
 无论 execute 是否抛错都读取取消线程结果，保留原始主异常与 phase，取消/线程退出失败作为附加证据。
 两处线程等待上限分别为 5 秒。Worker 遍历 cause、nextException、suppressed，以对象身份去重，
 最多输出 10 条、队列最多 16 项，消息/SQLState 先脱敏再限制为 2000 字符；附加分支不提供主 SQLState。
-getParentLogger 只修正 API 引入版本为 4.1，保留驱动实际 JDBC 4.0 和可选不支持策略，不按版本跳过。
+此前 getParentLogger 只修正 API 引入版本为 4.1，保留驱动实际 JDBC 4.0 和可选不支持策略，不按版本跳过。
 中文把 suite requirement 明确称为“套件要求”。UI、JSON 报告和回归比较继续保留 FAILED、
 NOT_EVALUATED 与 SUITE 标记；5 是 8 个未评估中的子集，不能重复相加，也不算 JDBC 违规或通过。
 已有通用回归及新增五项双语呈现测试核对这一边界。
@@ -228,4 +302,4 @@ NOT_EVALUATED 与 SUITE 标记；5 是 8 个未评估中的子集，不能重复
 [InputStream](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/io/InputStream.html) 和
 [JDBC 4.3 规范 §11.4](https://download.oracle.com/otn-pub/jcp/jdbc-4_3-mrel3-spec/jdbc4.3-fr-spec.pdf)。
 当前在线 DM 指南不是本次 DBMS/驱动补丁的固定版本手册；尚未取得该组合的完整发行说明及厂商归因。
-达梦继续保持 candidate，以上结果不推广到其他版本或兼容模式。
+以上为晋级前归因记录；当前正式接纳见[接纳记录](#dm-platform-acceptance)，结果不推广到其他版本或兼容模式。

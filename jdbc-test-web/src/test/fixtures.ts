@@ -63,7 +63,7 @@ export const adapters: Adapter[] = [
   { id: "vendor", name: "VendorDB", status: "CANDIDATE" },
   { id: "oracle", name: "Oracle", status: "OFFICIAL", dialect: "oracle", namespaceSelection: "schema", requiresDatabase: false },
   { id: "mysql", name: "MySQL", status: "OFFICIAL", dialect: "mysql", namespaceSelection: "catalog", requiresDatabase: true },
-  { id: "dm", name: "达梦 / Dameng", status: "CANDIDATE", dialect: "dm", namespaceSelection: "schema", requiresDatabase: false, qualificationNoteKey: "adapter.dmQualification" },
+  { id: "dm", name: "达梦 / Dameng", status: "OFFICIAL", dialect: "dm", namespaceSelection: "schema", requiresDatabase: false, qualificationNoteKey: "adapter.dmQualification" },
 ];
 export const catalog: Catalog = {
   profiles: [

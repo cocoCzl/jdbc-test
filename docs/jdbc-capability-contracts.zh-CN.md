@@ -36,11 +36,15 @@ false 不取消标准操作，也不产生异常豁免。
 | 已复核必需方法拒绝该异常 | UNSUPPORTED_REQUIRED，例如 Connection.getAutoCommit |
 | SQL、依赖、Provider 或权限前提缺失 | 准备/环境证据，不构成合法不支持 |
 | 普通 SQLException、未限定不支持、未知执行/准备错误 | 保留错误、SQLState/厂商码/原因及 NOT_EVALUATED，除非有具体证据归因 |
+| 契约适用性或条件性前提尚未确认 | 原调用及断言继续，失败保持 FAILED / NOT_EVALUATED；保留原因和原断言，不算通过或合法 unsupported |
 | 套件额外要求断言未满足 | FAILED / NOT_EVALUATED，requirementScope=SUITE，不等于通用 JDBC 违规 |
 
 不能按 SQLState0A000、厂商异常名称/消息、能力标志或前置失败推导合法不支持。
 `contractInvoked` 是用例级证据，不统计全部下游方法。容器/准备失败保留影响范围，不伪造子用例调用。
 历史报告不追溯重新分类。
+当前 `ContractApplicabilityAssertionError` 只标记已审阅的断言失败，不中止为 skipped/unsupported：
+getParentLogger 返回 null 且驱动声明低于 JDBC 4.1（或基线读取失败），以及达梦 SLEEP 正常完成但 cancel 未中断。
+JDBC 4.1 及以上的 null Logger 仍为规范断言失败；取消线程自身错误不被该标记吸收。
 
 <a id="methods"></a>
 ## 已复核元数据与可选操作

@@ -8,8 +8,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.yaml.snakeyaml.Yaml;
 
 class TestCatalogTest {
 
@@ -60,6 +62,16 @@ class TestCatalogTest {
     void scenarioIdsAreUnique() {
         assertEquals(CATALOG.testCases().size(), CATALOG.testCases().stream()
             .map(TestCaseDescriptor::scenarioId).distinct().count());
+    }
+
+    @Test
+    void rejectsDuplicateScenarioIds() throws IOException {
+        Map<?, ?> inventory = new Yaml().load(Files.readString(
+            PROJECT_ROOT.resolve("compatibility/v1/scenario-inventory.yaml")));
+        Object scenario = ((List<?>) inventory.get("scenarios")).getFirst();
+        var failure = assertThrows(IllegalArgumentException.class,
+            () -> TestCatalog.fromYaml(Map.of("scenarios", List.of(scenario, scenario)), null));
+        assertTrue(failure.getMessage().startsWith("Duplicate scenario ID: "));
     }
 
     @Test

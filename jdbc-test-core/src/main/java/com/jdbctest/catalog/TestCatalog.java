@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -21,7 +22,7 @@ import org.yaml.snakeyaml.Yaml;
 /**
  * Catalog backed by the repository's versioned scenario inventory.
  *
- * The inventory remains the stable report metadata source; source files are checked as part of
+ * <p>The inventory remains the stable report metadata source; source files are checked as part of
  * discovery so a catalog cannot silently drift from tests.
  */
 public final class TestCatalog {
@@ -33,19 +34,17 @@ public final class TestCatalog {
     private static final Map<String, ModuleDefinition> MODULES = moduleDefinitions();
 
     private final List<TestCaseDescriptor> descriptors;
-    private final Map<String, TestCaseDescriptor> byScenarioId;
     private final Map<String, TestModule> modules;
 
     private TestCatalog(List<TestCaseDescriptor> descriptors) {
         this.descriptors = List.copyOf(descriptors);
-        this.byScenarioId = Map.copyOf(descriptors.stream().collect(Collectors.toMap(
-            TestCaseDescriptor::scenarioId,
-            Function.identity(),
-            (left, right) -> {
-                throw new IllegalArgumentException("Duplicate scenario ID: " + left.scenarioId());
-            },
-            LinkedHashMap::new
-        )));
+        Set<String> scenarioIds = new HashSet<>();
+        for (TestCaseDescriptor descriptor : this.descriptors) {
+            if (!scenarioIds.add(descriptor.scenarioId())) {
+                throw new IllegalArgumentException(
+                    "Duplicate scenario ID: " + descriptor.scenarioId());
+            }
+        }
         this.modules = Map.copyOf(
             descriptors.stream().map(TestCaseDescriptor::module).collect(Collectors.toMap(
                 TestModule::id,
@@ -174,7 +173,7 @@ public final class TestCatalog {
                 "class " + className.substring(className.lastIndexOf('.') + 1));
             int methodPosition = source.indexOf(methodName + "(", classPosition);
             String classAnnotations = source.substring(0, classPosition);
-            // Array-valued annotations contain '}' too; only a standalone closing brace ends a block.
+            // Annotation arrays also contain '}'; match only a standalone block closing brace.
             Matcher blockEnd = Pattern.compile("(?m)^[ \\t]*}[ \\t]*$").matcher(source);
             blockEnd.region(classPosition, methodPosition);
             int previousMethodEnd = classPosition;

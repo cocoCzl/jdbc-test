@@ -18,6 +18,43 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 class AdapterRuntimeTest(unittest.TestCase):
+    def test_dm_acceptance_keeps_independent_history_cleanup_and_exact_combination(self):
+        package = load_adapter(PROJECT_ROOT, "dm")
+        manifest = package.manifest
+        self.assertEqual("official", manifest["trust"])
+        self.assertEqual(1, len(manifest["validated_combinations"]))
+        combination = manifest["validated_combinations"][0]
+        evidence = json.loads((package.root / combination["evidence"]).read_text())
+        for field in ("database_version", "driver_version", "database_mode", "driver_artifact_sha256"):
+            self.assertEqual(evidence[field], combination[field])
+        self.assertEqual("reviewed_redacted_summary", evidence["evidence_kind"])
+        self.assertTrue(evidence["historical_reports_unchanged"])
+        self.assertEqual((249, 21), (evidence["historical_older_full"]["passed"],
+                                     evidence["historical_older_full"]["failed"]))
+        runs = {run["profile"]: run for run in evidence["runs"]}
+        self.assertEqual({"CORE", "FULL", "CUSTOM"}, set(runs))
+        self.assertEqual(3, len({run["run_id"] for run in runs.values()}))
+        for profile, counts, cleaned in (("CORE", (151, 2), 18), ("FULL", (254, 16), 41),
+                                         ("CUSTOM", (1, 0), 3)):
+            run = runs[profile]
+            summary = run["summary"]
+            self.assertEqual(counts, (summary["passed"], summary["failed"]))
+            self.assertEqual(sum(counts), summary["total"])
+            self.assertEqual(summary["total"], summary["completed"])
+            self.assertEqual({"status": "SUCCESS", "attempted": cleaned,
+                              "confirmed_deleted": cleaned, "retained_objects": 0}, run["cleanup"])
+        recorded = runs["FULL"]["recorded_contract_summary"]
+        self.assertEqual((8, 8, 5), tuple(recorded[key] for key in
+                         ("CONTRACT_VIOLATION", "NOT_EVALUATED", "SUITE_REQUIREMENT_UNMET")))
+        cases = evidence["non_passing_full_cases"]
+        self.assertEqual(16, len(cases))
+        self.assertEqual(16, len({case["scenario_id"] for case in cases}))
+        self.assertEqual(8, sum(case["recorded_conclusion"] == "CONTRACT_VIOLATION" for case in cases))
+        self.assertEqual(5, sum(case["manual_review_category"] == "suite_requirement" for case in cases))
+        for guide in ("usage.md", "usage.zh-CN.md", "database-validation.md", "database-validation.zh-CN.md"):
+            self.assertIn(f"../adapters/dm/{combination['evidence']}",
+                          (PROJECT_ROOT / "docs" / guide).read_text())
+
     def test_all_scenario_requirements_are_declared_by_official_adapters(self):
         from compatibility_v1 import build_scenario_inventory
 

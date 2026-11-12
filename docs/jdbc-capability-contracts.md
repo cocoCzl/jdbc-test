@@ -38,12 +38,17 @@ are independent evidence; false never disables the standard operation or creates
 | Reviewed required method rejects that exception | UNSUPPORTED_REQUIRED; e.g. Connection.getAutoCommit |
 | Missing SQL, dependency, Provider or permission prerequisite | Preparation/environment evidence, not legal unsupported |
 | Ordinary SQLException, unscoped unsupported, unknown execution/preparation error | Retain error, SQLState/vendor code/cause and NOT_EVALUATED unless specific evidence establishes attribution |
+| Contract applicability or conditional precondition unverified | Keep the call/assertion; failure remains FAILED / NOT_EVALUATED with reason and original assertion, neither passing nor legal unsupported |
 | Extra suite feature assertion unmet | FAILED / NOT_EVALUATED, requirementScope=SUITE; not a universal JDBC violation |
 
 Do not infer legal unsupported from SQLState0A000, a vendor exception name/message, capability flags
 or failure of a prerequisite. `contractInvoked` is case-level evidence, not a count of all downstream
 JDBC methods. Container/setup failures retain affected descendants without fabricating child invocations.
 Historical reports are not retroactively reclassified.
+`ContractApplicabilityAssertionError` marks only reviewed failed assertions, without skipping or
+claiming unsupported: a null getParentLogger with declared JDBC below 4.1 (or unreadable baseline),
+and DM SLEEP completing normally despite cancel. A null Logger with JDBC 4.1+ remains a normative
+assertion failure; cancellation-thread errors are not absorbed by this marker.
 
 <a id="methods"></a>
 ## Reviewed metadata and optional operations

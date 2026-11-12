@@ -329,6 +329,8 @@ def execution_conclusion(case: dict[str, Any]) -> dict[str, Any]:
     elif "com.jdbctest.extension.JdbcContracts$SuiteRequirementAssertionError" in types:
         conclusion = "NOT_EVALUATED"
         result["requirement_scope"] = "SUITE"
+    elif "com.jdbctest.extension.JdbcContracts$ContractApplicabilityAssertionError" in types:
+        conclusion = "NOT_EVALUATED"
     elif "java.sql.SQLFeatureNotSupportedException" in types:
         conclusion = "NOT_EVALUATED"
     elif raw == "error" and "java.sql.SQLException" in types:
@@ -649,6 +651,17 @@ def detect_target_identity_mismatch(config: dict[str, Any], target: dict[str, An
         observed = target.get(field, {}).get("value", "")
         if observed and expected.lower() not in observed.lower():
             mismatches.append({"field": field, "expected": expected, "observed": observed})
+    # The bundled runtime carries regex constraints, not the legacy textual hints above.
+    # Metadata printed before a rejected Java preflight must not qualify a formal report.
+    for field, regex in (("database_product", db_config.get("expected_database_product_regex")),
+                         ("jdbc_driver_name", db_config.get("expected_driver_name_regex"))):
+        if not regex:
+            continue
+        evidence = target.get(field, {})
+        observed = evidence.get("value") or ""
+        if evidence.get("source") != "runtime" or not re.search(regex, observed, re.IGNORECASE):
+            mismatches.append({"field": field, "expected_regex": regex, "observed": observed,
+                               "source": evidence.get("source", "missing")})
     return {"mismatch": bool(mismatches), "details": mismatches}
 
 

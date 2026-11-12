@@ -22,7 +22,7 @@ The active index is [catalog.json](../adapters/catalog.json). These are scoped r
 | Oracle | [official](../adapters/oracle/adapter.json) | 19.3.0.0.0 / 21.13.0.0.0; [evidence](../adapters/oracle/evidence/oracle-19.3-driver-21.13.json) |
 | KingbaseES | [official](../adapters/kingbase/adapter.json) | V009R002C016 / oracle / JDBC 12.1 / V008R006B0001; [evidence](../adapters/kingbase/evidence/platform-v009r002c016-oracle-v008r006b0001.json) |
 | GaussDB | [candidate](../adapters/gaussdb/adapter.json) | No validated_combinations; PostgreSQL infrastructure reuse does not cover all GaussDB/openGauss products |
-| Dameng / DM | [candidate](../adapters/dm/adapter.json) | No validated_combinations; qualification records 8.1.3.162 + 8.1.2.192 and 8.1.3.62; see [below](#dameng) |
+| Dameng / DM | [official](../adapters/dm/adapter.json) | 8.1.3.162 / 8.1.3.62 / mode 0 / Java 21; [redacted evidence](../adapters/dm/evidence/platform-8.1.3.162-driver-8.1.3.62.json); [scope](#dm-platform-acceptance) |
 
 `official` is internal adaptation status, not vendor certification; `supported_versions` limits admission and capabilities are declarations.
 Kingbase server build, mode and JDBC product version are distinct fields. Unset numeric bounds do not mean all-version support; build/mode are not runtime-enforced.
@@ -50,7 +50,7 @@ and historical reports; a targeted follow-up never changes an earlier FULL pass 
 | Oracle resources | Native array/multiple-result preparation and nested dependency cleanup have automated checks but no real Oracle revalidation. Batch-key-by-name NPE attribution and terminal-page/filter/download review remain open. A reachable authorized PDB with quota/permissions is required. |
 | Oracle LOB inventory | Two pre-existing dictionary entries were absent after a historical run. Cause and historical parent mapping remain unknown; neither business-data loss nor absence of impact is established. Synthetic ownership tests do not explain/fix it. Keep that write scope closed; new writes need an independent dedicated account/schema. Attribution needs existing pre-run mapping/backups/audit/redo/capture identity, not another blind FULL. |
 | Historical evidence | Some earlier MySQL/Kingbase original FULL reports are unavailable. Sanitized excerpts are not original reports; do not reconstruct or certify missing history. Maintained adapter evidence stays in adapters. |
-| Dameng | Candidate: historical DM DBMS 8.1.3.162 + driver 8.1.2.192 FULL remains 249/21 with separate followups. The independent 2026-11-04 driver 8.1.3.62 CORE is 151/2 and FULL 254/16: eight contract violations, three other JDBC outcomes not evaluated, five extra suite failures. Owned-object cleanup is 18/18 and 41/41; 912 existing object metadata records match before/after. Intermediate driver releases and other modes/patches are unvalidated. The [Dameng records](#dm-capabilities) contain the per-capability audit; standalone observations do not confirm vendor defects. |
+| Dameng | Exact official scope is in the [acceptance record](#dm-platform-acceptance); historical DM DBMS 8.1.3.162 + driver 8.1.2.192 FULL remains 249/21 with separate followups. The independent 2026-11-04 driver 8.1.3.62 CORE is 151/2 and FULL 254/16: eight contract violations, three other JDBC outcomes not evaluated, five extra suite failures. Owned-object cleanup is 18/18 and 41/41; 912 existing object metadata records match before/after. Intermediate driver releases and other modes/patches are unvalidated. The [Dameng records](#dm-capabilities) contain the per-capability audit; standalone observations do not confirm vendor defects. |
 | Platform launch validation | Windows host ACL/PowerShell process behavior and IDEA UI remain unverified. Standard Docker source build has no successful retained verification after a registry authentication timeout; alternate local-image execution is not source-build proof. |
 
 Missing fixtures are not driver defects; legal unsupported is not a feature pass. REF/ROWID type
@@ -58,6 +58,90 @@ presence, automatic LOB persistence, invalid-call recovery and internal update-c
 remain separately scoped, as specified in [JDBC reference](jdbc-capability-contracts.md).
 
 SQL Server new connections, probes and execution are retired; historical connections, runs, raw reports and conclusions remain readable.
+
+<a id="dm-platform-acceptance"></a>
+## DM platform adapter acceptance (2026-11-12)
+
+**Decision: accept as official, registering only DM DBMS 8.1.3.162 + driver 8.1.3.62.**
+The boundary is `COMPATIBLE_MODE=0`, `CASE_SENSITIVE=1`, Java 21 and declared JDBC 4.0. Driver SHA-256:
+`327bade775f4f15b97618bc9736a4625def52701cf53f5ef5ad72580797e6e45`.
+`official` means a project-maintained platform adapter, not vendor certification, all tests passing or
+approval of other versions/modes. The [redacted evidence summary](../adapters/dm/evidence/platform-8.1.3.162-driver-8.1.3.62.json)
+separates original statistics, source hashes, manual review and subsequent CUSTOM.
+
+### Rules and evidence quality
+
+The previous candidate status coexisted with real-database records but no registered formal combination
+or public reviewable acceptance summary. The setter preparation was already repaired; contract
+preconditions still needed accurate expression. This means neither never tested nor fix every failure.
+The [development guide](development.md#adapter-acceptance) distinguishes existing rules, minimum code
+validation and the maintenance standard made explicit here. Generic eligibility rules, capabilities,
+selection, SQL and JDBC assertions were not relaxed.
+
+All 79 files in the local integrity index were verified by SHA-256, with no missing/mismatched entries.
+The persisted 8.1.3.62 CORE/FULL Worker reports, original set_array CUSTOM and journal are available.
+The public file is a reviewed redacted summary, **not a raw report**. Private connection material stays
+out of Git; source labels are provenance identifiers, not local download links. The older 8.1.2.192
+249/21 FULL original is unavailable in the reviewed materials: retain its historical narrative without
+reconstruction or formal registration. The 8.1.3.62 JAR is no longer locally present; its fingerprint
+comes from preserved records, not a newly computed artifact hash.
+
+### Platform chain acceptance
+
+| Chain | Reviewable basis and outcome | Boundary |
+|---|---|---|
+| Upload, dependencies, isolation and identity | Prior Web operation record; CORE/FULL metadata MATCHED with independent product/driver identity; supplied older JAR validates/probes in the current isolated Worker | No new Web acceptance; isolation is not a hostile-code sandbox |
+| Probe, save, edit and restart readback | Historical operation record and persisted reports; DM ConnectionService lifecycle fixtures preserve exact schema and encrypted credentials | No restart of the existing website this session |
+| Database/schema and authorization | ExecutionScope/ScopedDataSource preserve exact names, require no catalog, retain the existing namespace | Current read-only probe finds DEVELOP; inputs are not automatically uppercased |
+| Selection, preparation and standard calls | All 270 FULL cases started/completed; array fixture tests and separate CUSTOM verify setter insertion/exact readback | Setter success does not prove createArrayOf element-type semantics |
+| Timeout, cancel, exceptions and terminal outcomes | Bounded Worker, observed cancel thread/original failures; failed/unknown cleanup cannot claim success; applicability expression fixed this review | DM SLEEP interruptibility unknown; calls/assertions still execute and failures do not become passes |
+| UI, reports and persistence | Original FULL source=PERSISTED_WORKER_EVENTS, workerReportValidated=true; case/summary, pagination/download historical checks and presentation fixtures | New classification verified with fixtures, not a new real-database FULL |
+| Ownership and cleanup | Separate CORE 18/18, FULL 41/41, CUSTOM 3/3 successful cleanup; exact successful journal CREATEs dropped in reverse order | No DROP SCHEMA, CASCADE or prefix scan; uncertain CREATEs remain visible |
+| Version and declaration | Register only the 8.1.3.62 combination with available original reports; revision becomes 1.2.0 | Numeric admission range is not exhaustive validation |
+
+Subsequent attribution and CUSTOM each retain a matching pair of 912 existing-object metadata entries;
+these pairs were compared this review. They do not replace the original FULL baseline inventory or
+prove equality of all row data. FULL 41/41 cleanup is supported by its own report/journal.
+The supplied older JAR (SHA-256 `afc60f332c8b79d514c1c19d2b58164c3e42112fea455eae68c9d56716834a97`)
+was live-probed read-only: DM DBMS 8.1.3.162, driver 8.1.2.192, JDBC 4.0, actual schema `DEVELOP`.
+No new DDL/DML was performed.
+
+### Open questions and acceptance impact
+
+| Category / question | Evidence, affected scope and next step | Blocks acceptance? |
+|---|---|---|
+| Platform defect: unknown preconditions directly labelled violation | Original FULL logger/cancel labels unchanged; current explicit applicability failure retains original assertion as cause, FAILED / NOT_EVALUATED; focused Worker/CLI tests | Repaired; no block or historical reclassification |
+| Preparation/contract: array factory typeName | INTEGER rejection and collection-name/base-type-name questions retained independently; separate setter CUSTOM 1/1 already completed | No block for limited setter acceptance; patch-matched factory semantics still unknown, no factory-conformance claim |
+| Contract applicability: getParentLogger | Introduced in JDBC 4.1; observed declaration 4.0 and null result; patch commitment to higher JDBC unknown | No block: still invoked and failed/unknown, not allowed unsupported; JDBC 4.1+ null remains a normative assertion failure |
+| Contract/environment: cancel and timeout | SLEEP(0) proves availability/permission only; cancel requires interruptibility evidence; normally completed timed work remains an execution-control question | No block: unknown precondition separated, no general claim about all SQL cancellation/timeouts |
+| Driver behavior questions | Auto-commit, pooled handles, Blob, parameter ordinals, empty arrays, generated keys and absolute(0) retain original results/independent observations below | No block: unconfirmed vendor attribution, no compensation; unknown attribution stays unknown |
+| Extra suite requirements | Four type-existence requirements and internal procedure counts; retained SUITE failures, five is a subset of NOT_EVALUATED=8 | No block: neither universal JDBC violations nor passes |
+| Environment prerequisites | Public provider classes/constructors, scope privileges and system package; other modes/intermediate driver versions unverified | Outside the registered scope; new environments need authorization and preparation |
+| Missing evidence | Older 249/21 FULL original unavailable; no new 8.1.3.62 live run this review; some patch documentation unknown | No block for the verified historical combination; do not register old version or claim new end-to-end live acceptance |
+
+### Eligibility and followups
+
+New CLI runs require official trust, formal run kind, runtime identity matching manifest regexes and complete registered version tokens
+for formal_eligible. Only the 8.1.3.62 combination is registered; the supplied 8.1.2.192 may still run
+ordinary tests but gains no formal-combination eligibility from adapter promotion. Version tokens may
+appear in product descriptions, but extensions using digits, letters, dots, hyphens or plus signs do not match.
+
+| Dimension | Project-maintained validation scope | Enforced checks |
+|---|---|---|
+| Database version | 8.1.3.162 | Java admission range; CLI matches complete registered version tokens |
+| Driver version | 8.1.3.62 | Java admission still allows 8.1.2.192–8.1.3.62; CLI formal eligibility matches only registered 8.1.3.62 |
+| Driver SHA-256 | Fingerprint above | Actual artifacts are fingerprinted, but formal_eligible does not compare against the registered fingerprint |
+| COMPATIBLE_MODE | 0 | Not checked by formal_eligible; regression mode evidence is an operator attestation |
+| CASE_SENSITIVE | 1 | Instance flag not checked by formal_eligible; exact schema validation is not instance-flag validation |
+| Java | 21 | Maven requires JDK 21; formal_eligible does not compare the combination's Java/patch version |
+
+Thus `formal_eligible=true` does not prove programmatic verification of the entire precise combination.
+Reports retain combination declarations, runtime identity/version, Java information and artifact evidence;
+declarations are not enforced observations. Operators must check unenforced boundaries; comparisons
+separately need matching versioned environment evidence. Old reports, adapterSnapshot and eligibility stay
+unchanged. Remaining work is targeted API-precondition/behavior review, patch documentation or new
+combinations in a separately authorized dedicated environment, not another mechanical FULL or waiting
+for every failure to disappear.
 
 <a id="dameng"></a>
 ## Dameng history, current implementation and retests
@@ -121,7 +205,7 @@ without DROP SCHEMA, CASCADE, prefix scans or business-object DDL/DML. Connectio
 readback remained available after another Server restart. The temporary platform and test services
 were session-owned and removed after verification; the supplied driver and existing resources were preserved.
 
-DM stays **candidate**. Runtime DBMS admission remains exactly 8.1.3.162; the numeric driver range
+At the 2026-11-04 acceptance DM stayed **candidate** (see [current acceptance](#dm-platform-acceptance)). Runtime DBMS admission remains exactly 8.1.3.162; the numeric driver range
 8.1.2.192–8.1.3.62 preserves the old endpoint and admits the newly observed release. Intermediate
 releases, other DM8 patches, modes and driver/JDK combinations are **unverified**. The manifest's
 qualification records the boundary without promoting the adapter or changing historical reports.
@@ -212,7 +296,7 @@ execute outcome; preserve the original primary error and phase with cancel/shutd
 supplemental evidence. Both thread waits are limited to five seconds. Worker diagnostics traverse
 cause/nextException/suppressed with identity deduplication, at most 10 records, a queue of at most
 16 entries and at most 2000 characters per message/SQLState after redaction. Supplemental branches
-do not supply primary SQLState. Correct only getParentLogger's API introduction metadata to 4.1;
+do not supply primary SQLState. The earlier change corrected only getParentLogger's API introduction metadata to 4.1;
 retain the driver's observed JDBC 4.0 and optional-unsupported policy, without version-based skipping.
 Clarify the Chinese suite-requirement terminology. UI, JSON reports and
 regression comparisons retain FAILED, NOT_EVALUATED and SUITE: five is a subset of eight, not
@@ -259,4 +343,4 @@ Contract sources: Java 21 [Connection](https://docs.oracle.com/en/java/javase/21
 [InputStream](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/io/InputStream.html), and
 [JDBC 4.3 specification §11.4](https://download.oracle.com/otn-pub/jcp/jdbc-4_3-mrel3-spec/jdbc4.3-fr-spec.pdf).
 The live DM guide is not a patch-matched DBMS/driver manual; full release notes and vendor attribution
-for this combination remain unavailable. DM stays candidate; other versions and modes are not covered.
+for this combination remain unavailable. This is the pre-promotion attribution record; see [current acceptance](#dm-platform-acceptance). Other versions and modes are not covered.

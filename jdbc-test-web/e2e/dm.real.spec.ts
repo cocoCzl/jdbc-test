@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 // Use IDs created by the authorized disposable acceptance platform; never infer a target.
 test.skip(process.env.JDBC_TEST_DM_REAL !== "true", "Requires explicit DM acceptance configuration");
 
-test("REAL DM candidate: exact saved scope, probe, bilingual history and report", async ({ page, request }) => {
+test("REAL DM: exact saved scope, probe, bilingual history and report", async ({ page, request }) => {
   const connectionId = process.env.JDBC_TEST_DM_CONNECTION_ID;
   const runId = process.env.JDBC_TEST_DM_RUN_ID;
   const schema = process.env.DM_SCHEMA;
@@ -23,7 +23,10 @@ test("REAL DM candidate: exact saved scope, probe, bilingual history and report"
     await expect(page.locator("#database-type")).toHaveText(/达梦.*Dameng/);
     await expect(page.locator("#execution-schema")).toHaveValue(schema);
     await expect(page.locator("#execution-database")).toHaveCount(0);
-    await expect(page.getByText(zh ? /^候选适配。/ : /^Candidate integration\./)).toBeVisible();
+    const qualification = page.getByText(zh ? /^项目正式维护的适配。/ : /^Project-maintained adapter\./);
+    await expect(qualification).toBeVisible();
+    await expect(qualification).toContainText("8.1.3.162");
+    await expect(qualification).toContainText("8.1.3.62");
     const probed = page.waitForResponse(response => response.url().endsWith("/api/connections/test"));
     await page.getByRole("button", { name: zh ? "测试连接" : "Test connection", exact: true }).click();
     const response = await probed;

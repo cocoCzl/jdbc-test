@@ -842,5 +842,5 @@
   "record.adapterFingerprint": "适配清单 SHA-256",
   "driverPreset.dm": "达梦 / Dameng",
   "connection.dmUrlHint": "使用 jdbc:dm://主机:端口?schema=SCHEMA；路径或 schema 参数表示模式，不是数据库。授权 schema 填写实际名称（保留带引号名称的大小写）。",
-  "adapter.dmQualification": "候选适配。DM DBMS 8.1.3.162 的记录仅适用于已测试驱动版本；能力字段是历史声明，不是 JDBC 兼容性保证。结果、前置条件和未解决行为见使用指南。"
+  "adapter.dmQualification": "项目正式维护的适配。登记组合仅为 DM DBMS 8.1.3.162＋驱动 8.1.3.62、模式 0、Java 21；不代表厂商认证或全部 JDBC 用例通过。旧驱动记录、清理证据及未解决项见数据库验证记录。"
 }

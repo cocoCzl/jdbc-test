@@ -93,8 +93,10 @@ XML 依赖缺失只阻塞相关用例，不阻塞独立测试。
 和 `dm.jdbc.driver.DmdbXADataSource`，默认 Bean 属性为 `URL`、`user`、`password`。
 类存在不代表相应测试通过。
 
-达梦仍为 **candidate**。`qualification` 分别记录 DM DBMS 8.1.3.162 与驱动 8.1.2.192、
-8.1.3.62 的测试；`validated_combinations` 为空不等于从未实测，也不表示其他版本已验证。
+达梦为项目内 **official** 适配，登记组合仅为 DM DBMS 8.1.3.162＋驱动 8.1.3.62、
+`COMPATIBLE_MODE=0`、`CASE_SENSITIVE=1`、Java 21，不表示厂商认证或全部用例通过。
+旧驱动 8.1.2.192 的历史记录单独保留，不登记为正式组合。
+参见[脱敏组合证据](../adapters/dm/evidence/platform-8.1.3.162-driver-8.1.3.62.json)和[接纳评估](database-validation.zh-CN.md#dm-platform-acceptance)。
 驱动准入区间不证明区间内每个版本通过；Provider 类存在也不等于功能通过。
 
 <a id="已记录-full-的逐项归因"></a>

@@ -847,5 +847,5 @@
   "record.adapterFingerprint": "Adapter manifest SHA-256",
   "driverPreset.dm": "Dameng / 达梦",
   "connection.dmUrlHint": "Use jdbc:dm://host:port?schema=SCHEMA. The path or schema parameter selects a schema, not a database. Enter the exact authorized schema name (case-sensitive quoted names are preserved).",
-  "adapter.dmQualification": "Candidate integration. Recorded DM DBMS 8.1.3.162 observations are specific to the tested driver releases; capabilities are historical declarations, not a JDBC compatibility guarantee. See the Usage guide for results, prerequisites and unresolved behavior."
+  "adapter.dmQualification": "Project-maintained adapter. The registered combination is only DM DBMS 8.1.3.162 + driver 8.1.3.62, mode 0, Java 21; not vendor certification or an all-tests-pass claim. See database validation records for older-driver history, cleanup and open questions."
 }

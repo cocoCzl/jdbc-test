@@ -15,6 +15,42 @@ import org.junit.platform.launcher.core.*;
 
 class WorkerExecutionEvidenceTest {
 
+    static class UnverifiedApplicability {
+
+        @Test
+        void first() {
+            throw new JdbcContracts.ContractApplicabilityAssertionError(
+                "JDBC 4.1 baseline unverified", new AssertionError("null Logger"));
+        }
+
+        @Test
+        void second() {
+            throw new AssertionError("reviewed API assertion");
+        }
+    }
+
+    @Test
+    void unverifiedApplicabilityRemainsFailedInEventsAndReportWithItsOriginalAssertion()
+        throws Exception {
+        var evidence = execute(UnverifiedApplicability.class);
+        var row = evidence.results().stream()
+            .filter(item -> "fixture.first".equals(item.get("scenarioId")))
+            .findFirst().orElseThrow();
+        assertEquals("FAILED", row.get("status"));
+        assertEquals("EXECUTION", row.get("phase"));
+        assertEquals(true, row.get("contractInvoked"));
+        assertEquals("NOT_EVALUATED", row.get("conclusion"));
+        assertFalse(row.containsKey("contractConforms"));
+        assertFalse(row.containsKey("requirementScope"));
+        String json = new ObjectMapper().writeValueAsString(row);
+        assertTrue(json.contains("null Logger"));
+        assertTrue(json.contains("JDBC 4.1 baseline unverified"));
+        assertEquals(2, evidence.results().stream()
+            .filter(item -> "FAILED".equals(item.get("status"))).count());
+        assertTrue(evidence.results().stream()
+            .anyMatch(item -> "CONTRACT_VIOLATION".equals(item.get("conclusion"))));
+    }
+
     @Test
     void failureRetainsSqlNextAndSuppressedBranchesWithCyclesAndRedaction() throws Exception {
         var cancel = new java.sql.SQLException("cancel secret-fixture", "HY000", 77);

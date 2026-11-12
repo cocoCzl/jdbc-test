@@ -17,6 +17,25 @@ import org.junit.jupiter.api.TestReporter;
 class ExecutionControlFixtureTest {
 
     @Test
+    void unverifiedSleepInterruptionRetainsFailedAssertionAndDoesNotHideCancelErrors()
+        throws Exception {
+        Statement sql = mock(Statement.class);
+        var reporter = mock(TestReporter.class);
+        var failure = assertThrows(
+            com.jdbctest.extension.JdbcContracts.ContractApplicabilityAssertionError.class,
+            () -> ExecutionControlTest.executeAndObserveCancellation(sql, "slow",
+                CompletableFuture.completedFuture(null), reporter, false));
+        org.junit.jupiter.api.Assertions.assertInstanceOf(
+            org.opentest4j.AssertionFailedError.class, failure.getCause());
+        verify(sql).execute("slow");
+        var cancel = new SQLException("cancel rejected", "HY000", 77);
+        var failedCancel = assertThrows(ExecutionException.class,
+            () -> ExecutionControlTest.executeAndObserveCancellation(sql, "slow",
+                CompletableFuture.failedFuture(cancel), reporter, false));
+        assertSame(cancel, failedCancel.getCause());
+    }
+
+    @Test
     void normalExecutionStillObservesAndPreservesTheCancelThreadFailure() throws Exception {
         Statement sql = mock(Statement.class);
         TestReporter reporter = mock(TestReporter.class);

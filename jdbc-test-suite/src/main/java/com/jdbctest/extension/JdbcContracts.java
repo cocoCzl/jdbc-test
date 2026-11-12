@@ -14,6 +14,15 @@ public final class JdbcContracts {
         T call() throws SQLException;
     }
 
+    /** Retains a failed assertion when the normative contract's precondition is unverified. */
+    public static final class ContractApplicabilityAssertionError extends AssertionError {
+
+        public ContractApplicabilityAssertionError(String reason, AssertionError evidence) {
+            super("Contract applicability unverified: " + reason);
+            initCause(evidence);
+        }
+    }
+
     /** A suite feature requirement is not itself a normative JDBC API obligation. */
     public static final class SuiteRequirementAssertionError extends AssertionError {
 

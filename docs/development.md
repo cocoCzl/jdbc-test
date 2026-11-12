@@ -104,14 +104,40 @@ Schema identifiers retain the shared `[A-Za-z][A-Za-z0-9_]{0,62}` policy (numeri
 quoted delimiters and non-ASCII names are rejected). Each checkout sets and checks the exact name;
 close errors are suppressed on the original scope failure. Only successful journaled CREATEs are
 eligible for exact-object cleanup; uncertain CREATEs stay visible, without schema drops or scans.
-The adapter API exposes immutable historical capability declarations and a candidate qualification
-note; it does not certify driver behavior. Public provider interface/constructor availability is a
+The adapter API exposes immutable historical capability declarations and the current qualification
+scope; it does not certify driver behavior. Public provider interface/constructor availability is a
 prerequisite; actual constructor, setter and JDBC-call behavior still needs observation.
 Connection-probe diagnostics retain bounded next-exception, cause and suppressed branches with
 SQLState/vendor codes, redact credentials, and publish success only after the connection closes.
 
 A product enum alone does not implement support. Never change public assertions or deselect FULL
 cases to manufacture compatibility. Real authorized verification is required before widening claims.
+
+<a id="adapter-acceptance"></a>
+### Formal acceptance of a platform adapter
+
+Existing rules: `official` means project-maintained integration; historical results are immutable,
+and driver failures do not automatically disqualify the adapter. Minimum code validation requires
+nonempty `validated_combinations` and safe evidence paths in Java/Python; the Python loader also
+checks file existence. These checks do not review evidence content. Kingbase already has an official
+combination with failures and preparation blocks; all-tests-pass is not a DM acceptance condition.
+
+The maintenance standard made explicit here is to verify identity, artifact fingerprint, precise
+version/mode/JDK/date, reviewable redacted provenance, execution and cleanup evidence; audit
+upload/connection/scope/standard calls/terminal outcomes/presentation/ownership, and fix platform
+defects within the accepted scope. Unverified contract preconditions retain failure and unknown
+conclusions. Driver questions, extra suite requirements and out-of-scope environment prerequisites
+stay separate. Known incorrect platform attribution, unauthorized cleanup or unverifiable combination
+evidence blocks acceptance; exhaustive versions/platforms or all tests passing are not required.
+See the [DM acceptance record](database-validation.md#dm-platform-acceptance).
+
+CLI `formal_eligible` additionally requires formal run kind, runtime identity matching manifest regexes,
+official trust, no experimental override and complete version-token matching. It does not enforce the
+combination's mode, CASE_SENSITIVE, JDK or artifact fingerprint, or prove the entire precise combination.
+See the per-dimension [acceptance boundaries](database-validation.md#dm-platform-acceptance).
+Operators must preserve the registered scope, and comparisons separately require
+versioned environment evidence. Status changes affect new runs only, never promote old reports;
+unregistered combinations remain available for ordinary testing without formal eligibility.
 
 For the read-only external DM smoke, first build the packaged Worker, then supply private environment
 variables `DM_JDBC_JAR`, `DM_JDBC_URL`, `DM_USERNAME`, `DM_PASSWORD`, `DM_SCHEMA` and run:

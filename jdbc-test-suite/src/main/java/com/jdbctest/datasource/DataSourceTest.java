@@ -2,11 +2,14 @@ package com.jdbctest.datasource;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.jdbctest.extension.JdbcContracts;
 import com.jdbctest.extension.JdbcTestExtension;
 import com.jdbctest.extension.RequiresFeature;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.SQLException;
 import java.util.logging.Logger;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.*;
@@ -101,11 +104,37 @@ class DataSourceTest {
     @Test
     @Order(6)
     @DisplayName("getParentLogger 获取父 Logger")
-    void testGetParentLogger() throws Exception {
+    void testGetParentLogger(Connection connection) throws Exception {
         DataSource ds = getDataSource();
         Logger logger = com.jdbctest.extension.JdbcContracts.optional(
             "CommonDataSource.getParentLogger", ds::getParentLogger);
-        assertNotNull(logger, "getParentLogger 应返回有效 Logger");
+        assertParentLogger(logger, connection);
+    }
+
+    static void assertParentLogger(Logger logger, Connection connection) {
+        try {
+            assertNotNull(logger, "getParentLogger 应返回有效 Logger");
+        } catch (AssertionError failure) {
+            int major;
+            int minor;
+            try {
+                DatabaseMetaData metadata = connection.getMetaData();
+                major = metadata.getJDBCMajorVersion();
+                minor = metadata.getJDBCMinorVersion();
+            } catch (SQLException unavailable) {
+                failure.addSuppressed(unavailable);
+                throw new JdbcContracts.ContractApplicabilityAssertionError(
+                    "CommonDataSource.getParentLogger requires JDBC 4.1; "
+                        + "the driver's JDBC baseline could not be read", failure);
+            }
+            if (major < 4 || major == 4 && minor < 1) {
+                throw new JdbcContracts.ContractApplicabilityAssertionError(
+                    "CommonDataSource.getParentLogger requires JDBC 4.1; driver declares "
+                        + major + "." + minor + "; a higher-version support commitment is unverified",
+                    failure);
+            }
+            throw failure;
+        }
     }
 
     @Test

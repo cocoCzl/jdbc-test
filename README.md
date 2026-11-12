@@ -21,12 +21,12 @@
 | Oracle | official | 19.3.0.0.0 / 驱动 21.13.0.0.0 | [权限与 LOB 限制](docs/database-validation.zh-CN.md#known-limitations) |
 | KingbaseES | official | 服务端 V009R002C016；oracle 模式；JDBC 产品 12.1；驱动 V008R006B0001 | [组合边界](docs/database-validation.zh-CN.md#recorded-combinations) |
 | GaussDB | candidate | `validated_combinations` 为空 | [复用边界](docs/database-validation.zh-CN.md#recorded-combinations) |
-| 达梦 / DM | candidate | DM DBMS 8.1.3.162；分别测试驱动 8.1.2.192、8.1.3.62 | [历史记录与定向复测](docs/database-validation.zh-CN.md#dameng) |
+| 达梦 / DM | official | 8.1.3.162 / 驱动 8.1.3.62；COMPATIBLE_MODE=0 | [接纳范围与历史记录](docs/database-validation.zh-CN.md#dm-platform-acceptance) |
 
 活动索引为 [adapters/catalog.json](adapters/catalog.json)，状态与范围来自各 `adapter.json`、
 `qualification` 和已有 evidence，见[证据入口](docs/database-validation.zh-CN.md#recorded-combinations)。
 `official` 是项目内的平台适配状态，不是厂商认证，也不表示全部 JDBC 用例通过。
-`candidate` 保留候选状态；达梦虽无 `validated_combinations`，但有独立实测记录。
+`candidate` 为尚未正式接纳的适配；达梦仅登记下述验证记录中的精确组合，旧驱动历史另列。
 `supported_versions` 是准入范围，不代表区间内全部版本实测；capability 布尔值是声明，不是通过证明。
 GaussDB 复用 PostgreSQL 基础设施不代表所有 GaussDB/openGauss 产品完整验证。
 SQL Server 已停止新建连接、探测和执行，仅保留[历史读取](docs/database-validation.zh-CN.md#known-limitations)。

@@ -7,6 +7,35 @@ import i18n from "@/i18n";
 import type { CaseResult } from "@/types/api";
 
 describe("Contract outcome evidence", () => {
+  it.each(["en", "zh-CN"])("keeps unverified applicability failed and distinct from SUITE in %s", async locale => {
+    await i18n.changeLanguage(locale);
+    const failure: CaseResult = {
+      id: "applicability", scenarioId: "datasource.get_parent_logger", moduleId: "data-source",
+      displayName: "Logger applicability fixture", status: "FAILED", durationMs: 1,
+      message: "Contract applicability unverified: JDBC 4.1 baseline",
+      stackTrace: "Original assertion: null Logger", startedAt: null, finishedAt: null,
+      executionEvidence: { conclusion: "NOT_EVALUATED", phase: "EXECUTION", contractInvoked: true },
+    };
+    const summary = { ...finishedRun, passed: 0, failed: 1, completedCases: 1,
+      contractSummary: { NOT_EVALUATED: 1 } };
+    const original = { scenario_results: { "datasource.get_parent_logger": failure } };
+    mockApi(url => url.pathname.endsWith("/report.json") ? json(original)
+      : url.pathname.endsWith("/report") ? json({ summary, failures: [failure] }) : undefined);
+    const user = userEvent.setup();
+    renderPage("/runs/run-1");
+    await user.click(await screen.findByRole("tab", { name: locale === "en" ? "Report" : "报告" }));
+    await user.click(await screen.findByRole("button", { name: i18n.t("record.viewDetails") }));
+    const detail = screen.getByRole("dialog");
+    expect(within(detail).getByText(i18n.t("record.case.FAILED"))).toBeVisible();
+    expect(within(detail).getByText(i18n.t("selection.NOT_EVALUATED"))).toBeVisible();
+    expect(within(detail).queryByText(i18n.t("selection.suiteRequirementNote"))).not.toBeInTheDocument();
+    expect(within(detail).queryByText(i18n.t("selection.unsupportedNote"))).not.toBeInTheDocument();
+    expect(within(detail).getByText(failure.message!)).toBeVisible();
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByRole("button", { name: i18n.t("report.viewJSON") }));
+    expect(JSON.parse((await screen.findByText(/Original assertion: null Logger/)).textContent!)).toEqual(original);
+  });
+
   it.each(["en", "zh-CN"])("presents all five DM suite failures as a subset of eight not evaluated in %s", async locale => {
     await i18n.changeLanguage(locale);
     const ids = ["jdbc_type.array_type_metadata", "jdbc_type.ref_type_metadata",

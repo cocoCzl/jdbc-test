@@ -1,0 +1,351 @@
+{
+  "evidence_kind": "reviewed_redacted_summary",
+  "database_product": "DM DBMS",
+  "database_version": "8.1.3.162",
+  "driver_name": "dm.jdbc.driver.DmDriver",
+  "driver_version": "8.1.3.62",
+  "driver_artifact_sha256": "327bade775f4f15b97618bc9736a4625def52701cf53f5ef5ad72580797e6e45",
+  "database_mode": "COMPATIBLE_MODE=0",
+  "case_sensitive": 1,
+  "driver_compatible_mode": {
+    "original_full": "not captured",
+    "subsequent_independent_probe": 0
+  },
+  "jdbc_version": "4.0",
+  "driver_api_version": "8.1",
+  "jdk": "21 (historically recorded; patch not established by the reports)",
+  "validation_date": "2026-11-04",
+  "review_date": "2026-11-12",
+  "test_suite_version": "1.2.1-SNAPSHOT",
+  "acceptance_scope": "Project-maintained platform adapter for this precise historical combination, not vendor certification or complete JDBC compatibility. No all-tests-pass condition.",
+  "original_adapter_snapshot": {
+    "id": "dm",
+    "version": "1.0.0",
+    "revision": "1.1.0",
+    "status": "CANDIDATE",
+    "fingerprint": "c41a1919c34999acd54fe4e11500266fee87f14eeed4282135826c72db292434"
+  },
+  "historical_reports_unchanged": true,
+  "historical_older_full": {
+    "database_version": "8.1.3.162",
+    "driver_version": "8.1.2.192",
+    "selected": 270,
+    "passed": 249,
+    "failed": 21,
+    "raw_report_availability": "Not found in the reviewed local QA materials; historical documentary record only. Not registered as a validated combination."
+  },
+  "runs": [
+    {
+      "run_id": "b24e1c4d-7c71-4ef4-91e0-216fcc37d014",
+      "profile": "CORE",
+      "source_label": "acceptance/core-report.json",
+      "summary": {
+        "skipped": 0,
+        "started": 153,
+        "failed": 2,
+        "total": 153,
+        "completed": 153,
+        "passed": 151,
+        "aborted": 0
+      },
+      "recorded_contract_summary": {
+        "CONFORMS": 151,
+        "EXECUTED": 153,
+        "CONTRACT_VIOLATION": 1,
+        "NOT_EVALUATED": 1
+      },
+      "cleanup": {
+        "status": "SUCCESS",
+        "attempted": 18,
+        "confirmed_deleted": 18,
+        "retained_objects": 0
+      }
+    },
+    {
+      "run_id": "4ac9f8e9-88b7-41af-9154-07c09bc08636",
+      "profile": "FULL",
+      "source_label": "acceptance/full-report.json",
+      "summary": {
+        "skipped": 0,
+        "aborted": 0,
+        "passed": 254,
+        "completed": 270,
+        "total": 270,
+        "failed": 16,
+        "started": 270
+      },
+      "recorded_contract_summary": {
+        "NOT_EVALUATED": 8,
+        "SUITE_REQUIREMENT_UNMET": 5,
+        "EXECUTED": 270,
+        "CONFORMS": 254,
+        "CONTRACT_VIOLATION": 8
+      },
+      "cleanup": {
+        "status": "SUCCESS",
+        "attempted": 41,
+        "confirmed_deleted": 41,
+        "retained_objects": 0
+      }
+    },
+    {
+      "run_id": "f816ac85-c189-47c9-90df-4a799fc01d89",
+      "profile": "CUSTOM",
+      "source_label": "formal-report.json",
+      "summary": {
+        "started": 1,
+        "skipped": 0,
+        "aborted": 0,
+        "passed": 1,
+        "completed": 1,
+        "total": 1,
+        "failed": 0
+      },
+      "recorded_contract_summary": null,
+      "cleanup": {
+        "status": "SUCCESS",
+        "attempted": 3,
+        "confirmed_deleted": 3,
+        "retained_objects": 0
+      }
+    }
+  ],
+  "counting_policy": "Keep all runs separate. FULL remains 254/16; CUSTOM 1/1 never produces a revised FULL. Historical NOT_EVALUATED=8 includes SUITE_REQUIREMENT_UNMET=5. Current manual review or fixture tests never rewrite historical classifications.",
+  "non_passing_full_cases": [
+    {
+      "scenario_id": "jdbc_type.array_type_metadata",
+      "recorded_status": "FAILED",
+      "recorded_conclusion": "NOT_EVALUATED",
+      "recorded_phase": "EXECUTION",
+      "manual_review_category": "suite_requirement",
+      "manual_review": "Extra type-existence or internal procedure-count requirement; not a universal JDBC obligation.",
+      "blocks_platform_acceptance": false
+    },
+    {
+      "scenario_id": "connection.enable_auto_commit_commits_pending_work",
+      "recorded_status": "FAILED",
+      "recorded_conclusion": "CONTRACT_VIOLATION",
+      "recorded_phase": "EXECUTION",
+      "manual_review_category": "driver_behavior_question",
+      "manual_review": "Delayed commit observed; preserve assertion; vendor attribution unconfirmed.",
+      "blocks_platform_acceptance": false
+    },
+    {
+      "scenario_id": "advanced_type.set_array",
+      "recorded_status": "FAILED",
+      "recorded_conclusion": "NOT_EVALUATED",
+      "recorded_phase": "EXECUTION",
+      "manual_review_category": "preparation_fixed",
+      "manual_review": "Subsequent CUSTOM setter passed; element-type factory naming is a separate unresolved observation.",
+      "blocks_platform_acceptance": false
+    },
+    {
+      "scenario_id": "statement.actual_query_timeout",
+      "recorded_status": "FAILED",
+      "recorded_conclusion": "CONTRACT_VIOLATION",
+      "recorded_phase": "EXECUTION",
+      "manual_review_category": "driver_behavior_question",
+      "manual_review": "SLEEP completed despite timeout; timeout obligation remains, patch-specific behavior unconfirmed.",
+      "blocks_platform_acceptance": false
+    },
+    {
+      "scenario_id": "result_set.absolute",
+      "recorded_status": "FAILED",
+      "recorded_conclusion": "NOT_EVALUATED",
+      "recorded_phase": "EXECUTION",
+      "manual_review_category": "driver_behavior_question",
+      "manual_review": "absolute(0) error reproduced on scrollable literal query; original SQL exception and unknown conclusion retained.",
+      "blocks_platform_acceptance": false
+    },
+    {
+      "scenario_id": "jdbc_type.row_id_type_metadata",
+      "recorded_status": "FAILED",
+      "recorded_conclusion": "NOT_EVALUATED",
+      "recorded_phase": "EXECUTION",
+      "manual_review_category": "suite_requirement",
+      "manual_review": "Extra type-existence or internal procedure-count requirement; not a universal JDBC obligation.",
+      "blocks_platform_acceptance": false
+    },
+    {
+      "scenario_id": "jdbc_type.ref_type_metadata",
+      "recorded_status": "FAILED",
+      "recorded_conclusion": "NOT_EVALUATED",
+      "recorded_phase": "EXECUTION",
+      "manual_review_category": "suite_requirement",
+      "manual_review": "Extra type-existence or internal procedure-count requirement; not a universal JDBC obligation.",
+      "blocks_platform_acceptance": false
+    },
+    {
+      "scenario_id": "datasource.get_parent_logger",
+      "recorded_status": "FAILED",
+      "recorded_conclusion": "CONTRACT_VIOLATION",
+      "recorded_phase": "EXECUTION",
+      "manual_review_category": "contract_applicability",
+      "manual_review": "JDBC 4.1 applicability is unverified for declared JDBC 4.0; current null assertion still fails, NOT_EVALUATED.",
+      "blocks_platform_acceptance": false
+    },
+    {
+      "scenario_id": "statement.cancel_running_statement",
+      "recorded_status": "FAILED",
+      "recorded_conclusion": "CONTRACT_VIOLATION",
+      "recorded_phase": "EXECUTION",
+      "manual_review_category": "contract_applicability",
+      "manual_review": "DBMS/driver interruption support for SLEEP is unverified; current failed assertion is NOT_EVALUATED.",
+      "blocks_platform_acceptance": false
+    },
+    {
+      "scenario_id": "blob_clob.blob_stream_round_trip",
+      "recorded_status": "FAILED",
+      "recorded_conclusion": "CONTRACT_VIOLATION",
+      "recorded_phase": "EXECUTION",
+      "manual_review_category": "driver_behavior_question",
+      "manual_review": "readAllBytes truncated; independent zero-length read observation retained; no chunked-read workaround in suite.",
+      "blocks_platform_acceptance": false
+    },
+    {
+      "scenario_id": "jdbc_type.struct_type_metadata",
+      "recorded_status": "FAILED",
+      "recorded_conclusion": "NOT_EVALUATED",
+      "recorded_phase": "EXECUTION",
+      "manual_review_category": "suite_requirement",
+      "manual_review": "Extra type-existence or internal procedure-count requirement; not a universal JDBC obligation.",
+      "blocks_platform_acceptance": false
+    },
+    {
+      "scenario_id": "callable_statement.procedure_parameter_metadata",
+      "recorded_status": "FAILED",
+      "recorded_conclusion": "CONTRACT_VIOLATION",
+      "recorded_phase": "EXECUTION",
+      "manual_review_category": "driver_behavior_question",
+      "manual_review": "Observed ordinals 0/1/2 rather than 1/2/3; no index compensation.",
+      "blocks_platform_acceptance": false
+    },
+    {
+      "scenario_id": "datasource.pooled_replacement_invalidates_previous_handle",
+      "recorded_status": "FAILED",
+      "recorded_conclusion": "CONTRACT_VIOLATION",
+      "recorded_phase": "EXECUTION",
+      "manual_review_category": "driver_behavior_question",
+      "manual_review": "Replacement logical handle did not invalidate old handle; vendor attribution unconfirmed.",
+      "blocks_platform_acceptance": false
+    },
+    {
+      "scenario_id": "advanced_type.empty_array",
+      "recorded_status": "FAILED",
+      "recorded_conclusion": "CONTRACT_VIOLATION",
+      "recorded_phase": "EXECUTION",
+      "manual_review_category": "driver_behavior_question",
+      "manual_review": "Non-null empty Array materialized as null; vendor attribution unconfirmed.",
+      "blocks_platform_acceptance": false
+    },
+    {
+      "scenario_id": "statement.result_sequence",
+      "recorded_status": "FAILED",
+      "recorded_conclusion": "NOT_EVALUATED",
+      "recorded_phase": "EXECUTION",
+      "manual_review_category": "suite_requirement",
+      "manual_review": "Extra type-existence or internal procedure-count requirement; not a universal JDBC obligation.",
+      "blocks_platform_acceptance": false
+    },
+    {
+      "scenario_id": "prepared_statement.batch_keys_by_column_index",
+      "recorded_status": "FAILED",
+      "recorded_conclusion": "NOT_EVALUATED",
+      "recorded_phase": "EXECUTION",
+      "manual_review_category": "driver_behavior_question",
+      "manual_review": "Returned NAME/VARCHAR rather than requested ID; no switch to column names or index zero.",
+      "blocks_platform_acceptance": false
+    }
+  ],
+  "inventory_review": {
+    "subsequent_attribution": {
+      "before": 912,
+      "after": 912,
+      "identical": true
+    },
+    "setter_custom": {
+      "before": 912,
+      "after": 912,
+      "identical": true
+    },
+    "comparison_dimensions": [
+      "name",
+      "type",
+      "object ID",
+      "last DDL time"
+    ],
+    "limit": "These preserved pairs accompany subsequent attribution/CUSTOM runs. A separate original FULL baseline inventory is not present here. Metadata equality does not establish row-data equality."
+  },
+  "source_integrity": {
+    "indexed_files_verified": 79,
+    "missing_or_mismatched": 0,
+    "reviewed_material_base_commit": "2705e114697051fd27c46a38e1bb182675865a67",
+    "reviewed_material_review_commit": "97cc78f081b96c5f8452df94637cf559b083dbb5",
+    "sources": [
+      {
+        "source_label": "acceptance/core-report.json",
+        "sha256": "a8918cdc6906f06c1caadf14ae068eb902c9990f282b252d6ef6c83d033bd8cf",
+        "availability": "Private local material reviewed; not distributed. Labels are provenance identifiers, not public links."
+      },
+      {
+        "source_label": "acceptance/full-report.json",
+        "sha256": "e74b4e5125cb693df6359801355b41fdf3bbd8c74b1cec0ff8add01fa30bbf42",
+        "availability": "Private local material reviewed; not distributed. Labels are provenance identifiers, not public links."
+      },
+      {
+        "source_label": "formal-report.json",
+        "sha256": "34df9ec17f6293c536fc5caac72b6e5206c59a6ae664b1ad83003339742c9e94",
+        "availability": "Private local material reviewed; not distributed. Labels are provenance identifiers, not public links."
+      },
+      {
+        "source_label": "formal-object-ledger.yaml",
+        "sha256": "597d6bd594dd0676feb5d50489842f0ec37b7b6e784a7b55226439e620170fdf",
+        "availability": "Private local material reviewed; not distributed. Labels are provenance identifiers, not public links."
+      },
+      {
+        "source_label": "formal-inventory-before.json",
+        "sha256": "b1200810db234a977a41e4fe6f93b7afc1a9e3b4d548d06e0acb605beb0f3ab9",
+        "availability": "Private local material reviewed; not distributed. Labels are provenance identifiers, not public links."
+      },
+      {
+        "source_label": "formal-inventory-after.json",
+        "sha256": "b1200810db234a977a41e4fe6f93b7afc1a9e3b4d548d06e0acb605beb0f3ab9",
+        "availability": "Private local material reviewed; not distributed. Labels are provenance identifiers, not public links."
+      },
+      {
+        "source_label": "previous/inventory-before.json",
+        "sha256": "b1200810db234a977a41e4fe6f93b7afc1a9e3b4d548d06e0acb605beb0f3ab9",
+        "availability": "Private local material reviewed; not distributed. Labels are provenance identifiers, not public links."
+      },
+      {
+        "source_label": "previous/inventory-after.json",
+        "sha256": "b1200810db234a977a41e4fe6f93b7afc1a9e3b4d548d06e0acb605beb0f3ab9",
+        "availability": "Private local material reviewed; not distributed. Labels are provenance identifiers, not public links."
+      },
+      {
+        "source_label": "attribution.json",
+        "sha256": "2c20de76ff1d94c020f66638f4a47f417e318850aa53ca3bea0a8892c25e46c5",
+        "availability": "Private local material reviewed; not distributed. Labels are provenance identifiers, not public links."
+      },
+      {
+        "source_label": "INDEX.json",
+        "sha256": "5f3431d99c2f148f91c2e47ef47fc88f7c922fdce91136ea0a0b7633c83ea8ce",
+        "availability": "Private local material reviewed; not distributed. Labels are provenance identifiers, not public links."
+      }
+    ]
+  },
+  "platform_chain_review": {
+    "driver_identity": "FULL/CORE metadata MATCHED; workerReportValidated=true and PERSISTED_WORKER_EVENTS source. Current isolated Worker separately validates/probes the supplied older artifact.",
+    "connection_lifecycle": "Prior documented upload/probe/create/edit/restart and bilingual browser checks; connection lifecycle fixtures preserve schema and encrypted credential handling. No new live Web acceptance claimed.",
+    "scope_and_sql": "Exact schema preserved by ExecutionScope/ScopedDataSource; existing namespace retained; standard JDBC calls and original assertions kept. Native collection setup only qualifies the setter, not createArrayOf element-type semantics.",
+    "execution_and_results": "Current cancel/timeout ownership and terminal handling reviewed; newly explicit applicability failures retain FAILED/original cause and use NOT_EVALUATED. Fixture verification is not a new database run.",
+    "cleanup": "CORE 18/18, FULL 41/41 and CUSTOM 3/3 independently journaled/deleted. Only exact journal objects are dropped, reverse dependency order, no prefix scan or schema drop."
+  },
+  "current_review_limits": [
+    "Driver 8.1.3.62 is not present for new live retesting; its fingerprint is recorded in the preserved acceptance/attribution material, not rehashed from a present JAR.",
+    "Only the supplied 8.1.2.192 artifact was live-probed in this review (SHA-256 afc60f332c8b79d514c1c19d2b58164c3e42112fea455eae68c9d56716834a97); no writable database run was authorized or performed in this session.",
+    "Post-fix applicability handling is fixture-verified; no new FULL or aggregate pass rate is claimed.",
+    "Patch-matched vendor documentation for factory names, getParentLogger 4.1 commitment and SLEEP interruption remains unavailable. These limit contract attribution, not the maintained platform adapter scope.",
+    "Generic CLI formal eligibility checks official status/run kind, runtime identity against manifest regexes, and complete registered version tokens. It does not compare this artifact fingerprint, COMPATIBLE_MODE, CASE_SENSITIVE or the registered Java/patch version. Maven separately requires JDK 21. formal_eligible=true does not prove verification of the entire precise combination. Comparisons still require versioned comparable environment evidence; mode is an operator attestation. Old reports retain their original eligibility."
+  ]
+}

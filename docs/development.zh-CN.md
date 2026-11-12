@@ -97,7 +97,7 @@ DM 审计沿用注册表 → Server 冻结快照 → 隔离 Worker → Suite 资
 作用域保持共享的 `[A-Za-z][A-Za-z0-9_]{0,62}` 策略：拒绝纯数字、下划线开头、引号分隔符和非 ASCII 名称。
 每次 checkout 设置并核对精确名称；关闭失败作为原始作用域错误的 suppressed 异常保留。
 只有 journal 确认成功创建的对象可以按精确名称清理，不确定的 CREATE 保留为可见证据，不执行删 Schema 或扫描清理。
-适配器 API 返回不可变的历史 capability 声明和 candidate 说明，不保证驱动行为通过。
+适配器 API 返回不可变的历史 capability 声明和当前接纳范围说明，不保证驱动行为通过。
 Provider 必须提供公共类、匹配的接口及公共无参构造器；实际构造、属性设置及 JDBC 调用仍需观察。
 探测保留有界的 next-exception、cause 和 suppressed 分支及 SQLState/厂商码，诊断脱敏，连接关闭后才发布成功。
 
@@ -107,6 +107,25 @@ Provider 必须提供公共类、匹配的接口及公共无参构造器；实�
 适配资源在源码中维护，自定义适配包、SQL 包上传和 JSON 导入已撤回。
 多 JAR 驱动使用 Web 上传或 CLI 本地目录；CLI Maven 解析器仅加载主 JAR，不构成完整传递依赖包。
 没有 Web 在线 Maven 导入器。[示例](../examples/README.zh-CN.md)说明显式兼容方言选择。
+
+<a id="adapter-acceptance"></a>
+### 平台适配的正式接纳
+
+已有规则：`official` 表示项目正式维护；历史结果不可追溯改写，驱动失败不自动否定适配。
+代码最低校验：Java/Python manifest 校验要求非空 `validated_combinations` 和安全 evidence 路径，
+Python 加载器还检查文件存在。它们不审阅证据内容，非空字段本身不是接纳结论。
+Kingbase 已有含失败及准备阻塞的 official 组合，不能据此要求达梦全部用例通过。
+
+本次明确并沿用的维护标准：核对真实身份、制品指纹、精确版本/模式/JDK/时间；保留可审阅的脱敏来源、
+执行与清理记录；审查上传/连接/作用域/标准调用/终态/呈现/归属链路；修复接纳范围内的平台缺陷。
+未确认的契约前提保留失败和未评估结论，驱动疑点、套件额外要求及范围外环境前提分别记录。
+已知平台错误归因、越权清理或不可核对的组合证据阻止接纳；不要求全版本、全平台或全部用例通过。
+证据边界与逐项评估见[达梦接纳记录](database-validation.zh-CN.md#dm-platform-acceptance)。
+
+CLI 的 `formal_eligible` 还要求正式运行类别、运行时身份符合 manifest 正则、official、无实验覆盖及完整版本标记匹配；
+当前不按组合强制核对模式、CASE_SENSITIVE、JDK 或制品指纹，不能把该标记解释为整个精确组合已经程序核验。
+各维度边界见[接纳记录](database-validation.zh-CN.md#dm-platform-acceptance)；操作者须守住登记范围，比较另需版本化环境证据。
+状态更新只影响新运行，旧报告不因此晋级；超出已登记组合仍可普通测试，不具备正式资格。
 
 只读外部 DM 集成检查先构建 Worker，再通过私密环境提供 `DM_JDBC_JAR`、`DM_JDBC_URL`、
 `DM_USERNAME`、`DM_PASSWORD`、`DM_SCHEMA`，执行：

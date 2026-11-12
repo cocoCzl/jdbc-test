@@ -254,6 +254,9 @@ final class WorkerExecutionEvidence implements TestExecutionListener {
         } else if (hasCause(error,
             com.jdbctest.extension.JdbcContracts.SuiteRequirementAssertionError.class)) {
             value = "NOT_EVALUATED";
+        } else if (hasCause(error,
+            com.jdbctest.extension.JdbcContracts.ContractApplicabilityAssertionError.class)) {
+            value = "NOT_EVALUATED";
         } else if (hasCause(error, AssertionError.class)) {
             value = "EXECUTION".equals(phase) ? "CONTRACT_VIOLATION" : "NOT_EVALUATED";
             if ("EXECUTION".equals(phase)) {

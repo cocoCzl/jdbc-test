@@ -527,7 +527,10 @@ def _validated_formal_eligibility(report: dict[str, Any], manifest: dict[str, An
 
 
 def _version_matches(observed: str, expected: str) -> bool:
-    return bool(expected) and str(expected) in observed
+    # Allow descriptive metadata, but never a prefix of another release/build token.
+    return bool(expected) and re.search(
+        rf"(?<![\w.+-]){re.escape(str(expected))}(?![\w.+-])", observed
+    ) is not None
 
 
 def _assessment_exit_code(report: dict[str, Any]) -> int:

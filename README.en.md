@@ -21,12 +21,12 @@ A test platform for validating JDBC driver interface behavior against real datab
 | Oracle | official | 19.3.0.0.0 / driver 21.13.0.0.0 | [Privileges and LOB limits](docs/database-validation.md#known-limitations) |
 | KingbaseES | official | Server V009R002C016; oracle mode; JDBC product 12.1; driver V008R006B0001 | [Combination boundary](docs/database-validation.md#recorded-combinations) |
 | GaussDB | candidate | Empty `validated_combinations` | [Reuse boundary](docs/database-validation.md#recorded-combinations) |
-| Dameng / DM | candidate | DM DBMS 8.1.3.162; separate tests of drivers 8.1.2.192 and 8.1.3.62 | [History and targeted retests](docs/database-validation.md#dameng) |
+| Dameng / DM | official | 8.1.3.162 / driver 8.1.3.62; COMPATIBLE_MODE=0 | [Acceptance scope and history](docs/database-validation.md#dm-platform-acceptance) |
 
 The active index is [adapters/catalog.json](adapters/catalog.json). Status and scope come from each
 `adapter.json`, its `qualification` and existing evidence; see [evidence sources](docs/database-validation.md#recorded-combinations).
 `official` is an internal platform adaptation status, not vendor certification or an all-tests-pass claim.
-`candidate` retains candidate status; Dameng has independent test records despite empty `validated_combinations`.
+`candidate` denotes an adapter awaiting formal acceptance; Dameng registers only the precise combination in the validation records, with older-driver history kept separate.
 `supported_versions` controls admission, not proof of every version tested; capability booleans are declarations.
 GaussDB's reuse of PostgreSQL infrastructure does not validate every GaussDB/openGauss product.
 SQL Server creation, probes and execution are retired; [historical reads](docs/database-validation.md#known-limitations) remain.

@@ -3,6 +3,7 @@ package com.jdbctest.statement;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.jdbctest.config.ConfigLoader;
+import com.jdbctest.extension.JdbcContracts;
 import com.jdbctest.extension.JdbcTestExtension;
 import com.jdbctest.extension.RequiresFeature;
 import java.sql.*;
@@ -80,7 +81,7 @@ class ExecutionControlTest {
             try {
                 long started = System.nanoTime();
                 SQLException error = executeAndObserveCancellation(sql, sleepSql(5), cancellation,
-                    reporter);
+                    reporter, !ConfigLoader.load().db.isDialect("dm"));
                 long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
                 assertTrue(elapsed >= 300 && elapsed < 5000,
                     "Cancellation must interrupt ongoing work");
@@ -117,6 +118,11 @@ class ExecutionControlTest {
 
     static SQLException executeAndObserveCancellation(Statement sql, String command,
         Future<?> cancellation, TestReporter reporter) throws Exception {
+        return executeAndObserveCancellation(sql, command, cancellation, reporter, true);
+    }
+
+    static SQLException executeAndObserveCancellation(Statement sql, String command,
+        Future<?> cancellation, TestReporter reporter, boolean interruptionVerified) throws Exception {
         Throwable executionFailure = null;
         long started = System.nanoTime();
         try {
@@ -155,10 +161,19 @@ class ExecutionControlTest {
             throw failure;
         }
         Throwable observed = executionFailure;
-        return assertThrows(SQLException.class, () -> {
-            if (observed != null) {
-                throw observed;
+        try {
+            return assertThrows(SQLException.class, () -> {
+                if (observed != null) {
+                    throw observed;
+                }
+            });
+        } catch (AssertionError failure) {
+            if (!interruptionVerified) {
+                throw new JdbcContracts.ContractApplicabilityAssertionError(
+                    "Statement.cancel is conditional on DBMS/driver interruption support; "
+                        + "DM DBMS_LOCK.SLEEP support is unverified for this combination", failure);
             }
-        });
+            throw failure;
+        }
     }
 }

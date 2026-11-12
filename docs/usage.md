@@ -101,9 +101,11 @@ Optional provider classes are `dm.jdbc.driver.DmdbDataSource`, `dm.jdbc.driver.D
 and `dm.jdbc.driver.DmdbXADataSource`, with default bean properties `URL`, `user`, `password`.
 Their presence does not establish that those tests pass.
 
-Dameng remains **candidate**. Its `qualification` records separate tests of DM DBMS 8.1.3.162
-with drivers 8.1.2.192 and 8.1.3.62. Empty `validated_combinations` does not mean never tested
-or validate other releases. Driver admission bounds do not prove every intermediate version;
+Dameng is a project-maintained **official** adapter. The registered combination is only DM DBMS
+8.1.3.162 + driver 8.1.3.62, `COMPATIBLE_MODE=0`, `CASE_SENSITIVE=1`, Java 21; this is neither vendor
+certification nor an all-tests-pass claim. Older-driver 8.1.2.192 history stays separate and is not a
+registered formal combination. See the [redacted combination evidence](../adapters/dm/evidence/platform-8.1.3.162-driver-8.1.3.62.json)
+and [acceptance review](database-validation.md#dm-platform-acceptance). Driver admission bounds do not prove every intermediate version;
 Provider class presence does not prove passing behavior.
 
 <a id="attribution-of-the-recorded-full-failures"></a>
