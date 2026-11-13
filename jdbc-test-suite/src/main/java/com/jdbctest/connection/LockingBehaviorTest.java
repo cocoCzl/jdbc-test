@@ -69,10 +69,7 @@ class LockingBehaviorTest {
                 long started = System.nanoTime();
                 SQLException error = assertThrows(SQLException.class, () -> update(wait, 1));
                 long elapsed = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started);
-                reporter.publishEntry("jdbc.lock.timeout.sqlState",
-                    java.util.Objects.toString(error.getSQLState(), ""));
-                reporter.publishEntry("jdbc.lock.timeout.vendorCode",
-                    Integer.toString(error.getErrorCode()));
+                reportLockError(reporter, "jdbc.lock.timeout", error);
                 assertTrue(elapsed >= 300 && elapsed < 6000,
                     "The blocked update must fail within bounds");
                 assertTrue(isLockTimeout(error, ConfigLoader.load().db.dialect),
@@ -118,6 +115,14 @@ class LockingBehaviorTest {
         }
     }
 
+    static void reportLockError(TestReporter reporter, String prefix, SQLException error) {
+        String sqlState = error.getSQLState();
+        if (sqlState != null && !sqlState.isBlank()) {
+            reporter.publishEntry(prefix + ".sqlState", sqlState);
+        }
+        reporter.publishEntry(prefix + ".vendorCode", Integer.toString(error.getErrorCode()));
+    }
+
     static boolean isLockTimeout(SQLException error, String dialect) {
         return error instanceof SQLTimeoutException || "57014".equals(error.getSQLState())
             || "HYT00".equals(error.getSQLState()) || "HYT01".equals(error.getSQLState())
@@ -149,10 +154,7 @@ class LockingBehaviorTest {
             SQLException two = second.get(15, TimeUnit.SECONDS);
             for (SQLException error : new SQLException[] {one, two}) {
                 if (error != null) {
-                    reporter.publishEntry("jdbc.lock.deadlock.sqlState",
-                        java.util.Objects.toString(error.getSQLState(), ""));
-                    reporter.publishEntry("jdbc.lock.deadlock.vendorCode",
-                        Integer.toString(error.getErrorCode()));
+                    reportLockError(reporter, "jdbc.lock.deadlock", error);
                 }
             }
             String dialect = ConfigLoader.load().db.dialect;

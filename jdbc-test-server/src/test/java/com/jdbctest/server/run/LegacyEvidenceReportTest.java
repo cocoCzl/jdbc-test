@@ -58,6 +58,8 @@ class LegacyEvidenceReportTest {
     TestRunSelectedScenarioRepository selected;
     @Autowired
     TestRunService service;
+    @Autowired
+    TestRunExecutor executor;
     @MockitoBean
     TestRunScheduler scheduler;
     MockMvc mvc;
@@ -119,6 +121,72 @@ class LegacyEvidenceReportTest {
         assertFalse(text.contains("ReviewOnlyLegacyTail"), text);
     }
 
+    private static void controlledJdbcFailure() {
+        throw new NullPointerException("controlled failure password=delivery-password\n"
+            + "masterKey=delivery-key\njdbc:oracle:thin:user/delivery-url-secret@host/db");
+    }
+
+    @Test
+    void workerGeneratedStackSurvivesEventPersistenceRestAndDownload() throws Exception {
+        Throwable failure = assertThrows(NullPointerException.class,
+            LegacyEvidenceReportTest::controlledJdbcFailure);
+        var next = new java.sql.SQLException("next exception", "HY001", 72);
+        var sql = new java.sql.SQLException("suppressed", "HY000", 71);
+        sql.setNextException(next);
+        failure.addSuppressed(sql);
+        Class<?> evidence = Class.forName("com.jdbctest.worker.WorkerExecutionEvidence");
+        java.util.Map<String, Object> row = org.springframework.test.util.ReflectionTestUtils
+            .invokeMethod(evidence, "failure", failure);
+        assertNotNull(row);
+        row.putAll(org.springframework.test.util.ReflectionTestUtils.invokeMethod(evidence,
+            "conclusion", org.junit.platform.engine.TestExecutionResult.Status.FAILED,
+            failure, "EXECUTION"));
+        String trace = (String)row.get("stackTrace");
+        assertTrue(trace.contains("LegacyEvidenceReportTest.controlledJdbcFailure("));
+        assertTrue(trace.contains("NEXT_EXCEPTION: java.sql.SQLException"));
+        for (String secret : new String[] {"delivery-password", "delivery-key",
+            "delivery-url-secret"}) {
+            assertFalse(trace.contains(secret));
+        }
+        // Exercise the actual varchar(12000) boundary, not just short happy-path persistence.
+        String marker = "\n... [TRUNCATED]\n";
+        trace += "x".repeat(12000 - trace.length() - marker.length()) + marker;
+        row.put("stackTrace", trace);
+        var run = legacyRun(TestRunStatus.RUNNING);
+        run.setTotalCases(1);
+        runs.save(run);
+        selected.save(new TestRunSelectedScenarioEntity(run, "connection.fixture", "connection"));
+        row.putAll(java.util.Map.of("type", "CASE_FINISHED", "runId", run.getId().toString(),
+            "scenarioId", "connection.fixture", "moduleId", "connection", "status", "FAILED",
+            "phase", "EXECUTION", "durationMs", 42));
+        for (var event : java.util.List.of(
+            java.util.Map.of("type", "RUN_STARTED", "runId", run.getId().toString(),
+                "protocolVersion", 2),
+            java.util.Map.of("type", "CASE_STARTED", "runId", run.getId().toString(),
+                "scenarioId", "connection.fixture", "moduleId", "connection"), row)) {
+            org.springframework.test.util.ReflectionTestUtils.invokeMethod(executor, "handle",
+                run.getId(), mapper.writeValueAsString(event));
+        }
+        var stored = results.findByRun_Id(run.getId()).getFirst();
+        assertEquals(trace, stored.getStackTrace());
+        assertEquals(TestCaseResultStatus.FAILED, stored.getStatus());
+        assertEquals("NOT_EVALUATED", mapper.readTree(stored.getExecutionEvidence())
+            .path("conclusion").asString());
+        run = runs.findById(run.getId()).orElseThrow();
+        run.setStatus(TestRunStatus.SUCCEEDED);
+        runs.save(run);
+        var listed = mapper.readTree(mvc.perform(get("/api/runs/{id}/results", run.getId()))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString())
+            .path("items").get(0);
+        assertEquals("FAILED", listed.path("status").asString());
+        assertEquals(trace, listed.path("stackTrace").asString());
+        var downloaded = report(run.getId()).path("scenario_results").path("connection.fixture");
+        assertEquals(trace, downloaded.path("stackTrace").asString());
+        assertEquals("NOT_EVALUATED", downloaded.path("conclusion").asString());
+        assertEquals(mapper.valueToTree(row.get("causes")), downloaded.path("causes"));
+        assertFalse(downloaded.has("contractConforms"));
+    }
+
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.NullAndEmptySource
     @org.junit.jupiter.params.provider.ValueSource(strings = {"invalid JSON", "[]", "null", "{\"message\":\"legacy\"}"})
@@ -127,7 +195,9 @@ class LegacyEvidenceReportTest {
         var row = result(run, TestCaseResultStatus.FAILED, raw);
         var page = service.results(run.getId(), 0, 10, null, null, null);
         assertEquals(TestCaseResultStatus.FAILED, page.items().getFirst().status());
+        assertNull(page.items().getFirst().stackTrace());
         var downloaded = report(run.getId()).path("scenario_results").path("connection.fixture");
+        assertFalse(downloaded.has("stackTrace"));
         if (raw != null && !raw.equals("{\"message\":\"legacy\"}")) {
             assertEquals("LEGACY_EVIDENCE_UNREADABLE", downloaded.path("evidenceReadError").asString());
         }

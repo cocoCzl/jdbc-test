@@ -455,6 +455,13 @@ Dashboard metrics describe loaded recent tasks, not all history. Do not invent b
 Retain the upstream CPA Keeper MIT notice and source/adaptation attribution in
 `jdbc-test-web/public/third-party-notices.txt` when changing shared UI.
 
+The npm override for `@typescript-eslint/typescript-estree` selects patched `minimatch` 11
+for GHSA-g3hv-75wg-m249. It is limited to that development dependency; other callers keep
+their own versions. The current caller uses `minimatch(path, pattern, { dot: true })`, whose
+behavior should be checked alongside lint on the supported Node version in use. Remove the
+override when the upstream parser requires a patched version itself; do not downgrade the
+glob matcher to resolve dependency warnings.
+
 <a id="testing"></a>
 ## Checks
 

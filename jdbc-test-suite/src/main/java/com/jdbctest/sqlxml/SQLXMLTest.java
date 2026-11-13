@@ -114,7 +114,7 @@ class SQLXMLTest {
                 SQLXML actual = rows.getSQLXML(1);
                 assertNotNull(actual);
                 try {
-                    assertEquals("<test>hello</test>", actual.getString());
+                    assertStoredString(actual.getString());
                 } finally {
                     actual.free();
                 }
@@ -122,6 +122,33 @@ class SQLXMLTest {
             }
         } finally {
             conn.rollback();
+        }
+    }
+
+    static void assertStoredString(String content) {
+        assertNotNull(content, "Stored SQLXML must return a document");
+        try {
+            var factory = javax.xml.parsers.DocumentBuilderFactory.newInstance();
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+            var builder = factory.newDocumentBuilder();
+            var expected = builder.parse(new org.xml.sax.InputSource(
+                new StringReader("<test>hello</test>")));
+            var actual = builder.parse(new org.xml.sax.InputSource(new StringReader(content)));
+            assertTrue(expected.getDocumentElement().isEqualNode(actual.getDocumentElement()),
+                "Stored XML must preserve element structure, attributes and text");
+        } catch (javax.xml.parsers.ParserConfigurationException | org.xml.sax.SAXException
+            | IOException error) {
+            throw new AssertionError("Stored SQLXML must be a valid XML document", error);
+        }
+        try {
+            assertEquals("<test>hello</test>", content);
+        } catch (AssertionError lexicalDifference) {
+            throw new JdbcContracts.SuiteRequirementAssertionError(
+                "SQLXML serialization must preserve exact lexical text for this suite check; "
+                    + "JDBC exposes an XML value, not byte-for-byte storage preservation",
+                lexicalDifference);
         }
     }
 

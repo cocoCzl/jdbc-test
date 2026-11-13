@@ -55,7 +55,7 @@ JDBC 4.1 及以上的 null Logger 仍为规范断言失败；取消线程自身�
 | supportsBatchUpdates、supportsSavepoints | 原样保留 true/false；读取 SQLException 仍是错误，不当作 false。查询成功不证明功能可用。 | [批处理](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/DatabaseMetaData.html#supportsBatchUpdates())、[保存点](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/DatabaseMetaData.html#supportsSavepoints()) |
 | Connection.setSavepoint() | 非 XA、关闭自动提交、准备完成；非空保存点及回滚成功，或仅 setSavepoint 调用处可选异常。元数据、setAutoCommit、rollback、清理不在豁免内。 | [setSavepoint](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/Connection.html#setSavepoint()) |
 | Connection.createBlob/createClob/createSQLXML | 仅具体工厂调用允许可选异常，后续对象操作保留原断言。 | [Connection](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/Connection.html) |
-| SQLXML.setString | 写入可使原对象变为不可读。使用 setSQLXML 绑定，再从数据库取得新 SQLXML 并精确断言内容；不要求读取已写对象，也不省略内容验证。 | [SQLXML 生命周期](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/SQLXML.html) |
+| SQLXML.setString | 写入可使原对象变为不可读。使用 setSQLXML 绑定，再从数据库取得新 SQLXML。先核对 XML 结构、属性和文本；精确序列化差异仍为失败，但归入 SUITE 要求而非 JDBC 违反。不要求读取已写对象，也不省略内容验证。 | [SQLXML 生命周期](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/SQLXML.html) |
 | JdbcRowSet.updateRow | 通过独立连接按主键精确核对存储值，失败时也恢复同一记录。ownUpdatesAreVisible 为 false 时，不要求不敏感游标反映自身更新。 | [ResultSet.updateRow](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/ResultSet.html#updateRow()), [ownUpdatesAreVisible](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/DatabaseMetaData.html#ownUpdatesAreVisible(int)) |
 | CommonDataSource.getParentLogger | 自 Java 7 / JDBC 4.1 引入；已复核 logger 可选调用，不扩大至 log-writer。驱动仅宣称 4.0 时需另核适用性，不按版本跳过。 | [getParentLogger](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/javax/sql/CommonDataSource.html#getParentLogger()) |
 | Clob.setCharacterStream(long) | 有效 Clob 和一基位置，返回覆盖字符的 Writer 或该调用抛可选异常；流写入/关闭、提交、访问和清理错误不豁免。 | [setCharacterStream](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/Clob.html#setCharacterStream(long)) |
@@ -126,3 +126,13 @@ Worker 保留观察；CLI 保存 `capability_evidence` 及含来源、JDBC 版�
 新增未满足额外要求仍返回1；原有已完成要求失败可入基线，比较为0且 all_selected_passed=false。
 准备/未知错误、执行不完整或计划未评估会以2阻止比较。曾通过 API 变为合法不支持属于支持退化，
 不算功能通过。详见[驱动回归](internal-regression.zh-CN.md)。
+
+### 结果和诊断的归因边界
+
+Oracle 隐式结果在执行未返回初始结果/计数时，按[官方说明](https://docs.oracle.com/en/database/oracle/oracle-database/21/jjdbc/JDBC-getting-started.html#GUID-FA6FA05D-CE5C-4A03-B70E-8DD9F8F5DD92)先调用 `getMoreResults(CLOSE_CURRENT_RESULT)`。仅 Oracle 使用这一入口，其他适配器保留标准首结果协议。仍核对两个结果值、关闭语义及实际更新效果；要求过程内部更新计数可见仍是失败的 SUITE 要求。
+
+`DatabaseMetaData.getProcedureColumns` 的输入/输出参数 `ORDINAL_POSITION` 从 1 开始，0 表示过程返回值。三参数过程的 1/2/3 断言保持不变，依据为 [JDK 合同](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/DatabaseMetaData.html#getProcedureColumns(java.lang.String,java.lang.String,java.lang.String,java.lang.String))。
+
+执行阶段来源未明的运行时异常保留失败，结论为 `NOT_EVALUATED`；异常本身不能证明平台缺陷、JDBC 违反或支持。Worker 准备/基础设施失败单独处理。CLI 旧 JUnit error 同样缺少可靠来源证据。已有持久化报告不追溯重分类。
+
+Worker 诊断沿用事件、报告、持久化及用例详情中的 `stackTrace` 字段，保留根异常及已采集 cause/nextException/suppressed 分支的实际调用帧；最多 10 个不同异常（故深度最多为 9 条边）、16 个排队分支和每异常 32 帧。总计 12,000 字符预算为每个已采集分支预留首部调用帧空间。消息和调用帧先脱敏再截断；`[TRUNCATED]` 标记说明文本/帧、异常图上界或重复引用省略。这些限制不改变结果分类；旧报告未采集堆栈时仍正常读取，不补造历史调用帧。

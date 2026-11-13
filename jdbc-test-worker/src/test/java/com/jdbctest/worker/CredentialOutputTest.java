@@ -108,7 +108,11 @@ class CredentialOutputTest {
             var mapper = new ObjectMapper();
             var events = new WorkerEventWriter(mapper, new PrintStream(bytes));
             var fields = Map.<String, Object>of("message", "connection failed password=" + password,
-                "causes", List.of(Map.of("message", "driver echoed " + password)), "vendorCode", 7);
+                "causes", List.of(Map.of("message", "driver echoed " + password)), "vendorCode", 7,
+                "stackTrace", "java.lang.IllegalStateException: driver echoed " + password
+                    + "\n\tat fixture.Driver.connect(Driver.java:42)\n"
+                    + "masterKey=ReviewOnlyHeadReviewOnlyTail\n"
+                    + "jdbc:oracle:thin:user/ReviewOnlyHeadReviewOnlyTail@host/db");
             events.write("EXECUTION_ISSUE", "fixture", fields);
             if (!reportOnly) {
                 assertNoMarkers(bytes.toString(java.nio.charset.StandardCharsets.UTF_8));
@@ -124,6 +128,7 @@ class CredentialOutputTest {
             assertNoMarkers(json);
             assertEquals(7,
                 mapper.readTree(json).path("cleanupEvidence").path("vendorCode").asInt());
+            assertTrue(json.contains("fixture.Driver.connect(Driver.java:42)"));
             assertEquals("connection failed password=" + password, fields.get("message"));
         }
     }

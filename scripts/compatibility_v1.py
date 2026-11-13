@@ -343,7 +343,8 @@ def execution_conclusion(case: dict[str, Any]) -> dict[str, Any]:
         conclusion = "CONTRACT_VIOLATION"
         result["contract_conforms"] = False
     elif raw == "error":
-        conclusion = "PLATFORM_ERROR"
+        # Legacy JUnit errors do not establish whether the driver or the platform threw.
+        conclusion = "NOT_EVALUATED"
     else:
         conclusion = "NOT_EVALUATED"
     result["conclusion"] = conclusion

@@ -392,6 +392,12 @@ SSE 更新同一缓存，终态关闭流并刷新，10秒轮询兜底；重连�
 日期用浏览器时区，ID/API/原报告不翻译。仪表盘统计只描述近期已加载任务，不虚构后端统计。
 修改共用 UI 时保留 `jdbc-test-web/public/third-party-notices.txt` 的 CPA Keeper MIT 声明及来源/改编归属。
 
+npm 对 `@typescript-eslint/typescript-estree` 的局部 override 使用已修复
+GHSA-g3hv-75wg-m249 的 `minimatch` 11，仅影响这一开发依赖，其他调用方保留各自版本。
+当前调用形式为 `minimatch(path, pattern, { dot: true })`，需在项目支持的 Node 版本上
+结合 lint 核对行为。上游解析器自身要求安全版本后应移除此 override，不能为消除依赖警告
+而降级 glob 匹配器。
+
 <a id="testing"></a>
 ## 开发检查
 

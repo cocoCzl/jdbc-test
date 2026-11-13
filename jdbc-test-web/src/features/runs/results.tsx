@@ -4,7 +4,7 @@ import { Select } from "@/components/ui/select";
 import { moduleName } from "@/lib/presentation";
 import { t } from "i18next";
 import { useTranslation } from "react-i18next";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import { runsApi, runsKeys } from "@/api/runs";
@@ -94,35 +94,35 @@ export default function Results({
     queryKey: [...runsKeys.results(id), params],
     queryFn: ({ signal }) => runsApi.results(id, params, signal),
   });
-  const columns: ColumnDef<CaseResult>[] = [
+  const columns = useMemo<ColumnDef<CaseResult>[]>(() => [
     {
       id: "ui.status",
-      get header() { return t("ui.status"); },
+      header: () => t("ui.status"),
       cell: ({ row }) => (
         <StatusBadge {...resultPresentation[row.original.status]} />
       ),
     },
     {
-      id: "ui.module", get header() { return t("ui.module"); }, cell: ({ row }) => moduleName(row.original.moduleId) },
+      id: "ui.module", header: () => t("ui.module"), cell: ({ row }) => moduleName(row.original.moduleId) },
     {
       id: "ui.scenario",
-      get header() { return t("ui.scenario"); },
+      header: () => t("ui.scenario"),
       cell: ({ row }) => (
         <code className="text-xs">{row.original.scenarioId}</code>
       ),
     },
-    { get header() { return t("ui.displayName"); }, accessorKey: "displayName" },
+    { header: () => t("ui.displayName"), accessorKey: "displayName" },
     {
       id: "ui.duration",
-      get header() { return t("ui.duration"); },
+      header: () => t("ui.duration"),
       cell: ({ row }) => formatDuration(row.original.durationMs),
     },
     {
       id: "ui.detail",
-      get header() { return t("ui.detail"); },
+      header: () => t("ui.detail"),
       cell: ({ row }) => <Button variant="ghost" size="sm" className="text-primary" onClick={() => setSelected(row.original)}>{t("record.viewDetails")}</Button>,
     },
-  ];
+  ], []);
   return (
     <>
       <div className="run-result-toolbar">

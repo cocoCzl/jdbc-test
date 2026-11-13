@@ -5,6 +5,7 @@ import copy
 import re
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest.mock import patch
 
@@ -73,6 +74,10 @@ class AdapterRuntimeTest(unittest.TestCase):
         included = {path.relative_to(PROJECT_ROOT).as_posix() for path in release_files()}
         self.assertTrue({"README.md", "README.en.md", "README.zh-CN.md"} <= included)
         self.assertIn("scripts/runner.py", included)
+        document = ET.parse(PROJECT_ROOT / "pom.xml")
+        for module in document.findall("{http://maven.apache.org/POM/4.0.0}modules/"
+                                       "{http://maven.apache.org/POM/4.0.0}module"):
+            self.assertIn(f"{module.text}/pom.xml", included)
         forbidden = {
             "CONTEXT.md",
             "config.yaml.example",

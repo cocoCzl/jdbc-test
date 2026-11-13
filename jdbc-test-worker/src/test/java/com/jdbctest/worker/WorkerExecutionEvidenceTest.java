@@ -15,6 +15,115 @@ import org.junit.platform.launcher.core.*;
 
 class WorkerExecutionEvidenceTest {
 
+    static class ControlledFailure {
+
+        @Test
+        void first() {
+            try {
+                failAtJdbcCall();
+            } catch (NullPointerException error) {
+                throw new IllegalStateException("controlled wrapper", error);
+            }
+        }
+
+        private static void failAtJdbcCall() {
+            throw new NullPointerException("controlled driver failure");
+        }
+
+        @Test
+        void second() {
+        }
+    }
+
+    @Test
+    void actualFailureFramesSurviveTheEventAndReportProjectionWithoutChangingClassification(
+        @org.junit.jupiter.api.io.TempDir java.nio.file.Path workspace)
+        throws Exception {
+        var output = new ByteArrayOutputStream();
+        var evidence = execute(ControlledFailure.class, output);
+        var row = evidence.results().stream()
+            .filter(item -> "fixture.first".equals(item.get("scenarioId")))
+            .findFirst().orElseThrow();
+        String trace = (String)row.get("stackTrace");
+        assertTrue(trace.contains("ROOT: java.lang.IllegalStateException: controlled wrapper"));
+        assertTrue(trace.contains("CAUSE: java.lang.NullPointerException"));
+        assertTrue(trace.contains("ControlledFailure.failAtJdbcCall(WorkerExecutionEvidenceTest.java:"));
+        assertEquals("FAILED", row.get("status"));
+        assertEquals("EXECUTION", row.get("phase"));
+        assertEquals("NOT_EVALUATED", row.get("conclusion"));
+        assertFalse(row.containsKey("contractConforms"));
+        var mapper = new ObjectMapper();
+        var event = output.toString(java.nio.charset.StandardCharsets.UTF_8).lines()
+            .map(line -> {
+                try {
+                    return mapper.readTree(line);
+                } catch (IOException error) {
+                    throw new UncheckedIOException(error);
+                }
+            }).filter(item -> "CASE_FINISHED".equals(item.path("type").asText())
+                && "fixture.first".equals(item.path("scenarioId").asText()))
+            .findFirst().orElseThrow();
+        var request = mapper.readValue("""
+            {"runId":"fixture","connection":{"adapterId":"postgresql"},"driver":{}}
+            """, WorkerRunRequest.class);
+        var report = mapper.readTree(java.nio.file.Files.readString(
+            WorkerReportWriter.write(workspace, request, List.of(), evidence)));
+        assertEquals(trace, event.path("stackTrace").asText());
+        assertEquals(trace, report.path("scenario_results").path("fixture.first")
+            .path("stackTrace").asText());
+    }
+
+    @Test
+    void stackFramesAndEveryExceptionBranchAreRedactedBeforeVisibleTruncation() {
+        String secret = "raw-fixture-secret";
+        var failure = new java.sql.SQLException("x".repeat(550) + secret
+            + " password=assigned-secret\nmasterKey=key-secret\n"
+            + "jdbc:oracle:thin:user/url-secret@host:1521/db", "HY000", 71);
+        var next = new java.sql.SQLException("next", "HY001", 72);
+        var suppressed = new IllegalStateException("suppressed token=token-secret");
+        failure.setNextException(next);
+        failure.addSuppressed(suppressed);
+        next.initCause(failure);
+        failure.setStackTrace(new StackTraceElement[] {
+            new StackTraceElement("fixture." + secret, "invoke", "Failure.java", 42)});
+        CredentialSanitizer.password(secret);
+        try {
+            var evidence = WorkerExecutionEvidence.failure(failure);
+            String trace = (String)evidence.get("stackTrace");
+            assertTrue(trace.contains("Failure.java:42"));
+            assertTrue(trace.contains("NEXT_EXCEPTION: java.sql.SQLException: next"));
+            assertTrue(trace.contains("SUPPRESSED: java.lang.IllegalStateException"));
+            assertTrue(trace.contains("[TRUNCATED"));
+            for (String value : List.of(secret, "assigned-secret", "key-secret", "url-secret",
+                "token-secret")) {
+                assertFalse(trace.contains(value));
+                assertFalse(evidence.toString().contains(value));
+            }
+            assertEquals(3, ((List<?>)evidence.get("causes")).size());
+        } finally {
+            CredentialSanitizer.password(null);
+        }
+    }
+
+    @Test
+    void graphAndFrameBudgetsKeepEachVisitedCauseLocationIncludingDeepFailures() {
+        Throwable error = new NullPointerException("deep failure");
+        for (int depth = 0; depth < 12; depth++) {
+            var wrapper = new IllegalStateException("wrapper-" + depth, error);
+            var frames = new StackTraceElement[100];
+            Arrays.fill(frames, new StackTraceElement("fixture.Layer" + depth,
+                "invoke", "Layer.java", depth + 1));
+            wrapper.setStackTrace(frames);
+            error = wrapper;
+        }
+        String trace = (String)WorkerExecutionEvidence.failure(error).get("stackTrace");
+        assertTrue(trace.length() <= 12000);
+        assertTrue(trace.contains("[TRUNCATED"));
+        assertTrue(trace.contains("fixture.Layer11.invoke(Layer.java:12)"));
+        assertTrue(trace.contains("fixture.Layer2.invoke(Layer.java:3)"));
+        assertFalse(trace.contains("fixture.Layer1.invoke"));
+    }
+
     static class UnverifiedApplicability {
 
         @Test
@@ -226,13 +335,16 @@ class WorkerExecutionEvidenceTest {
     }
 
     WorkerExecutionEvidence execute(Class<?> fixture) {
+        return execute(fixture, new ByteArrayOutputStream());
+    }
+
+    WorkerExecutionEvidence execute(Class<?> fixture, ByteArrayOutputStream output) {
         var module = new TestModule("fixture", "Fixture", "Evidence regression");
         var selected = List.of("first", "second").stream().map(
             method -> new TestCaseDescriptor("fixture." + method, module, TestProfile.CORE, method,
                 fixture.getName(), method, List.of())).toList();
         var evidence = new WorkerExecutionEvidence("fixture", selected,
-            new WorkerEventWriter(new ObjectMapper(),
-                new PrintStream(new ByteArrayOutputStream())));
+            new WorkerEventWriter(new ObjectMapper(), new PrintStream(output)));
         var request = LauncherDiscoveryRequestBuilder.request()
             .selectors(DiscoverySelectors.selectClass(fixture)).build();
         LauncherFactory.create().execute(request, evidence);
@@ -307,6 +419,22 @@ class WorkerExecutionEvidenceTest {
             new AssertionError("fixture setup expectation"), "PREPARATION");
         assertEquals("NOT_EVALUATED", assertion.get("conclusion"));
         assertFalse(assertion.containsKey("contractConforms"));
+    }
+
+    @Test
+    void unclassifiedExecutionErrorsDoNotProveAPlatformDefectOrConformance() {
+        var driverError = new NullPointerException("driver return-parameter state");
+        driverError.setStackTrace(new StackTraceElement[] {
+            new StackTraceElement("oracle.jdbc.driver.OraclePreparedStatement", "addBatch",
+                "OraclePreparedStatement.java", 1)
+        });
+        for (Throwable error : new Throwable[] {driverError,
+            new NullPointerException("suite state"), new IllegalStateException("unknown origin")}) {
+            var evidence = WorkerExecutionEvidence.conclusion(TestExecutionResult.Status.FAILED,
+                error, "EXECUTION");
+            assertEquals("NOT_EVALUATED", evidence.get("conclusion"));
+            assertFalse(evidence.containsKey("contractConforms"));
+        }
     }
 
     @Test

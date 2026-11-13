@@ -12,6 +12,13 @@ import org.junit.platform.launcher.*;
  */
 final class WorkerExecutionEvidence implements TestExecutionListener {
 
+    // Match the existing Server stack_trace column; reserve space for visible limit markers.
+    private static final int STACK_TRACE_LIMIT = 12000;
+    private static final int STACK_FRAME_LIMIT = 32;
+    private static final String TRUNCATED = "... [TRUNCATED]\n";
+    private static final String GRAPH_LIMIT =
+        "[TRUNCATED: exception graph limit or repeated reference]\n";
+
     private final String runId;
     private final WorkerEventWriter events;
     private final Map<String, TestCaseDescriptor> methods = new LinkedHashMap<>();
@@ -263,7 +270,10 @@ final class WorkerExecutionEvidence implements TestExecutionListener {
                 conforms = false;
             }
         } else {
-            value = status == TestExecutionResult.Status.ABORTED ? "NOT_EVALUATED" : "PLATFORM_ERROR";
+            // A runtime exception during a JDBC call can originate in the driver or the suite.
+            // Failure alone does not establish either a platform defect or a JDBC violation.
+            value = status == TestExecutionResult.Status.ABORTED || "EXECUTION".equals(phase)
+                ? "NOT_EVALUATED" : "PLATFORM_ERROR";
         }
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("conclusion", value);
@@ -295,12 +305,16 @@ final class WorkerExecutionEvidence implements TestExecutionListener {
         var seen = new IdentityHashMap<Throwable, Boolean>();
         pending.add(Map.entry("ROOT", error));
         List<Map<String, Object>> causes = new ArrayList<>();
+        List<Map.Entry<String, Throwable>> traces = new ArrayList<>();
+        boolean graphLimited = false;
         while (!pending.isEmpty() && causes.size() < 10) {
             var branch = pending.removeFirst();
             Throwable cause = branch.getValue();
             if (seen.put(cause, true) != null) {
+                graphLimited = true;
                 continue;
             }
+            traces.add(branch);
             Map<String, Object> detail = new LinkedHashMap<>();
             detail.put("relation", branch.getKey());
             detail.put("errorType", cause.getClass().getName());
@@ -308,15 +322,24 @@ final class WorkerExecutionEvidence implements TestExecutionListener {
             if (cause instanceof SQLException sql) {
                 detail.put("sqlState", diagnosticText(sql.getSQLState()));
                 detail.put("vendorCode", sql.getErrorCode());
-                if (sql.getNextException() != null && pending.size() < 16) {
-                    pending.addLast(Map.entry("NEXT_EXCEPTION", sql.getNextException()));
+                if (sql.getNextException() != null) {
+                    if (pending.size() < 16) {
+                        pending.addLast(Map.entry("NEXT_EXCEPTION", sql.getNextException()));
+                    } else {
+                        graphLimited = true;
+                    }
                 }
             }
-            if (cause.getCause() != null && pending.size() < 16) {
-                pending.addLast(Map.entry("CAUSE", cause.getCause()));
+            if (cause.getCause() != null) {
+                if (pending.size() < 16) {
+                    pending.addLast(Map.entry("CAUSE", cause.getCause()));
+                } else {
+                    graphLimited = true;
+                }
             }
             for (Throwable suppressed : cause.getSuppressed()) {
                 if (pending.size() >= 16) {
+                    graphLimited = true;
                     break;
                 }
                 pending.addLast(Map.entry("SUPPRESSED", suppressed));
@@ -324,7 +347,47 @@ final class WorkerExecutionEvidence implements TestExecutionListener {
             causes.add(detail);
         }
         value.put("causes", causes);
+        value.put("stackTrace", stackTrace(traces, graphLimited || !pending.isEmpty()));
         return value;
+    }
+
+    private static String stackTrace(List<Map.Entry<String, Throwable>> traces,
+        boolean graphLimited) {
+        StringBuilder result = new StringBuilder();
+        // Share the budget so wrapper frames cannot consume the failing cause's first frames.
+        int budget = (STACK_TRACE_LIMIT - GRAPH_LIMIT.length()) / traces.size();
+        for (var branch : traces) {
+            Throwable error = branch.getValue();
+            StringBuilder part = new StringBuilder();
+            part.append(traceText(branch.getKey() + ": " + error.getClass().getName() + ": "
+                + Objects.toString(error.getMessage(), ""), Math.min(600, budget / 3)))
+                .append('\n');
+            StackTraceElement[] frames = error.getStackTrace();
+            int index = 0;
+            while (index < frames.length && index < STACK_FRAME_LIMIT) {
+                String frame = traceText("\tat " + frames[index], 500) + "\n";
+                if (part.length() + frame.length() + TRUNCATED.length() > budget) {
+                    break;
+                }
+                part.append(frame);
+                index++;
+            }
+            if (index < frames.length) {
+                part.append(TRUNCATED);
+            }
+            result.append(part);
+        }
+        if (graphLimited) {
+            result.append(GRAPH_LIMIT);
+        }
+        return result.toString();
+    }
+
+    private static String traceText(String value, int limit) {
+        // Redact before truncation, including secrets spanning the truncation boundary.
+        String safe = CredentialSanitizer.sanitize(value);
+        return safe.length() <= limit ? safe
+            : safe.substring(0, limit - TRUNCATED.length()) + TRUNCATED;
     }
 
     private static String diagnosticText(String value) {

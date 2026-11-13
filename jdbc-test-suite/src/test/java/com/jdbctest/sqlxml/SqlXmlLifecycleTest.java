@@ -29,6 +29,28 @@ class SqlXmlLifecycleTest {
         verifyRoundTrip("<test>corrupted</test>", true);
     }
 
+    @Test
+    void aSerializationNewlineStillFailsButAsASuiteRequirement() {
+        var error = assertThrows(
+            com.jdbctest.extension.JdbcContracts.SuiteRequirementAssertionError.class,
+            () -> SQLXMLTest.assertStoredString("<test>hello</test>\n"));
+        org.junit.jupiter.api.Assertions.assertInstanceOf(AssertionFailedError.class,
+            error.getCause());
+    }
+
+    @Test
+    void textAttributesAndStructureCorruptionRemainContractFailures() {
+        for (String content : new String[] {"<test>hÃ©llo</test>",
+            "<test changed='true'>hello</test>", "<test><value>hello</value></test>"}) {
+            assertThrows(AssertionFailedError.class, () -> SQLXMLTest.assertStoredString(content));
+        }
+    }
+
+    @Test
+    void aNullStoredValueRemainsAContractFailure() {
+        assertThrows(AssertionFailedError.class, () -> SQLXMLTest.assertStoredString(null));
+    }
+
     private void verifyRoundTrip(String content, boolean corrupted) throws SQLException {
         Connection connection = mock(Connection.class);
         PreparedStatement insert = mock(PreparedStatement.class);

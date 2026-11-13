@@ -28,6 +28,7 @@ INCLUDED_PATHS = (
     "pool",
     "scripts",
     "jdbc-test-core",
+    "jdbc-test-suite",
     "jdbc-test-worker",
     "jdbc-test-server",
     "mvnw",

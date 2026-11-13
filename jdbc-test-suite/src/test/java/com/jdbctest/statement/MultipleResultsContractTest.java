@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -45,7 +46,11 @@ class MultipleResultsContractTest {
             .thenAnswer(ignored -> cursor.incrementAndGet() == 1);
         when(call.getUpdateCount()).thenAnswer(ignored -> cursor.get() == 2 ? updateCount : -1);
         var observations = new HashMap<String, String>();
-        try (var jdbc = mockStatic(JdbcContext.class)) {
+        var config = new com.jdbctest.config.Config();
+        config.db = new com.jdbctest.config.Config.DbConfig();
+        try (var jdbc = mockStatic(JdbcContext.class);
+            var loader = mockStatic(com.jdbctest.config.ConfigLoader.class)) {
+            loader.when(com.jdbctest.config.ConfigLoader::load).thenReturn(config);
             jdbc.when(() -> JdbcContext.sql(anyString())).thenAnswer(callSql -> callSql.getArgument(0));
             try {
                 new MultipleResultsTest().testResultSequence(connection, observations::putAll);
@@ -71,5 +76,36 @@ class MultipleResultsContractTest {
     void aWrongStoredEffectRemainsAnAssertionFailure() {
         var failure = assertThrows(AssertionError.class, () -> sequence(0, 2));
         assertEquals(org.opentest4j.AssertionFailedError.class, failure.getClass());
+    }
+
+    @Test
+    void oracleImplicitResultsAdvanceOnceAfterAnEmptyExecutionResult() throws Exception {
+        var call = mock(CallableStatement.class);
+        when(call.execute()).thenReturn(false);
+        when(call.getUpdateCount()).thenReturn(-1);
+        when(call.getMoreResults(Statement.CLOSE_CURRENT_RESULT)).thenReturn(true);
+        var observations = new HashMap<String, String>();
+        assertEquals(true, MultipleResultsTest.firstResult(call, true, observations::putAll));
+        verify(call).getMoreResults(Statement.CLOSE_CURRENT_RESULT);
+        assertEquals("true", observations.get("jdbc.results.oracleImplicitAdvance"));
+    }
+
+    @Test
+    void ordinaryJdbcTerminationDoesNotProbeBeyondItsEnd() throws Exception {
+        var call = mock(CallableStatement.class);
+        when(call.execute()).thenReturn(false);
+        when(call.getUpdateCount()).thenReturn(-1);
+        assertEquals(false, MultipleResultsTest.firstResult(call, false, ignored -> { }));
+        verify(call, never()).getMoreResults(Statement.CLOSE_CURRENT_RESULT);
+    }
+
+    @Test
+    void oracleCurrentResultOrUpdateCountIsNotSkipped() throws Exception {
+        var call = mock(CallableStatement.class);
+        when(call.execute()).thenReturn(true, false);
+        when(call.getUpdateCount()).thenReturn(1);
+        assertEquals(true, MultipleResultsTest.firstResult(call, true, ignored -> { }));
+        assertEquals(false, MultipleResultsTest.firstResult(call, true, ignored -> { }));
+        verify(call, never()).getMoreResults(Statement.CLOSE_CURRENT_RESULT);
     }
 }

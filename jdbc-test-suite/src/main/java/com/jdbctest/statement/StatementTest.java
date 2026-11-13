@@ -64,7 +64,7 @@ class StatementTest {
         try (Statement stmt = conn.createStatement()) {
             boolean hasResultSet = stmt.execute(
                 JdbcContext.sql(
-                    "UPDATE {{statement_test}} SET value = 999 WHERE name = 'execute测试'"));
+                    "UPDATE {{statement_test}} SET value = 999 WHERE name = '批量2'"));
             assertFalse(hasResultSet);
             assertEquals(1, stmt.getUpdateCount(), "UPDATE 应影响 1 行");
         }
@@ -76,7 +76,7 @@ class StatementTest {
     void testExecuteDelete(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement()) {
             boolean hasResultSet = stmt.execute(
-                JdbcContext.sql("DELETE FROM {{statement_test}} WHERE name = 'execute测试'"));
+                JdbcContext.sql("DELETE FROM {{statement_test}} WHERE name = '批量3'"));
             assertFalse(hasResultSet);
             assertEquals(1, stmt.getUpdateCount(), "DELETE 应影响 1 行");
         }

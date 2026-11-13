@@ -6,6 +6,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { ThemeToaster } from "../../src/components/theme-toaster";
 import { ThemeToggle } from "../../src/components/layout/theme-toggle";
+import { LanguageSelector } from "../../src/components/layout/language-selector";
 import { Dialog } from "../../src/components/ui/dialog";
 import { Select } from "../../src/components/ui/select";
 import { Button } from "../../src/components/ui/button";
@@ -33,6 +34,7 @@ export default function Fixture() {
     <ErrorState error={new Error("Fixture unavailable")} retry={() => toast.info("Fixture retry only")} />
     <Loading label="Fixture loading" />
     <Dialog open={open} onOpenChange={setOpen} title="Modal fixture" description="Test-only options; no API requests">
+      <LanguageSelector />
       <form onSubmit={event => {event.preventDefault(); setSubmits(count => count+1);}}>
         <label htmlFor="fixture-options">Nested selection</label>
         <Select id="fixture-options" className="mt-3" value={value} onValueChange={setValue}>

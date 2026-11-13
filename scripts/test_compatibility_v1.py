@@ -233,6 +233,15 @@ class CompatibilityV1Test(unittest.TestCase):
         self.assertEqual(["NOT_EVALUATED"], list(matrix["conclusions"].values()))
         self.assertEqual(["SUITE"], list(matrix["requirement_scopes"].values()))
 
+    def test_runtime_error_does_not_prove_a_platform_defect(self):
+        case = {"status": "error", "error_type": "java.lang.NullPointerException",
+                "category": "extended", "required_capabilities": []}
+        self.assertEqual("execution_error", normalize_status(case, {}))
+        result = execution_conclusion(case)
+        self.assertEqual("error", result["execution_status"])
+        self.assertEqual("NOT_EVALUATED", result["conclusion"])
+        self.assertNotIn("contract_conforms", result)
+
     def test_unverified_applicability_preserves_failure_without_claiming_violation_or_support(self):
         case = {"status": "failure", "category": "core", "error_type":
                 "com.jdbctest.extension.JdbcContracts$ContractApplicabilityAssertionError"}

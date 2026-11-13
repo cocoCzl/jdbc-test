@@ -277,6 +277,7 @@ test("TEST FIXTURE ONLY: adapter declarations, filtered deep link and empty save
 
 test("TEST FIXTURE ONLY: bilingual driver presets preserve edits and render at desktop/mobile widths", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.route("**/api/adapters", route => route.fulfill({ json: adapters }));
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.route("**/api/drivers/presets", (route) => route.fulfill({ json: driverPresets }));

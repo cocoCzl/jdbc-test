@@ -44,7 +44,8 @@ test("TEST FIXTURE ONLY: dark shared states and live theme changes inside open p
   await expect(page.getByRole("option",{name:"Disabled option"})).toHaveAttribute("aria-disabled","true");
   await expect(page.getByRole("listbox")).toHaveCSS("background-color","rgb(42, 39, 35)");
   const selected = page.getByRole("option",{selected:true});
-  await expect(selected).toHaveCSS("background-color","rgb(46, 42, 38)");
+  // Dark selected menus use --selection: 20% primary mixed with the card surface.
+  await expect(selected).toHaveCSS("background-color","color(srgb 0.2 0.227451 0.275294)");
   await page.emulateMedia({colorScheme:"light"});
   await expect(page.getByRole("listbox")).toHaveCSS("background-color","rgb(255, 255, 255)");
   // Radix temporarily aria-hides the underlying dialog while its modal listbox is open.

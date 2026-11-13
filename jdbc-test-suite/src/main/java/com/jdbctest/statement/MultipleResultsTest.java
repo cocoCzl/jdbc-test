@@ -24,7 +24,8 @@ class MultipleResultsTest {
         connection.setAutoCommit(false);
         try (CallableStatement sql = connection.prepareCall(JdbcContext.sql(
             "{call {{multiple_results}}()}"))) {
-            boolean result = sql.execute();
+            boolean result = firstResult(sql,
+                com.jdbctest.config.ConfigLoader.load().db.isDialect("oracle"), reporter);
             List<Integer> actual = new ArrayList<>();
             List<Integer> counts = new ArrayList<>();
             List<ResultSet> closed = new ArrayList<>();
@@ -63,6 +64,18 @@ class MultipleResultsTest {
         } finally {
             connection.rollback();
         }
+    }
+
+    static boolean firstResult(CallableStatement sql, boolean oracleImplicit,
+        TestReporter reporter) throws SQLException {
+        boolean result = sql.execute();
+        if (oracleImplicit && !result && sql.getUpdateCount() == -1) {
+            // Oracle documents implicit results as beginning with getMoreResults after execution.
+            // Do not apply this extra advance to the normal JDBC first-result protocol.
+            reporter.publishEntry("jdbc.results.oracleImplicitAdvance", "true");
+            return sql.getMoreResults(Statement.CLOSE_CURRENT_RESULT);
+        }
+        return result;
     }
 
     static void requireUpdateCount(boolean updated) {

@@ -230,6 +230,7 @@ test("TEST FIXTURE ONLY: first-screen file picker, file operations and unchanged
 
 test("TEST FIXTURE ONLY: Chinese desktop first viewport and narrow-screen order", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("jdbc-test.locale", "zh-CN"));
+  await page.route("**/api/adapters", route => route.fulfill({ json: adapters }));
   await page.route("**/api/drivers/presets", route => route.fulfill({ json: driverPresets }));
   await page.setViewportSize({ width: 1366, height: 768 });
   await page.goto("/drivers/new");
